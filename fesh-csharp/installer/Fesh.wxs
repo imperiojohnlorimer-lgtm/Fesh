@@ -1,0 +1,34 @@
+<!--
+  Windows installer for Fesh. Built by build-installer.ps1; PublishDir and Version are passed in from there.
+  Installs for the current user only (no admin prompt) into %LocalAppData%\Programs\Fesh,
+  adds Start menu and desktop shortcuts, and shows up in Settings > Apps for uninstalling.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Fesh" Manufacturer="Fesh" Version="$(Version)" Scope="perUser"
+           UpgradeCode="DF369A0F-35EB-43E8-8CD8-DDF71DB67CB3">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Fesh is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="FeshIcon" SourceFile="$(sys.SOURCEFILEDIR)..\Assets\fesh.ico" />
+    <Property Id="ARPPRODUCTICON" Value="FeshIcon" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="Fesh" />
+    </StandardDirectory>
+
+    <Feature Id="Main">
+      <Component Id="GameExe" Directory="INSTALLFOLDER" Guid="A909AD90-D72E-465B-BE23-5EDF31E10DEB">
+        <File Id="FeshExe" Source="$(PublishDir)\Fesh.exe" />
+        <RegistryValue Root="HKCU" Key="Software\Fesh" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+      </Component>
+      <Component Id="Shortcuts" Directory="INSTALLFOLDER" Guid="63DA3AD4-EBBD-4F48-AB10-7806AC8DEE9A">
+        <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Fesh" Description="A fishing mystery on Saltmere Island"
+                  Target="[INSTALLFOLDER]Fesh.exe" WorkingDirectory="INSTALLFOLDER" Icon="FeshIcon" />
+        <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="Fesh" Description="A fishing mystery on Saltmere Island"
+                  Target="[INSTALLFOLDER]Fesh.exe" WorkingDirectory="INSTALLFOLDER" Icon="FeshIcon" />
+        <RegistryValue Root="HKCU" Key="Software\Fesh" Name="Shortcuts" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </Feature>
+  </Package>
+</Wix>
