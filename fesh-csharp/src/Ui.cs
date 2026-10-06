@@ -780,7 +780,7 @@ partial class Game
         var (savedPix, savedScene, savedMap, savedBase, savedIndex) = (pix, scene, map, basePix, buildIndex);
         (pix, scene, map, basePix) = (img, "world", worldMap, worldBase);
         ReindexBuilds();
-        foreach (var (tx, ty, kind) in trees) DrawTree(tx, ty, kind);
+        foreach (var (tx, ty, kind) in trees) DrawTree(tx, ty, kind, live: false);
         foreach (var b in state.builds) DrawBuild(b, 0);
         DrawHut();
         DrawFire(0);

@@ -34,7 +34,7 @@ static class LookData
         int hat = look.hat % Hats.Length;
         int fo = face == "left" ? -1 : face == "right" ? 1 : 0;
 
-        if (shadow) p.Rect(x - 3, y, 6, 1, "rgba(0,0,0,0.22)");
+        if (shadow) { p.Rect(x - 3, y, 6, 1, "rgba(16,40,44,0.3)"); p.Rect(x - 2, y + 1, 4, 1, "rgba(16,40,44,0.14)"); }
         p.Rect(x - 2, y - 3 + step, 2, 3 - step, pants);
         p.Rect(x + 1, y - 3 + (1 - step), 2, 3 - (1 - step), pants);
         y -= bob;   // everything above the legs

@@ -37,9 +37,10 @@ partial class Game
     bool Wading => scene == "world" && Has("waders") > 0;
     bool InWater => scene == "world" && Wadeable(TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T)));
 
-    // Wade lets you into shallow water (waders); swim into any water at all (riding Tidemane, see SwimOk).
+    // Wade lets you into shallow water (waders); swim into any water at all (riding Tidemane, see SwimOk and StormHoldsBack).
     bool CanStand(float x, float y, bool wade = false, bool swim = false)
     {
+        if (swim && StormHoldsBack(x, y)) return false;
         foreach (var (ax, ay) in new[] { (x - 3, y - 3), (x + 2.9f, y - 3), (x - 3, y), (x + 2.9f, y) })
         {
             int tx = (int)MathF.Floor(ax / T), ty = (int)MathF.Floor(ay / T);

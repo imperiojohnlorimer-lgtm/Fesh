@@ -8,7 +8,6 @@ partial class Game
     // map is the current scene's tiles; it points at worldMap whenever the player is outdoors.
     char[,] map = new char[ROWS, COLS];
     readonly byte[,] biome = new byte[ROWS, COLS];
-    readonly List<(int x, int y, char side)> waterEdges = new();
     // Trees, cacti, palms, boulders ('R') and berry bushes ('y'), all solid tiles drawn as sprites.
     readonly List<(int x, int y, char kind)> trees = new();
     readonly Dictionary<(int, int), char> stumps = new();
@@ -275,154 +274,98 @@ partial class Game
         't' => 'g', 'f' => 'n', 'c' => 'D', 'C' => 'n', 'h' => biome[y, x] switch { 2 => 'g', 4 => 's', _ => 'j' }, 'R' or 'y' => InnerGround[biome[y, x]], _ => t
     };
 
+    // The whole outdoor base layer: depth, the rounded coast, every tile's ground and details, then where the foam goes.
     void RenderBase()
     {
-        waterEdges.Clear();
+        ComputeDepth();
         for (int y = 0; y < ROWS; y++)
-            for (int x = 0; x < COLS; x++)
-            {
-                RenderTile(x, y);
-                char t = map[y, x];
-                if (Water.Contains(t) && t is not ('r' or 'I' or 'k'))
-                {
-                    foreach (var (ox, oy, side) in new[] { (0, -1, 'n'), (0, 1, 's'), (-1, 0, 'w'), (1, 0, 'e') })
-                        if (Land.Contains(TileAt(x + ox, y + oy))) waterEdges.Add((x, y, side));
-                }
-            }
+            for (int x = 0; x < COLS; x++) ShapeTile(x, y);
+        for (int y = 0; y < ROWS; y++)
+            for (int x = 0; x < COLS; x++) PaintTile(x, y);
+        FindShore();
     }
 
     // Redraws one world tile into the base layer (also used after chopping a tree).
     void RenderTile(int x, int y)
     {
+        ShapeTile(x, y);
+        PaintTile(x, y);
+    }
+
+    void PaintTile(int x, int y)
+    {
         var g = worldBase;
+        char t = worldMap[y, x];
+        int X = x * T, Y = y * T;
+        PaintGround(x, y);
+        PaintGroundDetail(x, y, t);
+        if (hoofprints.Contains((x, y)))
         {
+            // Two hoofprints per tile, left and right of the trail, a little off the grid.
+            int o = (int)(Pix.Hash(x, y, 34) * 3);
+            foreach (var (hx, hy) in new[] { (1 + o, 1), (5, 5 + o / 2) })
             {
-                char t = worldMap[y, x], gr = Ground(t, x, y);
-                int X = x * T, Y = y * T;
-                var (c0, c1) = TileCol[gr];
-                g.Rect(X, Y, T, T, c0);
-                bool blades = gr == 'g' || gr == 'j';
-                for (int i = 0; i < 4; i++)
-                {
-                    int hx = (int)(Pix.Hash(x, y, i) * 9), hy = (int)(Pix.Hash(x, y, i + 10) * 9);
-                    g.Rect(X + hx, Y + hy, 1, blades ? 2 : 1, c1);
-                }
-                double h1 = Pix.Hash(x, y, 40);
-                int rx = (int)(Pix.Hash(x, y, 41) * 9), ry = (int)(Pix.Hash(x, y, 42) * 9);
-                switch (gr)
-                {
-                    case 's':
-                        g.Rect(X + (int)(Pix.Hash(x, y, 30) * 9), Y + (int)(Pix.Hash(x, y, 31) * 9), 1, 1, "#f2dfb1");
-                        if (hoofprints.Contains((x, y)))
-                        {
-                            // Two hoofprints per tile, left and right of the trail, a little off the grid.
-                            int o = (int)(Pix.Hash(x, y, 34) * 3);
-                            foreach (var (hx, hy) in new[] { (1 + o, 1), (5, 5 + o / 2) })
-                            {
-                                g.Rect(X + hx, Y + hy, 3, 1, "#c4a56a"); g.Rect(X + hx, Y + hy + 1, 1, 2, "#c4a56a"); g.Rect(X + hx + 2, Y + hy + 1, 1, 2, "#c4a56a");
-                                g.Rect(X + hx + 1, Y + hy + 1, 1, 1, "#b8975c");
-                            }
-                        }
-                        break;
-                    case 'g':
-                        if (h1 > 0.7) g.Rect(X + 3, Y + 4, 1, 1, "#f3c25b");
-                        g.Rect(X + rx, Y + ry, 1, 1, "#6fb055");
-                        break;
-                    case 'j':
-                        if (h1 > 0.72) { g.Rect(X + 2, Y + 5, 1, 2, "#2a5a28"); g.Rect(X + 3, Y + 4, 1, 1, "#5aa047"); }
-                        if (h1 < 0.08) g.Rect(X + 6, Y + 6, 1, 1, "#e04b3a");
-                        g.Rect(X + rx, Y + ry, 1, 1, "#4f9447");
-                        break;
-                    case 'n':
-                        if (h1 > 0.55) g.Rect(X + rx, Y + ry, 1, 1, "#ffffff");
-                        g.Rect(X + (int)(Pix.Hash(x, y, 43) * 8), Y + (int)(Pix.Hash(x, y, 44) * 8), 2, 1, "#c8d8e2");
-                        break;
-                    case 'e':
-                        g.Rect(X + rx, Y + ry, 2, 1, "#8f8a7e");
-                        g.Rect(X + (int)(Pix.Hash(x, y, 43) * 8), Y + (int)(Pix.Hash(x, y, 44) * 8), 1, 1, "#d4cfc2");
-                        break;
-                    case 'i':
-                    case 'k':
-                        if (h1 > 0.5) { g.Line(X + 2, Y + 7, X + 6, Y + 3, "#e8f6fb"); g.Rect(X + 6, Y + 3, 1, 1, "#9cc9db"); }
-                        break;
-                    case 'D':
-                        g.Rect(X + rx, Y + ry, 3, 1, "#d29a4f");
-                        if (h1 > 0.5) g.Rect(X + (int)(Pix.Hash(x, y, 43) * 6), Y + (int)(Pix.Hash(x, y, 44) * 9), 3, 1, "#f2cc8a");
-                        break;
-                    case 'o': if (h1 > 0.6) g.Rect(X + 2, Y + 5, 3, 1, "#5fd6c9"); break;
-                    case 'm':
-                        g.Rect(X + rx, Y + ry, 1, 1, "#3d4f32");
-                        if (h1 > 0.7) { g.Rect(X + 2, Y + 4, 3, 2, "#3f7d3a"); g.Rect(X + 3, Y + 4, 1, 1, "#f2a5b5"); }
-                        break;
-                    case 'l': if (Pix.Hash(x, y, 50) > 0.6) g.Rect(X + 2, Y + 5, 3, 1, "#3cb8a8"); break;
-                }
-                if (t == 'k')
-                {
-                    g.Rect(X + 2, Y + 3, 6, 4, "#1d4f78"); g.Rect(X + 3, Y + 2, 4, 6, "#1d4f78");
-                    g.Rect(X + 3, Y + 3, 2, 1, "#3a6f99");
-                    g.Rect(X + 2, Y + 2, 1, 1, "#ffffff"); g.Rect(X + 7, Y + 7, 1, 1, "#ffffff");
-                }
-                if (t == 'r')
-                {
-                    g.Rect(X + 1, Y + 3, 8, 6, "#5e6468");
-                    g.Rect(X + 2, Y + 2, 6, 6, "#8a8f93");
-                    g.Rect(X + 3, Y + 2, 3, 2, "#b4b9bc");
-                    g.Rect(X + 1, Y + 8, 8, 1, "#cfe8ee");
-                }
-                if (t == 'I')
-                {
-                    g.Rect(X + 1, Y + 3, 8, 5, "#dfeaf0");
-                    g.Rect(X + 2, Y + 2, 6, 5, "#ffffff");
-                    g.Rect(X + 1, Y + 7, 8, 1, "#a8d4e6");
-                    g.Rect(X + 1, Y + 8, 8, 1, "#cfe8ee");
-                }
-                if (t == 'T')
-                {
-                    g.Rect(X + 2, Y + 3, 2, 2, "#6e767b"); g.Rect(X + 6, Y + 6, 2, 1, "#6e767b");
-                    g.Rect(X + 1, Y + 7, 3, 1, "#7fc0d6");
-                }
-                if (t == 'p') { g.Rect(X + 2, Y + 3, 2, 1, "#a88c58"); g.Rect(X + 6, Y + 7, 1, 1, "#a88c58"); }
-                if (t == 'd')
-                {
-                    g.Rect(X, Y + 1, T, 8, "#9a6a3a");
-                    for (int i = 0; i < T; i += 3) g.Rect(X + i, Y + 1, 1, 8, "#7a5230");
-                    g.Rect(X, Y + 1, T, 1, "#b58250");
-                    g.Rect(X, Y + 9, T, 1, "#1f5a7a");
-                    g.Rect(X + 1, Y + 9, 1, 1, "#5b3a24"); g.Rect(X + 8, Y + 9, 1, 1, "#5b3a24");
-                }
-                else if (t == 'b')
-                {
-                    g.Rect(X + 1, Y, 8, T, "#9a6a3a");
-                    for (int i = 0; i < T; i += 3) g.Rect(X + 1, Y + i, 8, 1, "#7a5230");
-                    g.Rect(X + 1, Y, 1, T, "#b58250");
-                    g.Rect(X + 9, Y, 1, T, "#1f5a7a");
-                    g.Rect(X, Y + 4, 1, 2, "#5b3a24");
-                }
-                else if (t == 'x')
-                {
-                    g.Rect(X + 1, Y + 2, 3, 6, "#7a5230");
-                    g.Rect(X + 6, Y + 4, 3, 2, "#7a5230");
-                    g.Rect(X + 1, Y + 9, 1, 1, "#5b3a24"); g.Rect(X + 8, Y + 9, 1, 1, "#5b3a24");
-                }
-                if (t is 's' or 'p' or 'e')
-                {
-                    string edge = t == 'e' ? "#cbc6ba" : "#d4b77f";
-                    char W(int tx, int ty) => tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS ? '~' : worldMap[ty, tx];
-                    if (Water.Contains(W(x, y + 1))) g.Rect(X, Y + 9, T, 1, edge);
-                    if (Water.Contains(W(x, y - 1))) g.Rect(X, Y, T, 1, edge);
-                    if (Water.Contains(W(x - 1, y))) g.Rect(X, Y, 1, T, edge);
-                    if (Water.Contains(W(x + 1, y))) g.Rect(X + 9, Y, 1, T, edge);
-                }
-                if (stumps.TryGetValue((x, y), out char was))
-                {
-                    if (was == 'R') { g.Rect(X + 2, Y + 6, 2, 2, "#8a8f93"); g.Rect(X + 6, Y + 5, 2, 1, "#9aa0a5"); g.Rect(X + 5, Y + 7, 1, 1, "#7d8288"); }
-                    else if (was == 'c') { g.Rect(X + 4, Y + 6, 3, 3, "#4f8a3c"); g.Rect(X + 4, Y + 6, 3, 1, "#8fbf6a"); }
-                    else
-                    {
-                        g.Rect(X + 3, Y + 5, 4, 4, "#6b4a2b"); g.Rect(X + 3, Y + 5, 4, 1, "#c9a06a");
-                        g.Rect(X + 4, Y + 5, 2, 1, "#a87d52"); g.Rect(X + 2, Y + 8, 6, 1, "rgba(0,0,0,0.2)");
-                    }
-                }
+                g.Rect(X + hx, Y + hy, 3, 1, "#c4a56a"); g.Rect(X + hx, Y + hy + 1, 1, 2, "#c4a56a"); g.Rect(X + hx + 2, Y + hy + 1, 1, 2, "#c4a56a");
+                g.Rect(X + hx + 1, Y + hy + 1, 1, 1, "#b8975c");
+            }
+        }
+        if (t == 'k')
+        {
+            g.Rect(X + 2, Y + 3, 6, 4, "#1d4f78"); g.Rect(X + 3, Y + 2, 4, 6, "#1d4f78");
+            g.Rect(X + 3, Y + 3, 2, 1, "#3a6f99");
+            g.Rect(X + 2, Y + 2, 1, 1, "#ffffff"); g.Rect(X + 7, Y + 7, 1, 1, "#ffffff");
+        }
+        if (t == 'r')
+        {
+            // A rock standing in the shallows, wet and dark at the waterline, with a ring of foam.
+            Rock(g, X, Y, "#33383b", "#5e6468", "#8a8f93", "#b4b9bc");
+            g.Rect(X + 1, Y + 6, 8, 1, "#4a5155");
+            g.Rect(X + 1, Y + 8, 1, 1, "#cfe8ee"); g.Rect(X + 8, Y + 8, 1, 1, "#cfe8ee"); g.Rect(X + 2, Y + 9, 6, 1, "#cfe8ee");
+            g.Rect(X, Y + 7, 1, 1, "#e8f6fb"); g.Rect(X + 9, Y + 7, 1, 1, "#e8f6fb");
+        }
+        if (t == 'I')
+        {
+            // A chunk of floating ice, blue where it meets the water.
+            Rock(g, X, Y, "#7fb3cc", "#cfe6f0", "#eef6fa", "#ffffff");
+            g.Rect(X + 1, Y + 6, 8, 1, "#a8d4e6");
+            g.Rect(X + 2, Y + 9, 6, 1, "#cfe8ee");
+        }
+        if (t == 'T')
+        {
+            g.Rect(X + 2, Y + 3, 2, 2, "#6e767b"); g.Rect(X + 6, Y + 6, 2, 1, "#6e767b");
+            g.Rect(X + 1, Y + 7, 3, 1, "#7fc0d6");
+        }
+        if (t == 'p') { g.Rect(X + 2, Y + 3, 2, 1, "#a88c58"); g.Rect(X + 6, Y + 7, 1, 1, "#a88c58"); }
+        if (t == 'd')
+        {
+            g.Rect(X, Y + 1, T, 8, "#9a6a3a");
+            for (int i = 0; i < T; i += 3) g.Rect(X + i, Y + 1, 1, 8, "#7a5230");
+            g.Rect(X, Y + 1, T, 1, "#b58250");
+            g.Rect(X, Y + 9, T, 1, "#1f5a7a");
+            g.Rect(X + 1, Y + 9, 1, 1, "#5b3a24"); g.Rect(X + 8, Y + 9, 1, 1, "#5b3a24");
+        }
+        else if (t == 'b')
+        {
+            g.Rect(X + 1, Y, 8, T, "#9a6a3a");
+            for (int i = 0; i < T; i += 3) g.Rect(X + 1, Y + i, 8, 1, "#7a5230");
+            g.Rect(X + 1, Y, 1, T, "#b58250");
+            g.Rect(X + 9, Y, 1, T, "#1f5a7a");
+            g.Rect(X, Y + 4, 1, 2, "#5b3a24");
+        }
+        else if (t == 'x')
+        {
+            g.Rect(X + 1, Y + 2, 3, 6, "#7a5230");
+            g.Rect(X + 6, Y + 4, 3, 2, "#7a5230");
+            g.Rect(X + 1, Y + 9, 1, 1, "#5b3a24"); g.Rect(X + 8, Y + 9, 1, 1, "#5b3a24");
+        }
+        if (stumps.TryGetValue((x, y), out char was))
+        {
+            if (was == 'R') { g.Rect(X + 2, Y + 6, 2, 2, "#8a8f93"); g.Rect(X + 6, Y + 5, 2, 1, "#9aa0a5"); g.Rect(X + 5, Y + 7, 1, 1, "#7d8288"); }
+            else if (was == 'c') { g.Rect(X + 4, Y + 6, 3, 3, "#4f8a3c"); g.Rect(X + 4, Y + 6, 3, 1, "#8fbf6a"); }
+            else
+            {
+                g.Rect(X + 3, Y + 5, 4, 4, "#6b4a2b"); g.Rect(X + 3, Y + 5, 4, 1, "#c9a06a");
+                g.Rect(X + 4, Y + 5, 2, 1, "#a87d52"); g.Rect(X + 2, Y + 8, 6, 1, "rgba(0,0,0,0.2)");
             }
         }
     }
@@ -441,30 +384,11 @@ partial class Game
                 string c = tile switch { '~' => "#3a6f99", 'l' => "#5cc7b8", 'o' => "#62dccf", 'm' => "#6b7f4a", 'w' or 'T' => "#6ab0cc", _ => null };
                 if (c == null) continue;
                 double k = Pix.Hash(x, y, 7);
-                if ((t * 0.35 + k) % 1 < 0.2) pix.Rect(x * T + (int)(k * 7), y * T + (int)(Pix.Hash(x, y, 9) * 9), 2, 1, c);
+                int gx = x * T + (int)(k * 7), gy = y * T + (int)(Pix.Hash(x, y, 9) * 9);
+                if ((t * 0.35 + k) % 1 < 0.2 && Wet(ShapePx(gx, gy)) && Wet(ShapePx(gx + 1, gy))) pix.Rect(gx, gy, 2, 1, c);
             }
-        var bright = Pal.C("rgba(230,246,250,0.85)");
-        var dim = Pal.C("rgba(230,246,250,0.35)");
-        var foam = Pal.C("rgba(230,246,250,0.3)");
-        foreach (var e in waterEdges)
-        {
-            if (e.x < vx0 || e.x > vx1 || e.y < vy0 || e.y > vy1) continue;
-            int X = e.x * T, Y = e.y * T;
-            int off = (int)Math.Floor(1 + Math.Sin(t * 2 + e.x * 0.9 + e.y * 1.3) + 0.5);
-            for (int i = 0; i < T; i++)
-            {
-                bool on = (Pix.Hash(e.x, e.y, i) + t * 0.5) % 1 < 0.6;
-                var c1 = on ? bright : dim;
-                bool spray = on && i % 2 == 1;
-                switch (e.side)
-                {
-                    case 'n': pix.Rect(X + i, Y, 1, 1, c1); if (spray) pix.Rect(X + i, Y + off + 1, 1, 1, foam); break;
-                    case 's': pix.Rect(X + i, Y + 9, 1, 1, c1); if (spray) pix.Rect(X + i, Y + 8 - off, 1, 1, foam); break;
-                    case 'w': pix.Rect(X, Y + i, 1, 1, c1); if (spray) pix.Rect(X + off + 1, Y + i, 1, 1, foam); break;
-                    default: pix.Rect(X + 9, Y + i, 1, 1, c1); if (spray) pix.Rect(X + 8 - off, Y + i, 1, 1, foam); break;
-                }
-            }
-        }
+        DrawRipples(t);
+        DrawFoam(t);
     }
 
     void DrawSpots(float t)
@@ -575,77 +499,6 @@ partial class Game
     {
         float wind = Stormy ? 3.2f : 1.1f, amp = Stormy ? 1.4f : 0.62f;
         return (int)MathF.Round(MathF.Sin(time * wind + tx * 0.7f + ty * 1.3f) * amp);
-    }
-
-    void DrawTree(int tx, int ty, char kind)
-    {
-        int X = tx * T, Y = ty * T;
-        if (chopTile == (tx, ty) && shakeT > 0) X += (int)MathF.Round(MathF.Sin(time * 70) * 1.5f);
-        int sw = kind is 't' or 'f' or 'h' ? Sway(tx, ty) : 0;
-        switch (kind)
-        {
-            case 'y': // berry bush; berries come back each day
-                pix.Rect(X + 1, Y + 8, 8, 2, "rgba(0,0,0,0.18)");
-                pix.Rect(X + 1, Y + 3, 8, 6, "#3f7d35");
-                pix.Rect(X, Y + 5, 10, 3, "#3f7d35");
-                pix.Rect(X + 2, Y + 2, 6, 1, "#3f7d35");
-                pix.Rect(X + 2, Y + 3, 3, 2, "#5aa047"); pix.Rect(X + 6, Y + 5, 2, 1, "#5aa047");
-                if (state.picked.GetValueOrDefault($"{tx},{ty}") != state.day)
-                    foreach (var (bx, by) in new[] { (2, 5), (6, 3), (4, 7), (7, 6), (1, 7), (5, 4) })
-                        pix.Rect(X + bx, Y + by, 1, 1, "#e04b3a");
-                break;
-            case 'f': // snowy fir; the top sways more than the bottom
-                pix.Rect(X + 1, Y + 8, 8, 2, "rgba(0,0,0,0.18)");
-                pix.Rect(X + 4, Y + 6, 2, 3, "#5b3a24");
-                pix.Rect(X + 1, Y + 3, 8, 3, "#2e5e46");
-                pix.Rect(X + 2 + sw, Y, 6, 3, "#2e5e46");
-                pix.Rect(X + 3 + sw, Y - 3, 4, 3, "#2e5e46");
-                pix.Rect(X + 4 + sw, Y - 5, 2, 2, "#2e5e46");
-                pix.Rect(X + 6, Y + 4, 2, 1, "#3f7a5a"); pix.Rect(X + 5 + sw, Y + 1, 2, 1, "#3f7a5a");
-                pix.Rect(X + 1, Y + 3, 3, 1, "#e8f0f4"); pix.Rect(X + 2 + sw, Y, 3, 1, "#e8f0f4");
-                pix.Rect(X + 3 + sw, Y - 3, 2, 1, "#e8f0f4"); pix.Rect(X + 4 + sw, Y - 5, 1, 1, "#ffffff");
-                break;
-            case 'c': // cactus
-                pix.Rect(X + 2, Y + 8, 7, 2, "rgba(0,0,0,0.16)");
-                pix.Rect(X + 4, Y - 3, 3, 12, "#4f8a3c");
-                pix.Rect(X + 4, Y - 3, 1, 12, "#6aa84f");
-                pix.Rect(X + 1, Y + 2, 3, 2, "#4f8a3c"); pix.Rect(X + 1, Y - 1, 2, 3, "#4f8a3c");
-                pix.Rect(X + 7, Y + 4, 2, 2, "#4f8a3c"); pix.Rect(X + 8, Y + 1, 2, 4, "#4f8a3c");
-                pix.Rect(X + 6, Y - 2, 1, 10, "#3d6e2f");
-                if (Pix.Hash(tx, ty, 5) > 0.6) pix.Rect(X + 5, Y - 4, 1, 1, "#e04b3a");
-                break;
-            case 'h': // jungle palm
-                pix.Rect(X, Y + 8, 10, 2, "rgba(0,0,0,0.18)");
-                pix.Rect(X + 4, Y + 2, 2, 7, "#7a5230");
-                pix.Rect(X + 5, Y - 1, 2, 3, "#7a5230");
-                pix.Rect(X + sw, Y - 3, 10, 3, "#2f7a3a");
-                pix.Rect(X - 2 + sw, Y - 1 + Math.Max(0, sw), 4, 2, "#2f7a3a"); pix.Rect(X + 8 + sw, Y - 1 + Math.Max(0, -sw), 4, 2, "#2f7a3a");
-                pix.Rect(X + 2 + sw, Y - 5, 6, 2, "#3c9147");
-                pix.Rect(X + 1 + sw, Y - 3, 3, 1, "#4caa55"); pix.Rect(X + 6 + sw, Y - 4, 2, 1, "#4caa55");
-                pix.Rect(X + 4, Y - 1, 1, 1, "#6b4a2b"); pix.Rect(X + 6, Y, 1, 1, "#6b4a2b");
-                break;
-            case 'R': // boulder: snow-capped, sandstone or mossy depending on the island
-                byte bi = BiomeAt(tx, ty);
-                var (dk, md, lt) = bi == 2 ? ("#9a5f3a", "#b5764a", "#d69a68") : bi == 1 ? ("#5e6b74", "#7d8b95", "#a9b6be") : ("#4f5558", "#6e7478", "#8f959a");
-                pix.Rect(X + 1, Y + 8, 8, 2, "rgba(0,0,0,0.2)");
-                pix.Rect(X + 1, Y + 3, 8, 6, dk);
-                pix.Rect(X + 2, Y + 2, 6, 6, md);
-                pix.Rect(X + 3, Y + 2, 3, 2, lt);
-                if (bi == 1) { pix.Rect(X + 2, Y + 2, 5, 1, "#ffffff"); pix.Rect(X + 3, Y + 1, 3, 1, "#ffffff"); }
-                if (bi == 3) { pix.Rect(X + 2, Y + 2, 4, 1, "#4caa55"); pix.Rect(X + 6, Y + 5, 2, 2, "#3f8a45"); }
-                break;
-            default: // Saltmere oak
-                pix.Rect(X + 1, Y + 8, 8, 2, "rgba(0,0,0,0.18)");
-                pix.Rect(X + 4, Y + 4, 2, 5, "#6b4a2b");
-                pix.Rect(X + 1, Y - 3, 8, 7, "#3f7d35");
-                pix.Rect(X + 2 + sw, Y - 5, 6, 2, "#3f7d35");
-                pix.Rect(X, Y - 1, 10, 3, "#3f7d35");
-                pix.Rect(X + 2 + sw, Y - 4, 3, 2, "#5aa047");
-                pix.Rect(X + 1, Y - 2, 2, 2, "#5aa047");
-                pix.Rect(X + 6, Y + 1, 3, 2, "#2f6428");
-                if (sw != 0) pix.Rect(sw > 0 ? X + 9 : X, Y - 3, 1, 2, "#3f7d35");
-                break;
-        }
     }
 
     void DrawHut()
@@ -1298,7 +1151,7 @@ partial class Game
 
     void DrawNight(float t)
     {
-        Array.Fill(dark, 0.68f);
+        Array.Fill(dark, 0.63f);
         LightHole(player.X, player.Y - 6, Wears("headlamp") ? 58 : 32, 0.85f);
         LightHole(FireX, FireY - 3, 44 + MathF.Sin(t * 9) * 2, 1);
         LightHole(165, 61, 12, 0.7f);
@@ -1313,7 +1166,8 @@ partial class Game
         // The Starwell glows after dark, enough to light a fight around it (and to catch your eye through the palms).
         LightHole(StarwellX, StarwellY, 62 + MathF.Sin(t * 1.3f) * 4, 0.8f);
         if (boss != null) LightHole(boss.X, boss.Y - 8, 34, 0.7f);
-        ApplyDark(new Color(6, 12, 36, 255));
+        ApplyDark(new Color(8, 16, 40, 255));
+        DrawMoonlitShore(t);
         pix.Glow(StarwellX, StarwellY, 30, Pal.Rgba(120, 220, 255, 0.22f + 0.06f * MathF.Sin(t * 1.3f)));
 
         var warm = Pal.Rgba(243, 150, 60, 0.18f);
@@ -1336,13 +1190,16 @@ partial class Game
             foreach (var (x, y) in new[] { (300, 112), (306, 115), (311, 110), (316, 116), (304, 120) })
                 pix.Rect(x, y, 1, 1, Pal.Rgba(255, 215, 106, a));
         }
-        // Fireflies drift over Mirewood after dark.
+        // Fireflies drift over Mirewood after dark, and a few over Saltmere's grass, each with a soft glow.
         for (int i = 0; i < 40; i++)
         {
             double fx = Pix.Hash(i, 5, 93) * W + Math.Sin(t * 0.6 + i * 1.7) * 14;
             double fy = Pix.Hash(i, 6, 93) * H + Math.Cos(t * 0.5 + i) * 10;
-            if (BiomeAt(((int)fx + camX) / T, ((int)fy + camY) / T) != 3) continue;
+            int ftx = ((int)fx + camX) / T, fty = ((int)fy + camY) / T;
+            byte fb = BiomeAt(ftx, fty);
+            if (fb != 3 && !(fb == 0 && i % 3 == 0 && TileAt(ftx, fty) is 'g' or 't')) continue;
             float a = (float)(0.5 + 0.5 * Math.Sin(t * 3 + i * 2.1));
+            pix.Glow(fx + camX + 0.5, fy + camY + 0.5, 4, Pal.Rgba(200, 255, 120, 0.25f * a));
             pix.Fill((int)fx, (int)fy, 1, 1, Pal.Rgba(230, 255, 140, a));
         }
     }
@@ -1375,6 +1232,7 @@ partial class Game
         if (scene == "world")
         {
             DrawWater(t);
+            DrawTufts(t);
             foreach (var b in state.builds) if (b.id == "path") DrawBuild(b, t);
             DrawLoose(t);
             DrawBugs(t);
@@ -1386,6 +1244,8 @@ partial class Game
             DrawBossEffects(t);
             DrawFishing(t);
             DrawParticles();
+            DrawLeaves();
+            DrawCloudShadows(t);
             DrawSkyLife(t);
             DrawSnow(t);
             DrawWeatherTint();

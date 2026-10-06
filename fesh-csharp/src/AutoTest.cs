@@ -340,7 +340,7 @@ partial class Game
             Check($"{s.Label} ({Data.Biomes.First(b => b.Id == s.Biome).Name}) can be fished from land", ok);
         }
         state.flags.tideOut = tide; state.flags.dockFixed = dock; BuildMap();
-        Note($"world {COLS}x{ROWS} tiles, {trees.Count} trees, {waterEdges.Count} shoreline edges");
+        Note($"world {COLS}x{ROWS} tiles, {trees.Count} trees, {shore.Count} shoreline pixels");
         File.WriteAllLines(Path.Combine(testDir, "map.txt"), Enumerable.Range(0, ROWS).Select(y =>
             $"{y,2} " + new string(Enumerable.Range(0, COLS).Select(x => map[y, x]).ToArray())));
 
@@ -1060,10 +1060,12 @@ partial class Game
         Check("Esc ends spearfishing", mode == "play");
 
         // Chum, polarized sunglasses and the fish finder
+        // Counted from what you had, since a sunken chest earlier in the run can already have given you chum.
+        int chum0 = Has("chum");
         Give("chum", 2); yield return 2;
         Check($"a fishing spot offers chum (prompt: {prompt.Text})", target?.AltType == "chum");
         Inp.Tap(KeyboardKey.F); yield return 2;
-        Check("F throws chum and the fish crowd in", Chummed("coral") && Has("chum") == 1);
+        Check($"F throws chum and the fish crowd in ({chum0 + 2} -> {Has("chum")})", Chummed("coral") && Has("chum") == chum0 + 1);
         Give("sunglasses"); Give("fish_finder");
         yield return 20;
         pendingShot = "50-chum-shadows-finder"; yield return 2;
@@ -1379,12 +1381,29 @@ partial class Game
         Check($"it swims out to sea ({player.X:0},{player.Y:0}, {AreaName()})", Swimming && player.X < AtollJettyX - 20 && AreaName() == "Open sea");
         yield return 10;
         pendingShot = "73-swimming"; yield return 2;
+        // Swimming along (bow wave and wake), then back to this spot out at sea for the checks below.
+        var (seaX, seaY) = (player.X, player.Y);
+        Inp.Hold(KeyboardKey.Left, true); yield return 12;
+        pendingShot = "73a-swimming-moving"; yield return 2;
+        Inp.Hold(KeyboardKey.Left, false); yield return 2;
+        // Half in, half out at the Starwell's edge: the water only covers the part of it that's over water.
+        player.X = StarwellX - 24; player.Y = StarwellY; player.Face = "right"; yield return 10;
+        Check("it swims right up to the edge of the Starwell", Swimming);
+        pendingShot = "73b-swimming-at-shore"; yield return 2;
+        player.X = seaX; player.Y = seaY; yield return 2;
         Inp.Tap(KeyboardKey.R); yield return 2;
         Check($"you can't hop off at sea ({toastMsg})", Riding && toastMsg.Contains("Nowhere dry"));
         state.weather = "storm";
         Check("caught out at sea by a storm, it still swims you home", CanStand(870, 268, false, true));
         player.X = AtollJettyX + 4;
         Check("but from the shore it won't head out into deep water in a storm", !CanStand(870, 268, false, true));
+        // And it really gets there: climbing out, its back end is still over the deep for a few steps.
+        player.X = 870; player.Y = 268; player.Face = "right"; yield return 2;
+        Inp.Hold(KeyboardKey.Right, true); yield return 40; Inp.Hold(KeyboardKey.Right, false); yield return 2;
+        Check($"in a storm it swims you all the way up onto the jetty ({player.X:0},{player.Y:0})", Riding && player.X > AtollJettyX);
+        Inp.Hold(KeyboardKey.Left, true); yield return 30; Inp.Hold(KeyboardKey.Left, false); yield return 2;
+        Check($"and won't take you back out into the deep ({player.X:0},{player.Y:0})", Riding && TileUnder(player.X, player.Y) != '~');
+        player.X = AtollJettyX + 4;
         state.weather = "clear";
         Check("it will in fair weather", CanStand(870, 268, false, true) && !CanStand(870, 268));
         player.X = 975; player.Y = 268; yield return 2;

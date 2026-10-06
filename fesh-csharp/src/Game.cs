@@ -760,6 +760,7 @@ partial class Game
             UpdateAnimals(dt);
             UpdateBugs(dt);
             UpdateParticles(dt);
+            UpdateLeaves(dt);
             UpdateWeather(dt);
             heldT = Math.Max(0, heldT - dt);
         }

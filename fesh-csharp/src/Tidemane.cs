@@ -390,10 +390,12 @@ partial class Game
     char TileUnder(float x, float y) => TileAt((int)MathF.Floor(x / T), (int)MathF.Floor((y - 1.5f) / T));
     bool Swimming => Riding && Swimmable(TileUnder(player.X, player.Y));
 
-    // Any water away from the edge of the map, except that in a storm it won't head out into deep water (if a storm
-    // catches you already out there, it still swims you home).
-    bool SwimOk(int tx, int ty, char t) => Swimmable(t) && tx > 0 && ty > 0 && tx < COLS - 1 && ty < ROWS - 1
-        && !(Stormy && t == '~' && TileUnder(player.X, player.Y) != '~');
+    // Any water away from the edge of the map.
+    static bool SwimOk(int tx, int ty, char t) => Swimmable(t) && tx > 0 && ty > 0 && tx < COLS - 1 && ty < ROWS - 1;
+
+    // In a storm it won't head out into deep water. That's judged by its middle, not its hooves: climbing out of the
+    // deep, its back end stays over it for a few steps, and if a storm catches you out there it must still swim you home.
+    bool StormHoldsBack(float x, float y) => Stormy && TileUnder(x, y) == '~' && TileUnder(player.X, player.Y) != '~';
 
     void ToggleRide()
     {
@@ -454,11 +456,11 @@ partial class Game
     /* ---------- Drawing ---------- */
     // Tidemane with its feet at (x, y). Pose is "stand", "run", "rear", "lie" or "swim"; frame alternates the gallop.
     // Drawn facing right and mirrored for dir -1.
-    void DrawTidemane(float fx, float fy, int dir, string pose, int frame, bool flash = false, float lift = 0)
+    void DrawTidemane(float fx, float fy, int dir, string pose, int frame, bool flash = false, float lift = 0, bool moving = false)
     {
         int x = (int)MathF.Round(fx), y = (int)MathF.Round(fy - lift);
         bool lie = pose == "lie", rear = pose == "rear", run = pose == "run", swim = pose == "swim";
-        int bob = run && frame == 1 ? -1 : 0, low = lie ? 4 : 0, up = rear ? -4 : 0;
+        int bob = swim ? FloatBob(fx) : run && frame == 1 ? -1 : 0, low = lie ? 4 : 0, up = rear ? -4 : 0;
         void R(int ox, int oy, int w, int h, string c, int dy = 0)
         {
             string col = flash ? "#ffffff" : c;
@@ -468,14 +470,24 @@ partial class Game
             fin = "#5fd6c9", finDark = "#3fb5a8", dark = "#10243a";
         if (!swim) pix.Rect(x - 13, (int)MathF.Round(fy) + 1, 22, 1, "rgba(0,0,0,0.22)");
 
-        // The fish tail: down from the haunch to the sand, then up into a fan.
-        int sway = (int)MathF.Round(MathF.Sin(time * (run ? 14 : 4) + fx) * (lie ? 0 : 1));
-        R(-11, -9, 4, 4, shade); R(-13, -7, 3, 4, body); R(-15, -5, 3, 4, body); R(-17, -3, 3, 3, shade);
-        R(-20, -7 + sway, 2, 6, fin); R(-22, -9 + sway, 2, 5, fin); R(-23, -11 + sway, 1, 4, finDark); R(-20, -2, 3, 2, finDark);
-        R(-18, -4, 2, 2, fin);
+        if (swim)
+        {
+            // Swimming, the fish tail trails out behind along the surface and its fan flicks up out of the water.
+            int flick = (int)MathF.Round(MathF.Sin(time * 3.2f + fx * 0.1f) * 1.3f);
+            R(-12, -9, 3, 4, shade); R(-15, -8, 3, 3, body); R(-18, -7, 3, 2, shade);
+            R(-21, -9 + flick, 2, 3, fin); R(-23, -11 + flick, 2, 4, fin); R(-24, -12 + flick, 1, 3, finDark); R(-20, -7, 2, 1, finDark);
+        }
+        else
+        {
+            // The fish tail: down from the haunch to the sand, then up into a fan.
+            int sway = (int)MathF.Round(MathF.Sin(time * (run ? 14 : 4) + fx) * (lie ? 0 : 1));
+            R(-11, -9, 4, 4, shade); R(-13, -7, 3, 4, body); R(-15, -5, 3, 4, body); R(-17, -3, 3, 3, shade);
+            R(-20, -7 + sway, 2, 6, fin); R(-22, -9 + sway, 2, 5, fin); R(-23, -11 + sway, 1, 4, finDark); R(-20, -2, 3, 2, finDark);
+            R(-18, -4, 2, 2, fin);
+        }
         // Forelegs, with fin-edged hooves. Galloping, they reach and tuck in turn; rearing, they paw the air.
         if (lie) { R(0, -3, 6, 2, shade); R(5, -2, 3, 1, fin); }
-        else
+        else if (!swim)
         {
             int a = run ? (frame == 0 ? 1 : -1) : 0;
             R(1 + a, -5, 2, 4, shade, up); R(0 + a, -1, 4, 1, fin, up);
@@ -483,7 +495,8 @@ partial class Game
             if (rear) { R(6, -10, 2, 2, body); R(2, -10, 2, 2, shade); }
         }
         // The body, with a pale belly, a little dorsal fin and starlight speckles.
-        R(-8, -11, 12, 1, body, up / 2); R(-10, -10, 16, 4, body, up / 2); R(-9, -6, 14, 1, belly, up / 2); R(-7, -5, 10, 1, shade, up / 2);
+        // (Swimming, the pale belly is under the surface, so the flank just darkens into the water.)
+        R(-8, -11, 12, 1, body, up / 2); R(-10, -10, 16, 4, body, up / 2); R(-9, -6, 14, 1, swim ? shade : belly, up / 2); R(-7, -5, 10, 1, shade, up / 2);
         R(-6, -13, 3, 2, fin, up / 2); R(-5, -14, 1, 1, finDark, up / 2);
         float tw = (time * 1.3f + fx * 0.1f) % 1;
         foreach (var (sx, sy, k) in new[] { (-6, -9, 0.0f), (-2, -10, 0.33f), (1, -8, 0.66f), (-8, -8, 0.5f) })
@@ -499,15 +512,55 @@ partial class Game
         int flow = (int)(time * (run ? 10 : 3)) % 2;
         R(5, -21, 2, 1, mane, hy); R(4, -20, 2, 2, mane, hy); R(3, -18, 2, 2, flow == 0 ? mane : mane2, hy);
         R(2, -16, 2, 2, mane, hy); R(1 - flow, -14, 2, 2, mane2, hy); R(0, -12, 2, 1, mane, hy); R(-1 - flow, -13, 1, 1, mane2, hy);
-        if (swim)
+        if (swim) DrawSwimWater(x, (int)MathF.Round(fy) - 5, dir, moving);
+    }
+
+    // Floating, it rises and settles a pixel on the swell (the rider goes with it).
+    int FloatBob(float fx) => MathF.Sin(time * 2.2f + fx * 0.07f) > 0.3f ? 1 : 0;
+
+    // The water around a swimming Tidemane, with the surface at row wl. The water itself (from the ground layer) is drawn
+    // back over everything below the surface, only where there really is water, so it matches the sea and stops at the
+    // shore. Broken foam where its body and tail cut the surface; moving, a bow wave and a wake fanning out behind;
+    // resting, little ripples spreading from either end. Every touch of foam is on water only.
+    void DrawSwimWater(int x, int wl, int dir, bool moving)
+    {
+        void OnWater(int px, int py, Color c)
         {
-            // Swimming: only its back, neck and head show above the water, with a wake behind.
-            string water = TileUnder(fx, fy) switch { 'l' => "#2a9d8f", 'o' => "#22a6a0", 'm' => "#4f6440", 'w' or 'T' => "#2f7fa3", _ => "#1d4f78" };
-            pix.Rect(x - 14, (int)MathF.Round(fy) - 6, 28, 7, water);
-            pix.Rect(x - 14, (int)MathF.Round(fy) - 6, 28, 1, Pal.Rgba(230, 246, 250, 0.6f));
-            float ph = time * 2 % 1;
-            pix.Ring(x, fy - 4, 5 + ph * 4, Pal.Rgba(230, 246, 250, 0.5f * (1 - ph)));
-            if ((int)(time * 3) % 3 == 0) R(-20, -10 + sway, 2, 3, fin);
+            if (px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py))) pix.Rect(px, py, 1, 1, c);
+        }
+        for (int py = wl; py <= wl + 6; py++)
+            for (int px = x - 16; px <= x + 16; px++)
+                if (px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py))) pix.Rect(px, py, 1, 1, worldBase.Buf[py * PW + px]);
+        int lap = (int)(time * 5);
+        var foam = Pal.Rgba(232, 246, 250, 0.65f);
+        var foamDim = Pal.Rgba(232, 246, 250, 0.3f);
+        for (int ox = -20; ox <= 8; ox++)
+        {
+            int px = x + dir * ox;
+            double h = Pix.Hash((px >> 1) + lap, 7, 260);
+            if (h < 0.6) OnWater(px, wl, foam);
+            else if (h < 0.75) OnWater(px, wl + 1, foamDim);
+        }
+        if (moving)
+        {
+            for (int i = 0; i < 3; i++) OnWater(x + dir * (9 + i), wl - (lap + i) % 2, foam);
+            // The wake: two arms opening out behind it in a V.
+            for (int k = 1; k <= 9; k++)
+            {
+                if ((k + lap) % 4 == 0) continue;
+                var c = Pal.Rgba(232, 246, 250, 0.55f * (1 - k / 10f));
+                int px = x - dir * (21 + k * 2), spread = 1 + k * 3 / 4;
+                OnWater(px, wl - spread, c); OnWater(px - dir, wl - spread, c);
+                OnWater(px, wl + spread, c); OnWater(px - dir, wl + spread, c);
+            }
+            return;
+        }
+        float ph = time * 0.7f % 1;
+        var ring = Pal.Rgba(232, 246, 250, 0.45f * (1 - ph));
+        foreach (int side in new[] { -1, 1 })
+        {
+            int cx = x + side * (int)(13 + ph * 8);
+            OnWater(cx - 1, wl, ring); OnWater(cx, wl + 1, ring); OnWater(cx + 1, wl, ring);
         }
     }
 
@@ -517,8 +570,8 @@ partial class Game
         if (player.Face is "left" or "right") mountDir = player.Face == "right" ? 1 : -1;
         bool swim = Swimming;
         string pose = swim ? "swim" : moving ? "run" : "stand";
-        DrawTidemane(x, y, mountDir, pose, step);
-        int bob = moving && step == 1 ? -1 : 0;
+        DrawTidemane(x, y, mountDir, pose, step, moving: moving);
+        int bob = swim ? FloatBob(x) : moving && step == 1 ? -1 : 0;
         LookData.DrawPerson(pix, state.look, x - mountDir, y - 8 + bob, player.Face, 0, shadow: false, blink: time % 3.7f < 0.12f,
             arms: heldT > 0 && heldItem != null ? 2 : 0);
     }
