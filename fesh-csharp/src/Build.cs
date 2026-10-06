@@ -10,15 +10,15 @@ record struct Box(float X, float Y, float W, float H)
 partial class Game
 {
     /* ---------- Collision ---------- */
-    // Tomas's hut, his campfire, the wreck and Tomas himself. Only outdoors.
-    // Tomas's hut, his campfire, the wreck, Tomas himself and Pip's stall. Only outdoors.
+    // Tomas's hut, his campfire, the wreck, Tomas himself, Pip's stall and the carving at the Starwell. Only outdoors.
     List<Box> StaticSolids() => scene != "world" ? new() : new()
     {
         new(150, 56, 20, 13),
         new(FireX - 4, FireY - 3, 9, 5),
         new(12, 144, 28, 14),
         new(tomasX - 3, tomasY - 3, 7, 3),
-        new(PipX - 10, PipY + 1, 20, 9)
+        new(PipX - 10, PipY + 1, 20, 9),
+        new(CarvingX - 4, CarvingY - 3, 8, 4)
     };
 
     List<Box> Solids()
@@ -37,13 +37,14 @@ partial class Game
     bool Wading => scene == "world" && Has("waders") > 0;
     bool InWater => scene == "world" && Wadeable(TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T)));
 
-    bool CanStand(float x, float y, bool wade = false)
+    // Wade lets you into shallow water (waders); swim into any water at all (riding Tidemane, see SwimOk).
+    bool CanStand(float x, float y, bool wade = false, bool swim = false)
     {
         foreach (var (ax, ay) in new[] { (x - 3, y - 3), (x + 2.9f, y - 3), (x - 3, y), (x + 2.9f, y) })
         {
             int tx = (int)MathF.Floor(ax / T), ty = (int)MathF.Floor(ay / T);
             char t = TileAt(tx, ty);
-            if (!(Walkable(t) || wade && Wadeable(t)) || BridgeClosed(tx, ty)) return false;
+            if (!(Walkable(t) || wade && Wadeable(t) || swim && SwimOk(tx, ty, t)) || BridgeClosed(tx, ty)) return false;
         }
         foreach (var r in Solids())
             if (x + 3 > r.X && x - 3 < r.X + r.W && y > r.Y && y - 3 < r.Y + r.H) return false;
@@ -128,20 +129,7 @@ partial class Game
             var b = g.Target;
             var d = Data.BuildById[b.id];
             list.Remove(b);
-            if (d.Water) state.pots.Remove($"{b.x},{b.y}");
-            foreach (var (id, n) in d.Cost) Give(id, n);
-            string extra = "";
-            if (b.id == "aquarium" && EmptyTank(TankKey(b)) is int fishBack && fishBack > 0) extra = $" The {fishBack} fish went back in your bag.";
-            // Taking down a shack also packs up everything inside it, aquarium fish included.
-            if (d.Door && state.rooms.Remove(ShackKey(b), out var room) && room.Count > 0)
-            {
-                foreach (var f in room)
-                {
-                    foreach (var (id, n) in Data.BuildById[f.id].Cost) Give(id, n);
-                    if (f.id == "aquarium") EmptyTank($"{ShackKey(b)}|{f.x},{f.y}");
-                }
-                extra = $" Packed up {room.Count} thing{(room.Count == 1 ? "" : "s")} from inside, too.";
-            }
+            string extra = PackUp(b);
             Sfx.Play("remove");
             Toast($"Took down the {d.Name.ToLowerInvariant()}. Got back {d.CostText}.{extra}", extra == "" ? 2 : 3.5f);
         }
@@ -166,9 +154,45 @@ partial class Game
         Save();
     }
 
+    // Refunds a piece that has already been taken out of its scene's list. Returns a note about anything else that came back.
+    string PackUp(Build b)
+    {
+        var d = Data.BuildById[b.id];
+        if (d.Water) state.pots.Remove($"{b.x},{b.y}");
+        foreach (var (id, n) in d.Cost) Give(id, n);
+        string extra = "";
+        if (b.id == "aquarium" && EmptyTank(TankKey(b)) is int fishBack && fishBack > 0) extra = $" The {fishBack} fish went back in your bag.";
+        // Taking down a shack also packs up everything inside it, aquarium fish included.
+        if (d.Door && state.rooms.Remove(ShackKey(b), out var room) && room.Count > 0)
+        {
+            foreach (var f in room)
+            {
+                foreach (var (id, n) in Data.BuildById[f.id].Cost) Give(id, n);
+                if (f.id == "aquarium") EmptyTank($"{ShackKey(b)}|{f.x},{f.y}");
+            }
+            extra = $" Packed up {room.Count} thing{(room.Count == 1 ? "" : "s")} from inside, too.";
+        }
+        return extra;
+    }
+
+    // Starfall Atoll used to be a small island further west. Anything built on its old shore is now out at sea:
+    // land pieces standing in water, and crab pots in deep water. They go back into the bag.
+    int RescueSunkBuilds()
+    {
+        var sunk = state.builds.Where(b =>
+        {
+            var d = Data.BuildById[b.id];
+            return Enumerable.Range(0, d.W).Any(i => worldMap[b.y, Math.Clamp(b.x + i, 0, COLS - 1)] is var t && (d.Water ? t == '~' : Water.Contains(t)));
+        }).ToList();
+        foreach (var b in sunk) { state.builds.Remove(b); PackUp(b); }
+        if (sunk.Count > 0) { ReindexBuilds(); mapTexDirty = true; Save(); }
+        return sunk.Count;
+    }
+
     void EnterBuild()
     {
         if (mode == "panel") ClosePanels();
+        if (boss != null) { Sfx.Play("nope"); Toast("Not in the middle of a fight!"); return; }
         if (mode != "play")
         {
             if (FishingModes.Contains(mode)) Toast("Finish fishing first.");

@@ -128,6 +128,7 @@ partial class Game
     {
         shakeT = Math.Max(0, shakeT - dt);
         swingT = Math.Max(0, swingT - dt);
+        quake = Math.Max(0, quake - dt);
         for (int i = particles.Count - 1; i >= 0; i--)
         {
             var p = particles[i];

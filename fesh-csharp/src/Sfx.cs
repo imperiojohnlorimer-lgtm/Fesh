@@ -41,6 +41,29 @@ static class Sfx
         Add("thunder", 2f, Rumble);
         Add("hit", 0.14f, b => { Noise(b, 0.06f, 0.2f); Tone(b, 520, 0.08f, "square", 0.04f, -260); });
         Add("hurt", 0.3f, b => { Tone(b, 300, 0.22f, "sawtooth", 0.05f, -160); Noise(b, 0.08f, 0.1f); });
+        Add("neigh", 0.9f, Whinny);
+        Add("stomp", 0.3f, b => { Tone(b, 95, 0.26f, "sine", 0.14f, -45); Noise(b, 0.14f, 0.12f); });
+        Add("whistle", 0.4f, b => { Tone(b, 1500, 0.12f, "sine", 0.05f, 500); Tone(b, 2000, 0.2f, "sine", 0.05f, -350, 0.15f); });
+        Add("bolt", 0.25f, b => { Noise(b, 0.12f, 0.1f); Tone(b, 760, 0.14f, "triangle", 0.035f, -380); });
+    }
+
+    // A horse's whinny: a bright, wobbling cry that slides down and breaks into a snort.
+    static void Whinny(float[] buf)
+    {
+        int n = (int)(0.7f * Rate);
+        double phase = 0;
+        for (int i = 0; i < n && i < buf.Length; i++)
+        {
+            double t = (double)i / n, s = (double)i / Rate;
+            double f = 980 * (1 - 0.45 * t) + 70 * Math.Sin(Math.Tau * 17 * s) * (0.4 + t);
+            phase = (phase + f / Rate) % 1.0;
+            double w = 0.6 * (2 * phase - 1) + 0.4 * Math.Sin(phase * Math.Tau);
+            double env = Math.Min(1, t / 0.05) * Math.Pow(1 - t, 0.8);
+            buf[i] += (float)(w * 0.045 * env);
+        }
+        int start = (int)(0.68f * Rate), len = (int)(0.16f * Rate);
+        for (int i = 0; i < len && start + i < buf.Length; i++)
+            buf[start + i] += (float)((rng.NextDouble() * 2 - 1) * 0.07 * (1 - (double)i / len));
     }
 
     public static void Play(string name)

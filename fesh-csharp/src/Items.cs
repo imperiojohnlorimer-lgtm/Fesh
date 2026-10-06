@@ -107,7 +107,7 @@ static class Items
         new("berries", "Berries", "food", "Sweet and a little sour. Grow on bushes.", 6, "berries"),
         new("egg", "Egg", "food", "Better cooked.", 5, "egg"),
         new("truffle", "Truffle", "food", "A pig found this. It smells wonderful.", 12, "truffle"),
-        new("coconut", "Coconut", "food", "From a palm tree.", 10, "coconut"),
+        new("coconut", "Coconut", "food", "From a palm tree. Sweet enough to use as bait, if you know who's hungry for it.", 10, "coconut"),
         new("cactus_fruit", "Cactus fruit", "food", "Juicy, once you get past the spines.", 8, "cactusfruit")
     };
 
@@ -161,6 +161,7 @@ static class Items
         ["glow_shrimp"] = new(0.5f, 2, false, "Deep-water fish can't resist a glowing shrimp."),
         ["slime_gel"] = new(0.5f, 2, false, "Cave fish go wild for it."),
         ["berries"] = new(0.7f, 0, false, "Carp and other plant-eaters like a berry."),
+        ["coconut"] = new(0.8f, 0, false, "Sweet and white. Hardly any fish care for it."),
         ["spinner_lure"] = new(0.85f, 0, true, "Never used up. Fish that run chase it."),
         ["fly_lure"] = new(0.85f, 0, true, "Never used up. Jumpers snap at it.")
     };
@@ -591,6 +592,13 @@ static class ItemArt
             case "eel":
                 p.Rect(1, 6, 3, 2, tint); p.Rect(3, 5, 3, 2, tint); p.Rect(5, 6, 3, 2, tint); p.Rect(7, 5, 3, 2, tint); p.Rect(9, 4, 2, 2, tint);
                 p.Rect(10, 4, 1, 1, "#10243a");
+                break;
+            case "tidemane":
+                // A hippocamp's head: teal, a foam mane, coral horns and a gold eye.
+                p.Rect(5, 3, 4, 3, "#2a9d8f"); p.Rect(7, 5, 4, 2, "#2a9d8f"); p.Rect(4, 5, 4, 5, "#2a9d8f"); p.Rect(3, 8, 3, 3, "#1d6f68");
+                p.Rect(10, 6, 1, 1, "#10243a"); p.Rect(7, 4, 1, 1, "#ffd76a");
+                p.Rect(6, 1, 1, 2, "#ff8a7a"); p.Rect(8, 1, 1, 2, "#ff8a7a");
+                p.Rect(3, 3, 2, 1, "#f2fbff"); p.Rect(2, 4, 2, 2, "#f2fbff"); p.Rect(1, 6, 2, 3, "#cfe8ee"); p.Rect(2, 9, 1, 1, "#f2fbff");
                 break;
         }
     }

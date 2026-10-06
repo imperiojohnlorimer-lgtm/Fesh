@@ -561,7 +561,10 @@ partial class Game
     }
 
     /* ---------- Health ---------- */
-    void HurtPlayer(int dmg, Monster m)
+    void HurtPlayer(int dmg, Monster m) => HurtPlayer(dmg, m.X, m.Y);
+
+    // A blow from something at (fromX, fromY) knocks you back a few steps of 3 pixels.
+    void HurtPlayer(int dmg, float fromX, float fromY, int push = 4)
     {
         float taken = dmg * (Has("shell_armor") > 0 ? 0.65f : 1f);
         state.hp = Math.Max(0, state.hp - taken);
@@ -569,11 +572,11 @@ partial class Game
         hurtFlash = 0.35f;
         lastHitT = time;
         Sfx.Play("hurt");
-        float dx = player.X - m.X, dy = player.Y - m.Y, d = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));
-        for (int i = 0; i < 4; i++)
+        float dx = player.X - fromX, dy = player.Y - fromY, d = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));
+        for (int i = 0; i < push; i++)
         {
             float nx = player.X + dx / d * 3, ny = player.Y + dy / d * 3;
-            if (CanStand(nx, ny)) { player.X = nx; player.Y = ny; }
+            if (CanStand(nx, ny, Wading)) { player.X = nx; player.Y = ny; }
         }
         if (FishingModes.Contains(mode))
         {
@@ -584,13 +587,26 @@ partial class Game
         if (state.hp <= 0) Faint();
     }
 
-    // Blacking out in the caverns: you wake up outside, a bit poorer.
+    // Blacking out in the caverns: you wake up outside, a bit poorer. Knocked flat at the Starwell, you come round on the
+    // atoll's jetty, and Tidemane has gone back under.
     void Faint()
     {
         fish = null; reel = null; pointerHold = false;
         panel = null;
-        int lost = state.coins / 10;
         mode = "play";
+        if (boss != null)
+        {
+            boss = null;
+            bolts.Clear();
+            FadeThrough(() =>
+            {
+                player.X = AtollJettyX + 8; player.Y = AtollJettyY + 1; player.Face = "right";
+                state.hp = 35;
+                Save();
+            }, () => Toast("Everything went dark... You came round on the atoll's jetty. Whatever lives in the Starwell has gone back under. Eat and rest, then try again another night.", 6));
+            return;
+        }
+        int lost = state.coins / 10;
         FadeThrough(() =>
         {
             LoadScene("world");

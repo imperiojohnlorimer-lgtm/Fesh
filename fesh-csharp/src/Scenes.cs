@@ -48,6 +48,7 @@ partial class Game
 
     void LoadScene(string key)
     {
+        if (key != "world" && scene == "world") LeaveMount();
         scene = key;
         if (key == "world") { map = worldMap; basePix = worldBase; }
         else if (key == "cave") BuildCave();

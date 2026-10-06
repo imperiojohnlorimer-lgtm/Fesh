@@ -22,6 +22,18 @@ partial class Game
             }, () => OpenShop());
             return;
         }
+        // Once you've been to the atoll, Pip passes on a sailors' story (until you've found out for yourself).
+        if (state.Hinted("visitedAtoll") && !StarwellFound && !state.Hinted("pipHoofprints"))
+        {
+            state.hinted["pipHoofprints"] = true;
+            Talk(new()
+            {
+                P("Back from the atoll? Then tell me: did you see the hoofprints?"),
+                P("Sailors swear there are hoofprints in the sand out there, heading off into the palms. Hoofprints! On an atoll!"),
+                P("Nobody's ever seen a horse, mind. Anyway. What can I get you?")
+            }, () => OpenShop());
+            return;
+        }
         OpenShop();
     }
 
@@ -95,7 +107,7 @@ partial class Game
             return new Req { item = r.Item, count = r.Count, coins = r.Coins, bonus = r.Bonus, bonusCount = r.BonusCount };
         }
         // After the set list: any ordinary fish from somewhere you can already reach.
-        var pool = Data.Spots.Where(s => s.Biome != "atoll" || state.Hinted("visitedAtoll"))
+        var pool = Data.Spots.Where(s => (s.Biome != "atoll" || state.Hinted("visitedAtoll")) && SpotKnown(s))
             .SelectMany(s => Data.Common[s.Id]).Where(f => !f.Rare).ToList();
         var fish = pool[rng.Next(pool.Count)];
         int count = 2 + rng.Next(3);
@@ -198,6 +210,7 @@ partial class Game
         }
         if (state.weather == "storm") { Sfx.Play("nope"); Toast("Far too rough to sail in a storm. Try tomorrow."); return; }
         bool atoll = to == "atoll";
+        LeaveMount();
         Sfx.Play("splash");
         FadeThrough(() =>
         {

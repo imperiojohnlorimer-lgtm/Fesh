@@ -65,6 +65,11 @@ sealed class State
     public int derbyDay, derbyWins;                  // the last day you entered Pip's derby, and how many you've won
     public int chests, perfects;                     // sunken chests opened, perfect hooks
 
+    // Tidemane, the mount from the Starwell
+    public bool tamed;                               // won the fight at the Starwell
+    public bool riding;                              // in the saddle right now
+    public float mountX, mountY;                     // where Tidemane is waiting outdoors when you're not riding
+
     public bool Caught(string id) => caught.Contains(id);
     public int Pity(string spot) => pity.GetValueOrDefault(spot);
     public bool Hinted(string key) => hinted.GetValueOrDefault(key);

@@ -32,7 +32,7 @@ partial class Game
         && (!f.Legend || (state.commons.GetValueOrDefault(f.Id) == 0 && (f.Bait == null || f.Bait == bait)));
 
     static readonly HashSet<string> FreshSpots = new() { "lagoon", "oasis", "swamp", "icehole" };
-    static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff" };
+    static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff", "starwell" };
     static readonly HashSet<string> CarpLike = new() { "mud_carp", "moon_carp", "old_whiskers", "oasis_tilapia", "parrotfish" };
 
     // Fish that go for a bait are three times as likely to bite on it.
@@ -81,6 +81,7 @@ partial class Game
 
     Catchable RollCatch(string spot)
     {
+        if (spot == "starwell" && TidemaneBites(fish?.Bait)) return new Catchable { Id = "tidemane", Name = "Something enormous", Difficulty = 4.8f, Boss = true };
         var ex = Data.Creatures.FirstOrDefault(c => c.Spot == spot && Eligible(c));
         if (ex != null)
         {
@@ -107,6 +108,7 @@ partial class Game
     List<(string id, string name, double pct)> CatchOdds(string spot, int depth)
     {
         var res = new List<(string, string, double)>();
+        if (spot == "starwell" && TidemaneBites(NextBait())) return new() { ("tidemane", "Something enormous", 1) };
         double left = 1;
         var ex = Data.Creatures.FirstOrDefault(c => c.Spot == spot && Eligible(c));
         if (ex != null)
@@ -214,7 +216,7 @@ partial class Game
     (float X, float Y) RodTip()
     {
         int dir = player.Face == "left" ? -1 : 1;
-        float forward = player.X + dir * 7, up = player.Y - 15;
+        float forward = player.X + dir * 7, up = player.Y - 15 - (Riding ? 8 : 0);
         if (mode == "charging") return (player.X - dir * (1 + charge * 5), up - 2 - charge * 3);
         if (mode == "casting" && fish != null && fish.T < 0.25f)
         {
@@ -373,7 +375,7 @@ partial class Game
         var roll = fish.Roll;
         if (roll.Chest) { StartChest(); return; }
         var f = Data.FishById.GetValueOrDefault(roll.Id);
-        float zoneH = roll.Exotic ? (roll.Id == "abyssal" ? 28 : 30) : roll.Rare ? 30 : roll.Odd ? 32 : 34;
+        float zoneH = roll.Exotic ? (roll.Id == "abyssal" ? 28 : 30) : roll.Rare || roll.Boss ? 30 : roll.Odd ? 32 : 34;
         zoneH += Rod.Zone + (Perk(2) ? 3 : 0) + (SetActive("cave") ? 3 : 0) - (Starving ? 6 : 0);
         reel = new ReelState
         {
@@ -388,6 +390,16 @@ partial class Game
             Sfx.Play("coin");
         }
         mode = "reeling";
+        if (roll.Boss)
+        {
+            // It fights every way there is, switching every few seconds, and it takes a long time to bring in.
+            reel.Pull = 0.6f;
+            reel.StyleT = 4.5f;
+            Sfx.Play("neigh");
+            quake = 0.4f;
+            Toast("Something enormous takes the coconut and the line screams off the reel! It fights every way a fish can.", 5);
+            return;
+        }
         string hint = reel.Style switch
         {
             "runner" => "This one runs! When it does, let go of the reel, or the line will snap.",
@@ -405,6 +417,11 @@ partial class Game
     void GotAway(string msg)
     {
         if (fish?.Roll is { Exotic: true }) state.pity[fish.Spot] = 2;
+        if (fish?.Roll is { Boss: true })
+        {
+            msg = "It tears free and sinks back into the Starwell. It'll rise again for another coconut.";
+            quake = 0.3f;
+        }
         fish = null; reel = null; pointerHold = false;
         mode = "play";
         Sfx.Play("fail");
@@ -447,6 +464,11 @@ partial class Game
                 SetPrompt(fish.Spot == "icehole" ? "Jig with [E] each time the ring closes. [Esc] reel in" : "Waiting for a bite... [E] reel in");
                 if (fish.Timer <= 0)
                 {
+                    if (fish.Spot == "starwell" && !state.tamed && state.night && fish.Bait != "coconut" && !state.Hinted("sniffed"))
+                    {
+                        state.hinted["sniffed"] = true;
+                        Toast("Something huge circles under your bobber, noses at the bait, and turns away. It wants something sweeter.", 5);
+                    }
                     fish.Roll = RollCatch(fish.Spot);
                     fish.BiteT = BiteWindow;
                     mode = "bite";
@@ -476,6 +498,22 @@ partial class Game
         var r = reel;
         bool hold = ReelHeld(), tap = reelTap;
         reelTap = false;
+        if (r.Roll.Boss)
+        {
+            // Tidemane switches how it fights every few seconds (never in the middle of a run or a leap).
+            r.StyleT -= dt;
+            if (r.StyleT <= 0 && r.Leap <= 0 && r.Running <= 0)
+            {
+                var styles = new[] { "dart", "runner", "jumper", "bottom" }.Where(s => s != r.Style).ToArray();
+                r.Style = styles[rng.Next(styles.Length)];
+                r.StyleT = Rand(4f, 6f);
+                r.HoldT = 0; r.Digging = false; r.Tension = Math.Min(r.Tension, 0.3f);
+                r.RunT = Rand(0.6f, 1.2f); r.LeapT = Rand(0.6f, 1.2f);
+                string shout = r.Style switch { "runner" => "It's bolting!", "jumper" => "It's leaping!", "bottom" => "It's diving deep!", _ => "It's thrashing!" };
+                Floater(shout, player.X, player.Y - 30, "#ffd76a");
+                Sfx.Play("splash");
+            }
+        }
         bool leaping = r.Leap > 0;
         if (!leaping)
         {
@@ -534,7 +572,7 @@ partial class Game
                     {
                         r.LeapDone = true;
                         bool good = r.LeapMark >= 0.6f && r.LeapMark <= 0.85f;
-                        r.Progress += good ? 0.14f : -0.08f;
+                        r.Progress += good ? 0.14f * r.Pull : -0.08f;
                         Floater(good ? "Nice!" : "Missed!", player.X, player.Y - 24, good ? "#7fd36b" : "#ff9a8a");
                         Sfx.Play(good ? "coin" : "nope");
                     }
@@ -564,7 +602,7 @@ partial class Game
                 gain = 0.16f;
                 if (tap && r.FishY >= r.ZoneY - 4 && r.FishY <= r.ZoneY + r.ZoneH + 4)
                 {
-                    r.Progress += 0.05f * ReelMul;
+                    r.Progress += 0.05f * ReelMul * r.Pull;
                     Sfx.Reel();
                 }
                 prompt = r.Digging ? "It's digging in! Let go, then tap [Space] in short pumps" : "Tap [Space] in short pumps to haul it up.";
@@ -579,7 +617,7 @@ partial class Game
         if (!leaping)
         {
             float loss = (0.13f + r.Diff * 0.035f) * (Perk(9) ? 0.85f : 1) + (r.Digging ? 0.1f : 0);
-            r.Progress += (r.Inside ? gain * ReelMul : -loss) * dt;
+            r.Progress += (r.Inside ? gain * ReelMul * r.Pull : -loss) * dt;
         }
         if (hold) { r.Tick += dt; if (r.Tick > 0.08f) { r.Tick = 0; Sfx.Reel(); } }
         SetPrompt(prompt, null, urgent);
@@ -602,6 +640,7 @@ partial class Game
 
     void LandCatch()
     {
+        if (reel.Roll.Boss) { BossBreach(); return; }
         var roll = reel.Roll;
         string spot = fish.Spot;
         float bonus = (reel.Perfect ? 1.1f : 1) * (fish.BigShadow ? 1.15f : 1);

@@ -102,6 +102,14 @@ static class Data
         new("atoll", "Starfall Atoll", "Tropical", "Starfall Atoll. Warm water, white sand, and something big out past the reef.")
     };
 
+    // Tidemane, the hippocamp of the Starwell: fished up and fought on the atoll, then ridden as a mount.
+    public const string MountName = "Tidemane";
+    public static readonly LegendInfo Tidemane = new("tidemane",
+        "Half horse, half fish, and all stubbornness. A mane of sea foam, coral horns, starlight speckled down its flanks, and a tail "
+        + "that could flip a rowing boat. It gallops on sand and swims the open sea faster than any sail.",
+        "Hooked in the Starwell at night on a coconut, then worn down on the sand until it chose you.",
+        "Hoofprints on Starfall Atoll lead into the palms and stop at the water.");
+
     public static readonly Dictionary<string, CommonFish[]> Common = new()
     {
         ["lagoon"] = new CommonFish[]
@@ -168,6 +176,12 @@ static class Data
             new("golden_marlin", "Golden marlin", 3.4f, 1, true, "day", Kg: 120f, Style: "jumper", Depth: "deep"),
             new("giant_squid", "Giant squid", 3.3f, 1, true, "night", Kg: 150f, Style: "bottom", Depth: "deep"),
             new("starfall_ray", "Starfall ray", 4.5f, 1, true, "night", Kg: 200f, Style: "runner", Depth: "deep", FullMoon: true, Legend: true, Bait: "glow_shrimp")
+        },
+        ["starwell"] = new CommonFish[]
+        {
+            new("seafoam_goby", "Seafoam goby", 1.2f, Kg: 0.3f, Style: "bottom", Depth: "shallow"),
+            new("blue_hole_grouper", "Blue hole grouper", 1.9f, Kg: 14f, Style: "bottom", Depth: "deep"),
+            new("moonglass_fish", "Moonglass fish", 2.8f, 1, true, "night", Kg: 1.5f, Style: "jumper")
         }
     };
 
@@ -233,8 +247,10 @@ static class Data
         // Cave spots move with each randomly generated floor; their real positions come from Game.SpotPos.
         new("cavepool", "Cave pool", "Fish the cave pool", 0, 0, 36, "frost", "cave"),
         new("ancientpool", "Ancient pool", "Fish the ancient pool", 0, 0, 44, "frost", "cave"),
-        new("atolllagoon", "Atoll lagoon", "Fish the atoll lagoon", 875, 215, 30, "atoll"),
-        new("dropoff", "Deep drop-off", "Fish the deep drop-off", 875, 159, 28, "atoll")
+        new("atolllagoon", "Atoll lagoon", "Fish the atoll lagoon", 1060, 272, 32, "atoll"),
+        new("dropoff", "Deep drop-off", "Fish the deep drop-off", 1135, 76, 36, "atoll"),
+        // A blue hole hidden in a ring of palms on the atoll. It stays off the map and out of the Fish log until you find it.
+        new("starwell", "The Starwell", "Fish the Starwell", Game.StarwellX, Game.StarwellY, 40, "atoll")
     };
     public static readonly Dictionary<string, Spot> SpotById = Spots.ToDictionary(s => s.Id);
 

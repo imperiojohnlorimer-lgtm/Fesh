@@ -41,6 +41,7 @@ This publishes a single self-contained `Fesh.exe` and wraps it in `dist\Fesh-Set
 | Tab | Map of the islands |
 | J / C | Fesh-dex (creatures and Fish log) / case board |
 | M | Sound on or off |
+| R | Ride Tidemane, or hop off (once you have it). From anywhere outdoors it whistles Tidemane over |
 | F11 | Fullscreen |
 | Esc | Back, reel in, stop spearfishing, or the pause menu (change your look, sound and music here) |
 
@@ -58,7 +59,7 @@ The mystery stays on Saltmere; the other three are there to explore and fish.
 | Frostfang Isle (north-east) | Snow | Ice hole: Arctic char, frost smelt, *crystal pike* (rare, night). Glacier shore: polar cod, snow crab, *aurora trout* (rare, full moon). Cave pools: blind cavefish, glow shrimp, *ghost eel* (rare). Ancient pool (cave floor 12): abyssal lanternfish, pale cave shark, **Ancient coelacanth** (legend) | Sheep, at the glacier shore |
 | Sunscald Dunes (south-east) | Desert | Oasis: oasis tilapia, desert pupfish, *mirage koi* (rare, day), **Sunscale lungfish** (legend). Mirage coast: sun mackerel, sand ray, *thunderfin* (rare, storms only) | Cat, at the oasis |
 | Mirewood (south-west) | Jungle | Mangrove swamp: mudskipper, swamp catfish, *emerald arowana* (rare), **Mire leviathan** (legend). Coral shallows: parrotfish, jungle piranha | Pig, in the swamp |
-| Starfall Atoll (east, boat only) | Tropical | Atoll lagoon: clownfish, Moorish idol, *pearl angelfish* (rare), *silver moonfish* (rare, full moon). Deep drop-off: bluefin tuna, sailfish, *golden marlin* (rare, day), *giant squid* (rare, night), **Starfall ray** (legend) | Parrot, in the lagoon |
+| Starfall Atoll (far east, boat only) | Tropical | A big ring of sand and palms around a lagoon. Atoll lagoon: clownfish, Moorish idol, *pearl angelfish* (rare), *silver moonfish* (rare, full moon). Deep drop-off: bluefin tuna, sailfish, *golden marlin* (rare, day), *giant squid* (rare, night), **Starfall ray** (legend). And something hidden in the palms (see Tidemane below) | Parrot, in the lagoon |
 
 Each odd catch has a 7% chance per bite at its spot. You get a card for it, then the animal runs off.
 Everything you catch is tracked in the Fesh-dex's **Fish log**, island by island, with your heaviest catch of each.
@@ -154,16 +155,45 @@ Make a **sailboat** at a workbench from 20 wood, 4 iron bars and sailcloth from 
 **Pip's jetty** (Saltmere's east beach) and press E to sail to Starfall Atoll, and back from the atoll's jetty.
 You can't sail in a storm.
 
+## Tidemane (spoilers)
+Starfall Atoll hides a secret. A trail of hoofprints leads from the jetty into a ring of palms on the south-east side,
+where a gap opens onto **the Starwell**, a deep blue hole with a coral carving beside it. The Starwell stays off the
+map and shows as ??? in the Fish log until you find it. By day it has its own fish (seafoam goby, blue hole grouper,
+*moonglass fish*, rare, night). Pip passes on a rumour about the hoofprints once you've been to the atoll.
+
+The carving tells you the rest: at **night**, fish the Starwell with a **coconut** (chop a palm, then pick it as your
+bait in the tackle box). Something enormous takes it, and you get a long reel fight that switches between all four
+fight styles every few seconds. Land it and **Tidemane**, a hippocamp (front half horse, back half fish, with coral
+horns and a mane of sea foam), bursts out onto the sand. Then you fight it in the glade:
+
+- It circles you, then **rears and charges** in a straight line (16 damage). Charging into a palm or the water's
+  edge leaves it dazed for longer.
+- After a charge or a stomp it's **winded**: blows land two and a half times as hard. Any blow tires it out more with a
+  better weapon, and it shrugs off blows for a moment after each one.
+- Once it's tired it also **stomps**, sending a shockwave across the sand (12 damage). Get right under its hooves,
+  or well away.
+- Near the end it **dives** into the pool and bursts out on your side, spitting water bolts (9 each).
+- Wear its wild spirit down to nothing and it lies down and lets you near. It's yours.
+
+If you black out you wake on the atoll's jetty and it goes back under; try again with another coconut. Walking far
+away from the Starwell ends the fight too.
+
+**Riding:** press R to climb on and R to hop off (on dry land). Tidemane gallops much faster than you walk, and
+swims through any water, including the open sea between islands (but not deep water in a storm). From anywhere
+outdoors, R whistles it over. Going indoors, into the caves or out by boat leaves it waiting where you got off; the
+map shows where.
+
 ## Music
-Every island has its own looping tune, and so do Frostfang Caverns and the insides of houses. Rain adds its own
-patter. Like the sound effects, the music is composed by code at startup, so there are no audio files.
-Turn it on or off from the pause menu.
+Every island has its own looping tune, and so do Frostfang Caverns, the insides of houses and the fight with
+Tidemane. Rain adds its own patter. Like the sound effects, the music is composed by code at startup, so there are
+no audio files. Turn it on or off from the pause menu.
 
 ## Health
-The heart bar (top left, under the clock) is your health. Only cave monsters hurt you. Health comes back slowly
-while your food meter is above 30 and nothing has hit you for a few seconds, food heals half of what it fills,
-and resting restores 50. Starving wears health down, but never below 10. If it reaches zero in the caves you
-black out and wake up at the cave mouth with 35 health and 10% fewer coins.
+The heart bar (top left, under the clock) is your health. Only cave monsters and Tidemane hurt you. Health comes
+back slowly while your food meter is above 30 and nothing has hit you for a few seconds, food heals half of what it
+fills, and resting restores 50. Starving wears health down, but never below 10. If it reaches zero in the caves you
+black out and wake up at the cave mouth with 35 health and 10% fewer coins. At the Starwell you wake on the atoll's
+jetty with 35 health.
 
 ## Food and your bag
 Your food meter (next to the heart bar) drops slowly as you play and by 10 each time you rest. Below a quarter you get a
@@ -279,6 +309,7 @@ taking down a shack also packs up everything inside it.
 - `src/Life.cs`: gulls, butterflies and Pip waving
 - `src/Trade.cs`: Pip's shop, Tomas's requests, aquariums, sailing and planted berry bushes
 - `src/Weather.cs`: the daily weather, rain, storms and closed bridges
+- `src/Tidemane.cs`: the Starwell's secret, the fight with Tidemane, and riding it
 - `src/Music.cs`: the music, composed by code on a background thread at startup
 - `src/UiTrade.cs`: the shop and aquarium panels
 - `src/Build.cs`: collision, placing and removing pieces, driftwood and stone spawning
@@ -300,7 +331,7 @@ depth, bait, every fight style, perfect hooks, sizes, records, chests, the ice h
 worms and crickets, the tackle box, the derby, legends, the moon and storms), all five
 islands, odd catches, chopping, mining, crafting, cooking, eating, houses, the cave (ore tiers, monsters,
 health, fainting, the Ancient Floor and the lift), animals, the shop, requests, bait, weather, planters, the
-aquarium, the boat, music and every screen.
+aquarium, the boat, the Starwell and the whole fight with Tidemane, riding and swimming, music and every screen.
 It checks every island and fishing spot can be reached on foot, generates 33 random cave floors and checks each
 one can be crossed (hole, ore and pool all reachable), saves screenshots, writes the generated map to
 `map.txt`, and writes a PASS/FAIL log:

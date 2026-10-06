@@ -17,6 +17,7 @@ partial class Game
         bool title = mode == "title";
         if (!title) DrawHud();
         if (!title) DrawFishingUi();
+        if (!title && (BossFighting || BossOnLine)) DrawBossBar();
         if (mode == "build") DrawBuildBar();
         if (!title) DrawPrompt();
         DrawToast();
@@ -26,6 +27,7 @@ partial class Game
         if (mode == "catch") DrawCatch();
         if (mode == "odd") DrawOdd();
         if (mode == "legend") DrawLegend();
+        if (mode == "tamed") DrawTamed();
         if (mode == "panel" && panel == "dex") DrawDex();
         if (mode == "panel" && panel == "case") DrawCase();
         if (mode == "panel" && panel == "map") DrawMap();
@@ -411,7 +413,7 @@ partial class Game
     List<(string head, List<CommonFish> fish)> LogGroups(int page)
     {
         var b = Data.Biomes[page];
-        var groups = Data.Spots.Where(s => s.Biome == b.Id).Select(s => (s.Label, Data.Common[s.Id].ToList())).ToList();
+        var groups = Data.Spots.Where(s => s.Biome == b.Id).Select(s => (SpotKnown(s) ? s.Label : "???", Data.Common[s.Id].ToList())).ToList();
         groups.Add(("Crab pots", Data.PotCatch[b.Id].ToList()));
         return groups;
     }
@@ -499,7 +501,7 @@ partial class Game
         var groups = log && logPage < 5 ? LogGroups(logPage) : new();
         var heights = groups.Select(g => (int)(headH + g.fish.Count * rowH + 8)).ToList();
         var cols = TwoColumns(heights);
-        float logH = logPage < 5 ? cols.Max(c => c.Sum(i => heights[i] + cardGap)) : 330;
+        float logH = logPage < 5 ? cols.Max(c => c.Sum(i => heights[i] + cardGap)) : 380;
 
         float contentH = log ? 50 + 34 + logH : cardH + 24 + 30 + 32;
         float h = padT + 46 + 10 + lead.Count * 28 + 16 + contentH + padB + 6;
@@ -583,7 +585,7 @@ partial class Game
         {
             // Legends, with a hint for each one still out there.
             float cx = x, cy = y;
-            Gfx.Box(cx, cy, colW, 300, CardBg, Pal.C("#c9b48f"), 2, 5);
+            Gfx.Box(cx, cy, colW, 350, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text($"Legends: {Data.Legends.Keys.Count(id => state.commons.GetValueOrDefault(id) > 0)} of {Data.Legends.Count}", cx + 12, cy + 8, FontKind.Ui700, 18, Pal.PaperInk);
             cy += 38;
             foreach (var (id, info) in Data.Legends)
@@ -595,6 +597,11 @@ partial class Game
                 Gfx.Text(Gfx.Ellipsize(note, FontKind.Note, 15, colW - 54), cx + 42, cy + 22, FontKind.Note, 15, Muted);
                 cy += 50;
             }
+            // Not a fish, but the atoll's other legend.
+            Gfx.Rect(cx + 10, cy - 6, colW - 20, 1, Pal.C("#e0d0b0"));
+            if (state.tamed) DrawIcon("tidemane", cx + 10, cy, 24); else Gfx.TextCenter("?", cx + 22, cy, FontKind.Ui700, 20, Pal.C("#9a8a70"));
+            Gfx.Text(state.tamed ? $"{Data.MountName}, your mount" : "???", cx + 42, cy + 1, FontKind.Ui700, 17, state.tamed ? Pal.C("#1d6f68") : Pal.C("#9a8a70"));
+            Gfx.Text(Gfx.Ellipsize(state.tamed ? Data.Tidemane.Where : Data.Tidemane.Hint, FontKind.Note, 15, colW - 54), cx + 42, cy + 22, FontKind.Note, 15, Muted);
             cx = x + colW + gap; cy = y;
             Gfx.Box(cx, cy, colW, 196, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text("Odd catches", cx + 12, cy + 8, FontKind.Ui700, 18, Pal.PaperInk);
@@ -664,13 +671,28 @@ partial class Game
     /* ---------- Legendary catch card ---------- */
     void DrawLegend()
     {
+        var info = Data.Legends[legendId];
+        string weight = state.records.TryGetValue(legendId, out float kg) ? $" It weighs {Kg(kg)}." : "";
+        if (GoldCard(info.Art, Data.FishById[legendId].Name, "Legendary", info.Desc,
+            $"{info.Where}{weight} It's in your bag. Pip would pay a fortune, but it belongs in an aquarium.", "Incredible!")) CloseLegend();
+    }
+
+    // Winning Tidemane over at the Starwell.
+    void DrawTamed()
+    {
+        var t = Data.Tidemane;
+        if (GoldCard(t.Art, Data.MountName, "Your mount", t.Desc,
+            $"{t.Where} Press R to ride. From anywhere outdoors, R whistles it over.", "Ride on!")) CloseTamed();
+    }
+
+    // A glowing card for something extraordinary: portrait, name, a tag, a description, a boxed note and one button.
+    // Returns true when the button is clicked.
+    bool GoldCard(string art, string name, string tag, string about, string note, string button)
+    {
         Backdrop();
         const float cw = 520, pad = 17, iw = cw - pad * 2, artH = iw / 2;
-        var info = Data.Legends[legendId];
-        string name = Data.FishById[legendId].Name;
-        var desc = Gfx.Wrap(info.Desc, FontKind.Note, 20, iw);
-        string weight = state.records.TryGetValue(legendId, out float kg) ? $" It weighs {Kg(kg)}." : "";
-        var where = Gfx.Wrap($"{info.Where}{weight} It's in your bag. Pip would pay a fortune, but it belongs in an aquarium.", FontKind.Ui500, 17, iw - 32);
+        var desc = Gfx.Wrap(about, FontKind.Note, 20, iw);
+        var where = Gfx.Wrap(note, FontKind.Ui500, 17, iw - 32);
         float boxH = 12 + where.Count * 22 + 10;
         float h = pad + artH + 14 + 38 + 8 + 26 + 12 + desc.Count * 29 + 12 + boxH + 18 + 56 + pad + 8;
         float x = (Gfx.LW - cw) / 2, y = Math.Max(10, (Gfx.LH - h) / 2);
@@ -678,13 +700,13 @@ partial class Game
         Gfx.Box(x, y, cw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
         float cy = y + pad;
         Gfx.Box(x + pad - 2, cy - 2, iw + 4, artH + 4, Pal.Ink, Pal.Ink, 2, 4);
-        Gfx.Portrait(info.Art, false, x + pad, cy, iw, artH);
+        Gfx.Portrait(art, false, x + pad, cy, iw, artH);
         cy += artH + 14;
         Gfx.Text(name, x + pad, cy, FontKind.Ui700, 37, Pal.PaperInk);
         cy += 38 + 8;
-        float rw = Gfx.Measure("Legendary", FontKind.Ui600, 17) + 18;
+        float rw = Gfx.Measure(tag, FontKind.Ui600, 17) + 18;
         Gfx.Rect(x + pad, cy, rw, 26, Pal.Ink, 3);
-        Gfx.Text("Legendary", x + pad + 9, cy + 4, FontKind.Ui600, 17, Pal.Lantern);
+        Gfx.Text(tag, x + pad + 9, cy + 4, FontKind.Ui600, 17, Pal.Lantern);
         cy += 26 + 12;
         Lines(desc, x + pad, cy, 29, FontKind.Note, 20, Pal.PaperInk);
         cy += desc.Count * 29 + 12;
@@ -692,7 +714,25 @@ partial class Game
         Gfx.Dashed(x + pad, cy, iw, boxH, 2, 6, Rust);
         Lines(where, x + pad + 16, cy + 12, 22, FontKind.Ui500, 17, Pal.Ink);
         cy += boxH + 18;
-        if (BigButton("Incredible!", x + pad, cy, true)) CloseLegend();
+        return BigButton(button, x + pad, cy, true);
+    }
+
+    /* ---------- Tidemane's bar ---------- */
+    // Over the top of the screen during the fight: on the line it's "something enormous"; on the sand, its wild spirit.
+    void DrawBossBar()
+    {
+        const float w = 520, h = 56, y = 54;
+        float x = Gfx.LW / 2 - w / 2;
+        bool line = BossOnLine;
+        string name = line ? "Something enormous" : Data.MountName;
+        Gfx.Box(x, y, w, h, Pal.C("rgba(16,36,58,0.92)"), Pal.C("#5fd6c9"), 2, 6);
+        Gfx.Text(name, x + 16, y + 7, FontKind.Ui700, 20, Pal.C("#bff4ff"));
+        string sub = line ? "Reel it in!" : boss.Phase == "winded" ? "Winded! Strike now!" : "Wild spirit";
+        Gfx.Text(sub, x + w - 16 - Gfx.Measure(sub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16,
+            !line && boss.Phase == "winded" ? Pal.Lantern : Pal.C("#9fc3d1"));
+        float k = line ? 1 : Math.Clamp(boss.Spirit / BossSpirit, 0, 1);
+        Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
+        if (k > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * k), 12, line ? Pal.C("#2a9d8f") : Pal.C("#5fd6c9"), 4);
     }
 
     /* ---------- Cave lift ---------- */
@@ -775,12 +815,12 @@ partial class Game
 
         bool atollKnown = state.Hinted("visitedAtoll");
         foreach (var (name, wx, wy) in new[] { ("Saltmere Island", 255f, 182f), ("Frostfang Isle", 560f, 186f), ("Sunscald Dunes", 760f, 292f),
-                     ("Mirewood", 100f, 236f), (atollKnown ? "Starfall Atoll" : "Unknown island", 880f, 252f) })
+                     ("Mirewood", 100f, 236f), (atollKnown ? "Starfall Atoll" : "Unknown island", 1120f, 170f) })
         {
             var p = M(wx, wy);
             Shadowed(name, p.X - Gfx.Measure(name, FontKind.Ui700, 22) / 2, p.Y, FontKind.Ui700, 22, White);
         }
-        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && (s.Biome != "atoll" || atollKnown)))
+        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && (s.Biome != "atoll" || atollKnown) && SpotKnown(s)))
         {
             var p = M(s.X, s.Y);
             bool open = SpotOpen(s.Id);
@@ -789,7 +829,9 @@ partial class Game
             string label = open ? s.Label : s.Label + " (closed)";
             Shadowed(label, p.X - Gfx.Measure(label, FontKind.Ui600, 14) / 2, p.Y + 8, FontKind.Ui600, 14, Pal.Paper);
         }
-        foreach (var (label, wx, wy) in new[] { ("Frostfang Caverns", MouthDoorX, MouthDoorY - 26), ("Pip's stall", PipX, PipY - 6), ("Pip's jetty", SaltJettyX, SaltJettyY) })
+        var places = new List<(string, float, float)> { ("Frostfang Caverns", MouthDoorX, MouthDoorY - 26), ("Pip's stall", PipX, PipY - 6), ("Pip's jetty", SaltJettyX, SaltJettyY) };
+        if (state.tamed && !state.riding) places.Add((Data.MountName, state.mountX, state.mountY - 6));
+        foreach (var (label, wx, wy) in places)
         {
             var p = M(wx, wy);
             Gfx.Circle(p.X, p.Y, 5, Pal.Ink);

@@ -124,6 +124,37 @@ partial class Game
 
     string CaveLayout() => new(Enumerable.Range(0, CaveW * CaveH).Select(i => caveMap[i / CaveW, i % CaveW]).ToArray());
 
+    // Every outdoor tile you could reach from a point on foot in waders (land and shallow water).
+    HashSet<(int, int)> WadeReach(float px, float py)
+    {
+        var start = ((int)(px / T), (int)(py / T));
+        var seen = new HashSet<(int, int)> { start };
+        var stack = new Stack<(int, int)>();
+        stack.Push(start);
+        while (stack.Count > 0)
+        {
+            var (x, y) = stack.Pop();
+            foreach (var (ox, oy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            {
+                var n = (x + ox, y + oy);
+                char t = TileAt(n.Item1, n.Item2);
+                if (!(Walkable(t) || Wadeable(t)) || !seen.Add(n)) continue;
+                stack.Push(n);
+            }
+        }
+        return seen;
+    }
+
+    // Puts Tidemane on the sand north of the Starwell, winded, with you right beside it, facing it.
+    void BossBeside(float spirit = -1)
+    {
+        boss.X = StarwellX - 30; boss.Y = StarwellY - 45; boss.Dir = 1; boss.Lift = 0; boss.Ring = -1; boss.Hurt = 0;
+        if (spirit >= 0) boss.Spirit = spirit;
+        Winded(boss, 5);
+        player.X = boss.X + 12; player.Y = boss.Y; player.Face = "left";
+        swingT = 0;
+    }
+
     // Everything a floor needs to be playable, checked from the foot of the ladder.
     List<string> FloorProblems()
     {
@@ -1178,6 +1209,221 @@ partial class Game
         Check("an old save moves wood and stone into the bag and asks for a fisher",
             old != null && old.inv.GetValueOrDefault("wood") == 12 && old.inv.GetValueOrDefault("stone") == 5 && old.inv.ContainsKey("rod_old")
             && !old.created && old.food == 100 && old.builds.Count == 1 && old.scene == "world");
+
+        // ---------- Starfall Atoll, the Starwell and Tidemane ----------
+        state.night = false; state.weather = "clear"; mode = "play"; boss = null; fish = null; reel = null;
+        state.tackle["bait"] = "auto"; iframes = 0; state.hp = 100; state.food = 90;
+        int atollLand = 0;
+        for (int yy = 0; yy < ROWS; yy++)
+            for (int xx = 0; xx < COLS; xx++)
+                if (biome[yy, xx] == 4 && Land.Contains(worldMap[yy, xx])) atollLand++;
+        Check($"Starfall Atoll is a big island now ({atollLand} land tiles)", atollLand > 500);
+        Check("waders can't wade across to the atoll", !WadeReach(160, 115).Any(t => biome[t.Item2, t.Item1] == 4 && Land.Contains(worldMap[t.Item2, t.Item1])));
+        player.X = AtollJettyX + 4; player.Y = AtollJettyY + 1; player.Face = "right"; yield return 3;
+        var fromJetty = Reachable();
+        Check("the Starwell glade can be walked to from the jetty", fromJetty.Contains(((int)(StarwellX / T) - 4, (int)(StarwellY / T))));
+        int ringPalms = trees.Count(tr => tr.kind == 'h' && GladeDist(tr.x, tr.y) >= GladeR && GladeDist(tr.x, tr.y) < PalmRingR);
+        Check($"a ring of palms hides it ({ringPalms} palms) and hoofprints lead there ({hoofprints.Count} tiles)", ringPalms >= 30 && hoofprints.Count >= 12);
+        Check("the Starwell starts out secret: not on the map, ??? in the Fish log", !StarwellFound && LogGroups(4).Any(g => g.head == "???"));
+        yield return 10;
+        pendingShot = "62-atoll-jetty"; yield return 2;
+        player.X = StarwellX - 9 * T; player.Y = StarwellY + 3; player.Face = "right"; yield return 2;
+        Inp.Hold(KeyboardKey.Right, true); yield return 45; Inp.Hold(KeyboardKey.Right, false); yield return 3;
+        Check($"walking in through the gap in the palms finds the Starwell ({toastMsg})", StarwellFound && toastMsg.Contains("Starwell"));
+        pendingShot = "63-starwell"; yield return 2;
+        player.X = CarvingX; player.Y = CarvingY + 10; player.Face = "up"; yield return 3;
+        Check($"there's a carving by the pool (prompt: {prompt.Text})", target?.Type == "carving");
+        Inp.Tap(KeyboardKey.E); yield return 5;
+        Check("the carving gives the secret away", mode == "dialogue" && dlg.Lines.Any(l => l.T.Contains("coconut")) && dlg.Lines.Any(l => l.T.Contains("night") || l.T.Contains("moon")));
+        while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 3; }
+
+        // What bites at the Starwell
+        var (wsx, wsy) = StandNear("starwell");
+        player.X = wsx; player.Y = wsy; yield return 3;
+        Check($"the Starwell can be fished (prompt: {prompt.Text})", target?.Type == "spot" && target.Id == "starwell");
+        fish = new FishCast { Spot = "starwell", Bait = "coconut" };
+        Check("nothing strange bites there by day", Enumerable.Range(0, 300).All(_ => !RollCatch("starwell").Boss));
+        state.night = true; fish.Bait = "worm";
+        Check("nor at night on any other bait", Enumerable.Range(0, 300).All(_ => !RollCatch("starwell").Boss));
+        fish.Bait = "coconut";
+        Check("but at night, a coconut brings up something enormous", RollCatch("starwell").Boss);
+        fish = null;
+        Give("coconut", 4); state.tackle["bait"] = "coconut";
+        var wellOdds = CatchOdds("starwell", 1);
+        Check($"the fish finder knows ({wellOdds[0].name}, {wellOdds[0].pct:0.00})", wellOdds.Count == 1 && wellOdds[0].id == "tidemane");
+
+        // On the line: it fights every way a fish can, switching every few seconds
+        int coco = Has("coconut");
+        Inp.Tap(KeyboardKey.E); yield return 2;
+        Check($"the cast uses a coconut ({coco} -> {Has("coconut")})", fish?.Bait == "coconut" && Has("coconut") == coco - 1);
+        for (int i = 0; i < 600 && mode is "casting" or "waiting"; i++) yield return 1;
+        Check("something bites", mode == "bite" && fish.Roll.Boss);
+        Inp.Tap(KeyboardKey.E); yield return 2;
+        Check("hooking it starts a long, hard fight", mode == "reeling" && BossOnLine && reel.Pull < 1);
+        yield return 20;
+        pendingShot = "64-boss-on-the-line"; yield return 2;
+        string style0 = reel.Style;
+        reel.Running = 0; reel.Leap = 0; reel.StyleT = 0.01f; yield return 2;
+        Check($"it switches fighting style ({style0} -> {reel.Style})", reel.Style != style0);
+        reel.Progress = 0.8f; yield return 50;
+        Check($"the fight has its own tune ({Music.Current})", Music.Current == "boss");
+        reel.Progress = 0.01f; reel.FishY = 0; reel.ZoneY = Bar - reel.ZoneH; reel.Running = 0; reel.Leap = 0; reel.LeapT = 99; reel.RunT = 99; reel.StyleT = 99;
+        Inp.Hold(KeyboardKey.Space, false);
+        for (int i = 0; i < 30 && mode == "reeling"; i++) yield return 1;
+        Check($"losing it sends it back down for another night ({toastMsg})", mode == "play" && toastMsg.Contains("Starwell") && boss == null);
+
+        // Landing it brings it out onto the sand
+        player.X = wsx; player.Y = wsy;
+        Inp.Tap(KeyboardKey.E); yield return 2;
+        for (int i = 0; i < 600 && mode is "casting" or "waiting"; i++) yield return 1;
+        Inp.Tap(KeyboardKey.E); yield return 2;
+        reel.Progress = 1.2f; reel.Running = 0; reel.Leap = 0; reel.StyleT = 99; yield return 2;
+        Check($"landing it brings it bursting out of the pool ({boss?.Phase})", boss != null && boss.Phase == "emerge" && mode == "play" && !BossOnLine);
+        iframes = 30;
+        yield return 18;
+        pendingShot = "65-boss-emerges"; yield return 2;
+        for (int i = 0; i < 60 && boss.Phase == "emerge"; i++) yield return 1;
+        Check($"it lands on the sand and starts circling ({boss.Phase})", boss.Phase == "stalk" && BossCanBe(boss.X, boss.Y));
+        Check($"mid-fight the only thing to do is fight (prompt: {prompt.Text})", target == null || target.Type is "boss" or "info");
+
+        // A charge that hits you hurts, and leaves it winded
+        player.X = StarwellX; player.Y = StarwellY - 45; player.Face = "left";
+        boss.X = StarwellX - 34; boss.Y = player.Y; boss.Lift = 0;
+        boss.Phase = "charge"; boss.T = 0; boss.Ran = 0; boss.Hit = false; boss.AimX = 1; boss.AimY = 0; boss.Dir = 1;
+        state.hp = 100; iframes = 0;
+        yield return 6;
+        pendingShot = "66-boss-charge"; yield return 2;
+        for (int i = 0; i < 90 && boss.Phase == "charge"; i++) yield return 1;
+        Check($"a charge that hits you hurts ({state.hp:0} health)", state.hp < 100 && state.hp >= 100 - ChargeHurt - 0.1f);
+        Check($"after a charge it's winded ({boss.Phase})", boss.Phase == "winded");
+
+        // Blows: big ones while it's winded, then a moment where it shrugs them off
+        iframes = 30;
+        BossBeside();
+        yield return 2;
+        Check($"you can strike it up close (prompt: {prompt.Text})", target?.Type == "boss");
+        float sp0 = boss.Spirit;
+        Inp.Tap(KeyboardKey.E); yield return 2;
+        Check($"a blow while it's winded tires it out a lot ({sp0:0} -> {boss.Spirit:0})", boss.Spirit <= sp0 - 10);
+        sp0 = boss.Spirit; swingT = 0;
+        Inp.Tap(KeyboardKey.E); yield return 2;
+        Check("it shrugs off another blow straight after", boss.Spirit == sp0);
+        pendingShot = "67-boss-winded"; yield return 2;
+
+        // The stomp: the shockwave knocks you over at a distance, but not right under its hooves
+        state.hp = 100; iframes = 0;
+        BossBeside();
+        boss.Phase = "stompRear"; boss.T = 0.59f; boss.Hit = false;
+        player.X = boss.X + 40; yield return 16;
+        pendingShot = "68-boss-stomp"; yield return 2;
+        yield return 25;
+        Check($"the stomp's shockwave hurts ({state.hp:0} health)", state.hp < 100);
+        state.hp = 100; iframes = 0;
+        BossBeside();
+        boss.Phase = "stompRear"; boss.T = 0.59f; boss.Hit = false;
+        player.X = boss.X + 5; yield return 50;
+        Check($"but right under its hooves you're safe ({state.hp:0} health)", state.hp == 100);
+
+        // Into the pool and back out, spitting water
+        iframes = 30;
+        BossBeside();
+        StartDive(boss);
+        for (int i = 0; i < 300 && boss.Phase != "stalk"; i++) yield return 1;
+        Check($"it dives, then bursts out spitting water bolts ({bolts.Count})", boss.Phase == "stalk" && bolts.Count >= 3);
+        pendingShot = "69-boss-bolts"; yield return 2;
+        state.hp = 100; iframes = 0;
+        bolts.Clear();
+        bolts.Add(new Bolt { X = player.X - 20, Y = player.Y - 5, Vx = 85, Vy = 0, Life = 2 });
+        yield return 20;
+        Check($"a water bolt hurts ({state.hp:0} health)", state.hp < 100);
+
+        // Knocked flat: you come round on the jetty, and it's gone back under
+        state.hp = 3; iframes = 0;
+        bolts.Add(new Bolt { X = player.X - 20, Y = player.Y - 5, Vx = 85, Vy = 0, Life = 2 });
+        for (int i = 0; i < 200 && !(mode == "play" && boss == null && state.hp == 35); i++) yield return 1;
+        Check($"fainting wakes you on the atoll's jetty ({player.X:0},{player.Y:0}, {state.hp:0} health)",
+            boss == null && state.hp == 35 && Dist(player.X, player.Y, AtollJettyX + 8, AtollJettyY + 1) < 4 && !state.tamed);
+
+        // Worn right out, it calms down and becomes yours
+        state.hp = 100;
+        player.X = wsx; player.Y = wsy;
+        BossBreach(); iframes = 30;
+        for (int i = 0; i < 60 && boss.Phase == "emerge"; i++) yield return 1;
+        BossBeside(3); yield return 2;
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        Check($"worn out, it lies down on the sand ({boss?.Phase})", boss?.Phase == "calm" && mode == "dialogue");
+        yield return 30;
+        pendingShot = "70-boss-calm"; yield return 2;
+        while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 3; }
+        Check("then it's yours", mode == "tamed" && state.tamed && boss == null);
+        yield return 45;
+        pendingShot = "71-tamed-card"; yield return 2;
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        Check($"closing the card explains riding ({toastMsg})", mode == "play" && toastMsg.Contains("R to ride"));
+        state.tackle["bait"] = "auto";
+        Check("it won't bite again once it's yours", !TidemaneBites("coconut"));
+
+        // Riding: faster on land, and it swims
+        state.night = false; iframes = 0;
+        player.X = StarwellX - 30; player.Y = StarwellY - 40; player.Face = "right";
+        state.mountX = player.X + 10; state.mountY = player.Y; yield return 2;
+        Check($"you can climb on (prompt: {prompt.Text})", target?.Type == "ride");
+        Inp.Tap(KeyboardKey.R); yield return 3;
+        Check("R puts you in the saddle", Riding);
+        float rx0 = player.X;
+        Inp.Hold(KeyboardKey.Right, true); yield return 30; Inp.Hold(KeyboardKey.Right, false); yield return 2;
+        Check($"riding is much faster than walking ({player.X - rx0:0} px in half a second)", player.X - rx0 > 36);
+        pendingShot = "72-riding"; yield return 2;
+        player.X = AtollJettyX + 4; player.Y = AtollJettyY + 1; player.Face = "left"; yield return 2;
+        Inp.Hold(KeyboardKey.Left, true); yield return 45; Inp.Hold(KeyboardKey.Left, false); yield return 3;
+        Check($"it swims out to sea ({player.X:0},{player.Y:0}, {AreaName()})", Swimming && player.X < AtollJettyX - 20 && AreaName() == "Open sea");
+        yield return 10;
+        pendingShot = "73-swimming"; yield return 2;
+        Inp.Tap(KeyboardKey.R); yield return 2;
+        Check($"you can't hop off at sea ({toastMsg})", Riding && toastMsg.Contains("Nowhere dry"));
+        state.weather = "storm";
+        Check("caught out at sea by a storm, it still swims you home", CanStand(870, 268, false, true));
+        player.X = AtollJettyX + 4;
+        Check("but from the shore it won't head out into deep water in a storm", !CanStand(870, 268, false, true));
+        state.weather = "clear";
+        Check("it will in fair weather", CanStand(870, 268, false, true) && !CanStand(870, 268));
+        player.X = 975; player.Y = 268; yield return 2;
+        Inp.Tap(KeyboardKey.R); yield return 2;
+        Check($"on dry land R hops you off and it waits there ({state.mountX:0},{state.mountY:0})", !Riding && Dist(state.mountX, state.mountY, 975, 268) < 1 && CanStand(player.X, player.Y));
+        yield return 10;
+        pendingShot = "74-tidemane-waiting"; yield return 2;
+        player.X = StarwellX; player.Y = StarwellY - 45; yield return 2;
+        Inp.Tap(KeyboardKey.R); yield return 2;
+        Check("from far away, R whistles it over", Riding && Dist(state.mountX, state.mountY, player.X, player.Y) < 1);
+        player.X = 160; player.Y = 74; player.Face = "up"; yield return 3;
+        Inp.Tap(KeyboardKey.E); yield return 70;
+        Check("going indoors leaves it waiting at the door", scene == "house:tomas" && !state.riding && Dist(state.mountX, state.mountY, 160, 74) < 1);
+        player.X = RoomDoorWX; player.Y = RoomDoorWY - 6; player.Face = "down"; yield return 2;
+        Inp.Tap(KeyboardKey.E); yield return 70;
+        Save();
+        var rideSave = SaveFile.Read();
+        Check("Tidemane, riding and the Starwell are saved", rideSave != null && rideSave.tamed && !rideSave.riding && rideSave.hinted.ContainsKey("starwell")
+            && Math.Abs(rideSave.mountX - 160) < 1);
+
+        // The map, the Fish log and the legends page
+        mapTexDirty = true;
+        Inp.Tap(KeyboardKey.Tab); yield return 10;
+        pendingShot = "75-map-atoll"; yield return 2;
+        Inp.Tap(KeyboardKey.Escape); yield return 3;
+        Inp.Tap(KeyboardKey.J); yield return 3;
+        dexTab = "log"; logPage = 4; yield return 15;
+        pendingShot = "76-fishlog-atoll"; yield return 2;
+        logPage = 5; yield return 10;
+        pendingShot = "77-fishlog-legends"; yield return 2;
+        logPage = 0; dexTab = "creatures";
+        Inp.Tap(KeyboardKey.Escape); yield return 3;
+
+        // Anything built on the old, smaller atoll's shore (now open sea) comes back to the bag
+        state.builds.Add(new Build { id = "campfire", x = 86, y = 21 });
+        int woodR = Has("wood"), stoneR = Has("stone");
+        int rescued = RescueSunkBuilds();
+        Check($"pieces on the old atoll's shore come back to the bag ({rescued})", rescued == 1 && Has("wood") == woodR + 3 && Has("stone") == stoneR + 2);
+        Check("and nothing else is touched", RescueSunkBuilds() == 0);
 
         // Ending screen
         state.caught = Data.Creatures.Select(c => c.Id).ToList();

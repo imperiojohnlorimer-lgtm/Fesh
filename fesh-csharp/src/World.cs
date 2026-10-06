@@ -23,14 +23,23 @@ partial class Game
     const int TreeRegrowDays = 3, BoulderRegrowDays = 2;
     static readonly (int x, int y)[] Tide = { (8, 13), (8, 14), (7, 14), (6, 14) };
     // The other islands: biome, center and radii in tiles. Saltmere keeps its original shape in the top-left corner.
-    // Starfall Atoll (biome 4) has no bridge; only the boat gets there.
-    static readonly (byte biome, float cx, float cy, float rx, float ry)[] Isles = { (1, 62, 9, 17, 8), (2, 66, 38, 20, 12), (3, 20, 38, 17, 11), (4, 87, 21, 5.5f, 3.8f) };
+    // Starfall Atoll (biome 4) has no bridge; you get there by boat (or on Tidemane). A channel of deep water keeps
+    // it out of reach of waders from the Dunes.
+    static readonly (byte biome, float cx, float cy, float rx, float ry)[] Isles = { (1, 62, 9, 17, 8), (2, 66, 38, 20, 12), (3, 20, 38, 17, 11), (4, 113, 26, 17, 15) };
     // Bridges are drawn along these lines, but only over open sea, so they always join shore to shore.
     // The lines run well into both islands so a wobbly coastline can't leave a gap.
     static readonly (int x0, int y0, int x1, int y1)[] Bridges = { (20, 5, 56, 5), (16, 10, 16, 34), (66, 12, 66, 32), (28, 38, 52, 38) };
-    // Boat jetties: Pip's jetty on Saltmere's east beach, and the atoll's landing. Storms don't close these.
-    static readonly (int x0, int y0, int x1, int y1)[] Jetties = { (25, 11, 27, 11), (78, 21, 84, 21) };
-    const float SaltJettyX = 275, SaltJettyY = 117, AtollJettyX = 785, AtollJettyY = 217;
+    // Boat jetties: Pip's jetty on Saltmere's east beach, and the atoll's landing on its west shore. Storms don't close these.
+    static readonly (int x0, int y0, int x1, int y1)[] Jetties = { (25, 11, 27, 11), (89, 26, 96, 26) };
+    const float SaltJettyX = 275, SaltJettyY = 117, AtollJettyX = 895, AtollJettyY = 267;
+    // The atoll's lagoon (in tiles), and the Starwell glade (in pixels): a blue hole inside a ring of palms with one gap,
+    // facing west. Hoofprints lead to it from the jetty. The glade is raised ground, so the ring never opens onto the sea.
+    const float AtollLagoonX = 106, AtollLagoonY = 24;
+    public const float StarwellX = 1200, StarwellY = 300;
+    const float WellDeep = 1.9f, WellRim = 2.8f, GladeR = 7f, PalmRingR = 8.2f, GladeGap = 0.24f;
+    const float CarvingX = 1162, CarvingY = 282;
+    static readonly (float x, float y)[] HoofTrail = { (97.5f, 26.5f), (99, 28.5f), (101, 30.5f), (105, 31.5f), (109, 31), (112.5f, 30.3f), (116.5f, 30.2f) };
+    readonly HashSet<(int, int)> hoofprints = new();
     const float PipX = 210, PipY = 101;
     readonly HashSet<(int, int)> bridgeSet = new();
     static readonly char[] InnerGround = { 'g', 'n', 'D', 'j', 's' }, ShoreGround = { 's', 'e', 's', 's', 's' }, TreeKind = { 't', 'f', 'c', 'h', 'h' };
@@ -61,6 +70,13 @@ partial class Game
     {
         double dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
         return dx * dx + dy * dy < k;
+    }
+
+    // How far a tile's centre is from the middle of the Starwell, in tiles.
+    static double GladeDist(int x, int y)
+    {
+        double dx = x + 0.5 - StarwellX / T, dy = y + 0.5 - StarwellY / T;
+        return Math.Sqrt(dx * dx + dy * dy);
     }
 
     // An ellipse with a ragged edge, for ponds and lakes.
@@ -136,9 +152,15 @@ partial class Game
                     case 3: // Mirewood: swamp pools
                         if (InBlob(x, y, 14.5, 40.5, 5, 3, 7) || InBlob(x, y, 26.5, 34.5, 2.5, 1.6, 9)) map[y, x] = 'm';
                         break;
-                    case 4: // Starfall Atoll: a ring of sand around a lagoon
-                        if (InBlob(x, y, 87.5, 21.5, 2.4, 1.5, 11)) map[y, x] = 'l';
+                    case 4: // Starfall Atoll: a ring of sand around a lagoon, and the Starwell in its palm glade
+                    {
+                        double gd = GladeDist(x, y);
+                        if (gd < WellDeep) map[y, x] = '~';
+                        else if (gd < WellRim) map[y, x] = 'w';
+                        else if (gd < PalmRingR + 0.5) map[y, x] = 's';
+                        else if (InBlob(x, y, AtollLagoonX, AtollLagoonY, 6, 5, 11) && Land.Contains(t)) map[y, x] = 'l';
                         break;
+                    }
                 }
             }
         map[8, 60] = 'k';
@@ -180,11 +202,35 @@ partial class Game
         }
         foreach (var (x, y) in SaltTrees) Place(x, y, 't');
         foreach (var (x, y) in SaltBushes) Place(x, y, 'y');
+
+        // The hoofprint trail, sampled every half tile along its waypoints.
+        hoofprints.Clear();
+        for (int i = 0; i + 1 < HoofTrail.Length; i++)
+        {
+            var (ax, ay) = HoofTrail[i]; var (bx, by) = HoofTrail[i + 1];
+            int steps = (int)MathF.Ceiling(MathF.Max(MathF.Abs(bx - ax), MathF.Abs(by - ay)) * 2);
+            for (int k = 0; k <= steps; k++)
+            {
+                int hx = (int)MathF.Floor(ax + (bx - ax) * k / steps), hy = (int)MathF.Floor(ay + (by - ay) * k / steps);
+                if (map[hy, hx] == 's') hoofprints.Add((hx, hy));
+            }
+        }
+        // The palm ring around the Starwell, open on the west where the hoofprints come in.
+        for (int y = 1; y < ROWS - 1; y++)
+            for (int x = 1; x < COLS - 1; x++)
+            {
+                double gd = GladeDist(x, y);
+                if (gd < GladeR || gd >= PalmRingR || map[y, x] != 's') continue;
+                double ang = Math.Atan2(y + 0.5 - StarwellY / T, x + 0.5 - StarwellX / T);
+                if (Math.PI - Math.Abs(ang) < GladeGap) continue;
+                Place(x, y, 'h');
+            }
         for (int y = 1; y < ROWS - 1; y++)
             for (int x = 1; x < COLS - 1; x++)
             {
                 byte bi = biome[y, x];
                 if (bi == 0) continue;
+                if (bi == 4 && (GladeDist(x, y) < PalmRingR + 1.5 || hoofprints.Contains((x, y)))) continue;
                 bool palm = bi == 2 && map[y, x] == 'g' && Pix.Hash(x, y, 78) < 0.15;
                 double roll = Pix.Hash(x, y, 77);
                 bool boulder = false, bush = false;
@@ -265,7 +311,19 @@ partial class Game
                 int rx = (int)(Pix.Hash(x, y, 41) * 9), ry = (int)(Pix.Hash(x, y, 42) * 9);
                 switch (gr)
                 {
-                    case 's': g.Rect(X + (int)(Pix.Hash(x, y, 30) * 9), Y + (int)(Pix.Hash(x, y, 31) * 9), 1, 1, "#f2dfb1"); break;
+                    case 's':
+                        g.Rect(X + (int)(Pix.Hash(x, y, 30) * 9), Y + (int)(Pix.Hash(x, y, 31) * 9), 1, 1, "#f2dfb1");
+                        if (hoofprints.Contains((x, y)))
+                        {
+                            // Two hoofprints per tile, left and right of the trail, a little off the grid.
+                            int o = (int)(Pix.Hash(x, y, 34) * 3);
+                            foreach (var (hx, hy) in new[] { (1 + o, 1), (5, 5 + o / 2) })
+                            {
+                                g.Rect(X + hx, Y + hy, 3, 1, "#c4a56a"); g.Rect(X + hx, Y + hy + 1, 1, 2, "#c4a56a"); g.Rect(X + hx + 2, Y + hy + 1, 1, 2, "#c4a56a");
+                                g.Rect(X + hx + 1, Y + hy + 1, 1, 1, "#b8975c");
+                            }
+                        }
+                        break;
                     case 'g':
                         if (h1 > 0.7) g.Rect(X + 3, Y + 4, 1, 1, "#f3c25b");
                         g.Rect(X + rx, Y + ry, 1, 1, "#6fb055");
@@ -661,8 +719,14 @@ partial class Game
         int bob = moving ? step : mode == "reeling" ? 0 : (time % 2.2f > 1.4f ? 1 : 0);
         bool blink = time % 3.7f < 0.12f;
         bool rod = fish != null || mode == "charging";
-        LookData.DrawPerson(pix, state.look, x, y, f, step, bob: bob, blink: blink, arms: holding ? 2 : 0, swing: moving && !rod ? (step == 0 ? 1 : -1) : 0);
-        if (InWater)
+        if (Riding)
+        {
+            // In the saddle: everything you hold or swing is up where you sit.
+            DrawRider(x, y, moving, step);
+            y -= 8;
+        }
+        else LookData.DrawPerson(pix, state.look, x, y, f, step, bob: bob, blink: blink, arms: holding ? 2 : 0, swing: moving && !rod ? (step == 0 ? 1 : -1) : 0);
+        if (InWater && !Riding)
         {
             // Wading: the water comes up past your knees, with a ripple around you.
             string water = TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T)) switch { 'l' => "#2a9d8f", 'o' => "#22a6a0", 'm' => "#4f6440", _ => "#2f7fa3" };
@@ -1064,6 +1128,9 @@ partial class Game
             if (Visible(bx, by)) list.Add((by - 6, () => DrawBoat(bx, by, t)));
         }
         if (Visible(160, 60)) { list.Add((69, DrawHut)); list.Add((FireY + 2, () => DrawFire(t))); }
+        if (Visible(CarvingX, CarvingY)) list.Add((CarvingY, DrawCarving));
+        if (state.tamed && !state.riding && Visible(state.mountX, state.mountY)) list.Add((state.mountY, DrawMountIdle));
+        if (boss != null) list.Add((boss.Y, () => DrawBoss(t)));
         list.Add((tomasY, DrawTomas));
         list.Add((player.Y, DrawPlayer));
         if (Visible(26, 150)) list.Add((157, DrawWreck));
@@ -1243,7 +1310,11 @@ partial class Game
             float r = d.Light[2] + (b.id == "campfire" ? MathF.Sin(t * 9 + b.x) * 2 : 0);
             LightHole(b.x * T + d.Light[0], b.y * T + d.Light[1], r, b.id == "shack" ? 0.75f : 1);
         }
+        // The Starwell glows after dark, enough to light a fight around it (and to catch your eye through the palms).
+        LightHole(StarwellX, StarwellY, 62 + MathF.Sin(t * 1.3f) * 4, 0.8f);
+        if (boss != null) LightHole(boss.X, boss.Y - 8, 34, 0.7f);
         ApplyDark(new Color(6, 12, 36, 255));
+        pix.Glow(StarwellX, StarwellY, 30, Pal.Rgba(120, 220, 255, 0.22f + 0.06f * MathF.Sin(t * 1.3f)));
 
         var warm = Pal.Rgba(243, 150, 60, 0.18f);
         pix.Glow(FireX, FireY - 3, 40, warm);
@@ -1287,6 +1358,13 @@ partial class Game
         int sw = SCols * T, sh = SRows * T;
         camX = sw <= W ? -(W - sw) / 2 : Math.Clamp((int)MathF.Round(player.X) - W / 2, 0, sw - W);
         camY = sh <= H ? -(H - sh) / 2 : Math.Clamp((int)MathF.Round(player.Y - 8) - H / 2, 0, sh - H);
+        // Big impacts (Tidemane landing, charging into a palm, stomping) shake the view.
+        if (quake > 0 && mode is not ("pause" or "panel"))
+        {
+            float k = Math.Min(1, quake * 4);
+            camX += (int)MathF.Round(MathF.Sin(time * 71) * 2 * k);
+            camY += (int)MathF.Round(MathF.Cos(time * 53) * 2 * k);
+        }
     }
 
     void RenderWorld(float t)
@@ -1301,9 +1379,11 @@ partial class Game
             DrawLoose(t);
             DrawBugs(t);
             DrawSpots(t);
+            DrawStarwell(t);
             DrawIceCap();
             DrawSpearing(t);
             DrawObjects(t);
+            DrawBossEffects(t);
             DrawFishing(t);
             DrawParticles();
             DrawSkyLife(t);

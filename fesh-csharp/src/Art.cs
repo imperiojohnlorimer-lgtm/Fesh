@@ -596,13 +596,76 @@ static class CreatureArt
                 g.FillStyle = Paint.Of("#e8f0ff"); Circ(g, -6, -12, 1.4f); Circ(g, 6, -12, 1.4f);
             }
         }
+        else if (id == "tidemane")
+        {
+            // Tidemane: a horse's head, neck and forelegs with fin-edged hooves, coral horns, a mane of sea foam,
+            // and a long fish tail curling up into a fan.
+            g.Translate(0, 4);
+            g.StrokeStyle = C("#1d6f68"); g.LineWidth = 12;
+            g.BeginPath(); g.MoveTo(-8, 2); g.QuadTo(-22, 16, -34, 4); g.Stroke();
+            g.LineWidth = 7;
+            g.BeginPath(); g.MoveTo(-31, 7); g.QuadTo(-38, 2, -40, -6); g.Stroke();
+            g.FillStyle = C("#5fd6c9");
+            Poly(g, -38, -6, -48, -22, -45, -11, -54, -11, -46, -5, -51, 5, -38, 0);
+            if (!sil)
+            {
+                g.StrokeStyle = Paint.Of("rgba(255,255,255,0.45)"); g.LineWidth = 0.8f;
+                Seg(g, -40, -4, -47, -18); Seg(g, -40, -4, -51, -10); Seg(g, -40, -3, -48, 3);
+            }
+            // Forelegs, one reaching forward, each ending in a little fan of fin instead of a hoof.
+            g.StrokeStyle = C("#1d6f68"); g.LineWidth = 4.5f;
+            g.BeginPath(); g.MoveTo(7, 5); g.QuadTo(10, 14, 6, 21); g.Stroke();
+            g.StrokeStyle = C("#2a9d8f");
+            g.BeginPath(); g.MoveTo(14, 4); g.QuadTo(20, 12, 21, 20); g.Stroke();
+            g.FillStyle = C("#5fd6c9");
+            Poly(g, 3, 21, 10, 21, 11, 25, 2, 25);
+            Poly(g, 18, 20, 25, 19, 27, 23, 18, 24);
+            // Body, belly and dorsal fin.
+            g.FillStyle = C("#3fb5a8"); Poly(g, -11, -8, -4, -19, 3, -9);
+            g.FillStyle = sil ? Sil : Paint.Linear(0, -11, 0, 11, (0, "#3cb9a9"), (0.6f, "#2a9d8f"), (1, "#1d6f68"));
+            Ell(g, 0, 0, 17, 11);
+            // Neck and head, angled down toward the muzzle.
+            g.BeginPath(); g.MoveTo(5, -6); g.QuadTo(9, -20, 16, -27); g.LineTo(26, -24); g.QuadTo(20, -12, 16, 3); g.ClosePath(); g.Fill();
+            Ell(g, 25, -25, 10, 5.5f, 0.45f);
+            Ell(g, 31, -20, 5.5f, 4.2f, 0.45f);
+            g.StrokeStyle = C("#ff8a7a"); g.LineWidth = 2.2f;
+            Seg(g, 19, -29, 17, -34); Seg(g, 17.8f, -31.6f, 14.5f, -33);
+            Seg(g, 23, -30, 24, -35); Seg(g, 23.6f, -32.5f, 26.5f, -33.8f);
+            if (!sil)
+            {
+                g.FillStyle = Paint.Of("#8fd3c4"); Ell(g, 2, 6, 13, 4);
+                g.FillStyle = Paint.Of("rgba(255,255,255,0.18)"); Ell(g, -2, -6, 11, 3);
+                // Starlight speckles down its flanks.
+                foreach (var (x, y, r) in new[] { (-9f, -3f, 1.1f), (-4, -6, 0.9f), (1, -2, 1.2f), (6, -5, 0.8f), (-6, 2, 0.8f), (10, -1, 0.9f) })
+                {
+                    g.Save(); g.ShadowColor = Paint.Of("#ffe8a0"); g.ShadowBlur = 5 * s / 3.4f; g.FillStyle = Paint.Of("#fff6d0"); Circ(g, x, y, r); g.Restore();
+                }
+                // The mane: a sheet of sea foam streaming back down the neck, scalloped at the edge, with spray coming off it.
+                g.Save(); g.ShadowColor = Paint.Of("#bff4ff"); g.ShadowBlur = 6 * s / 3.4f;
+                g.FillStyle = Paint.Linear(16, -30, 0, -6, (0, "#ffffff"), (1, "#cfe8ee"));
+                g.BeginPath();
+                g.MoveTo(17, -31); g.QuadTo(9, -31, 8, -26); g.QuadTo(3, -25, 4, -20); g.QuadTo(-1, -19, 1, -14);
+                g.QuadTo(-3, -12, 0, -8); g.QuadTo(-1, -4, 4, -4); g.QuadTo(8, -12, 10, -20); g.QuadTo(13, -26, 17, -31);
+                g.Fill();
+                g.Restore();
+                g.StrokeStyle = Paint.Of("rgba(140,200,220,0.7)"); g.LineWidth = 0.8f;
+                g.BeginPath(); g.MoveTo(13, -28); g.QuadTo(7, -22, 5, -14); g.QuadTo(4, -9, 3, -6); g.Stroke();
+                g.FillStyle = Paint.Of("#e8f8ff");
+                foreach (var (x, y, r) in new[] { (2f, -27f, 1.3f), (-1.5f, -21, 1.1f), (-3, -15, 0.9f), (-3.5f, -9, 0.7f), (5, -31, 0.9f) }) Circ(g, x, y, r);
+                g.Save(); g.ShadowColor = Paint.Of("#ffd76a"); g.ShadowBlur = 7 * s / 3.4f; g.FillStyle = Paint.Of("#ffd76a"); Circ(g, 23, -27, 2.2f); g.Restore();
+                g.FillStyle = Paint.Of("#3a2a00"); Ell(g, 23.3f, -27, 0.7f, 1.5f);
+                g.FillStyle = Paint.Of("#10243a"); Circ(g, 34.6f, -18.5f, 0.9f);
+                g.StrokeStyle = Paint.Of("#16514b"); g.LineWidth = 1;
+                Seg(g, 29, -16.2f, 33.5f, -15.6f);
+            }
+        }
         g.Restore();
     }
 
     // Draws the underwater portrait at logical size w x h onto a canvas that is already scaled to device pixels.
     public static void Scene(VCanvas g, float w, float h, string id, bool sil)
     {
-        bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan";
+        bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan" or "tidemane";
         g.FillStyle = Paint.Linear(0, 0, 0, h, (0, deep ? "#1d3a5a" : "#3a8db0"), (1, deep ? "#050d18" : "#12304a"));
         g.BeginPath(); g.RectPath(0, 0, w, h); g.Fill();
         g.FillStyle = Paint.Of("rgba(255,255,255,0.06)");

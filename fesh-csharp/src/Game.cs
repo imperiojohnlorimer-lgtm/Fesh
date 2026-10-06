@@ -4,7 +4,7 @@ using static Raylib_cs.Raylib;
 
 namespace Fesh;
 
-sealed class Catchable { public string Id, Name; public float Difficulty; public bool Exotic, Odd, Rare, Chest; }
+sealed class Catchable { public string Id, Name; public float Difficulty; public bool Exotic, Odd, Rare, Chest, Boss; }
 sealed class Critter { public string Id; public float X, Y, Vx, Vy, T; }
 // One cast. Depth is 0 shallow, 1 middle, 2 deep. WaitT counts up while waiting (the ice hole's jig rhythm uses it).
 sealed class FishCast
@@ -14,11 +14,12 @@ sealed class FishCast
 }
 // The reel fight. Style is the fish's fighting style (see CommonFish). Runners build Tension while you hold during a run;
 // jumpers Leap (LeapMark sweeps 0..1 and you press in the gold); bottom fish dig in if you hold too long (HoldT).
+// Tidemane (Roll.Boss) changes style every StyleT seconds, and Pull scales how fast the catch meter fills.
 sealed class ReelState
 {
     public float ZoneH, ZoneY, ZoneV, FishY, FishTarget, FishTimer, Progress, Diff, Tick;
     public bool Exotic, Inside, Perfect, LeapDone, Digging; public Catchable Roll;
-    public string Style = "dart"; public float Tension, RunT, Running, LeapT, Leap, LeapLen = 1, LeapMark, HoldT;
+    public string Style = "dart"; public float Tension, RunT, Running, LeapT, Leap, LeapLen = 1, LeapMark, HoldT, StyleT, Pull = 1;
 }
 sealed record Say(string S, string T);
 sealed class DialogueState { public List<Say> Lines; public int I; public float Shown; public string Full = ""; public Action OnDone; }
@@ -30,7 +31,7 @@ sealed class Actor { public float X, Y, WalkT; public string Face = "down"; publ
 partial class Game
 {
     // W x H is the view; the world is COLS x ROWS tiles of T pixels.
-    const int W = 320, H = 180, T = 10, COLS = 96, ROWS = 56;
+    const int W = 320, H = 180, T = 10, COLS = 140, ROWS = 56;
     const float FireX = 185, FireY = 86, TomasHomeX = 146, TomasHomeY = 82, Reach = 30;
     const int MaxBuilds = 150;
     static readonly HashSet<char> Buildable = new() { 's', 'g', 'n', 'e', 'D', 'j' };
@@ -130,7 +131,7 @@ partial class Game
     void PickMusic(float dt)
     {
         // lastBiome only changes on land, so crossing a bridge or standing on a jetty keeps the island's tune.
-        string track = mode is "title" or "create" ? "saltmere" : scene == "cave" ? "cave" : InHouse ? "home"
+        string track = mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine ? "boss" : scene == "cave" ? "cave" : InHouse ? "home"
             : Data.Biomes[lastBiome < Data.Biomes.Length ? lastBiome : PlayerBiome()].Id;
         Music.Want(track, state.night && mode is not ("title" or "create") ? 0.3f : 0.42f);
         bool wet = scene == "world" && state.weather != "clear" && mode is not ("title" or "create");
@@ -200,12 +201,14 @@ partial class Game
         else if (Inp.Pressed(KeyboardKey.C)) TogglePanel("case");
         else if (Inp.Pressed(KeyboardKey.Tab)) TogglePanel("map");
         else if (Inp.Pressed(KeyboardKey.M)) ToggleSound();
+        else if (Inp.Pressed(KeyboardKey.R)) ToggleRide();
         else if (Inp.Pressed(KeyboardKey.Escape))
         {
             if (mode == "panel") ClosePanels();
             else if (mode == "catch") CloseCatch();
             else if (mode == "odd") CloseOdd();
             else if (mode == "legend") CloseLegend();
+            else if (mode == "tamed") CloseTamed();
             else if (mode == "build") ExitBuild();
             else if (mode is "waiting" or "charging") ReelIn("You reeled in.");
             else if (mode == "spear") EndSpear();
@@ -262,6 +265,7 @@ partial class Game
         if (Dist(x, y, SaltJettyX - 10, SaltJettyY) < 22) return "Pip's jetty";
         if (Dist(x, y, AtollJettyX + 20, AtollJettyY) < 34) return "Atoll jetty";
         char tile = TileAt((int)MathF.Floor(x / T), (int)MathF.Floor((y - 1.5f) / T));
+        if (Riding && tile == '~' && Dist(x, y, StarwellX, StarwellY) > 40) return "Open sea";
         var b = Data.Biomes[PlayerBiome()];
         if (b.Id == "saltmere")
         {
@@ -611,6 +615,8 @@ partial class Game
             return null;
         }
 
+        // In the middle of the fight at the Starwell there's nothing to do but fight.
+        if (boss != null) return BossTarget();
         if (Dist(x, y, tomasX, tomasY) < 16)
             return new Target { Type = "npc", Label = CanHandIn ? $"Give Tomas the {Items.Amount(state.req.item, state.req.count)}" : "Talk to Tomas" };
         if (Dist(x, y, PipX, PipY + 14) < 12) return new Target { Type = "pip", Label = "Trade with Pip" };
@@ -634,6 +640,8 @@ partial class Game
         if (BuildAt(fx, fy) is Build pot && pot.id == "crabpot")
             return PotReady(pot) ? new Target { Type = "pot", Ref = pot, Label = "Haul up the crab pot" }
                 : new Target { Type = "info", Label = "The crab pot is soaking. Haul it up tomorrow morning" };
+        if (MountNear()) return new Target { Type = "ride", Label = $"Ride {Data.MountName}" };
+        if (Dist(x, y, CarvingX, CarvingY + 4) < 13) return new Target { Type = "carving", Label = "Read the carving" };
         if (NearestAnimal() is Animal a) return new Target { Type = "animal", Ref = a, Label = AnimalLabel(a) };
         if (CricketNear() is Bug bug) return new Target { Type = "cricket", Ref = bug, Label = "Catch the cricket" };
         if (state.loose.FirstOrDefault(l => l.kind == "worm" && Dist(l.x, l.y, x, y - 2) < 10) is Loose mound)
@@ -691,6 +699,7 @@ partial class Game
             case "catch": CloseCatch(); return;
             case "odd": CloseOdd(); return;
             case "legend": CloseLegend(); return;
+            case "tamed": CloseTamed(); return;
             case "build": BuildAction(); return;
             case "play":
                 if (target == null) return;
@@ -713,6 +722,9 @@ partial class Game
                     case "cave": EnterCaveFromMouth(); break;
                     case "descend": EnterCaveFloor(caveFloor + 1); break;
                     case "monster": Attack((Monster)target.Ref); break;
+                    case "boss": StrikeBoss(); break;
+                    case "ride": Mount(); break;
+                    case "carving": ReadCarving(); break;
                     case "craft": OpenCraft(target.Id); break;
                     case "animal": Pet((Animal)target.Ref); break;
                     case "tree": HitTree(target.Tx, target.Ty); break;
@@ -756,6 +768,7 @@ partial class Game
             TickFood(dt);
             TickHealth(dt);
             UpdateMonsters(dt);
+            UpdateBoss(dt);
             TickDerby(dt);
         }
         else { iframes = Math.Max(0, iframes - dt); hurtFlash = Math.Max(0, hurtFlash - dt); }
@@ -798,11 +811,13 @@ partial class Game
             player.Moving = dx != 0 || dy != 0;
             if (player.Moving)
             {
-                bool wet = InWater;
-                float len = MathF.Sqrt(dx * dx + dy * dy), sp = 52 * dt * (Starving ? 0.6f : 1f) * (wet ? 0.7f : 1f);
+                // On Tidemane you gallop on land and swim through any water; on foot, waders slow you in the shallows.
+                bool wet = InWater, ride = Riding;
+                float speed = ride ? (Swimming ? 74 : 92) : wet ? 52 * 0.7f : 52;
+                float len = MathF.Sqrt(dx * dx + dy * dy), sp = speed * dt * (Starving ? 0.6f : 1f);
                 float mx = dx / len * sp, my = dy / len * sp;
-                if (CanStand(player.X + mx, player.Y, Wading)) player.X += mx;
-                if (CanStand(player.X, player.Y + my, Wading)) player.Y += my;
+                if (CanStand(player.X + mx, player.Y, Wading, ride)) player.X += mx;
+                if (CanStand(player.X, player.Y + my, Wading, ride)) player.Y += my;
                 player.Face = MathF.Abs(dx) > MathF.Abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
                 int stepBefore = (int)(player.WalkT * 8);
                 player.WalkT += dt;
@@ -813,6 +828,8 @@ partial class Game
             {
                 TickLoose(dt);
                 AnnounceBiome();
+                CheckStarwell();
+                if (Riding) { state.mountX = player.X; state.mountY = player.Y; }
             }
             // Walking down onto a doorway steps back outside.
             if (InHouse && dy > 0 && TileAt((int)(player.X / T), (int)((player.Y - 1.5f) / T)) == 'Y') { LeaveToWorld(); return; }
@@ -845,7 +862,7 @@ partial class Game
     void AnnounceBiome()
     {
         char tile = TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T));
-        if (tile is 'd' or 'b') return;
+        if (tile is 'd' or 'b' || WaterTile(tile)) return;
         byte b = PlayerBiome();
         if (b == lastBiome) return;
         lastBiome = b;
@@ -863,19 +880,25 @@ partial class Game
             if (look != null) { state.look = look; state.created = true; }
         }
         tomasX = TomasHomeX; tomasY = TomasHomeY;
-        fish = null; reel = null; panel = null;
+        fish = null; reel = null; panel = null; boss = null;
+        bolts.Clear();
         LoadScene("world");
         BuildMap();
         SpawnAnimals();
+        int sunk = RescueSunkBuilds();
         player.X = state.px; player.Y = state.py; player.Face = "down";
         // Cave floors aren't saved, so a game saved underground carries on at the cave mouth.
         if (state.scene == "cave") { player.X = MouthDoorX; player.Y = MouthDoorY + 2; }
         else if (state.scene != "world" && SceneExists(state.scene)) LoadScene(state.scene);
-        if (!CanStand(player.X, player.Y))
+        if (!CanStand(player.X, player.Y, Wading, Riding))
         {
+            // Somewhere that isn't there any more (the atoll used to be smaller): back to the boat, or to Saltmere.
             LoadScene("world");
-            player.X = 160; player.Y = 115;
+            state.riding = false;
+            bool atoll = state.boatAt == "atoll" && Has("boat") > 0;
+            player.X = atoll ? AtollJettyX + 4 : 160; player.Y = atoll ? AtollJettyY + 1 : 115;
         }
+        if (state.tamed && !state.riding && state.mountX == 0 && state.mountY == 0) { state.mountX = player.X + 12; state.mountY = player.Y; }
         ReindexBuilds();
         if (scene == "world") FillLoose();
         critters.Clear();
@@ -889,6 +912,8 @@ partial class Game
                 new("", "Tomas waves from his hut. Walk over with WASD or the arrow keys and press E to talk.")
             });
         }
+        else if (sunk > 0)
+            Toast($"Starfall Atoll has grown since you were last there, and the sea took the old shoreline. The {sunk} thing{(sunk == 1 ? "" : "s")} you built there {(sunk == 1 ? "is" : "are")} back in your bag.", 7);
         else Toast("Welcome back to Saltmere.");
         hasSave = true;
         Save();

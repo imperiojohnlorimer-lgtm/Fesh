@@ -170,7 +170,7 @@ partial class Game
         foreach (var (id, name, pct) in odds)
         {
             if (Items.ById.ContainsKey(id)) DrawIcon(id, x + 10, ry, 22);
-            else if (id == "chest") DrawIcon("coin", x + 10, ry, 22);
+            else if (id is "chest" or "tidemane") DrawIcon(id == "chest" ? "coin" : id, x + 10, ry, 22);
             Gfx.Text(Gfx.Ellipsize(name, FontKind.Ui600, 16, w - 110), x + 40, ry + 2, FontKind.Ui600, 16, Pal.Paper);
             string p = pct < 0.01 ? "<1%" : $"{pct * 100:0}%";
             Gfx.Text(p, x + w - 12 - Gfx.Measure(p, FontKind.Ui700, 16), ry + 2, FontKind.Ui700, 16, Pal.C("#7fd36b"));
