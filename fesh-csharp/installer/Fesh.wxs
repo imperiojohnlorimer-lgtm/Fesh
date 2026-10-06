@@ -12,8 +12,12 @@
     <Icon Id="FeshIcon" SourceFile="$(sys.SOURCEFILEDIR)..\Assets\fesh.ico" />
     <Property Id="ARPPRODUCTICON" Value="FeshIcon" />
 
-    <StandardDirectory Id="ProgramFiles6432Folder">
-      <Directory Id="INSTALLFOLDER" Name="Fesh" />
+    <!-- Spelled out as %LocalAppData%\Programs\Fesh: in a per-user package ProgramFiles6432Folder still means
+         C:\Program Files, which needs admin rights. -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Fesh" />
+      </Directory>
     </StandardDirectory>
 
     <Feature Id="Main">
@@ -21,6 +25,8 @@
         <File Id="FeshExe" Source="$(PublishDir)\Fesh.exe" />
         <RegistryValue Root="HKCU" Key="Software\Fesh" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
         <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+        <!-- Only removed if empty, so other apps in Programs are safe. -->
+        <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
       </Component>
       <Component Id="Shortcuts" Directory="INSTALLFOLDER" Guid="63DA3AD4-EBBD-4F48-AB10-7806AC8DEE9A">
         <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Fesh" Description="A fishing mystery on Saltmere Island"
