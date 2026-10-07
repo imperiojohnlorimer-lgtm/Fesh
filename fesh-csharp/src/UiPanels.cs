@@ -69,7 +69,7 @@ partial class Game
         };
         Gfx.Text($"{kind}  ·  You have {Has(bagSel)}", cx + 86, cy + 38, FontKind.Ui500, 16, Muted);
         cy += 90;
-        var desc = Gfx.Wrap(d.Desc, FontKind.Note, 18, dw - 32);
+        var desc = Gfx.Wrap(Bind.Fix(d.Desc), FontKind.Note, 18, dw - 32);
         Lines(desc, cx, cy, 25, FontKind.Note, 18, Pal.PaperInk);
         cy += desc.Count * 25 + 10;
         // Fish: your record and how many big ones you're carrying. Bait: what it's good for, and whether it's in use.
@@ -83,13 +83,13 @@ partial class Game
         {
             Lines(Gfx.Wrap("As bait: " + bait.Summary, FontKind.Ui500, 16, dw - 32), cx, cy, 21, FontKind.Ui500, 16, Muted);
             cy += 46;
-            Gfx.Text(NextBait() == bagSel ? "Your next cast uses this." : "Pick it in the tackle box (T).", cx, cy, FontKind.Ui600, 16, NextBait() == bagSel ? Pal.C("#3f7d35") : Muted);
+            Gfx.Text(NextBait() == bagSel ? "Your next cast uses this." : Bind.Fix("Pick it in the tackle box (<tackle>)."), cx, cy, FontKind.Ui600, 16, NextBait() == bagSel ? Pal.C("#3f7d35") : Muted);
             cy += 30;
         }
         if (Items.Tackle.TryGetValue(bagSel, out var tk))
         {
             bool on = GearId(tk.Slot) == bagSel;
-            Gfx.Text(on ? "Equipped in your tackle box." : "Equip it in the tackle box (T).", cx, cy, FontKind.Ui600, 16, on ? Pal.C("#3f7d35") : Muted);
+            Gfx.Text(on ? "Equipped in your tackle box." : Bind.Fix("Equip it in the tackle box (<tackle>)."), cx, cy, FontKind.Ui600, 16, on ? Pal.C("#3f7d35") : Muted);
             cy += 30;
         }
         if (d.Kind == "rod")
@@ -138,17 +138,17 @@ partial class Game
             "workbench" => craftTab switch
             {
                 "Rods" => "Each rod upgrades the one before, so you always keep your best.",
-                "Tackle" => "Reels, lines, hooks, bobbers, sinkers and lures. Equip them in the tackle box (T).",
+                "Tackle" => "Reels, lines, hooks, bobbers, sinkers and lures. Equip them in the tackle box (<tackle>).",
                 "Gear" => "Accessories you wear automatically once they're made.",
                 "Combat" => "Swords hit cave monsters harder. Armour softens their blows.",
-                "Bait" => "Pick which bait to use in the tackle box (T). Throw chum at a spot with F.",
+                "Bait" => "Pick which bait to use in the tackle box (<tackle>). Throw chum at a spot with <alt>.",
                 _ => "Stronger pickaxes mine rarer ore deeper in Frostfang Caverns."
             },
             "furnace" => "Two ore and a piece of wood for fuel make one bar.",
             "smoker" => $"Smoked fish keeps well and sells for double. You have {FishCount()} raw fish.",
             _ => $"Cook any raw fish from your bag. You have {FishCount()} raw fish."
         };
-        Gfx.Text(hint, x + pad, y + pad + 48, FontKind.Note, 18, Muted);
+        Gfx.Text(Bind.Fix(hint), x + pad, y + pad + 48, FontKind.Note, 18, Muted);
         float ry = y + pad + 48 + 34;
         if (tabs)
         {
@@ -229,7 +229,7 @@ partial class Game
         if ((Inp.Pressed(KeyboardKey.Backspace) || IsKeyPressedRepeat(KeyboardKey.Backspace)) && editLook.name.Length > 0)
             editLook.name = editLook.name[..^1];
         if (Inp.Pressed(KeyboardKey.Enter)) FinishCreator();
-        else if (Inp.Pressed(KeyboardKey.Escape)) CancelCreator();
+        else if (BackPressed()) CancelCreator();
     }
 
     void CancelCreator()

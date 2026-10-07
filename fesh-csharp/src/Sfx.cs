@@ -12,6 +12,7 @@ static class Sfx
     static readonly List<Sound> reels = new();
     static readonly Random rng = new();
     public static bool Muted;
+    public static float Volume = 1;
 
     public static void Init()
     {
@@ -69,13 +70,16 @@ static class Sfx
     public static void Play(string name)
     {
         if (Muted || !sounds.TryGetValue(name, out var s)) return;
+        SetSoundVolume(s, Volume);
         PlaySound(s);
     }
 
     public static void Reel()
     {
         if (Muted || reels.Count == 0) return;
-        PlaySound(reels[rng.Next(reels.Count)]);
+        var s = reels[rng.Next(reels.Count)];
+        SetSoundVolume(s, Volume);
+        PlaySound(s);
     }
 
     public static void Shutdown()

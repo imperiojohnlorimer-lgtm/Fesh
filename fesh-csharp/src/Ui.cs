@@ -10,6 +10,7 @@ partial class Game
         Muted = Pal.C("#6b5a45"), Rust = Pal.C("#b5523b"), CardBg = Pal.C("#fffaf0"), NoteBg = Pal.C("#fdf3c4"), PinRed = Pal.C("#c0392b");
     static readonly float[] Tilts = { -2, 1.6f, -1, 2.2f, -1.4f };
     float buildBarH;
+    float? clockTip;   // where the clock chip is, while the mouse is over it (its tooltip is drawn last, over the meters)
 
     void DrawUi()
     {
@@ -20,9 +21,9 @@ partial class Game
         if (!title && (BossFighting || BossOnLine)) DrawBossBar();
         if (mode == "build") DrawBuildBar();
         if (!title) DrawPrompt();
-        DrawToast();
+        if (!title) DrawToast();
         if (mode == "dialogue" && dlg != null) DrawDialogue();
-        if (title) DrawTitle();
+        if (title) { DrawTitle(); DrawToast(); }
         if (mode == "ending") DrawEnd();
         if (mode == "catch") DrawCatch();
         if (mode == "odd") DrawOdd();
@@ -37,7 +38,19 @@ partial class Game
         if (mode == "panel" && panel == "tank") DrawTank();
         if (mode == "panel" && panel == "lift") DrawLift();
         if (mode == "panel" && panel == "tackle") DrawTackle();
-        if (mode == "pause") DrawPause();
+        if (mode == "pause") DrawMenu();
+    }
+
+    // The pointer a gamepad steers around menus (drawn over everything, since the real mouse pointer doesn't move).
+    static void DrawPadPointer()
+    {
+        if (!Inp.CursorUi || Inp.PadCursor == null) return;
+        var m = Gfx.Mouse;
+        Vector2 P(float x, float y) => Gfx.P(m.X + x, m.Y + y);
+        // Drawn both ways round, as Raylib only fills one winding.
+        void Tri(Vector2 a, Vector2 b, Vector2 c, Color col) { DrawTriangle(a, b, c, col); DrawTriangle(a, c, b, col); }
+        Tri(P(-3, -5), P(-3, 27), P(20, 19), Pal.Ink);
+        Tri(P(0, 0), P(0, 20), P(14, 15), Color.White);
     }
 
     /* ---------- Building blocks ---------- */
@@ -49,6 +62,9 @@ partial class Game
         if (live && Gfx.Hover(x, y, w, h)) fill = Lighten(fill, 0.14f);
         Gfx.Box(x, y, w, h, fill, Pal.Ink, border, radius, shadow);
         Gfx.TextCenter(label, x + w / 2, y + (h - fs) / 2 - 1, font, fs, text);
+#if DEBUG
+        Gfx.Seen[label] = new Rectangle(x, y, w, h);   // so the autotest can click it by name
+#endif
         return live && Gfx.Click(x, y, w, h);
     }
 
@@ -85,11 +101,13 @@ partial class Game
     {
         const float m = 13, h = 36, fs = 20;
         float x = m;
-        string clock = (state.night ? FullMoon ? "Full moon" : "Night" : "Day") + (state.weather switch { "rain" => " · Rain", "storm" => " · Storm", _ => "" });
-        float cw = Gfx.Measure(clock, FontKind.Ui600, fs) + 50;
+        string weather = state.weather switch { "rain" => " · Rain", "storm" => " · Storm", _ => "" };
+        string clock = $"Day {state.day} · {ClockText(state.clock, 10)}{weather}";
+        // Sized for a wide time, so the chips beside it don't shuffle about as the minutes tick by.
+        float cw = Math.Max(Gfx.Measure(clock, FontKind.Ui600, fs), Gfx.Measure($"Day {state.day} · {(Settings.Data.clock24 ? "00:00" : "00:00 PM")}{weather}", FontKind.Ui600, fs)) + 50;
         Gfx.Rect(x, m, cw, h, Navy, 5);
         float ix = x + 20, iy = m + h / 2;
-        if (state.night)
+        if (Night)
         {
             // The moon in its current phase: a shadow slides across it over eight days.
             Gfx.Circle(ix, iy, 7.5f, Pal.Paper);
@@ -106,6 +124,8 @@ partial class Game
             Gfx.Circle(ix, iy, 5.5f, Pal.Lantern);
         }
         Gfx.Text(clock, x + 36, m + (h - fs) / 2 - 1, FontKind.Ui600, fs, Pal.Paper);
+        Gfx.Block(x, m, cw, h);
+        if (Gfx.Hover(x, m, cw, h)) clockTip = x;
         x += cw + 7;
         string area = AreaName();
         float aw = Gfx.Measure(area, FontKind.Ui600, fs) + 24;
@@ -122,7 +142,11 @@ partial class Game
         DrawFoodMeter(m + 136 + 7, m + h + 7, h);
 
         bool live = mode is not ("panel" or "catch" or "odd" or "pause" or "ending");
-        float rx = Gfx.LW - m;
+        // The menu button (the same as Esc), far right.
+        float rx = Gfx.LW - m - h;
+        if (Button("", rx, m, h, h, FontKind.Ui600, fs, Pal.Sand, Pal.Ink, 2, 2, 5, live)) OpenPause();
+        for (int i = 0; i < 3; i++) Gfx.Rect(rx + 9, m + 10 + i * 7, h - 18, 3, Pal.Ink, 1);
+        rx -= 7;
         var buttons = new (string label, Action act, bool on)[]
         {
             ("Case board", () => TogglePanel("case"), false),
@@ -139,6 +163,24 @@ partial class Game
             if (Button(label, rx, m, w, h, FontKind.Ui600, fs, on ? Pal.Lantern : Pal.Sand, Pal.Ink, 2, 2, 5, live)) act();
             rx -= 7;
         }
+        if (clockTip is float tipX) DrawClockTip(tipX, m + h + 6);
+        clockTip = null;
+    }
+
+    // Hovering over the clock: the moon, and what the weather will do next.
+    void DrawClockTip(float x, float y)
+    {
+        int toFull = (4 - MoonPhase + 8) % 8;
+        var lines = new List<string>
+        {
+            Night ? $"Night until {HourText(DawnMin)}" : $"Daylight until {HourText(DuskMin)}",
+            FullMoon ? "The moon is full tonight" : toFull == 0 ? "Full moon tonight" : toFull == 1 ? "Full moon tomorrow night" : $"Full moon in {toFull} days",
+            Forecast() ?? "No change in the weather expected today."
+        };
+        if (KnowTomorrow) lines.Add($"Tomorrow: {DescribeDay(state.tomorrow)}");
+        float w = lines.Max(l => Gfx.Measure(l, FontKind.Ui500, 17)) + 24;
+        Gfx.Rect(x, y, w, lines.Count * 23 + 14, NavyStrong, 5);
+        for (int i = 0; i < lines.Count; i++) Gfx.Text(lines[i], x + 12, y + 8 + i * 23, FontKind.Ui500, 17, Pal.Paper);
     }
 
     // A small fish icon and a bar that goes from green to amber to red as you get hungry.
@@ -283,7 +325,7 @@ partial class Game
             for (int i = 0; i < tools.Length; i++)
             {
                 var d = Data.BuildById.GetValueOrDefault(tools[i]);
-                string name = $"{(d != null ? $"{i + 1}" : "X")} {(d != null ? d.Name : "Take down")}", cost = d != null ? d.CostText : "refunds all";
+                string name = $"{(d != null ? $"{i + 1}" : Bind.Name("remove"))} {(d != null ? d.Name : "Take down")}", cost = d != null ? d.CostText : "refunds all";
                 widths[i] = Math.Max(Gfx.Measure(name, FontKind.Ui600, fs), Gfx.Measure(cost, FontKind.Ui500, small)) + 18;
             }
             total = widths.Sum() + gap * (tools.Length - 1) + pad * 2;
@@ -310,7 +352,7 @@ partial class Game
             if (Gfx.Hover(x, y + pad, bw, bh) && !on) fill = Lighten(fill, 0.14f);
             Gfx.Box(x, y + pad, bw, bh, Pal.WithAlpha(fill, a), Pal.WithAlpha(Pal.Ink, a), 2, 5);
             if (on && !remove) Gfx.Box(x + 2, y + pad + 2, bw - 4, bh - 4, fill, Pal.C("#fff8e3"), 2, 3);
-            string num = d != null ? $"{i + 1} " : "X ", name = d != null ? d.Name : "Take down", cost = d != null ? d.CostText : "refunds all";
+            string num = d != null ? $"{i + 1} " : Bind.Name("remove") + " ", name = d != null ? d.Name : "Take down", cost = d != null ? d.CostText : "refunds all";
             float nw = Gfx.Measure(num + name, FontKind.Ui600, fs), tx = x + bw / 2 - nw / 2;
             Color main = remove && on ? White : Pal.Ink;
             Color sub = remove && on ? Pal.C("#ffe3dc") : shortOf ? Rust : Muted;
@@ -322,34 +364,7 @@ partial class Game
         }
     }
 
-    /* ---------- Title and ending ---------- */
-    void DrawTitle()
-    {
-        DrawRectangleGradientV(0, 0, GetScreenWidth(), GetScreenHeight(), Pal.C("rgba(16,36,58,0.05)"), Pal.C("rgba(16,36,58,0.78)"));
-        const float logo = 176, tfs = 26, tlh = 35;
-        var tag = Gfx.Wrap("A fishing mystery on Saltmere Island. Catch what shouldn't exist, and find out how it got here.", FontKind.Note, tfs, 540);
-        float total = 160 + 22 + tag.Count * tlh + 26 + 56;
-        float y = (Gfx.LH - total) / 2 - 10;
-        float cx = Gfx.LW / 2;
-        Gfx.TextCenter("Fesh", cx, y + 21, FontKind.Ui700, logo, Pal.C("rgba(0,0,0,0.22)"));
-        Gfx.TextCenter("Fesh", cx, y + 10, FontKind.Ui700, logo, Pal.Ink);
-        Gfx.TextCenter("Fesh", cx, y, FontKind.Ui700, logo, Pal.Sand);
-        y += 160 + 22;
-        for (int i = 0; i < tag.Count; i++) Gfx.TextCenter(tag[i], cx, y + i * tlh, FontKind.Note, tfs, Pal.Paper);
-        y += tag.Count * tlh + 26;
-        string newLabel = confirmNew ? "Erase save and start over" : "New game";
-        float w = BigW(newLabel) + (hasSave ? BigW("Continue") + 13 : 0);
-        float x = cx - w / 2;
-        if (hasSave)
-        {
-            if (BigButton("Continue", x, y, true)) TitleContinue();
-            x += BigW("Continue") + 13;
-        }
-        if (BigButton(newLabel, x, y, !hasSave)) TitleNew();
-        Gfx.TextCenter("WASD or arrows to walk  ·  E or Space to act  ·  I bag  ·  B build  ·  Tab map  ·  J Fesh-dex  ·  F11 fullscreen",
-            cx, Gfx.LH - 44, FontKind.Ui500, 18, Pal.WithAlpha(Pal.Paper, 0.85f));
-    }
-
+    /* ---------- Ending (the title screen and menus are in UiMenu.cs) ---------- */
     void DrawEnd()
     {
         DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Pal.C("rgba(8,18,32,0.88)"));
@@ -682,7 +697,7 @@ partial class Game
     {
         var t = Data.Tidemane;
         if (GoldCard(t.Art, Data.MountName, "Your mount", t.Desc,
-            $"{t.Where} Press R to ride. From anywhere outdoors, R whistles it over.", "Ride on!")) CloseTamed();
+            Bind.Fix($"{t.Where} Press <ride> to ride. From anywhere outdoors, <ride> whistles it over."), "Ride on!")) CloseTamed();
     }
 
     // A glowing card for something extraordinary: portrait, name, a tag, a description, a boxed note and one button.
@@ -941,57 +956,5 @@ partial class Game
         for (int i = 0; i < theory.Count; i++) tt.Text(theory[i], tx + 24, y + 19 + 26 + i * 29, FontKind.Note, 20, Pal.PaperInk);
 
         if (Gfx.PressedOutside(bx, by, bw, h)) ClosePanels();
-    }
-
-    /* ---------- Pause menu ---------- */
-    static readonly (string keys, string what)[] Controls =
-    {
-        ("WASD / arrows", "Walk"), ("E or Space", "Talk, fish, chop, use"), ("Hold E", "Power up a cast"), ("Hold Space", "Reel in a fish"),
-        ("F", "Cook / throw chum"), ("G", "Spearfish on a reef"), ("T", "Tackle box"), ("I", "Your bag (eat food here)"),
-        ("B", "Build or furnish"), ("1–9, X", "Pick a piece, take down"), ("Tab", "Map of the islands"), ("J / C", "Fesh-dex / case board"),
-        ("M", "Sound on or off"), ("F11", "Fullscreen"), ("Esc", "Back / this menu / reel in")
-    };
-
-    void DrawPause()
-    {
-        Backdrop();
-        const float cw = 820, pad = 26, lh = 30, colW = 384;
-        int rows = (Controls.Length + 1) / 2;
-        float h = pad + 48 + 12 + rows * lh + 12 + 28 + 18 + 56 + 12 + 56 + pad;
-        float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, cw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
-        float cy = y + pad;
-        Gfx.Text("Paused", x + pad, cy, FontKind.Ui700, 40, Pal.PaperInk);
-        int toFull = (4 - MoonPhase + 8) % 8;
-        string dayText = $"Day {state.day} · " + (toFull == 0 ? "Full moon tonight" : toFull == 1 ? "Full moon tomorrow night" : $"Full moon in {toFull} days");
-        Gfx.Text(dayText, x + cw - pad - Gfx.Measure(dayText, FontKind.Ui600, 20), cy + 12, FontKind.Ui600, 20, Muted);
-        cy += 48 + 12;
-        for (int i = 0; i < Controls.Length; i++)
-        {
-            var (keys, what) = Controls[i];
-            float cx = x + pad + (i / rows) * colW, ry = cy + (i % rows) * lh;
-            Gfx.Text(keys, cx, ry, FontKind.Ui700, 19, Pal.PaperInk);
-            Gfx.Text(what, cx + 150, ry, FontKind.Ui500, 19, Muted);
-        }
-        cy += rows * lh + 12;
-        Gfx.Text("Your progress saves automatically.", x + pad, cy, FontKind.Note, 19, Pal.PaperInk);
-        cy += 28 + 18;
-        bool full = IsWindowState(ConfigFlags.BorderlessWindowMode);
-        string fsLabel = full ? "Windowed" : "Fullscreen";
-        float bx = x + pad;
-        if (BigButton("Resume", bx, cy, true)) ClosePause();
-        bx += BigW("Resume") + 13;
-        if (BigButton(fsLabel, bx, cy, false)) ToggleBorderlessWindowed();
-        bx += BigW(fsLabel) + 13;
-        if (BigButton("Quit", bx, cy, false)) { Save(); quit = true; }
-        cy += 56 + 12;
-        bx = x + pad;
-        if (BigButton("Change your look", bx, cy, false)) OpenCreator("edit");
-        bx += BigW("Change your look") + 13;
-        string snd = Sfx.Muted ? "Sound: off" : "Sound: on";
-        if (BigButton(snd, bx, cy, false)) ToggleSound();
-        bx += BigW(snd) + 13;
-        string mus = Music.Enabled ? "Music: on" : "Music: off";
-        if (BigButton(mus, bx, cy, false)) Music.Enabled = !Music.Enabled;
     }
 }

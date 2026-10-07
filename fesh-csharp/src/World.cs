@@ -193,7 +193,7 @@ partial class Game
             string key = $"{x},{y}";
             if (state.felled.TryGetValue(key, out int day))
             {
-                if (state.day - day < (kind == 'R' ? BoulderRegrowDays : TreeRegrowDays)) { stumps[(x, y)] = kind; return; }
+                if (state.day - day < (kind == 'R' ? BoulderRegrowDays : TreeRegrowDays) || RegrowBlocked(x, y)) { stumps[(x, y)] = kind; return; }
                 state.felled.Remove(key);
             }
             map[y, x] = kind;
@@ -476,7 +476,7 @@ partial class Game
         }
     }
 
-    // The ice hole freezes over each night. While you're drilling, cracks spread across the ice.
+    // The ice hole freezes over again by each morning. While you're drilling, cracks spread across the ice.
     void DrawIceCap()
     {
         if (scene != "world" || !IceFrozen) return;
@@ -507,7 +507,7 @@ partial class Game
         pix.Rect(151, 57, 18, 12, "#9a6a3a");
         foreach (int y in new[] { 60, 63, 66 }) pix.Rect(151, y, 18, 1, "#7a5230");
         pix.Rect(158, 62, 4, 7, "#3b2a1d");
-        pix.Rect(164, 60, 3, 3, state.night ? "#f3c25b" : "#bfe0ea");
+        pix.Rect(164, 60, 3, 3, Night ? "#f3c25b" : "#bfe0ea");
         for (int i = 0; i < 10; i++)
         {
             int half = 2 + (int)(i * 1.25);
@@ -682,7 +682,7 @@ partial class Game
         pix.Rect(X + 3, Y + 7, 4, 2, "#3b2a1d");
         pix.Rect(X + 4, Y - 1, 2, 8, "#5b3a24");
         pix.Rect(X + 3, Y - 6, 4, 5, "#1d2f45");
-        pix.Rect(X + 4, Y - 5, 2, 3, state.night ? "#ffe28a" : "#9fc3d1");
+        pix.Rect(X + 4, Y - 5, 2, 3, Night ? "#ffe28a" : "#9fc3d1");
         pix.Rect(X + 2, Y - 7, 6, 1, "#1d2f45");
     }
 
@@ -700,7 +700,7 @@ partial class Game
 
     void DrawShack(int X, int Y)
     {
-        string win = state.night ? "#f3c25b" : "#bfe0ea";
+        string win = Night ? "#f3c25b" : "#bfe0ea";
         pix.Rect(X, Y + 9, 20, 1, "rgba(0,0,0,0.2)");
         pix.Rect(X + 1, Y - 3, 18, 12, "#a8794a");
         foreach (int o in new[] { 0, 3, 6 }) pix.Rect(X + 1, Y + o, 18, 1, "#8a5f36");
@@ -835,7 +835,7 @@ partial class Game
                 pix.Rect(X + 3, Y + 9, 4, 1, "rgba(0,0,0,0.25)");
                 pix.Rect(X + 3, Y + 7, 4, 2, "#3b2a1d");
                 pix.Rect(X + 4, Y - 4, 2, 11, "#5b3a24");
-                pix.Rect(X + 2, Y - 8, 6, 4, state.night ? "#ffe28a" : "#f3c25b");
+                pix.Rect(X + 2, Y - 8, 6, 4, Night ? "#ffe28a" : "#f3c25b");
                 pix.Rect(X + 2, Y - 8, 6, 1, "#d9a83a");
                 break;
         }
@@ -933,6 +933,8 @@ partial class Game
         pix.Rect(X + 15, Y + 13, 4, 3, "#9aa0a5"); pix.Rect(X + 16, Y + 12, 1, 1, "#e8939a");
         pix.Rect(X + 2, Y + 19, 18, 1, "#7a5230");
         pix.Rect(X + 6, Y + 20, 10, 3, "#f3c25b"); pix.Rect(X + 7, Y + 21, 8, 1, "#9a6a3a");
+        // After hours a canvas sheet covers the goods.
+        if (!PipOpen) { pix.Rect(X + 2, Y + 11, 18, 6, "#b9a27a"); pix.Rect(X + 2, Y + 11, 18, 1, "#d2bf98"); pix.Rect(X + 9, Y + 12, 1, 5, "#a08a62"); }
     }
 
     void DrawBoat(float x, float y, float t)
@@ -974,7 +976,7 @@ partial class Game
         foreach (var a in animals)
             if (Visible(a.X, a.Y)) list.Add((a.Y, () => DrawAnimal(a)));
         if (Visible(MouthX * T, MouthY * T)) list.Add(((MouthY + 2) * T, DrawCaveMouth));
-        if (Visible(PipX, PipY)) { list.Add((PipY, DrawPip)); list.Add((PipY + 9, () => DrawStall(t))); }
+        if (Visible(PipX, PipY)) { if (PipOpen) list.Add((PipY, DrawPip)); list.Add((PipY + 9, () => DrawStall(t))); }
         if (Has("boat") > 0)
         {
             var (bx, by) = state.boatAt == "atoll" ? (AtollJettyX - 14, AtollJettyY) : (SaltJettyX + 14, SaltJettyY);
@@ -984,7 +986,7 @@ partial class Game
         if (Visible(CarvingX, CarvingY)) list.Add((CarvingY, DrawCarving));
         if (state.tamed && !state.riding && Visible(state.mountX, state.mountY)) list.Add((state.mountY, DrawMountIdle));
         if (boss != null) list.Add((boss.Y, () => DrawBoss(t)));
-        list.Add((tomasY, DrawTomas));
+        if (!TomasInBed) list.Add((tomasY, DrawTomas));
         list.Add((player.Y, DrawPlayer));
         if (Visible(26, 150)) list.Add((157, DrawWreck));
         foreach (var o in list.OrderBy(o => o.y)) o.draw();
@@ -1125,7 +1127,7 @@ partial class Game
     void DrawSnow(float t)
     {
         var flake = Pal.C("rgba(255,255,255,0.85)");
-        int flakes = state.weather switch { "storm" => 260, "rain" => 170, _ => 110 };
+        int flakes = (int)(110 + 60 * rainAmt + 90 * stormAmt);
         for (int i = 0; i < flakes; i++)
         {
             double sx = (Pix.Hash(i, 0, 91) * W + t * 6 * (0.5 + Pix.Hash(i, 1, 91)) + Math.Sin(t * 1.3 + i) * 4) % W;
@@ -1149,9 +1151,11 @@ partial class Game
             }
     }
 
+    // k is how dark it is (Darkness): the lights, glows and fireflies fade in with it at dusk and out at dawn.
     void DrawNight(float t)
     {
-        Array.Fill(dark, 0.63f);
+        float k = Darkness;
+        Array.Fill(dark, 0.63f * k);
         LightHole(player.X, player.Y - 6, Wears("headlamp") ? 58 : 32, 0.85f);
         LightHole(FireX, FireY - 3, 44 + MathF.Sin(t * 9) * 2, 1);
         LightHole(165, 61, 12, 0.7f);
@@ -1167,10 +1171,10 @@ partial class Game
         LightHole(StarwellX, StarwellY, 62 + MathF.Sin(t * 1.3f) * 4, 0.8f);
         if (boss != null) LightHole(boss.X, boss.Y - 8, 34, 0.7f);
         ApplyDark(new Color(8, 16, 40, 255));
-        DrawMoonlitShore(t);
-        pix.Glow(StarwellX, StarwellY, 30, Pal.Rgba(120, 220, 255, 0.22f + 0.06f * MathF.Sin(t * 1.3f)));
+        DrawMoonlitShore(t, k);
+        pix.Glow(StarwellX, StarwellY, 30, Pal.Rgba(120, 220, 255, (0.22f + 0.06f * MathF.Sin(t * 1.3f)) * k));
 
-        var warm = Pal.Rgba(243, 150, 60, 0.18f);
+        var warm = Pal.Rgba(243, 150, 60, 0.18f * k);
         pix.Glow(FireX, FireY - 3, 40, warm);
         foreach (var b in state.builds)
         {
@@ -1181,12 +1185,12 @@ partial class Game
         if (Eligible(Data.ById["glowgill"]))
         {
             float gx = 100 + MathF.Sin(t * 0.7f) * 13, gy = 66 + MathF.Cos(t * 0.9f) * 5;
-            pix.Glow(gx, gy, 9, Pal.Rgba(127, 243, 255, 0.55f));
+            pix.Glow(gx, gy, 9, Pal.Rgba(127, 243, 255, 0.55f * k));
             pix.Rect(gx, gy, 2, 1, "#bdfaff");
         }
         if (Eligible(Data.ById["abyssal"]) && state.flags.dockFixed)
         {
-            float a = 0.4f + 0.4f * MathF.Sin(t * 1.4f);
+            float a = (0.4f + 0.4f * MathF.Sin(t * 1.4f)) * k;
             foreach (var (x, y) in new[] { (300, 112), (306, 115), (311, 110), (316, 116), (304, 120) })
                 pix.Rect(x, y, 1, 1, Pal.Rgba(255, 215, 106, a));
         }
@@ -1198,7 +1202,7 @@ partial class Game
             int ftx = ((int)fx + camX) / T, fty = ((int)fy + camY) / T;
             byte fb = BiomeAt(ftx, fty);
             if (fb != 3 && !(fb == 0 && i % 3 == 0 && TileAt(ftx, fty) is 'g' or 't')) continue;
-            float a = (float)(0.5 + 0.5 * Math.Sin(t * 3 + i * 2.1));
+            float a = (float)(0.5 + 0.5 * Math.Sin(t * 3 + i * 2.1)) * k;
             pix.Glow(fx + camX + 0.5, fy + camY + 0.5, 4, Pal.Rgba(200, 255, 120, 0.25f * a));
             pix.Fill((int)fx, (int)fy, 1, 1, Pal.Rgba(230, 255, 140, a));
         }
@@ -1215,8 +1219,8 @@ partial class Game
         int sw = SCols * T, sh = SRows * T;
         camX = sw <= W ? -(W - sw) / 2 : Math.Clamp((int)MathF.Round(player.X) - W / 2, 0, sw - W);
         camY = sh <= H ? -(H - sh) / 2 : Math.Clamp((int)MathF.Round(player.Y - 8) - H / 2, 0, sh - H);
-        // Big impacts (Tidemane landing, charging into a palm, stomping) shake the view.
-        if (quake > 0 && mode is not ("pause" or "panel"))
+        // Big impacts (Tidemane landing, charging into a palm, stomping) shake the view, unless that is turned off in Settings.
+        if (quake > 0 && Settings.Data.shake && mode is not ("pause" or "panel"))
         {
             float k = Math.Min(1, quake * 4);
             camX += (int)MathF.Round(MathF.Sin(time * 71) * 2 * k);
@@ -1249,7 +1253,8 @@ partial class Game
             DrawSkyLife(t);
             DrawSnow(t);
             DrawWeatherTint();
-            if (state.night) DrawNight(t);
+            DrawSunGlow();
+            if (Darkness > 0) DrawNight(t);
             DrawRain(t);
             DrawGhost(t);
         }

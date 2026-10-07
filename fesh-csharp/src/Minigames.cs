@@ -50,7 +50,7 @@ partial class Game
         if (!state.Hinted("spear"))
         {
             state.hinted["spear"] = true;
-            Toast("Spearfishing! Move the target onto a fish shadow with WASD or the mouse, and press E to throw. You have three spears.", 5);
+            Toast("Spearfishing! Move the target onto a fish shadow with <move> or the mouse, and press <act> to throw. You have three spears.", 5);
         }
     }
 
@@ -86,10 +86,10 @@ partial class Game
         var (sx, sy) = SpotPos(s);
         spearT -= dt;
         float ax = 0, ay = 0;
-        if (Inp.Down(KeyboardKey.Left) || Inp.Down(KeyboardKey.A)) ax -= 1;
-        if (Inp.Down(KeyboardKey.Right) || Inp.Down(KeyboardKey.D)) ax += 1;
-        if (Inp.Down(KeyboardKey.Up) || Inp.Down(KeyboardKey.W)) ay -= 1;
-        if (Inp.Down(KeyboardKey.Down) || Inp.Down(KeyboardKey.S)) ay += 1;
+        if (Bind.Down("left")) ax -= 1;
+        if (Bind.Down("right")) ax += 1;
+        if (Bind.Down("up")) ay -= 1;
+        if (Bind.Down("down")) ay += 1;
         aimX += ax * 70 * dt; aimY += ay * 70 * dt;
         if (Gfx.MouseMoved && !Gfx.OverUiPrev) AimAtPointer();
         aimX = Math.Clamp(aimX, sx - s.R - 10, sx + s.R + 10);
@@ -141,7 +141,7 @@ partial class Game
             }
         }
         if (spearT <= 0 && thrown == null) { EndSpear(); return; }
-        SetPrompt($"Aim with WASD or the mouse.   [E] Throw ({spears} left)   [Esc] Stop");
+        SetPrompt($"Aim with <move> or the mouse.   [<act>] Throw ({spears} left)   [Esc] Stop");
     }
 
     void DrawSpearing(float t)
@@ -217,7 +217,7 @@ partial class Game
         if (!state.Hinted("worms"))
         {
             state.hinted["worms"] = true;
-            Toast("Worms! Pick them as your bait in the tackle box (T). Freshwater fish love them.", 4);
+            Toast("Worms! Pick them as your bait in the tackle box (<tackle>). Freshwater fish love them.", 4);
         }
         else Toast($"Dug up {n} worms ({Has("worm")} now).", 1.8f);
     }
@@ -236,7 +236,7 @@ partial class Game
         if (!state.Hinted("crickets"))
         {
             state.hinted["crickets"] = true;
-            Toast("Got a cricket! Jumpers and shallow-water fish love them. Pick your bait in the tackle box (T).", 4);
+            Toast("Got a cricket! Jumpers and shallow-water fish love them. Pick your bait in the tackle box (<tackle>).", 4);
         }
     }
 
@@ -295,15 +295,16 @@ partial class Game
     const float DerbyTime = 180;
     bool DerbyOn => derbyT > 0;
 
-    // Today's rival anglers and their catches. They get better each time you win.
-    (string name, float kg, string fish)[] DerbyRivals()
+    // A day's rival anglers and their catches. They get better each time you win. A derby running past dawn keeps the
+    // rivals of the day it started (state.derbyDay).
+    (string name, float kg, string fish)[] DerbyRivals(int day)
     {
         float scale = 1 + 0.5f * Math.Min(state.derbyWins, 6);
         string[] names = { "Old Bess", "Marlo", "Captain Ivy" };
         float[] baseKg = { 0.8f, 1.6f, 3.2f };
         return names.Select((n, i) =>
         {
-            float kg = MathF.Round(baseKg[i] * scale * (0.85f + 0.3f * (float)Pix.Hash(state.day, i, 71)) * 100) / 100;
+            float kg = MathF.Round(baseKg[i] * scale * (0.85f + 0.3f * (float)Pix.Hash(day, i, 71)) * 100) / 100;
             var f = Data.AllCommon.Where(c => !c.Legend && !c.Rare && c.Kg * 1.3f >= kg).OrderBy(c => c.Kg).FirstOrDefault() ?? Data.FishById["bluefin_tuna"];
             return (n, kg, f.Name);
         }).ToArray();
@@ -340,7 +341,7 @@ partial class Game
     void EndDerby()
     {
         derbyT = 0;
-        var rivals = DerbyRivals();
+        var rivals = DerbyRivals(state.derbyDay);
         int place = 4 - rivals.Count(r => derbyBest > r.kg);
         string what = derbyFish == null ? "You didn't catch anything" : $"Your {derbyFish.ToLowerInvariant()} weighed {Kg(derbyBest)}";
         string prize;

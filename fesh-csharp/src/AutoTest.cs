@@ -19,8 +19,22 @@ partial class Game
         testDir = Environment.GetEnvironmentVariable("FESH_AUTOTEST");
         if (string.IsNullOrEmpty(testDir)) return;
         Directory.CreateDirectory(testDir);
-        SaveFile.Clear();
+        // The run wipes every save slot and the settings where it saves, so never let it near the real ones.
+        if (Environment.GetEnvironmentVariable("FESH_SAVE") is not { Length: > 0 })
+        {
+            File.WriteAllText(Path.Combine(testDir, "autotest.log"), "FAIL  FESH_SAVE isn't set: the autotest would wipe your real saves, so it didn't run.");
+            quit = true;
+            return;
+        }
+        SaveFile.Slot = 1;
+        for (int n = 1; n <= SaveFile.Slots; n++) SaveFile.Clear(n);
         hasSave = false;
+        Settings.Reset();
+        // The clock stands still unless a check moves it, so day and night only change when the script says so.
+        Settings.Data.dayLength = 0;
+        // Clicking another window during the run mustn't pause it: the run always has focus, as far as the game knows.
+        Settings.Data.pauseUnfocused = false;
+        Inp.ScriptFocused = true;
         script = Script();
     }
 
@@ -48,6 +62,26 @@ partial class Game
         ExportImage(img, Path.Combine(testDir, pendingShot + ".png"));
         UnloadImage(img);
         pendingShot = null;
+    }
+
+    // Noon or ten at night, straight away (no dusk or dawn in between: the day doesn't change).
+    void SetNight(bool night) => state.clock = night ? 22 * 60 : 12 * 60;
+
+    // Clicks a button the way a player would: the mouse goes where it was last drawn, and clicks on the next frame.
+    bool ClickButton(string label)
+    {
+        if (!Gfx.Seen.TryGetValue(label, out var r)) return false;
+        Inp.ScriptMouse = new System.Numerics.Vector2(r.X + r.Width / 2, r.Y + r.Height / 2);
+        Inp.ScriptClickNext = true;
+        return true;
+    }
+
+    // Fair weather all day, so no change of weather turns up in the middle of a check.
+    void ClearSkies()
+    {
+        state.forecast = new() { new WeatherSpell { at = 0, w = "clear" } };
+        state.weather = planned = "clear";
+        SnapWeather();
     }
 
     void Check(string what, bool ok) => testLog.Add($"{(ok ? "PASS" : "FAIL")}  {what}");
@@ -192,6 +226,7 @@ partial class Game
             }
             Check($"{k} spaces are visible at 10-40px{(narrow.Count > 0 ? " (too narrow at " + string.Join(" ", narrow) + ")" : "")}", narrow.Count == 0);
         }
+        Note(Inp.PadIndex >= 0 ? $"a gamepad is plugged in (index {Inp.PadIndex})" : "no gamepad plugged in");
         yield return 20;
         pendingShot = "01-title"; yield return 2;
 
@@ -253,7 +288,7 @@ partial class Game
         Check($"fence blocks walking (stopped at y={player.Y:0.0})", player.Y <= 122.1f);
 
         // Night lighting
-        state.night = true; yield return 10;
+        SetNight(true); yield return 10;
         pendingShot = "04-night"; yield return 2;
 
         // Resting at the built campfire
@@ -262,7 +297,7 @@ partial class Game
         Check($"campfire offers rest and cooking (prompt: {prompt.Text})", target?.Type == "rest" && target.AltType == "cook");
 
         // Talking to Tomas shows the speaker tag
-        state.night = false;
+        SetNight(false);
         player.X = 146; player.Y = 96; yield return 3;
         Inp.Tap(KeyboardKey.E); yield return 120;
         Check("talking to Tomas opens dialogue", mode == "dialogue");
@@ -315,7 +350,57 @@ partial class Game
         Inp.Tap(KeyboardKey.Escape); yield return 5;
         Check("Esc in play opens the pause menu", mode == "pause");
         pendingShot = "10-pause"; yield return 2;
+        Check("the menu opens on the Game tab", menuTab == "game");
+        menuTab = "settings"; yield return 3;
+        pendingShot = "10b-settings"; yield return 2;
+
+        // Rebinding a key in the Controls tab
+        menuTab = "controls"; yield return 3;
+        rebind = ("bag", 0); yield return 2;
+        pendingShot = "10c-controls"; yield return 2;
+        Inp.Tap(KeyboardKey.Escape); yield return 2;
+        Check("Esc while waiting for a key cancels it and keeps the menu open", rebind == null && mode == "pause" && Bind.Key("bag", 0) == KeyboardKey.I);
+        rebind = ("bag", 0); yield return 2;
+        Inp.Tap(KeyboardKey.K); yield return 2;
+        Check("pressing a key binds it", rebind == null && Bind.Key("bag", 0) == KeyboardKey.K && mode == "pause");
+        rebind = ("bag", 1); yield return 2;
+        Inp.Tap(KeyboardKey.Enter); yield return 2;
+        Check($"Enter can't be bound ({rebindNote})", rebind != null && Bind.Key("bag", 1) == KeyboardKey.Null);
+        Inp.Tap(KeyboardKey.Escape); yield return 2;
         Inp.Tap(KeyboardKey.Escape); yield return 3;
+        Check("then Esc closes the menu", mode == "play");
+        Inp.Tap(KeyboardKey.I); yield return 3;
+        Check("the old key no longer opens the bag", mode == "play");
+        Inp.Tap(KeyboardKey.K); yield return 3;
+        Check("the new one does", mode == "panel" && panel == "bag");
+        Inp.Tap(KeyboardKey.Escape); yield return 3;
+        Bind.Set("act", 0, KeyboardKey.K);
+        Check("taking another action's key swaps the two", Bind.Key("act", 0) == KeyboardKey.K && Bind.Key("bag", 0) == KeyboardKey.E);
+        player.X = 100; player.Y = 98; player.Face = "up"; yield return 3;
+        Check($"prompts name the new key ({prompt.Key}: {prompt.Text})", target?.Type == "spot" && prompt.Key == "K");
+        TestBite("lagoon", "pond_perch"); yield return 2;
+        Check($"so does the bite ({prompt.Key}: {prompt.Text})", prompt.Key == "K");
+        fish = null; reel = null; mode = "play"; yield return 2;
+        Toast("Press <act> to cast, <bag> for your bag, <move> to walk.");
+        Check($"so do tips ({toastMsg})", toastMsg == "Press K to cast, E for your bag, WASD to walk.");
+        Settings.Data.music = 0.35f;
+        Settings.Save();
+        Settings.Load();
+        Check("settings and keys are saved and come back", Math.Abs(Settings.Data.music - 0.35f) < 0.001f && Bind.Key("act", 0) == KeyboardKey.K && Settings.Data.dayLength == 0);
+        Settings.Reset();
+        Settings.Data.dayLength = 0; Settings.Data.pauseUnfocused = false;
+        Check("resetting puts every key back", Bind.Key("act", 0) == KeyboardKey.E && Bind.Key("bag", 0) == KeyboardKey.I && Settings.Data.music == 0.8f);
+        Bind.Load(new() { ["bag"] = new[] { (int)KeyboardKey.W, 0 } });
+        Check("a settings file that gives W to the bag doesn't also leave W walking up",
+            Bind.Key("bag", 0) == KeyboardKey.W && Bind.Key("up", 0) == KeyboardKey.Null && Bind.Key("up", 1) == KeyboardKey.Up);
+        Bind.Reset();
+        Inp.Tap(KeyboardKey.Escape); yield return 3;
+        menuTab = "settings"; yield return 2;
+        dragSlider = "music"; Inp.Tap(KeyboardKey.Escape); yield return 3;
+        Check("Esc while holding a slider lets go of it", dragSlider == null && mode == "play");
+        Check($"test settings live apart from the real ones ({Path.GetFileName(SaveFile.SettingsPath)})",
+            Path.GetFileName(SaveFile.SettingsPath) == Path.GetFileNameWithoutExtension(Environment.GetEnvironmentVariable("FESH_SAVE")) + "-settings.json");
+        player.X = 160; player.Y = 115; yield return 3;
 
         // Saving and loading
         Save();
@@ -345,14 +430,14 @@ partial class Game
             $"{y,2} " + new string(Enumerable.Range(0, COLS).Select(x => map[y, x]).ToArray())));
 
         // Catch odds: the dog at the lagoon, the night-only pike, and each spot keeping its own fish
-        state.night = false;
+        SetNight(false);
         int dogs = 0;
         for (int i = 0; i < 4000; i++) if (RollCatch("lagoon").Id == "dog") dogs++;
         Check($"a dog bites at the lagoon about 7% of the time ({dogs / 40.0:0.0}%)", dogs > 180 && dogs < 400);
         int pikeDay = Enumerable.Range(0, 2000).Count(_ => RollCatch("icehole").Id == "crystal_pike");
-        state.night = true;
+        SetNight(true);
         int pikeNight = Enumerable.Range(0, 2000).Count(_ => RollCatch("icehole").Id == "crystal_pike");
-        state.night = false;
+        SetNight(false);
         Check($"crystal pike only bites at night (day {pikeDay}, night {pikeNight} of 2000)", pikeDay == 0 && pikeNight > 60);
         foreach (var s in Data.Spots.Where(s => s.Biome != "saltmere"))
         {
@@ -371,9 +456,9 @@ partial class Game
             yield return 30;
             pendingShot = shot; yield return 2;
         }
-        state.night = true; yield return 10;
+        SetNight(true); yield return 10;
         pendingShot = "15-mire-night"; yield return 2;
-        state.night = false;
+        SetNight(false);
 
         // Hooking a dog at the lagoon
         player.X = 100; player.Y = 98; player.Face = "up"; yield return 3;
@@ -513,9 +598,9 @@ partial class Game
         state.inv["copper_bar"] = 3;
         Craft(Items.Recipes.First(r => r.Out == "rod_copper"));
         Check("crafted a copper rod and it's used for fishing", BestRod() == "rod_copper" && Rod.Zone == 5);
-        state.night = true; yield return 5;
+        SetNight(true); yield return 5;
         pendingShot = "24-shack-night"; yield return 2;
-        state.night = false;
+        SetNight(false);
         player.X = RoomDoorWX; player.Y = RoomDoorWY - 6; player.Face = "down"; yield return 2;
         Inp.Hold(KeyboardKey.Down, true); yield return 8; Inp.Hold(KeyboardKey.Down, false); yield return 70;
         Check("walking down through the door goes back outside", scene == "world");
@@ -738,12 +823,60 @@ partial class Game
 
         // A new day regrows the oak and resets the sheep's gift
         int day0 = state.day;
-        state.night = true;
+        SetNight(true);
         player.X = FireX; player.Y = FireY + 11; yield return 3;
         Inp.Tap(KeyboardKey.E); yield return 70;
-        Check($"resting into morning starts day {state.day}", state.day == day0 + 1 && !state.night);
+        Check($"resting into morning starts day {state.day}", state.day == day0 + 1 && !Night);
         state.day += 3; BuildMap();
         Check("chopped trees grow back after a few days", worldMap[11, 12] == 't');
+
+        // ---------- The clock ----------
+        Check($"resting through the night ends at 6:30 AM ({ClockText(state.clock)})", (int)state.clock == 6 * 60 + 30);
+        Check($"the clock reads like a clock ({ClockText(0)}, {ClockText(13 * 60 + 5)}, {HourText(20 * 60)})",
+            ClockText(0) == "12:00 AM" && ClockText(13 * 60 + 5) == "1:05 PM" && HourText(20 * 60) == "8 PM");
+        Settings.Data.clock24 = true;
+        Check($"or a 24-hour one ({ClockText(13 * 60 + 5)})", ClockText(13 * 60 + 5) == "13:05" && HourText(6 * 60) == "06:00");
+        Settings.Data.clock24 = false;
+        int dayR = state.day;
+        Inp.Tap(KeyboardKey.E); yield return 70;
+        Check($"resting by day ends at 9 PM the same day ({ClockText(state.clock)}, day {state.day})", (int)state.clock == 21 * 60 && state.day == dayR && Night);
+        // Two boundaries in one skip (dusk, then dawn) make exactly one new day.
+        state.clock = 19 * 60;
+        SkipTo(7 * 60);
+        Check($"skipping from 7 PM to 7 AM is one new day ({state.day})", state.day == dayR + 1 && !Night);
+
+        // Left alone, the clock runs while you play (12-minute days: two game minutes a second) and stops in menus.
+        player.X = 160; player.Y = 115; player.Face = "down";
+        ClearSkies();
+        Settings.Data.dayLength = 12;
+        state.clock = 19 * 60 + 58; yield return 90;
+        Check($"the clock runs while you play ({ClockText(state.clock)})", state.clock > 20 * 60 && state.clock < 20 * 60 + 15 && Night);
+        Check($"and nightfall is announced ({toastMsg})", toastMsg.StartsWith("Night falls"));
+        Inp.Tap(KeyboardKey.Escape); yield return 3;
+        float pausedAt = state.clock; yield return 60;
+        Check("it stops while the menu is open", mode == "pause" && state.clock == pausedAt);
+        Inp.Tap(KeyboardKey.Escape); yield return 3;
+
+        // Dawn brings a new day without resting, and grows back what's due, one tile at a time, but not under your feet.
+        var due = trees.Where(t => t.kind == 't' && t.x < 32 && t.y < 18 && Dist(t.x * T + 5, t.y * T + 5, 160, 115) > 30).Take(2).ToList();
+        foreach (var (tx, ty, tk) in due) { Fell(tx, ty, tk); state.felled[$"{tx},{ty}"] = state.day - 5; }
+        var (ux, uy, _) = due[1];
+        player.X = ux * T + 5; player.Y = uy * T + 7;
+        int dayD = state.day;
+        state.clock = 5 * 60 + 59; yield return 60;
+        Check($"dawn starts a new day by itself (day {state.day}, {toastMsg})", state.day == dayD + 1 && toastMsg.StartsWith($"Morning of day {state.day}"));
+        Check("a felled tree that's due grows back at dawn", worldMap[due[0].y, due[0].x] == 't' && !state.felled.ContainsKey($"{due[0].x},{due[0].y}"));
+        Check("but not the one you're standing on", worldMap[uy, ux] != 't' && state.felled.ContainsKey($"{ux},{uy}"));
+        BuildMap();
+        Check("and it still doesn't when the map is rebuilt, as it is on loading", worldMap[uy, ux] != 't');
+        Settings.Data.dayLength = 0;
+        player.X = 160; player.Y = 115;
+        ClearSkies();
+        state.clock = 19.5f * 60; yield return 5;
+        pendingShot = "12a-dusk"; yield return 2;
+        state.clock = 6 * 60; yield return 5;
+        pendingShot = "12b-dawn"; yield return 2;
+        SetNight(false);
 
         // Change your look from the pause menu
         Inp.Tap(KeyboardKey.Escape); yield return 3;
@@ -803,10 +936,10 @@ partial class Game
         fish = null; reel = null; mode = "play"; yield return 3;
 
         // Weather
-        state.weather = "rain"; player.X = 160; player.Y = 115; yield return 30;
+        state.weather = "rain"; SnapWeather(); player.X = 160; player.Y = 115; yield return 30;
         pendingShot = "31-rain"; yield return 2;
         Check("rain makes fish bite faster", WeatherBite < 1);
-        state.weather = "storm"; flash = 1; yield return 2;
+        state.weather = "storm"; SnapWeather(); flash = 1; yield return 2;
         pendingShot = "32-storm"; yield return 2;
         var bridgeTile = bridgeSet.First(b => b.Item2 > 18 && b.Item1 == 16);
         Check("a storm closes the bridges", !CanStand(bridgeTile.Item1 * T + 5, bridgeTile.Item2 * T + 7));
@@ -815,6 +948,65 @@ partial class Game
         Note($"in a storm away from everything, the prompt is: {prompt.Text}");
         Check("you can always wait out a storm", target?.Type == "rest");
         state.weather = "clear";
+
+        // The forecast moves the weather along as the clock runs: rain, a warning, then a storm
+        ClearSkies();
+        SetNight(false);
+        state.clock = 9 * 60;
+        state.forecast = new() { new() { at = 0, w = "clear" }, new() { at = 200, w = "rain" }, new() { at = 260, w = "storm" }, new() { at = 400, w = "clear" } };
+        Advance(30, quiet: false);
+        Check($"rain comes when the forecast says ({state.weather}: {toastMsg})", state.weather == "rain" && toastMsg.StartsWith("It's starting to rain"));
+        Advance(30, quiet: false);
+        Check($"with half an hour's warning before a storm ({toastMsg})", state.weather == "rain" && toastMsg.Contains("A storm is coming"));
+        // Rain that starts only half an hour before the storm still gets the warning, in the same message
+        state.clock = 9 * 60;
+        state.forecast = new() { new() { at = 0, w = "clear" }, new() { at = 200, w = "rain" }, new() { at = 230, w = "storm" }, new() { at = 400, w = "clear" } };
+        state.weather = planned = "clear"; warnedStorm = -1;
+        Advance(25, quiet: false);
+        Check($"and when the rain only starts half an hour before ({toastMsg})", toastMsg.StartsWith("It's starting to rain") && toastMsg.Contains("A storm is coming"));
+        state.clock = 10 * 60;
+        state.forecast = new() { new() { at = 0, w = "clear" }, new() { at = 200, w = "rain" }, new() { at = 260, w = "storm" }, new() { at = 400, w = "clear" } };
+        planned = state.weather = "rain"; warnedStorm = 2;
+        // Caught halfway across a bridge by the storm: you can walk off it, but not back on.
+        var span = bridgeSet.Where(b => b.Item1 == 16 && b.Item2 > 10).OrderBy(b => b.Item2).ToList();
+        var mid = span[span.Count / 2];
+        player.X = mid.Item1 * T + 5; player.Y = mid.Item2 * T + 7; player.Face = "down";
+        Advance(25, quiet: false);
+        SnapWeather();
+        Check($"the storm arrives on time ({state.weather}: {toastMsg})", Stormy && toastMsg.StartsWith("A storm is raging"));
+        float yOnBridge = player.Y;
+        Inp.Hold(KeyboardKey.Down, true); yield return 40; Inp.Hold(KeyboardKey.Down, false); yield return 2;
+        Check($"you can still walk off a bridge the storm caught you on (moved {player.Y - yOnBridge:0}px)", player.Y > yOnBridge + 15);
+        var top = span[0];
+        player.X = top.Item1 * T + 5; player.Y = top.Item2 * T - 6; yield return 2;
+        Check("but you can't step onto one", !OnBridge() && CanStand(player.X, player.Y) && !CanStand(top.Item1 * T + 5, top.Item2 * T + 7));
+        pendingShot = "32b-storm-forecast"; yield return 2;
+        // Sheltering waits until the storm has passed, the same day.
+        int dayS = state.day;
+        player.X = 480; player.Y = 150; yield return 3;
+        Inp.Tap(KeyboardKey.E); yield return 70;
+        Check($"sheltering waits out the storm ({ClockText(state.clock)}, {state.weather}, day {state.day})",
+            (int)state.clock == 6 * 60 + 400 && state.weather == "clear" && state.day == dayS && toastMsg.StartsWith("You wait out the storm"));
+        // Each morning's forecast: well formed, storms only out of rain and only from day 3.
+        int keepDayW = state.day, stormDays = 0, wetDays = 0;
+        bool plansOk = true, earlyStorm = false;
+        state.day = 10;
+        for (int i = 0; i < 2000; i++)
+        {
+            RollWeather();
+            var p = state.forecast;
+            var pairs = p.Zip(p.Skip(1)).ToList();
+            plansOk &= p[0].at == 0 && p.All(s => s.w is "clear" or "rain" or "storm" && s.at < 1440)
+                && pairs.All(z => z.First.at < z.Second.at && z.First.w != z.Second.w && (z.Second.w != "storm" || z.First.w == "rain"));
+            if (p.Any(s => s.w == "storm")) stormDays++; else if (p.Any(s => s.w == "rain")) wetDays++;
+        }
+        state.day = 2;
+        for (int i = 0; i < 300; i++) earlyStorm |= MakeForecast(1).Any(s => s.w == "storm") || MakeForecast(2).Any(s => s.w == "storm");
+        Check($"forecasts are well formed ({stormDays / 20.0:0}% storm days, {wetDays / 20.0:0}% rain without a storm, none before day 3)",
+            plansOk && !earlyStorm && stormDays > 180 && stormDays < 420 && wetDays > 600);
+        state.day = keepDayW;
+        ClearSkies();
+        SetNight(false);
 
         // Plant a berry bush from a sapling
         player.X = 135; player.Y = 147; player.Face = "up"; yield return 3;
@@ -885,7 +1077,7 @@ partial class Game
         LoadScene("world"); player.X = 160; player.Y = 115; yield return 3;
 
         // ---------- Fishing: power casts, depth, bait, fights, sizes, and everything around the rod ----------
-        state.night = false; state.weather = "clear";
+        SetNight(false); state.weather = "clear";
         state.inv.Remove("bait"); state.inv.Remove("glow_bait");
         player.X = 100; player.Y = 98; player.Face = "up"; yield return 3;
         Check($"the lagoon offers a power cast (prompt: {prompt.Text})", target?.Type == "spot" && prompt.Text.Contains("hold"));
@@ -911,14 +1103,14 @@ partial class Game
         state.weather = "clear";
         Check("and never when it's dry", !FishWeights("lagoon", "berries", 1).Any(p => p.f.Id == "old_whiskers"));
         int keepDay = state.day;
-        state.night = true;
+        SetNight(true);
         while (MoonPhase != 4) state.day++;
         Check($"the moon carp bites on a full-moon night (day {state.day})", FullMoon && FishWeights("lagoon", null, 1).Any(p => p.f.Id == "moon_carp"));
         yield return 15;
         pendingShot = "41-full-moon"; yield return 2;
         state.day++;
         Check("but not on other nights", !FullMoon && !FishWeights("lagoon", null, 1).Any(p => p.f.Id == "moon_carp"));
-        state.day = keepDay; state.night = false;
+        state.day = keepDay; SetNight(false);
         state.weather = "storm";
         Check("the storm eel only bites in a storm", FishWeights("wreck", null, 1).Any(p => p.f.Id == "storm_eel"));
         state.weather = "clear";
@@ -1202,18 +1394,22 @@ partial class Game
             && reloaded.tackle.GetValueOrDefault("bait") == state.tackle.GetValueOrDefault("bait") && reloaded.pots.Count == state.pots.Count);
 
         // A save from before the bag and character creation still loads
-        string realSave = Environment.GetEnvironmentVariable("FESH_SAVE"), oldSave = Path.Combine(testDir, "old-save.json");
+        string oldSave = Path.Combine(testDir, "old-save.json");
         File.WriteAllText(oldSave, "{\"caught\":[\"glowgill\"],\"commons\":{\"pond_perch\":3},\"night\":false,\"casts\":7,\"flags\":{\"metTomas\":true},"
             + "\"pity\":{},\"hinted\":{},\"px\":160,\"py\":115,\"mats\":{\"wood\":12,\"stone\":5},\"builds\":[{\"id\":\"campfire\",\"x\":17,\"y\":11}],\"loose\":[]}");
-        Environment.SetEnvironmentVariable("FESH_SAVE", oldSave);
-        var old = SaveFile.Read();
-        Environment.SetEnvironmentVariable("FESH_SAVE", realSave);
+        var old = SaveFile.Load(oldSave);
         Check("an old save moves wood and stone into the bag and asks for a fisher",
             old != null && old.inv.GetValueOrDefault("wood") == 12 && old.inv.GetValueOrDefault("stone") == 5 && old.inv.ContainsKey("rod_old")
             && !old.created && old.food == 100 && old.builds.Count == 1 && old.scene == "world");
+        Check($"a save from before the clock starts at 8 AM, keeping its weather all day ({old?.clock})",
+            old != null && old.clock == 8 * 60 && old.forecast.Count == 1 && old.forecast[0].w == "clear" && old.forecast[0].at == 0);
+        File.WriteAllText(oldSave, "{\"night\":true,\"day\":6,\"weather\":\"rain\",\"created\":true}");
+        var oldNight = SaveFile.Load(oldSave);
+        Check($"and one saved at night starts at 9 PM, still raining ({oldNight?.clock})",
+            oldNight != null && oldNight.clock == 21 * 60 && oldNight.weather == "rain" && oldNight.forecast[0].w == "rain" && oldNight.day == 6);
 
         // ---------- Starfall Atoll, the Starwell and Tidemane ----------
-        state.night = false; state.weather = "clear"; mode = "play"; boss = null; fish = null; reel = null;
+        SetNight(false); state.weather = "clear"; mode = "play"; boss = null; fish = null; reel = null;
         state.tackle["bait"] = "auto"; iframes = 0; state.hp = 100; state.food = 90;
         int atollLand = 0;
         for (int yy = 0; yy < ROWS; yy++)
@@ -1245,7 +1441,7 @@ partial class Game
         Check($"the Starwell can be fished (prompt: {prompt.Text})", target?.Type == "spot" && target.Id == "starwell");
         fish = new FishCast { Spot = "starwell", Bait = "coconut" };
         Check("nothing strange bites there by day", Enumerable.Range(0, 300).All(_ => !RollCatch("starwell").Boss));
-        state.night = true; fish.Bait = "worm";
+        SetNight(true); fish.Bait = "worm";
         Check("nor at night on any other bait", Enumerable.Range(0, 300).All(_ => !RollCatch("starwell").Boss));
         fish.Bait = "coconut";
         Check("but at night, a coconut brings up something enormous", RollCatch("starwell").Boss);
@@ -1366,7 +1562,7 @@ partial class Game
         Check("it won't bite again once it's yours", !TidemaneBites("coconut"));
 
         // Riding: faster on land, and it swims
-        state.night = false; iframes = 0;
+        SetNight(false); iframes = 0;
         player.X = StarwellX - 30; player.Y = StarwellY - 40; player.Face = "right";
         state.mountX = player.X + 10; state.mountY = player.Y; yield return 2;
         Check($"you can climb on (prompt: {prompt.Text})", target?.Type == "ride");
@@ -1443,6 +1639,222 @@ partial class Game
         int rescued = RescueSunkBuilds();
         Check($"pieces on the old atoll's shore come back to the bag ({rescued})", rescued == 1 && Has("wood") == woodR + 3 && Has("stone") == stoneR + 2);
         Check("and nothing else is touched", RescueSunkBuilds() == 0);
+
+        // ---------- Tomorrow's forecast, opening hours and bedtime ----------
+        ClearSkies();
+        state.clock = 10 * 60; state.toldDay = 0; mode = "play";
+        player.X = 146; player.Y = 96; player.Face = "up"; yield return 3;
+        Check($"by day Tomas is at his camp ({target?.Label})", target?.Type == "npc" && !TomasInBed);
+        Inp.Tap(KeyboardKey.E); yield return 5;
+        bool toldWeather = dlg != null && dlg.Lines.Any(l => l.T.StartsWith("Tomorrow? My old knee says"));
+        while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 3; }
+        Check($"Tomas tells you tomorrow's weather ({DescribeDay(state.tomorrow)})", toldWeather && KnowTomorrow);
+        var promised = state.tomorrow.Select(s => (s.at, s.w)).ToList();
+        string said = DescribeDay(state.tomorrow);
+        Save();
+        LoadSlot(SaveFile.Slot); yield return 10;
+        Check($"tomorrow's forecast survives saving and loading, spell by spell ({promised.Count})", state.tomorrow.Select(s => (s.at, s.w)).SequenceEqual(promised) && KnowTomorrow);
+        int dayF = state.day;
+        SkipTo(7 * 60);
+        Check($"and it comes true ({said} -> {DescribeDay(state.forecast)})", state.day == dayF + 1 && state.forecast.Select(s => (s.at, s.w)).SequenceEqual(promised) && DescribeDay(state.forecast) == said && !KnowTomorrow);
+        Check($"with the next day already rolled ({DescribeDay(state.tomorrow)})", state.tomorrow != null && !ReferenceEquals(state.tomorrow, state.forecast));
+        ClearSkies();
+        // Night: Pip's stall shuts, Tomas goes to bed, and you can still wake him.
+        state.clock = 23 * 60; yield return 2;
+        player.X = PipX; player.Y = PipY + 15; player.Face = "up"; yield return 3;
+        Check($"Pip's stall is closed at night ({target?.Label})", target?.Type == "info" && !PipOpen);
+        pendingShot = "80-stall-closed"; yield return 2;
+        player.X = 146; player.Y = 96; player.Face = "up"; yield return 3;
+        Check($"Tomas has gone to bed ({target?.Label})", target?.Type == "info" && TomasInBed);
+        Check("his spot isn't solid while he's away", CanStand(TomasHomeX, TomasHomeY));
+        int bedTx = (int)(TomasHomeX / T), bedTy = (int)(TomasHomeY / T);
+        Check($"and nothing can be built on it ({PlaceProblem(Data.BuildById["fence"], bedTx, bedTy)})", PlaceProblem(Data.BuildById["fence"], bedTx, bedTy) == "Keep Tomas's spot clear");
+        player.X = 160; player.Y = 74; player.Face = "up"; yield return 3;
+        Inp.Tap(KeyboardKey.E); yield return 70;
+        player.X = TomasBedX; player.Y = TomasBedY + 3; player.Face = "up"; yield return 3;
+        Check($"in his hut, he's asleep in bed ({target?.Label})", scene == "house:tomas" && target?.Type == "npc" && target.Label == "Wake Tomas");
+        player.X = 60; player.Y = 60; yield return 2;
+        pendingShot = "81-tomas-asleep"; yield return 2;
+        player.X = TomasBedX; player.Y = TomasBedY + 3; player.Face = "up"; yield return 3;
+        Inp.Tap(KeyboardKey.E); yield return 5;
+        Check($"waking him gets a sleepy hello ({dlg?.Full})", mode == "dialogue" && dlg.Full.StartsWith("Mm?"));
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        Inp.Tap(KeyboardKey.E); yield return 5;
+        Check("then he talks as usual", mode == "dialogue" && dlg.Lines[0].S == "Tomas" && !dlg.Full.StartsWith("Mm?"));
+        while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 3; }
+        player.X = RoomDoorWX; player.Y = RoomDoorWY - 6; player.Face = "down"; yield return 2;
+        Inp.Tap(KeyboardKey.E); yield return 70;
+        // Morning: he's back at his camp, even if you were standing on his spot (you can step off it).
+        player.X = TomasHomeX; player.Y = TomasHomeY + 1;
+        state.clock = 7 * 60; yield return 3;
+        Check("in the morning Pip opens and Tomas is up", PipOpen && !TomasInBed && scene == "world");
+        float stuckY = player.Y;
+        Inp.Hold(KeyboardKey.Down, true); yield return 25; Inp.Hold(KeyboardKey.Down, false); yield return 2;
+        Check($"and you can step off his spot if you were on it (moved {player.Y - stuckY:0}px)", player.Y > stuckY + 8);
+        tomasX = 270; tomasY = 95; state.clock = 23 * 60;
+        Check("on the dock for the ending, Tomas isn't in bed", !TomasInBed);
+        tomasX = TomasHomeX; tomasY = TomasHomeY;
+
+        // ---------- Birds and crickets ----------
+        player.X = 160; player.Y = 115; ClearSkies();
+        state.clock = 6.5f * 60; yield return 3;
+        Check($"birds sing at dawn ({Music.NatureWanted})", Music.NatureWanted == "birds");
+        state.clock = 23 * 60; yield return 3;
+        Check($"crickets at night ({Music.NatureWanted})", Music.NatureWanted == "crickets");
+        float calm = Music.NatureVolume;
+        state.weather = "storm"; SnapWeather(); yield return 3;
+        Check($"and they go quiet in a storm ({calm:0.00} -> {Music.NatureVolume:0.00})", Music.NatureVolume < 0.05f && calm > 0.3f);
+        ClearSkies(); state.clock = 13 * 60;
+
+        // ---------- Pausing in the background ----------
+        Settings.Data.pauseUnfocused = true;
+        player.X = 100; player.Y = 98; player.Face = "up"; yield return 3;
+        TestBite("lagoon", "pond_perch"); yield return 1;
+        Inp.ScriptFocused = false; yield return 2;
+        Check($"switching away mid-bite pauses ({mode}, from {pausedFrom})", mode == "pause" && pausedFrom == "bite");
+        float biteLeft = fish.BiteT; yield return 30;
+        Check("and the bite waits", fish != null && fish.BiteT == biteLeft);
+        Inp.ScriptFocused = true;
+        Inp.Tap(KeyboardKey.Escape); yield return 2;
+        Check($"resuming goes back to the bite ({mode})", mode == "bite");
+        Inp.Hold(KeyboardKey.E, true); yield return 1;
+        bool reelsAtOnce = ReelHeld();
+        Inp.Hold(KeyboardKey.E, false); yield return 1;
+        bool letGo = !ReelHeld();
+        Inp.Hold(KeyboardKey.E, true); yield return 1;
+        Check("a button still held from clicking Resume doesn't reel until it's let go", !reelsAtOnce && letGo && ReelHeld());
+        Inp.Hold(KeyboardKey.E, false);
+        fish = null; reel = null; mode = "play"; yield return 2;
+        Inp.Hold(KeyboardKey.E, true); yield return 3;
+        bool charging = mode == "charging";
+        Inp.ScriptFocused = false; yield return 2;
+        Inp.ScriptFocused = true; Inp.Hold(KeyboardKey.E, false);
+        Check($"a power cast being held is dropped rather than thrown ({mode}, from {pausedFrom})", charging && mode == "pause" && pausedFrom == "play" && fish == null);
+        Inp.Tap(KeyboardKey.Escape); yield return 2;
+        Settings.Data.pauseUnfocused = false;
+        mode = "play"; fish = null;
+
+        // ---------- Gamepad ----------
+        player.X = 146; player.Y = 96; player.Face = "up"; yield return 3;
+        Inp.TapPad(GamepadButton.RightFaceDown); yield return 2;
+        Check($"A on a gamepad talks to Tomas ({mode})", mode == "dialogue" && Inp.UsingPad);
+        while (mode == "dialogue") { Inp.TapPad(GamepadButton.RightFaceDown); yield return 3; }
+        yield return 2;
+        Check($"prompts name the gamepad's buttons ({prompt.Key}: {prompt.Text})", prompt.Key == "A");
+        float padX = player.X;
+        Inp.ScriptStick = new System.Numerics.Vector2(1, 0); yield return 20; Inp.ScriptStick = null; yield return 2;
+        Check($"the left stick walks (moved {player.X - padX:0}px)", player.X > padX + 10);
+        Inp.TapPad(GamepadButton.RightFaceUp); yield return 3;
+        Check("Y opens the bag", mode == "panel" && panel == "bag");
+        Inp.TapPad(GamepadButton.RightFaceRight); yield return 3;
+        Check("B closes it", mode == "play");
+        player.X = 140; player.Y = 135; yield return 2;
+        Inp.TapPad(GamepadButton.LeftTrigger2); yield return 3;
+        string tool0 = buildTool;
+        Inp.TapPad(GamepadButton.RightTrigger1); yield return 3;
+        Check($"LT builds and RB picks the next piece ({tool0} -> {buildTool})", mode == "build" && buildTool != tool0);
+        Inp.TapPad(GamepadButton.RightFaceRight); yield return 3;
+        Check("B leaves build mode", mode == "play");
+        TestBite("lagoon", "pond_perch"); yield return 1;
+        Inp.TapPad(GamepadButton.MiddleRight); yield return 3;
+        Check($"Start pauses even mid-bite ({mode}, from {pausedFrom})", mode == "pause" && pausedFrom == "bite");
+        Inp.TapPad(GamepadButton.MiddleRight); yield return 3;
+        Check($"and Start again goes back to it ({mode})", mode == "bite");
+        fish = null; mode = "play"; yield return 2;
+        Inp.TapPad(GamepadButton.MiddleRight); yield return 3;
+        Check("Start opens the menu", mode == "pause");
+        // In menus the stick moves a pointer and A clicks: here, on Resume.
+        Inp.ScriptMouse = null;
+        Inp.ScriptStick = new System.Numerics.Vector2(0.9f, -0.9f); yield return 4; Inp.ScriptStick = null;
+        bool pointerMoved = Inp.PadCursor != null;
+        Inp.PadCursor = new System.Numerics.Vector2(160 + 960 - 28 - SmallW("Resume") / 2, (720 - 610) / 2 + 28 + 22); yield return 2;
+        pendingShot = "82-pad-pointer"; yield return 2;
+        Inp.TapPad(GamepadButton.RightFaceDown); yield return 3;
+        Check($"the stick moves a pointer in menus, and A clicks Resume ({mode})", pointerMoved && mode == "play");
+        Inp.ScriptMouse = Offscreen; Inp.PadCursor = null;
+        Inp.Tap(KeyboardKey.Escape); yield return 3; Inp.Tap(KeyboardKey.Escape); yield return 3;
+        Check("the keyboard takes over again as soon as it's used", !Inp.UsingPad && mode == "play");
+        yield return 2;
+
+        // ---------- Save slots ----------
+        Save();
+        int robinDay = state.day;
+        Inp.Tap(KeyboardKey.Escape); yield return 3;
+        QuitToTitle(); yield return 10;
+        Check("Quit to title goes back to the title with the game saved", mode == "title" && SaveFile.Read(1)?.look.name == "Robin");
+        pendingShot = "78-title-saves"; yield return 2;
+        // Clicked for real, as a player would (opening the slot list mid-draw once crashed the game).
+        bool found = ClickButton("Load game"); yield return 3;
+        Inp.ScriptMouse = Offscreen; yield return 5;
+        Check($"clicking Load game opens the slot list ({titleView})", found && mode == "title" && titleView == "slots" && slotsFor == "load");
+        pendingShot = "79-slots"; yield return 2;
+        found = ClickButton("Back"); yield return 3;
+        Inp.ScriptMouse = Offscreen; yield return 3;
+        Check($"and Back returns to the title ({titleView})", found && titleView == "main");
+        ClickButton("Load game"); yield return 3;
+        Inp.ScriptMouse = Offscreen; yield return 3;
+        Inp.Tap(KeyboardKey.Escape); yield return 3;
+        Check("Esc goes back from the slot list", titleView == "main");
+        // With every slot in use, New game asks which one to give up (that path opened the list mid-draw too)
+        CopySlot(1); CopySlot(1); yield return 3;
+        found = ClickButton("New game"); yield return 3;
+        Inp.ScriptMouse = Offscreen; yield return 3;
+        Check($"with every slot full, New game asks which to replace ({titleView}, {slotsFor})", found && mode == "title" && titleView == "slots" && slotsFor == "new");
+        pendingShot = "79b-slots-full"; yield return 2;
+        ClickButton("Back"); yield return 3;
+        ClickButton("Load game"); yield return 3;
+        ClickButton("Delete"); yield return 3;
+        found = ClickButton("Yes, delete"); yield return 3;
+        Inp.ScriptMouse = Offscreen; yield return 3;
+        Check($"deleting through the slot list empties that slot and redraws the list", found && !SaveFile.Exists(3) && SaveFile.Exists(2) && titleView == "slots" && slotInfo != null && slotInfo[3] == null);
+        SaveFile.Clear(2); slotInfo = null;
+        ClickButton("Back"); yield return 3;
+        Inp.ScriptMouse = Offscreen; yield return 3;
+        TitleNew(); yield return 5;
+        Check($"a new game goes in the first empty slot (slot {newSlot})", mode == "create" && newSlot == 2);
+        foreach (char c in "Sam") Inp.ScriptChars.Enqueue(c);
+        yield return 3;
+        Inp.Tap(KeyboardKey.Enter); yield return 10;
+        Check($"the new fisher starts day 1 at 8 AM in slot 2 ({state.look.name}, day {state.day}, {ClockText(state.clock)})",
+            SaveFile.Slot == 2 && state.look.name == "Sam" && state.day == 1 && (int)state.clock == 8 * 60 && SaveFile.Exists(2));
+        while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 3; }
+        var robin = SaveFile.Read(1);
+        Check("and Robin's game in slot 1 is untouched", robin?.look.name == "Robin" && robin.day == robinDay && robin.tamed);
+        QuitToTitle(); yield return 5;
+        Check($"Continue now means the newest save (slot {SaveFile.Newest()})", SaveFile.Newest() == 2);
+        // A save whose weather disagrees with its forecast takes the forecast's weather when it loads
+        var r1 = SaveFile.Read(1);
+        r1.weather = "clear"; r1.forecast = new() { new() { at = 0, w = "rain" } };
+        SaveFile.Slot = 1; SaveFile.Write(r1); SaveFile.Slot = 2;
+        LoadSlot(1); yield return 10;
+        Check("loading slot 1 brings Robin back", SaveFile.Slot == 1 && state.look.name == "Robin" && state.day == robinDay && mode == "play" && state.tamed);
+        Check($"and the weather follows the forecast on loading ({state.weather})", state.weather == "rain");
+        SaveFile.Clear(2);
+        Check("deleting a slot empties only that one", !SaveFile.Exists(2) && SaveFile.Exists(1));
+        // Copy a slot, then give the copy its own name; Continue still means the original
+        Save();
+        QuitToTitle(); yield return 5;
+        OpenSlots("load"); yield return 5;
+        CopySlot(1); yield return 3;
+        Check($"copying a slot fills the first empty one ({toastMsg})", SaveFile.Read(2)?.look.name == "Robin" && SaveFile.Read(2).day == robinDay && SaveFile.Newest() == 1);
+        renameSlot = 2; renameText = "";
+        foreach (char c in "Robin, backup") Inp.ScriptChars.Enqueue(c);
+        yield return 3;
+        Inp.Tap(KeyboardKey.Enter); yield return 5;
+        var named = SaveFile.Read(2);
+        Check($"renaming gives the slot its own name ({named?.slotName}), keeps the fisher's, and Continue stays put",
+            renameSlot == 0 && named?.slotName == "Robin, backup" && named.look.name == "Robin" && SaveFile.Newest() == 1);
+        yield return 5;
+        pendingShot = "83-slots-copy"; yield return 2;
+        TitleBack(); yield return 2;
+        LoadSlot(1); yield return 10;
+        SaveFile.Clear(2);
+        // The single save.json from before slots becomes the first free slot
+        string legacy = Environment.GetEnvironmentVariable("FESH_SAVE");
+        File.WriteAllText(legacy, "{\"created\":true,\"day\":9,\"look\":{\"name\":\"Old\"}}");
+        SaveFile.MigrateLegacy();
+        Check("an old single save moves into the first free slot", !File.Exists(legacy) && SaveFile.Read(2)?.look.name == "Old" && SaveFile.Read(1)?.look.name == "Robin");
+        SaveFile.Clear(2);
 
         // Ending screen
         state.caught = Data.Creatures.Select(c => c.Id).ToList();

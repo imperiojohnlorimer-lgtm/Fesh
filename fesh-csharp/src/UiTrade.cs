@@ -44,7 +44,7 @@ partial class Game
         y += 82;
         Gfx.Text("Today's anglers to beat", x, y, FontKind.Ui700, 22, Pal.PaperInk);
         y += 36;
-        foreach (var (name, kg, fishName) in DerbyRivals())
+        foreach (var (name, kg, fishName) in DerbyRivals(state.day))
         {
             Gfx.Box(x, y, 520, 46, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text(name, x + 14, y + 12, FontKind.Ui700, 19, Pal.PaperInk);
@@ -118,7 +118,7 @@ partial class Game
             DrawIcon(id, rx + 10, ry + 10, 44);
             Gfx.Text(d.Name, rx + 66, ry + 8, FontKind.Ui700, 19, Pal.PaperInk);
             Gfx.Text($"(have {Has(id)})", rx + 74 + Gfx.Measure(d.Name, FontKind.Ui700, 19), ry + 11, FontKind.Ui500, 14, Muted);
-            Gfx.Text(Gfx.Ellipsize(d.Desc, FontKind.Note, 15, colW - 80), rx + 66, ry + 56, FontKind.Note, 15, Pal.PaperInk);
+            Gfx.Text(Gfx.Ellipsize(Bind.Fix(d.Desc), FontKind.Note, 15, colW - 80), rx + 66, ry + 56, FontKind.Note, 15, Pal.PaperInk);
             DrawIcon("coin", rx + 66, ry + 31, 20);
             Gfx.Text(price.ToString(), rx + 90, ry + 31, FontKind.Ui700, 18, Pal.C("#9a6a1a"));
             bool can1 = state.coins >= price;

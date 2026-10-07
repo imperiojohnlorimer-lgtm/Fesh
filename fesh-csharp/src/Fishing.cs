@@ -19,14 +19,14 @@ partial class Game
     bool Eligible(Creature cr) =>
         !state.Caught(cr.Id)
         && (cr.Req == null || state.Caught(cr.Req))
-        && (cr.Time == "any" || (cr.Time == "night") == state.night);
+        && (cr.Time == "any" || (cr.Time == "night") == Night);
 
     // The moon runs through eight phases, one per day; phase 4 is full. The first night of a new game is a full moon.
     int MoonPhase => (state.day + 3) % 8;
-    bool FullMoon => state.night && MoonPhase == 4;
+    bool FullMoon => Night && MoonPhase == 4;
 
     bool Bites(CommonFish f, string bait) =>
-        (f.Time == "any" || (f.Time == "night") == state.night)
+        (f.Time == "any" || (f.Time == "night") == Night)
         && (f.Weather == null || (f.Weather == "storm" ? Stormy : f.Weather == "rain" ? state.weather != "clear" : state.weather == "clear"))
         && (!f.FullMoon || FullMoon)
         && (!f.Legend || (state.commons.GetValueOrDefault(f.Id) == 0 && (f.Bait == null || f.Bait == bait)));
@@ -240,7 +240,7 @@ partial class Game
         if (!state.Hinted("powerCast"))
         {
             state.hinted["powerCast"] = true;
-            Toast("Hold E to power up your cast, and let go to throw. Short casts reach shallow fish, long casts deep ones.", 5);
+            Toast("Hold <act> to power up your cast, and let go to throw. Short casts reach shallow fish, long casts deep ones.", 5);
         }
     }
 
@@ -403,8 +403,8 @@ partial class Game
         string hint = reel.Style switch
         {
             "runner" => "This one runs! When it does, let go of the reel, or the line will snap.",
-            "jumper" => "A jumper! When it leaps, press E as the marker crosses the gold.",
-            "bottom" => "It's hugging the bottom. Tap E in short pumps; holding too long lets it dig in.",
+            "jumper" => "A jumper! When it leaps, press <act> as the marker crosses the gold.",
+            "bottom" => "It's hugging the bottom. Tap <act> in short pumps; holding too long lets it dig in.",
             _ => null
         };
         if (hint != null && !state.Hinted("style:" + reel.Style))
@@ -461,10 +461,10 @@ partial class Game
             case "waiting":
                 fish.Timer -= dt;
                 fish.WaitT += dt;
-                SetPrompt(fish.Spot == "icehole" ? "Jig with [E] each time the ring closes. [Esc] reel in" : "Waiting for a bite... [E] reel in");
+                SetPrompt(fish.Spot == "icehole" ? "Jig with [<act>] each time the ring closes. [Esc] reel in" : "Waiting for a bite... [<act>] reel in");
                 if (fish.Timer <= 0)
                 {
-                    if (fish.Spot == "starwell" && !state.tamed && state.night && fish.Bait != "coconut" && !state.Hinted("sniffed"))
+                    if (fish.Spot == "starwell" && !state.tamed && Night && fish.Bait != "coconut" && !state.Hinted("sniffed"))
                     {
                         state.hinted["sniffed"] = true;
                         Toast("Something huge circles under your bobber, noses at the bait, and turns away. It wants something sweeter.", 5);
@@ -478,7 +478,7 @@ partial class Game
                 return;
             case "bite":
                 fish.BiteT -= dt;
-                SetPrompt(BiteWindow - fish.BiteT < PerfectWindow ? "Bite! Hook it NOW for a perfect hook!" : "Bite! Hook it!", "E", true);
+                SetPrompt(BiteWindow - fish.BiteT < PerfectWindow ? "Bite! Hook it NOW for a perfect hook!" : "Bite! Hook it!", "<act>", true);
                 if (fish.BiteT <= 0) GotAway("Too slow. It got away.");
                 return;
             case "reeling":
@@ -488,7 +488,7 @@ partial class Game
             case "spear": UpdateSpear(dt); return;
             case "drill":
                 drill = MathF.Max(0, drill - dt * 0.12f);
-                SetPrompt("Mash [E] to break through the ice!   [Esc] stop", null, true);
+                SetPrompt("Mash [<act>] to break through the ice!   [Esc] stop", null, true);
                 return;
         }
     }
@@ -535,7 +535,7 @@ partial class Game
             }
             if (r.Diff >= 3 && rng.NextDouble() < dt * 0.8) r.FishTarget = Math.Clamp(r.FishY + Rand(-40, 40), 4, Bar - 4);
         }
-        string prompt = "Hold [Space] to lift the green bar. Keep the fish inside.";
+        string prompt = "Hold [<act>] to lift the green bar. Keep the fish inside.";
         bool urgent = false;
         float gain = 0.3f;
         switch (r.Style)
@@ -556,7 +556,7 @@ partial class Game
                     Dart();
                     r.RunT -= dt;
                     if (r.RunT <= 0) { r.Running = Rand(0.8f, 1.3f) + r.Diff * 0.1f; Sfx.Play("splash"); }
-                    prompt = "Hold [Space] to lift the bar. Let go when it runs.";
+                    prompt = "Hold [<act>] to lift the bar. Let go when it runs.";
                 }
                 r.Tension += r.Running > 0 && hold ? dt * (0.75f + r.Diff * 0.08f) / LineMul : -dt * (r.Running > 0 ? 0.25f : 0.55f);
                 r.Tension = Math.Clamp(r.Tension, 0, 1);
@@ -581,7 +581,7 @@ partial class Game
                         if (!r.LeapDone) { r.Progress -= 0.08f; Floater("It shook its head!", player.X, player.Y - 24, "#ff9a8a"); }
                         r.LeapT = Rand(2.2f, 3.6f);
                     }
-                    prompt = "It leaps! Press [Space] as the marker hits the gold!";
+                    prompt = "It leaps! Press [<act>] as the marker hits the gold!";
                     urgent = true;
                 }
                 else
@@ -589,7 +589,7 @@ partial class Game
                     Dart();
                     r.LeapT -= dt;
                     if (r.LeapT <= 0) { r.Leap = r.LeapLen; r.LeapMark = 0; r.LeapDone = false; Sfx.Play("splash"); }
-                    prompt = "Hold [Space] to lift the bar. Time a press when it leaps.";
+                    prompt = "Hold [<act>] to lift the bar. Time a press when it leaps.";
                 }
                 break;
             case "bottom":
@@ -605,7 +605,7 @@ partial class Game
                     r.Progress += 0.05f * ReelMul * r.Pull;
                     Sfx.Reel();
                 }
-                prompt = r.Digging ? "It's digging in! Let go, then tap [Space] in short pumps" : "Tap [Space] in short pumps to haul it up.";
+                prompt = r.Digging ? "It's digging in! Let go, then tap [<act>] in short pumps" : "Tap [<act>] in short pumps to haul it up.";
                 urgent = r.Digging;
                 break;
             default:
@@ -699,7 +699,7 @@ partial class Game
         if (!f.Rare && !state.Hinted("fishBag"))
         {
             state.hinted["fishBag"] = true;
-            Toast($"Caught a {f.Name.ToLowerInvariant()}, {Kg(kg)}! It's in your bag (I). Cook fish at a campfire with F.", 4.5f);
+            Toast($"Caught a {f.Name.ToLowerInvariant()}, {Kg(kg)}! It's in your bag (<bag>). Cook fish at a campfire with <alt>.", 4.5f);
         }
         Save();
         MaybeHint(spot);
@@ -768,15 +768,15 @@ partial class Game
         reel = null;
         mode = "chest";
         Sfx.Play("odd");
-        if (!state.Hinted("chest")) { state.hinted["chest"] = true; Toast("A sunken chest! Press the arrow keys (or WASD) in order to haul it up.", 4); }
+        if (!state.Hinted("chest")) { state.hinted["chest"] = true; Toast("A sunken chest! Press the direction keys (<move>) in order to haul it up.", 4); }
     }
 
     int? ArrowPressed()
     {
-        if (Inp.Pressed(KeyboardKey.Up) || Inp.Pressed(KeyboardKey.W)) return 0;
-        if (Inp.Pressed(KeyboardKey.Right) || Inp.Pressed(KeyboardKey.D)) return 1;
-        if (Inp.Pressed(KeyboardKey.Down) || Inp.Pressed(KeyboardKey.S)) return 2;
-        if (Inp.Pressed(KeyboardKey.Left) || Inp.Pressed(KeyboardKey.A)) return 3;
+        if (Bind.Pressed("up")) return 0;
+        if (Bind.Pressed("right")) return 1;
+        if (Bind.Pressed("down")) return 2;
+        if (Bind.Pressed("left")) return 3;
         return null;
     }
 

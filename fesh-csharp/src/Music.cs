@@ -32,11 +32,15 @@ static class Music
 
     static readonly ConcurrentDictionary<string, float[]> pcm = new();
     static readonly Dictionary<string, Sound> sounds = new();
-    static string current, wanted, amb, ambWanted;
-    static float vol, wantVol = 0.45f, ambVol, ambWantVol;
+    static string current, wanted, amb, ambWanted, nat, natWanted;
+    static float vol, wantVol = 0.45f, ambVol, ambWantVol, natVol, natWantVol;
     public static bool Enabled = true;
+    public static float Volume = 1;   // the music; the rain loop follows the sound volume instead
+    public static bool Hushed;        // silent for now (paused in the background), without touching the settings
     public static int ReadyCount => pcm.Count;
     public static string Current => current;
+    public static string NatureWanted => natWanted;
+    public static float NatureVolume => natWantVol;
     public static IEnumerable<string> Names => Tracks.Keys;
 
     public static void Init()
@@ -46,22 +50,27 @@ static class Music
         {
             foreach (var name in Tracks.Keys) pcm[name] = Compose(Tracks[name]);
             pcm["rain"] = RainLoop();
+            pcm["birds"] = BirdLoop();
+            pcm["crickets"] = CricketLoop();
         });
     }
 
     public static void Want(string track, float volume) { wanted = track; wantVol = volume; }
     public static void WantAmbience(string name, float volume) { ambWanted = name; ambWantVol = volume; }
+    // A second ambient loop for the time of day (birds, crickets), separate from the rain.
+    public static void WantNature(string name, float volume) { natWanted = name; natWantVol = volume; }
 
     public static void Update(float dt)
     {
         if (!IsAudioDeviceReady()) return;
-        bool audible = Enabled && !Sfx.Muted;
-        Step(ref current, wanted, ref vol, wantVol, dt, audible);
-        Step(ref amb, ambWanted, ref ambVol, ambWantVol, dt, !Sfx.Muted);
+        float sound = Sfx.Muted || Hushed ? 0 : Sfx.Volume;
+        Step(ref current, wanted, ref vol, wantVol, dt, Enabled && !Sfx.Muted && !Hushed ? Volume : 0);
+        Step(ref amb, ambWanted, ref ambVol, ambWantVol, dt, sound);
+        Step(ref nat, natWanted, ref natVol, natWantVol, dt, sound);
     }
 
-    // Fades the playing loop out before switching, and fades the new one in.
-    static void Step(ref string playing, string want, ref float v, float target, float dt, bool audible)
+    // Fades the playing loop out before switching, and fades the new one in. Gain is the player's volume setting.
+    static void Step(ref string playing, string want, ref float v, float target, float dt, float gain)
     {
         if (playing != want)
         {
@@ -76,7 +85,7 @@ static class Music
         else v += Math.Clamp(target - v, -dt * 0.8f, dt * 0.8f);
         if (playing == null || Load(playing) is not Sound s) return;
         if (!IsSoundPlaying(s)) PlaySound(s);
-        SetSoundVolume(s, audible ? Math.Max(0, v) : 0);
+        SetSoundVolume(s, Math.Max(0, v) * gain);
     }
 
     static Sound? Load(string name)
@@ -226,6 +235,93 @@ static class Music
         {
             float k = (float)i / fade;
             buf[i] = buf[i] * k + buf[buf.Length - fade + i] * (1 - k);
+        }
+        return buf;
+    }
+
+    // Adds a sound into a looping buffer, wrapping round the end so the loop has no seam.
+    static void Mix(float[] buf, int at, int len, Func<int, double> sample)
+    {
+        for (int i = 0; i < len; i++) buf[(at + i) % buf.Length] += (float)sample(i);
+    }
+
+    // The dawn chorus: quick rising tweets, a warbler, and a two-note "fee-bee" call, scattered over twelve seconds.
+    static float[] BirdLoop()
+    {
+        var r = new Random(41);
+        var buf = new float[Rate * 12];
+        for (int p = 0; p < 15; p++)
+        {
+            int at = r.Next(buf.Length);
+            switch (r.Next(3))
+            {
+                case 0:
+                {
+                    int chirps = 3 + r.Next(5), len = (int)(Rate * (0.05 + r.NextDouble() * 0.04));
+                    double f0 = 2800 + r.NextDouble() * 900, f1 = f0 * (r.Next(2) == 0 ? 1.4 : 0.75), amp = 0.05 + r.NextDouble() * 0.04;
+                    for (int c = 0; c < chirps; c++)
+                    {
+                        double ph = 0;
+                        Mix(buf, at + c * (len + Rate / 18), len, i =>
+                        {
+                            double t = (double)i / len;
+                            ph += (f0 + (f1 - f0) * t) / Rate;
+                            return Math.Sin(ph * Math.Tau) * amp * Math.Sin(Math.PI * t);
+                        });
+                    }
+                    break;
+                }
+                case 1:
+                {
+                    int len = (int)(Rate * (0.3 + r.NextDouble() * 0.25));
+                    double f = 2000 + r.NextDouble() * 600, amp = 0.04, ph = 0;
+                    Mix(buf, at, len, i =>
+                    {
+                        double t = (double)i / len;
+                        ph += (f + 160 * Math.Sin(i * Math.Tau * 24.0 / Rate)) / Rate;
+                        return Math.Sin(ph * Math.Tau) * amp * Math.Sin(Math.PI * t);
+                    });
+                    break;
+                }
+                default:
+                {
+                    int len = Rate / 5;
+                    double amp = 0.05;
+                    foreach (var (off, f) in new[] { (0, 3300.0), (len + Rate / 20, 2750.0) })
+                    {
+                        double ph = 0;
+                        Mix(buf, at + off, len, i =>
+                        {
+                            double t = (double)i / len;
+                            ph += f / Rate;
+                            return Math.Sin(ph * Math.Tau) * amp * Math.Min(1, t * 8) * (1 - t);
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+        return buf;
+    }
+
+    // Crickets at night: three of them, each trilling three quick pulses on its own pitch and beat.
+    static float[] CricketLoop()
+    {
+        var r = new Random(77);
+        var buf = new float[Rate * 8];
+        foreach (var (f, period) in new[] { (4300.0, 0.62), (4700.0, 0.71), (3900.0, 0.83) })
+        {
+            int pulse = (int)(Rate * 0.018), gap = (int)(Rate * 0.014);
+            for (double t0 = r.NextDouble() * period; t0 < 8; t0 += period * (0.92 + r.NextDouble() * 0.16))
+                for (int k = 0; k < 3; k++)
+                {
+                    double ph = 0;
+                    Mix(buf, (int)(t0 * Rate) + k * (pulse + gap), pulse, i =>
+                    {
+                        ph += f / Rate;
+                        return Math.Sin(ph * Math.Tau) * 0.035 * Math.Sin(Math.PI * i / pulse);
+                    });
+                }
         }
         return buf;
     }

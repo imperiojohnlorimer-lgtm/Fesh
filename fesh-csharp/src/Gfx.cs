@@ -6,12 +6,16 @@ namespace Fesh;
 
 enum FontKind { Ui500, Ui600, Ui700, Note }
 
-// Keyboard input, with an optional scripted layer used by the automated test run.
+// Keyboard and gamepad input, with an optional scripted layer used by the automated test run.
 static class Inp
 {
     static readonly HashSet<KeyboardKey> held = new(), tapped = new();
+    static readonly List<KeyboardKey> framePressed = new();
     public static Vector2? ScriptMouse;
     public static bool ScriptClick;
+    public static bool ScriptClickNext { get; set; }   // the autotest clicks: it lands next frame, when Gfx works out the mouse
+    public static bool? ScriptFocused { get; set; }    // the autotest decides whether the window has focus
+    public static bool Focused => ScriptFocused ?? IsWindowFocused();
     public static readonly Queue<int> ScriptChars = new();
 
     // Characters typed this frame, for the name field.
@@ -25,13 +29,87 @@ static class Inp
 
     public static bool Down(KeyboardKey k) => IsKeyDown(k) || held.Contains(k);
     public static bool Pressed(KeyboardKey k) => IsKeyPressed(k) || tapped.Contains(k);
-    public static void Tap(KeyboardKey k) => tapped.Add(k);
+    // Any key pressed this frame, for rebinding a control (null if none).
+    public static KeyboardKey? FirstPressed()
+    {
+        foreach (var k in tapped) return k;
+        return framePressed.Count > 0 ? framePressed[0] : null;
+    }
+    public static void Tap(KeyboardKey k) { tapped.Add(k); UsingPad = false; }
     public static void Hold(KeyboardKey k, bool on)
     {
         if (!on) { held.Remove(k); return; }
         if (held.Add(k)) tapped.Add(k);
+        UsingPad = false;
     }
-    public static void EndFrame() { tapped.Clear(); ScriptClick = false; }
+
+    /* ---------- Gamepad (the first one plugged in) ---------- */
+    // In menus (CursorUi) the left stick or D-pad steers a pointer and A clicks, so every mouse-driven screen works.
+    static readonly HashSet<GamepadButton> padTapped = new(), padQueued = new(), padHeld = new();
+    public static Vector2? ScriptStick { get; set; }
+    public static bool UsingPad;          // the last input came from the gamepad: prompts name its buttons
+    public static Vector2? PadCursor;     // the pointer the pad steers in menus (null: the mouse has it)
+    public static bool CursorUi, PadClick, PadHold;
+    static Vector2 stick, lastStick;
+    const float Dead = 0.35f;
+
+    // The first gamepad plugged in (Raylib numbers them 0 to 3), or -1.
+    public static int PadIndex { get; private set; } = -1;
+    static bool Pad => PadIndex >= 0;
+    public static bool PadPressed(GamepadButton b) => padTapped.Contains(b) || Pad && IsGamepadButtonPressed(PadIndex, b);
+    public static bool PadDown(GamepadButton b) => padHeld.Contains(b) || Pad && IsGamepadButtonDown(PadIndex, b);
+    public static Vector2 Stick => stick;
+    // The stick pushed into a direction this frame (0 up, 1 right, 2 down, 3 left), for one-step moves like the chest arrows.
+    public static bool StickPressed(int dir) => StickDir(stick) == dir && StickDir(lastStick) != dir;
+    static int StickDir(Vector2 s) => s.Length() < 0.6f ? -1 : MathF.Abs(s.X) > MathF.Abs(s.Y) ? (s.X > 0 ? 1 : 3) : (s.Y > 0 ? 2 : 0);
+    // Scripted presses count from the next frame, so they're there when the pointer and clicks are worked out.
+    public static void TapPad(GamepadButton b) { padQueued.Add(b); UsingPad = true; }
+    public static void HoldPad(GamepadButton b, bool on)
+    {
+        if (!on) { padHeld.Remove(b); return; }
+        if (padHeld.Add(b)) padQueued.Add(b);
+        UsingPad = true;
+    }
+
+    // Once a frame, before anything reads input. cursorUi: a menu, panel or the title is up.
+    public static void BeginFrame(float dt, bool cursorUi)
+    {
+        ScriptClick = ScriptClickNext;
+        ScriptClickNext = false;
+        framePressed.Clear();
+        for (int k = GetKeyPressed(); k != 0; k = GetKeyPressed()) framePressed.Add((KeyboardKey)k);
+        if (PadIndex < 0 || !IsGamepadAvailable(PadIndex)) PadIndex = Enumerable.Range(0, 4).FirstOrDefault(i => IsGamepadAvailable(i), -1);
+        padTapped.UnionWith(padQueued);
+        padQueued.Clear();
+        lastStick = stick;
+        stick = ScriptStick ?? (Pad ? new Vector2(GetGamepadAxisMovement(PadIndex, GamepadAxis.LeftX), GetGamepadAxisMovement(PadIndex, GamepadAxis.LeftY)) : Vector2.Zero);
+        if (stick.Length() < Dead) stick = Vector2.Zero;
+        bool padUsed = stick != Vector2.Zero || padTapped.Count > 0;
+        if (Pad) for (var b = GamepadButton.LeftFaceUp; b <= GamepadButton.RightThumb; b++) padUsed |= IsGamepadButtonPressed(PadIndex, b);
+        if (padUsed) UsingPad = true;
+        if (framePressed.Count > 0 || IsMouseButtonPressed(MouseButton.Left) || GetMouseDelta() != Vector2.Zero) UsingPad = false;
+        // Moving or clicking the real mouse takes the pointer back from the pad.
+        if (GetMouseDelta() != Vector2.Zero || IsMouseButtonPressed(MouseButton.Left)) PadCursor = null;
+        CursorUi = cursorUi;
+        if (cursorUi)
+        {
+            var move = stick;
+            if (PadDown(GamepadButton.LeftFaceUp)) move.Y -= 1;
+            if (PadDown(GamepadButton.LeftFaceDown)) move.Y += 1;
+            if (PadDown(GamepadButton.LeftFaceLeft)) move.X -= 1;
+            if (PadDown(GamepadButton.LeftFaceRight)) move.X += 1;
+            if (move != Vector2.Zero)
+            {
+                var p = (PadCursor ?? Gfx.Mouse) + move * 820 * dt;
+                PadCursor = new Vector2(Math.Clamp(p.X, 0, Gfx.LW - 1), Math.Clamp(p.Y, 0, Gfx.LH - 1));
+            }
+        }
+        PadClick = cursorUi && PadPressed(GamepadButton.RightFaceDown);
+        PadHold = cursorUi && PadDown(GamepadButton.RightFaceDown);
+        if (PadClick) PadCursor ??= Gfx.Mouse;
+    }
+
+    public static void EndFrame() { tapped.Clear(); padTapped.Clear(); ScriptClick = false; }
 }
 
 // UI drawing in a fixed 1280x720 layout that is scaled and letterboxed into the window.
@@ -42,6 +120,7 @@ static class Gfx
     public static float Z = 1, OX, OY;
     public static Vector2 Mouse;
     public static bool MouseMoved, Pressed, Down, OverUiPrev;
+    public static readonly Dictionary<string, Rectangle> Seen = new();   // debug builds: where each button was last drawn, by label
     static bool clickTaken;
     static List<Rectangle> now = new(), prev = new();
     static readonly Dictionary<(FontKind, int), Font> fonts = new();
@@ -84,11 +163,11 @@ static class Gfx
         OX = MathF.Floor((w - LW * Z) / 2);
         OY = MathF.Floor((h - LH * Z) / 2);
         var m = GetMousePosition();
-        var logical = Inp.ScriptMouse ?? new Vector2((m.X - OX) / Z, (m.Y - OY) / Z);
+        var logical = Inp.ScriptMouse ?? (Inp.CursorUi && Inp.PadCursor is Vector2 pad ? pad : new Vector2((m.X - OX) / Z, (m.Y - OY) / Z));
         MouseMoved = logical != Mouse;
         Mouse = logical;
-        Pressed = IsMouseButtonPressed(MouseButton.Left) || Inp.ScriptClick;
-        Down = IsMouseButtonDown(MouseButton.Left);
+        Pressed = IsMouseButtonPressed(MouseButton.Left) || Inp.ScriptClick || Inp.PadClick;
+        Down = IsMouseButtonDown(MouseButton.Left) || Inp.PadHold;
         (prev, now) = (now, prev);
         now.Clear();
         OverUiPrev = prev.Any(r => Mouse.X >= r.X && Mouse.X < r.X + r.Width && Mouse.Y >= r.Y && Mouse.Y < r.Y + r.Height);

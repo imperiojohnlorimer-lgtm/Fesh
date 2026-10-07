@@ -306,9 +306,9 @@ partial class Game
     }
 
     // After dark the surf still catches the moon, so you can make out the coast beyond the firelight.
-    void DrawMoonlitShore(float t)
+    void DrawMoonlitShore(float t, float k = 1)
     {
-        var glint = Pal.Rgba(214, 228, 240, 0.3f);
+        var glint = Pal.Rgba(214, 228, 240, 0.3f * k);
         int x0 = camX - 1, x1 = camX + W + 1, y0 = camY - 1, y1 = camY + H + 1;
         foreach (var (sx, sy, _, _, w) in shore)
             if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1 && w != 'm' && (Pix.Hash(sx / 3, sy / 3, 5) + t * 0.3) % 1 < 0.55)
@@ -373,11 +373,12 @@ partial class Game
     }
 
     /* ---------- Sky ---------- */
-    // Big soft cloud shadows drift slowly over land and sea on fair days.
+    // Big soft cloud shadows drift slowly over land and sea on fair days, fading out as rain comes in or night falls.
     void DrawCloudShadows(float t)
     {
-        if (state.night || state.weather != "clear") return;
-        var shade = Pal.Rgba(16, 34, 56, 0.1f);
+        float fair = (1 - rainAmt) * (1 - Darkness);
+        if (fair <= 0.02f) return;
+        var shade = Pal.Rgba(16, 34, 56, 0.1f * fair);
         float span = PW + 360;
         Span<(float ox, float oy, float rx, float ry)> lobes = stackalloc (float, float, float, float)[4];
         for (int i = 0; i < 8; i++)
@@ -418,7 +419,7 @@ partial class Game
             l.X += (l.Vx + MathF.Sin(time * 3 + l.Phase) * 9) * dt;
             l.Y += l.Vy * dt;
         }
-        if (scene != "world" || state.night || leaves.Count > 40) return;
+        if (scene != "world" || Night || leaves.Count > 40) return;
         leafT -= dt * (Stormy ? 5 : 1);
         if (leafT > 0) return;
         leafT = 0.4f + (float)fxRng.NextDouble() * 0.8f;
@@ -480,7 +481,7 @@ partial class Game
         int m = Pix.Hash(tx, ty, 62) < 0.5 ? 1 : -1;
         var (height, half) = kind switch { 't' => (30, 12), 'f' => (31, 9), 'h' => (30, 12), 'c' => (21, 7), _ => (0, 0) };
         bool Hides(float x, float y) => y < by - 1 && y > by - height && MathF.Abs(x - bx) < half;
-        bool fade = live && height > 0 && scene == "world" && (Hides(player.X, player.Y) || Hides(tomasX, tomasY));
+        bool fade = live && height > 0 && scene == "world" && (Hides(player.X, player.Y) || !TomasInBed && Hides(tomasX, tomasY));
         switch (kind)
         {
             case 'y': DrawBush(tx, ty, bx, by); return;

@@ -16,10 +16,13 @@ partial class Game
         new(150, 56, 20, 13),
         new(FireX - 4, FireY - 3, 9, 5),
         new(12, 144, 28, 14),
-        new(tomasX - 3, tomasY - 3, 7, 3),
+        TomasSolid ? new(tomasX - 3, tomasY - 3, 7, 3) : new(-100, -100, 0, 0),
         new(PipX - 10, PipY + 1, 20, 9),
         new(CarvingX - 4, CarvingY - 3, 8, 4)
     };
+
+    // Tomas blocks the way while he's standing at his camp, but not if he came back from bed while you stood on his spot.
+    bool TomasSolid => !TomasInBed && !new Box(tomasX - 3, tomasY - 3, 7, 3).Overlaps(new Box(player.X - 3, player.Y - 3, 6, 3));
 
     List<Box> Solids()
     {
@@ -95,6 +98,7 @@ partial class Game
         var area = new Box(tx * T, ty * T, d.W * T, T);
         if (StaticSolids().Any(r => area.Overlaps(new Box(r.X - 3, r.Y - 3, r.W + 6, r.H + 6)))) return "No room here";
         if (scene == "world" && Dist(tx * T + 5, ty * T + 5, MouthDoorX, MouthDoorY) < 24) return "Keep the cave entrance clear";
+        if (scene == "world" && area.Overlaps(new Box(TomasHomeX - 6, TomasHomeY - 6, 13, 9))) return "Keep Tomas's spot clear";
         if (BuildBox(new Build { id = d.Id, x = tx, y = ty }) is Box box && box.Overlaps(new Box(player.X - 3, player.Y - 3, 6, 3)))
             return "Step back to make room";
         if (SceneBuilds().Count >= MaxBuilds) return "That's plenty of building for one place";
@@ -212,7 +216,7 @@ partial class Game
         if (!state.Hinted("buildHelp"))
         {
             state.hinted["buildHelp"] = true;
-            Toast("Press E to build in front of you, or click a spot nearby. Number keys pick what to build.", 5);
+            Toast("Press <act> to build in front of you, or click a spot nearby. Number keys pick what to build.", 5);
         }
     }
 
@@ -310,7 +314,7 @@ partial class Game
             if (!state.Hinted("buildTip"))
             {
                 state.hinted["buildTip"] = true;
-                Toast($"{(l.kind == "wood" ? "Driftwood" : "A good flat stone")}! Press B to make things with it.", 4);
+                Toast($"{(l.kind == "wood" ? "Driftwood" : "A good flat stone")}! Press <build> to make things with it.", 4);
             }
             else Toast($"+1 {l.kind} ({Has(l.kind)} in your bag)", 1.4f);
         }

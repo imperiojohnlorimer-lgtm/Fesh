@@ -32,7 +32,7 @@ partial class Game
     bool BossOnLine => reel?.Roll?.Boss == true;
 
     // Tidemane only rises at night, for a coconut, and only until you've won it over.
-    bool TidemaneBites(string bait) => !state.tamed && state.night && bait == "coconut";
+    bool TidemaneBites(string bait) => !state.tamed && Night && bait == "coconut";
 
     bool StarwellFound => state.Hinted("starwell");
     bool SpotKnown(Spot s) => s.Id != "starwell" || StarwellFound;
@@ -382,7 +382,7 @@ partial class Game
         if (mode != "tamed" || Raylib.GetTime() - catchOpenedAt < 0.6) return;
         mode = "play";
         Sfx.Play("ui");
-        Toast($"Press R to ride {Data.MountName}, and R again to hop off. It gallops on land and swims across the open sea. From anywhere outdoors, R whistles it over.", 7);
+        Toast($"Press <ride> to ride {Data.MountName}, and <ride> again to hop off. It gallops on land and swims across the open sea. From anywhere outdoors, <ride> whistles it over.", 7);
     }
 
     /* ---------- Riding ---------- */
@@ -675,7 +675,7 @@ partial class Game
             float a = (float)Pix.Hash(i, 3, 41) * MathF.Tau, r = (float)Pix.Hash(i, 4, 41) * (WellDeep * T - 2);
             float sx = StarwellX + MathF.Cos(a) * r * 1.3f, sy = StarwellY + MathF.Sin(a) * r * 0.8f;
             float tw = 0.5f + 0.5f * MathF.Sin(t * (1.5f + i * 0.4f) + i);
-            pix.Rect(sx, sy, 1, 1, Pal.Rgba(255, 246, 208, (state.night ? 0.9f : 0.35f) * tw));
+            pix.Rect(sx, sy, 1, 1, Pal.Rgba(255, 246, 208, (Night ? 0.9f : 0.35f) * tw));
         }
     }
 }

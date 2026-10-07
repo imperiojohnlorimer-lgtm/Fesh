@@ -85,12 +85,12 @@ partial class Game
             if (tomas && !state.Hinted("tomasHut"))
             {
                 state.hinted["tomasHut"] = true;
-                Toast("Tomas's workbench and stove are yours to use. Press E at the workbench to craft an axe.", 5);
+                Toast("Tomas's workbench and stove are yours to use. Press <act> at the workbench to craft an axe.", 5);
             }
             else if (!tomas && !state.Hinted("ownHouse"))
             {
                 state.hinted["ownHouse"] = true;
-                Toast("Your own place. Press B to furnish it: workbench, furnace, stove, bed and more.", 5);
+                Toast("Your own place. Press <build> to furnish it: workbench, furnace, stove, bed and more.", 5);
             }
         });
     }
@@ -164,7 +164,7 @@ partial class Game
 
     void DrawWindows()
     {
-        string glass = state.night ? "#1d2f45" : "#bfe0ea", frame = "#5b3a24";
+        string glass = Night ? "#1d2f45" : "#bfe0ea", frame = "#5b3a24";
         foreach (int wx in new[] { 3, SCols - 4 })
         {
             if (scene == "house:tomas" && wx == 3) continue;
@@ -172,7 +172,7 @@ partial class Game
             pix.Rect(X, Y, 10, 12, frame);
             pix.Rect(X + 1, Y + 1, 8, 10, glass);
             pix.Rect(X + 5, Y + 1, 1, 10, frame); pix.Rect(X + 1, Y + 6, 8, 1, frame);
-            if (state.night) pix.Rect(X + 2, Y + 2, 1, 1, "#f3c25b");
+            if (Night) pix.Rect(X + 2, Y + 2, 1, 1, "#f3c25b");
         }
     }
 
@@ -186,9 +186,10 @@ partial class Game
             else list.Add((b.y * T + 9, () => DrawBuild(b, t)));
         }
         list.Add((player.Y, DrawPlayer));
+        if (scene == "house:tomas" && TomasInBed) list.Add((TomasBedY - 3.5f, DrawTomasAsleep));
         foreach (var o in list.OrderBy(o => o.y)) o.draw();
         DrawParticles();
-        if (state.night)
+        if (Night)
         {
             // A dim room at night, lit by lamps, the furnace and the stove.
             Array.Fill(dark, 0.45f);

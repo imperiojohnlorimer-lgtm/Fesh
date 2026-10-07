@@ -7,7 +7,9 @@ A fishing mystery game on Saltmere Island, written in C# with [Raylib-cs](https:
   adds Fesh to the Start menu and desktop, and can be removed from Settings > Apps.
 - **No install:** run `dist\Fesh.exe` directly. It is self-contained, so it does not need .NET installed.
 
-Progress saves automatically to `%AppData%\Fesh\save.json`.
+There are three save slots (Load game on the title screen). Each game saves itself every few seconds to
+`%AppData%\Fesh\save1.json` to `save3.json`; settings and key bindings live in `settings.json` next to them.
+A `save.json` from an older version moves into the first free slot the first time you start this one.
 
 ## Run from source
 Needs the .NET 8 SDK.
@@ -24,6 +26,8 @@ This publishes a single self-contained `Fesh.exe` and wraps it in `dist\Fesh-Set
 `<Version>` in `Fesh.csproj`; installing the newer MSI replaces the old one.
 
 ## Controls
+These are the defaults. Every one of them can be changed in the menu (Esc, then Controls); Esc, Enter and 1–9 stay fixed.
+
 | Keys | Action |
 |------|--------|
 | WASD / arrow keys | Walk |
@@ -43,11 +47,55 @@ This publishes a single self-contained `Fesh.exe` and wraps it in `dist\Fesh-Set
 | M | Sound on or off |
 | R | Ride Tidemane, or hop off (once you have it). From anywhere outdoors it whistles Tidemane over |
 | F11 | Fullscreen |
-| Esc | Back, reel in, stop spearfishing, or the pause menu (change your look, sound and music here) |
+| Esc | Back, reel in, stop spearfishing, or the menu (also the button at the top right): save, change your look, quit to the title, Settings and Controls |
 
 ## Your fisher
 A new game starts with character creation: name, skin, hair, hair colour, hat, shirt and trousers.
-Saves from older versions ask you to make your fisher once. You can change your look any time from the pause menu.
+Saves from older versions ask you to make your fisher once. You can change your look any time from the menu.
+
+## Day, night and the menu
+An island clock runs while you play: the HUD shows the day and the time. A whole day and night takes 24 minutes of play
+by default (12, 36 or 48 in Settings, or stop the clock so only resting moves it). Night falls at 8 PM and the sun is
+up again at 6 AM, with a sunset and a pink dawn on the way; a new day starts at 6 AM. The clock stops while a menu, a
+panel or a conversation is open. Resting at a campfire or in a bed still skips ahead: to 9 PM by day, or to 6:30 the
+next morning by night (it costs some food and heals you). Hover over the clock for the moon and the forecast.
+
+The islanders keep their own hours. **Pip's stall** is open from 7 AM to 9 PM (night catches keep in your bag until
+morning). **Tomas** goes to bed in his hut at 10 PM and is up at 6; you can still go in and wake him, so nothing in
+the story ever has to wait. Once a day, Tomas or Pip will tell you **tomorrow's weather**, and it comes true; after
+that the menu and the clock's tooltip remember it. Outdoors you hear a dawn chorus that thins to the odd bird by day,
+and crickets after dark (not on snowy Frostfang, and hushed by rain).
+
+The game pauses itself when you switch to another window (or unplug the gamepad you were using), even in the middle of
+a cast or a fight, and Resume picks up exactly where you were. Turn that off in Settings if you like.
+
+The menu (Esc, Start, or the button at the top right) has three tabs. **Game:** resume, save now, change your look,
+quit to the title or quit; plus the day, the moon, today's and tomorrow's forecast and time played. **Settings:** music
+and sound volume, music and sound on or off, fullscreen, screen shake, pausing in the background, the length of a day,
+and a 12- or 24-hour clock. **Controls:** two keys for every action (click one and press the new key), and the gamepad
+layout. The title screen has Continue (your most recent save), Load game, New game and Settings. Load game shows each
+slot with Play, Copy (into an empty slot), Rename (give the slot its own name, like "Robin, before the storm") and
+Delete.
+
+### Gamepad
+Plug in any gamepad Raylib knows. The layout is fixed:
+
+| Button | Action |
+|--------|--------|
+| Left stick / D-pad | Walk, aim the spear, the chest arrows; in menus, move the pointer |
+| A | Talk, fish, use; hold to power up a cast and to reel; in menus, click |
+| B | Back, reel in, close |
+| X | Cook, throw chum; take down while building |
+| Y | Bag |
+| LB / RB | Tackle box / map; pick a piece while building |
+| LT | Build |
+| RT | Ride your mount |
+| Back | Fesh-dex |
+| L3 / R3 | Case board / spearfish |
+| Start | The menu |
+
+Prompts and tips name the gamepad's buttons while you're using it, and the keyboard's again as soon as you type or
+move the mouse. Naming a new fisher or a slot needs the keyboard ("Surprise me" in the creator works without one).
 
 ## The islands
 The world is four islands joined by old bridges, each with its own climate and its own fish.
@@ -81,7 +129,7 @@ Everything you catch is tracked in the Fesh-dex's **Fish log**, island by island
   the odd double catch.
 - **Sunken chests** (3% of bites): press the arrows shown in order before time runs out. Inside: coins, bars, crystal,
   bait, pearls, and sometimes a golden hook.
-- **The ice hole** freezes over every night. Mash E to chip it open (much faster with a pickaxe). While you wait, jig
+- **The ice hole** freezes over again by each morning. Mash E to chip it open (much faster with a pickaxe). While you wait, jig
   with E each time the ring closes on the bobber; off the beat scares the fish.
 - **Spearfishing:** with a fishing spear, press G at the coral shallows or the atoll lagoon. Steer the target onto a
   fish shadow (WASD or the mouse) and press E. Three spears, 25 seconds.
@@ -90,8 +138,8 @@ Everything you catch is tracked in the Fesh-dex's **Fish log**, island by island
 - **Chum:** at a fishing spot press F to throw it. For two minutes fish bite twice as fast, with a little more rare luck.
 - **Legends:** each island has one legendary fish that bites once, under the right conditions and only on the right
   bait. The Fish log's "Legends & more" page has a hint for each.
-- **The moon and the weather:** the moon goes through a cycle every eight days (the HUD shows it at night, and the pause
-  menu says when it's next full). Some fish only bite under a full moon, some only in storms.
+- **The moon and the weather:** the moon goes through a cycle every eight days (the HUD shows it at night, and the menu
+  and the clock's tooltip say when it's next full). Some fish only bite under a full moon, some only in storms.
 - **Pip's derby:** once a day, from the Derby tab at Pip's stall. Catch the heaviest fish you can in three minutes to beat
   three rival anglers. First place wins 120 coins and tackle; the rivals get better each time you win.
 
@@ -137,7 +185,7 @@ for fish), Jungle waters (15% more XP), Coral reef (fish 10% heavier), Deep dark
 each set's progress.
 
 ## Pip, coins and Tomas's requests
-- **Pip** keeps a stall just east of Tomas's camp. Pip buys fish and materials (rare fish are worth far more, big fish
+- **Pip** keeps a stall just east of Tomas's camp, open from 7 AM to 9 PM. Pip buys fish and materials (rare fish are worth far more, big fish
   more too) and sells bait (5), chum (8), cork bobbers (20), crab pots (40), spinner lures (45), berry saplings (15),
   sailcloth (120), copper bars (30), iron bars (55) and crystal (90). Your coins show in the HUD.
 - **Tomas's requests:** once you've met him, Tomas asks for things (3 pond perch, 6 wood, 2 Arctic char, ...)
@@ -145,15 +193,18 @@ each set's progress.
   after that he asks for random fish. When you have what he wants, his prompt says so. The bag shows the current request.
 
 ## Weather
-Each morning rolls the day's weather: clear, rain, or (from day 3) a storm. Rain makes fish bite 25% faster;
-a storm makes them bite 40% faster and adds a little rare luck, but closes the bridges (not the jetties)
-until the next morning. You can always shelter and wait out a storm wherever you are. On Frostfang the rain
+Each morning rolls a forecast for the day, and the weather follows it as the clock runs: most days are fair (some
+with a passing shower), some rain for hours, and from day 3 a storm day builds from rain into a few hours of storm
+before it eases off. Rain makes fish bite 25% faster; a storm makes them bite 40% faster and adds a little rare luck,
+but closes the bridges (not the jetties) until it passes. You get half an hour's warning before a storm, and if one
+catches you halfway across a bridge you can still walk off it. You can always shelter wherever you are, which waits
+until the storm is over. The morning message and the clock's tooltip tell you what's coming. On Frostfang the rain
 falls as snow.
 
 ## The boat
 Make a **sailboat** at a workbench from 20 wood, 4 iron bars and sailcloth from Pip. Then go to the end of
 **Pip's jetty** (Saltmere's east beach) and press E to sail to Starfall Atoll, and back from the atoll's jetty.
-You can't sail in a storm.
+You can't sail in a storm; wait for it to pass.
 
 ## Tidemane (spoilers)
 Starfall Atoll hides a secret. A trail of hoofprints leads from the jetty into a ring of palms on the south-east side,
@@ -308,7 +359,8 @@ taking down a shack also packs up everything inside it.
 - `src/FishingUi.cs`: fishing overlays (cast power, leap timing, chest arrows, derby clock, fish finder, floating text) and the tackle box
 - `src/Life.cs`: gulls, butterflies and Pip waving
 - `src/Trade.cs`: Pip's shop, Tomas's requests, aquariums, sailing and planted berry bushes
-- `src/Weather.cs`: the daily weather, rain, storms and closed bridges
+- `src/Weather.cs`: the daily forecast, rain and storms coming and going, closed bridges
+- `src/Clock.cs`: the island clock: day and night, dusk and dawn, a new day at 6 AM, regrowing trees
 - `src/Tidemane.cs`: the Starwell's secret, the fight with Tidemane, and riding it
 - `src/Music.cs`: the music, composed by code on a background thread at startup
 - `src/UiTrade.cs`: the shop and aquarium panels
@@ -316,12 +368,14 @@ taking down a shack also packs up everything inside it.
 - `src/World.cs`: outdoor map generation (islands, bridges, trees), the camera, and the pixel-art drawing, including snow, fireflies and night lighting
 - `src/Look.cs`: appearance options and how the player is drawn
 - `src/Animals.cs`: pixel sprites for the animals
-- `src/Ui.cs`: HUD, prompts, dialogue box, build bar, title and end screens, catch cards, Fesh-dex and Fish log, map, case board, pause menu
+- `src/Ui.cs`: HUD, prompts, dialogue box, build bar, end screen, catch cards, Fesh-dex and Fish log, map, case board
+- `src/UiMenu.cs`: the title screen, the save slots, and the menu (Game, Settings and Controls tabs)
+- `src/Settings.cs`: settings (`settings.json`) and the rebindable controls
 - `src/UiPanels.cs`: the bag, crafting stations and the character creator
 - `src/Gfx.cs`: UI scaling, fonts, text wrapping, buttons, input
 - `src/Art.cs`: a small vector renderer and the smooth creature portraits
 - `src/Sfx.cs`: sound effects, synthesized at startup
-- `src/State.cs`: the save file
+- `src/State.cs`: the save file and the three save slots
 - `src/AutoTest.cs`: debug-only scripted play-through (see below)
 - `installer/Fesh.wxs`: the installer definition
 
@@ -331,7 +385,10 @@ depth, bait, every fight style, perfect hooks, sizes, records, chests, the ice h
 worms and crickets, the tackle box, the derby, legends, the moon and storms), all five
 islands, odd catches, chopping, mining, crafting, cooking, eating, houses, the cave (ore tiers, monsters,
 health, fainting, the Ancient Floor and the lift), animals, the shop, requests, bait, weather, planters, the
-aquarium, the boat, the Starwell and the whole fight with Tidemane, riding and swimming, music and every screen.
+aquarium, the boat, the Starwell and the whole fight with Tidemane, riding and swimming, music, save slots, settings,
+rebinding keys, the clock (dusk, dawn, resting, regrowth), the forecast and tomorrow's, Pip's and Tomas's hours, birds and
+crickets, pausing in the background, copying and renaming slots, the gamepad (scripted), and every screen. It refuses to run without
+`FESH_SAVE`, because it wipes the slots and settings wherever that points.
 It checks every island and fishing spot can be reached on foot, generates 33 random cave floors and checks each
 one can be crossed (hole, ore and pool all reachable), saves screenshots, writes the generated map to
 `map.txt`, and writes a PASS/FAIL log:

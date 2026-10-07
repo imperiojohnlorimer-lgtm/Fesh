@@ -58,7 +58,7 @@ partial class Game
         const float w = 140, h = 14;
         Gfx.Rect(p.X - w / 2 - 4, p.Y - 4, w + 8, h + 8, Pal.C("rgba(16,36,58,0.9)"), 5);
         Gfx.Rect(p.X - w / 2, p.Y, w * Math.Clamp(drill, 0, 1), h, Pal.C("#9fe8ff"), 3);
-        string s = "Mash E!";
+        string s = Bind.Fix("Mash <act>!");
         float bounce = (int)(time * 8) % 2 * 2;
         Outlined(s, p.X - Gfx.Measure(s, FontKind.Ui700, 20) / 2, p.Y - 32 - bounce, FontKind.Ui700, 20, Pal.C("#ffffff"));
     }
@@ -142,7 +142,7 @@ partial class Game
     void DrawDerbyChip()
     {
         int secs = (int)MathF.Ceiling(derbyT);
-        var rivals = DerbyRivals();
+        var rivals = DerbyRivals(state.derbyDay);
         float target = rivals.Max(r => r.kg);
         string s = $"Derby {secs / 60}:{secs % 60:00}   ·   Your best: {(derbyFish == null ? "nothing yet" : Kg(derbyBest))}   ·   To win: over {Kg(target)}";
         float w = Gfx.Measure(s, FontKind.Ui600, 18) + 30, x = 13 + (136 + 7) * 2, y = 13 + 36 + 7;
@@ -206,7 +206,7 @@ partial class Game
         if (slot == "bait")
             return id == "auto" ? (Has("glow_bait") + Has("bait") > 0 ? "Glow bait first, then plain bait" : "No bait: fish bite slowly") : Items.Baits[id].Summary;
         return id == null ? slot switch { "reel" => "The basic reel on your rod", "line" => "Plain line: snaps easily", "hook" => "A plain hook", "bobber" => "A plain float", _ => "None: casts reach the depth you throw to" }
-            : Items.ById[id].Desc;
+            : Bind.Fix(Items.ById[id].Desc);
     }
 
     void DrawTackle()
@@ -281,7 +281,7 @@ partial class Game
             else Gfx.TextCenter("?", ax + 22, ay + 10, FontKind.Ui700, 22, Pal.C("#9a8a70"));
             var nameLines = Gfx.Wrap(own ? Items.ById[acc[i]].Name : "Not made yet", FontKind.Ui500, 13, rw / 3 - 54);
             Lines(nameLines.Take(2).ToList(), ax + 50, ay + (nameLines.Count > 1 ? 5 : 13), 16, FontKind.Ui500, 13, own ? Pal.PaperInk : Pal.C("#9a8a70"));
-            if (Gfx.Hover(ax, ay, 44, 44) && own) Gfx.Text(Items.ById[acc[i]].Desc, x + pad, y + ch - pad - 18, FontKind.Ui500, 15, Pal.PaperInk);
+            if (Gfx.Hover(ax, ay, 44, 44) && own) Gfx.Text(Bind.Fix(Items.ById[acc[i]].Desc), x + pad, y + ch - pad - 18, FontKind.Ui500, 15, Pal.PaperInk);
         }
         ry += 110;
         var sets = Data.AquaSets.Where(s => SetActive(s.Id)).ToList();

@@ -9,6 +9,7 @@ partial class Game
     void TalkPip()
     {
         Say P(string t) => new("Pip", t);
+        if (!PipOpen) { Sfx.Play("nope"); Toast("Pip's stall has just closed for the night."); return; }
         if (!state.Hinted("metPip"))
         {
             state.hinted["metPip"] = true;
@@ -32,6 +33,13 @@ partial class Game
                 P("Sailors swear there are hoofprints in the sand out there, heading off into the palms. Hoofprints! On an atoll!"),
                 P("Nobody's ever seen a horse, mind. Anyway. What can I get you?")
             }, () => OpenShop());
+            return;
+        }
+        // Once a day Pip passes on what the boats say about tomorrow's weather.
+        if (!KnowTomorrow)
+        {
+            TellTomorrow();
+            Talk(new() { P($"Word from the boats about tomorrow: {DescribeDay(state.tomorrow)}. Now, what can I get you?") }, () => OpenShop());
             return;
         }
         OpenShop();
@@ -86,11 +94,11 @@ partial class Game
         string tip = id switch
         {
             "bait" when !state.Hinted("bait") => " Bait is used up automatically, one per cast.",
-            "sapling" when !state.Hinted("sapling") => " Plant it outdoors with B.",
+            "sapling" when !state.Hinted("sapling") => " Plant it outdoors with <build>.",
             "sailcloth" when !state.Hinted("sailcloth") => " A boat is made at a workbench: 20 wood, 4 iron bars and this.",
-            "crab_pot" when !state.Hinted("crab_pot") => " Press B outdoors and set it in shallow water.",
-            "chum" when !state.Hinted("chum") => " At a fishing spot, press F to throw it.",
-            "cork_bobber" or "spinner_lure" when !state.Hinted("tackleTip") => " Change your tackle with T.",
+            "crab_pot" when !state.Hinted("crab_pot") => " Press <build> outdoors and set it in shallow water.",
+            "chum" when !state.Hinted("chum") => " At a fishing spot, press <alt> to throw it.",
+            "cork_bobber" or "spinner_lure" when !state.Hinted("tackleTip") => " Change your tackle with <tackle>.",
             _ => ""
         };
         if (tip != "") state.hinted[id is "cork_bobber" or "spinner_lure" ? "tackleTip" : id] = true;
@@ -208,7 +216,7 @@ partial class Game
             Toast("You'd need a boat. Make one at a workbench: 20 wood, 4 iron bars and sailcloth from Pip.", 4.5f);
             return;
         }
-        if (state.weather == "storm") { Sfx.Play("nope"); Toast("Far too rough to sail in a storm. Try tomorrow."); return; }
+        if (state.weather == "storm") { Sfx.Play("nope"); Toast("Far too rough to sail in a storm. Wait for it to pass."); return; }
         bool atoll = to == "atoll";
         LeaveMount();
         Sfx.Play("splash");

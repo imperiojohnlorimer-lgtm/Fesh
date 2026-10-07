@@ -57,7 +57,7 @@ partial class Game
     {
         float before = state.food;
         state.food = Math.Max(0, state.food - dt / 7f);
-        if (before >= 25 && state.food < 25) Toast("You're getting hungry. Open your bag (I) and eat something.", 4);
+        if (before >= 25 && state.food < 25) Toast("You're getting hungry. Open your bag (<bag>) and eat something.", 4);
         if (before > 0 && state.food <= 0) Toast("You're starving! You walk slower and reeling is harder until you eat.", 4.5f);
     }
 
@@ -92,7 +92,7 @@ partial class Game
         Sfx.Play("craft");
         string tip = r.Out switch
         {
-            "axe" => " Face a tree and press E to chop it.",
+            "axe" => " Face a tree and press <act> to chop it.",
             "pickaxe" => " It breaks boulders, and mines copper in Frostfang Caverns, up north.",
             "copper_pickaxe" => " Now you can mine iron ore.",
             "iron_pickaxe" => " Now you can mine gold ore.",
@@ -101,13 +101,13 @@ partial class Game
             "copper_sword" or "iron_sword" or "gold_sword" or "crystal_blade" => " Your best weapon is used automatically in the caves.",
             "shell_armor" => " You wear it automatically. Cave monsters hurt less.",
             "glow_bait" => " It's used before plain bait when you cast.",
-            "spear" => " At the coral shallows or the atoll lagoon, press G to spearfish.",
-            "crab_pot" => " Press B outdoors to set it in shallow water.",
-            "cut_bait" or "fly_lure" or "spinner_lure" => " Pick it as your bait in the tackle box (T).",
-            "chum" => " At a fishing spot, press F to throw it.",
+            "spear" => " At the coral shallows or the atoll lagoon, press <spear> to spearfish.",
+            "crab_pot" => " Press <build> outdoors to set it in shallow water.",
+            "cut_bait" or "fly_lure" or "spinner_lure" => " Pick it as your bait in the tackle box (<tackle>).",
+            "chum" => " At a fishing spot, press <alt> to throw it.",
             "sunglasses" => " You wear them automatically. Look for fish shadows at fishing spots.",
             "fish_finder" or "waders" or "lucky_charm" or "headlamp" or "cooler" => " You use it automatically.",
-            _ when Items.Tackle.ContainsKey(r.Out) => " Your best tackle is equipped automatically; change it in the tackle box (T).",
+            _ when Items.Tackle.ContainsKey(r.Out) => " Your best tackle is equipped automatically; change it in the tackle box (<tackle>).",
             "rod_copper" or "rod_iron" or "rod_crystal" => " Your best rod is used automatically.",
             _ => ""
         };
