@@ -64,8 +64,9 @@ partial class Game
         Inp.Hold(KeyboardKey.Right, true); yield return 20; Inp.Hold(KeyboardKey.Right, false); yield return 2;
         Inp.Tap(KeyboardKey.E); yield return 4;
         Check($"E lands safely during a storm ({player.X:0},{player.Y:0})", !Aboard && CanStand(player.X, player.Y));
-        Inp.Tap(KeyboardKey.E); yield return 3;
-        Check("the boat will not set out again during the storm", !Aboard);
+        // In a storm E is the shelter (a tied-up boat can't hide it), so try the ride key, which boards in fair weather.
+        Inp.Tap(KeyboardKey.R); yield return 3;
+        Check("the boat will not set out again during the storm", !Aboard && mode == "play");
         ClearSkies();
         yield return 3; Inp.Tap(KeyboardKey.E); yield return 4;
         Check("E boards the moored boat again in fair weather", Aboard);
@@ -151,6 +152,63 @@ partial class Game
         var legacy = SaveFile.Read(3);
         Check("older saves default to a moored boat", legacy != null && !legacy.aboard && legacy.boatX == 0 && legacy.boatAt == "atoll");
         SaveFile.Clear(3);
+
+        Note("Claude review: nearby activities, Starfall discovery, shore saves and attack penalties");
+        ClearSkies(); state.aboard = false; state.riding = state.tamed = false;
+        state.flags.dockFixed = true; state.boatAt = "saltmere"; state.boatX = state.boatY = 0;
+        state.inv["boat"] = 1; BuildMap();
+        player.X = 293; player.Y = 98; player.Face = "up"; yield return 3;
+        Check("a boat at Pip's jetty does not hide the story's deep-water spot", target?.Type == "spot" && target.Id == "deep");
+
+        player.X = 2315; player.Y = 327; player.Face = "up";
+        state.boatX = 2315; state.boatY = 315; state.inv["chum"] = 1;
+        yield return 3;
+        Check("mooring at Baga leaves fishing and chum available", target?.Type == "spot" && target.Id == "bagareef" && target.AltType == "chum");
+        Check($"the prompt says the ride key boards the boat (prompt: {prompt.Text})", prompt.Text.Contains("R] Board your boat"));
+        pendingShot = "90-moored-prompt"; yield return 2;
+        Inp.Tap(KeyboardKey.R); yield return 3;
+        Check("the ride key boards a nearby boat while other activities keep E", Aboard);
+        state.aboard = false; player.X = 1495; player.Y = 217; state.boatX = 1483; state.boatY = 217;
+        state.weather = "storm"; SnapWeather(); yield return 3;
+        Check("a moored boat cannot hide the storm shelter action", target?.Type == "rest" && target.Id == "shelter");
+        state.tamed = true; state.mountX = player.X + 60; state.mountY = player.Y;
+        Inp.Tap(KeyboardKey.R); yield return 3;
+        Check("in a storm, the ride key beside the tied-up boat still calls Tidemane", Riding && !Aboard);
+        state.riding = state.tamed = false;
+
+        ClearSkies(); state.hinted.Remove("visitedAtoll"); state.aboard = true;
+        player.X = state.boatX = AtollJettyX - 30; player.Y = state.boatY = AtollJettyY;
+        Inp.Hold(KeyboardKey.Right, true); yield return 25; Inp.Hold(KeyboardKey.Right, false); yield return 3;
+        Inp.Tap(KeyboardKey.E); yield return 4;
+        Check("landing manually at Starfall unlocks its chart, clues and requests", !Aboard && PlayerBiome() == 4 && state.Hinted("visitedAtoll"));
+
+        // Find a valid shoreline position whose rounded feet would fall into the next water tile.
+        (float x, float y)? shore = null;
+        for (int tx = EastStart + 1; tx < COLS - 1 && shore == null; tx++)
+            for (int ty = 1; ty < ROWS - 1 && shore == null; ty++)
+            {
+                float x = tx * T + 5, y = ty * T + 9.75f;
+                if (Walkable(TileAt(tx, ty)) && CanStand(x, y) && !CanStand(x, MathF.Round(y))) shore = (x, y);
+            }
+        Check("the shoreline regression starts at a valid fractional position", shore != null);
+        if (shore is (float sx, float sy))
+        {
+            state.aboard = false; player.X = sx; player.Y = sy; Save();
+            state = SaveFile.Read(SaveFile.Slot); StartGame(false); yield return 3;
+            Check("saving against the shore reloads on the same island and position", InAmihan && Dist(player.X, player.Y, sx, sy) < .01f && CanStand(player.X, player.Y));
+        }
+
+        player.X = 2315; player.Y = 327; state.hp = 100;
+        TestBite("bagareef", "amihan_barracuda"); Hook();
+        reel.Progress = .03f; reel.AttackWarning = .05f; reel.DuckTime = 0;
+        // Watch every frame, so the meter is read straight after the hit and before the reel moves it again.
+        Inp.Hold(KeyboardKey.E, true);
+        for (int i = 0; i < 30 && state.hp >= 100; i++) yield return 0;
+        float afterHit = reel?.Progress ?? 0;
+        Inp.Hold(KeyboardKey.E, false);
+        Check($"a fish attack cannot refill a nearly empty catch meter ({afterHit:0.000})", state.hp < 100 && afterHit <= .03f);
+        if (reel != null) GotAway("It got away.");
+        yield return 3;
     }
 }
 #endif

@@ -31,7 +31,8 @@ partial class Game
             float taken = damage * (Has("shell_armor") > 0 ? .65f : 1);
             state.hp = Math.Max(0, state.hp - taken);
             lastHitT = time; hurtFlash = .35f; iframes = .9f;
-            r.Progress = Math.Max(.05f, r.Progress - .08f);
+            // The hit costs progress but never loses the fish by itself, and never adds any either.
+            r.Progress = Math.Min(r.Progress, Math.Max(.05f, r.Progress - .08f));
             Sfx.Play("hurt"); Floater($"-{taken:0} health", player.X, player.Y - 24, "#ff9a8a");
             if (state.hp <= 0) Faint();
         }

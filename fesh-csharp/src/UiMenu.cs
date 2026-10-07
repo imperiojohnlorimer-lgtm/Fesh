@@ -518,7 +518,7 @@ partial class Game
         {
             ("Left stick / D-pad", "Walk, aim the spear, the chest arrows"), ("A", "Talk, fish, use; hold to cast and reel"),
             ("B", "Back, reel in, close"), ("X", "Cook, throw chum; take down when building"), ("Y", "Bag"),
-            ("LB / RB", "Tackle box / map; pick a piece when building"), ("LT", "Build"), ("RT", "Ride your mount"),
+            ("LB / RB", "Tackle box / map; pick a piece when building"), ("LT", "Build"), ("RT", "Ride, board your boat"),
             ("Back", "Fesh-dex"), ("L3 / R3", "Case board / spearfish"), ("Start", "This menu"),
             ("In menus", "The left stick moves a pointer and A clicks")
         };

@@ -208,9 +208,10 @@ partial class Game
     bool Save()
     {
         if (mode == "title" || mode == "create" && creatorFor == "new") return false;
-        // Rounding an afloat hull against a dock can put its edge over the dock on reload.
-        state.px = Aboard ? player.X : MathF.Round(player.X);
-        state.py = Aboard ? player.Y : MathF.Round(player.Y);
+        // Exactly where you are: rounding could put a hull's edge over a dock, or the feet of someone pushed against
+        // the water onto the water tile, and then StartGame wouldn't accept the spot on loading.
+        state.px = player.X;
+        state.py = player.Y;
         if (Aboard) { state.boatX = player.X; state.boatY = player.Y; }
         state.scene = scene;
         return SaveFile.Write(state);
@@ -721,7 +722,7 @@ partial class Game
 
         // In the middle of the fight at the Starwell there's nothing to do but fight.
         if (boss != null) return BossTarget();
-        if (BoatTarget() is Target boatTarget) return boatTarget;
+        if (Aboard) return HelmTarget();
         if (ArchipelagoTarget() is Target islandTarget) return islandTarget;
         if (Dist(x, y, tomasX, tomasY) < 16)
             return TomasInBed ? new Target { Type = "info", Label = "Tomas has gone to bed in his hut" }
@@ -762,6 +763,9 @@ partial class Game
         if (BridgeClosed(fx, fy)) return new Target { Type = "info", Label = "The bridge is closed until the storm passes" };
         foreach (var s in Data.Spots)
             if (s.Scene == "world" && SpotOpen(s.Id) && Dist(x, y, s.X, s.Y) < s.R) return SpotTarget(s);
+        // A moored boat comes last: it mustn't hide anything else, and <ride> boards it from beside them anyway.
+        // In a storm it stays tied up, which leaves the shelter.
+        if (!Stormy && BoatInReach()) return new Target { Type = "boat", Label = "Board your boat" };
         // A storm can strand you on another island, so you can always shelter and wait it out.
         if (Stormy) return new Target { Type = "rest", Id = "shelter", Label = "Shelter until the storm passes" };
         return null;
@@ -979,6 +983,7 @@ partial class Game
                 string label = target?.Label ?? "";
                 if (target?.AltLabel != null) label += $"   [<alt>] {target.AltLabel}";
                 if (target?.Alt2Label != null) label += $"   [<spear>] {target.Alt2Label}";
+                if (target?.Type != "boat" && !Stormy && BoatInReach()) label += "   [<ride>] Board your boat";
                 SetPrompt(label, target != null ? "<act>" : null);
             }
             saveTimer += dt;
@@ -993,9 +998,12 @@ partial class Game
     void AnnounceBiome()
     {
         char tile = TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T));
-        if (tile is 'd' or 'b' || WaterTile(tile)) return;
+        if (WaterTile(tile)) return;
         byte b = PlayerBiome();
-        if (b == lastBiome) return;
+        // Setting foot on the atoll counts as a visit however you came (Sail, your own boat or Tidemane): it puts the
+        // atoll on the map and opens Pip's hoofprints story and Tomas's atoll requests.
+        if (b == 4 && !state.Hinted("visitedAtoll")) state.hinted["visitedAtoll"] = true;
+        if (tile is 'd' or 'b' || b == lastBiome) return;
         lastBiome = b;
         var biomeDef = Data.Biomes[b];
         Toast($"{biomeDef.Enter} ({biomeDef.Climate})", 3);

@@ -45,7 +45,7 @@ These are the defaults. Every one of them can be changed in the menu (Esc, then 
 | Tab | Map of the islands |
 | J / C | Fesh-dex (creatures and Fish log) / case board |
 | M | Sound on or off |
-| R | Ride Tidemane, or hop off (once you have it). From anywhere outdoors it whistles Tidemane over |
+| R | Board your moored boat when it's beside you. Ride Tidemane, or hop off (once you have it); from anywhere outdoors it whistles Tidemane over |
 | F11 | Fullscreen |
 | Esc | Back, reel in, stop spearfishing, or the menu (also the button at the top right): save, change your look, quit to the title, Settings and Controls |
 
@@ -89,7 +89,7 @@ Plug in any gamepad Raylib knows. The layout is fixed:
 | Y | Bag |
 | LB / RB | Tackle box / map; pick a piece while building |
 | LT | Build |
-| RT | Ride your mount |
+| RT | Ride your mount, or board your boat beside you |
 | Back | Fesh-dex |
 | L3 / R3 | Case board / spearfish |
 | Start | The menu |
@@ -207,7 +207,9 @@ Make a **sailboat** at a workbench from 20 wood, 4 iron bars and sailcloth from 
 You can't sail in a storm; wait for it to pass.
 
 Press **F at either jetty** to take the helm and explore freely. Steer with **WASD / arrow keys** (or the gamepad
-stick). Come alongside a beach or jetty and press **E to land**; E beside your moored boat boards it again.
+stick). Come alongside a beach or jetty and press **E to land**. Beside your moored boat, **R** (RT on a gamepad)
+boards it again, and so does E when there's nothing else to do there: a fishing spot, a villager or the storm shelter
+next to the boat keeps E.
 **Tab** opens the sea chart, including the boat's location. Boat positions and an ongoing voyage survive saving.
 A storm prevents launching, but a boat already at sea can still steer home at reduced speed.
 The banca-inspired boat has twin bamboo outriggers, a cream sail and a seated fisher at the helm.

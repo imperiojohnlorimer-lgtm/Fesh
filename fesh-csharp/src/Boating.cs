@@ -37,17 +37,18 @@ partial class Game
         return null;
     }
 
-    Target BoatTarget()
+    // At the helm nothing ashore is in reach, so FindTarget asks this first.
+    Target HelmTarget() => new() { Type = "land", Label = LandingSpot() != null ? "Land on shore" : "Steer with <move> · sail east to Amihan · <map> sea chart" };
+
+    // A moored boat close enough to step into. E boards it only when nothing else is here (FindTarget puts it last,
+    // so it can't hide a fishing spot, a villager or the storm shelter); <ride> boards it any time.
+    bool BoatInReach()
     {
-        if (scene != "world") return null;
-        if (Aboard) return new Target { Type = "land", Label = LandingSpot() != null ? "Land on shore" : "Steer with <move> · sail east to Amihan · <map> sea chart" };
-        if (Has("boat") == 0 || Riding) return null;
-        var (x, y) = BoatPosition();
+        if (scene != "world" || Has("boat") == 0 || Aboard || Riding) return false;
         // Original jetties keep their quick route and alternate helm action.
-        if (Dist(player.X, player.Y, SaltJettyX, SaltJettyY) < 10 || Dist(player.X, player.Y, AtollJettyX, AtollJettyY) < 10) return null;
-        if (Dist(player.X, player.Y, x, y) < 23 && BoatCanStand(x, y))
-            return new Target { Type = "boat", Label = "Board your boat" };
-        return null;
+        if (Dist(player.X, player.Y, SaltJettyX, SaltJettyY) < 10 || Dist(player.X, player.Y, AtollJettyX, AtollJettyY) < 10) return false;
+        var (x, y) = BoatPosition();
+        return Dist(player.X, player.Y, x, y) < 23 && BoatCanStand(x, y);
     }
 
     void LaunchBoat()
@@ -83,7 +84,7 @@ partial class Game
         state.boatX = player.X; state.boatY = player.Y; state.aboard = false;
         player.X = x; player.Y = y; target = null;
         Save(); Sfx.Play("pickup");
-        Toast("Boat moored. Press <act> beside it to board again.");
+        Toast("Boat moored. Press <ride> beside it to board again.");
     }
 
     void DrawHelmsman() => DrawBoat(player.X, player.Y, time, occupied: true);

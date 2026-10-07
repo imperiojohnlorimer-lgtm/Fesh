@@ -399,6 +399,9 @@ partial class Game
 
     void ToggleRide()
     {
+        // R also boards your moored boat beside you, since E may belong to a fishing spot there. In a storm the boat
+        // stays tied up, so if you have Tidemane, R calls it instead.
+        if (mode == "play" && boss == null && BoatInReach() && !(Stormy && state.tamed)) { BoardBoat(); return; }
         if (!state.tamed || mode != "play" || boss != null) return;
         if (scene != "world") { Toast($"{Data.MountName} is waiting for you outside."); return; }
         if (state.riding) Dismount();
