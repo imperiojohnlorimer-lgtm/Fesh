@@ -62,6 +62,8 @@ sealed class State
     public string slotName = "";                     // a name for the save slot, given on the slot screen ("" shows the fisher's name)
     public Dictionary<string, List<string>> tanks = new(); // aquarium ("house:x,y|tx,ty") -> fish inside
     public string boatAt = "saltmere";               // which jetty the boat is tied up at
+    public bool aboard;                              // steering the boat outdoors
+    public float boatX, boatY;                        // 0,0: use the old boatAt jetty (older saves)
     public float hp = 100;
     public int caveDeepest;                          // deepest cave floor reached (unlocks lift stops at 5, 10 and the Ancient Floor)
 

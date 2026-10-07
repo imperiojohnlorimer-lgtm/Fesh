@@ -115,7 +115,7 @@ partial class Game
             return new Req { item = r.Item, count = r.Count, coins = r.Coins, bonus = r.Bonus, bonusCount = r.BonusCount };
         }
         // After the set list: any ordinary fish from somewhere you can already reach.
-        var pool = Data.Spots.Where(s => (s.Biome != "atoll" || state.Hinted("visitedAtoll")) && SpotKnown(s))
+        var pool = Data.Spots.Where(s => (s.Biome != "atoll" || state.Hinted("visitedAtoll")) && (s.Biome != "amihan" || state.Hinted("amihan")) && SpotKnown(s))
             .SelectMany(s => Data.Common[s.Id]).Where(f => !f.Rare).ToList();
         var fish = pool[rng.Next(pool.Count)];
         int count = 2 + rng.Next(3);
@@ -223,6 +223,7 @@ partial class Game
         FadeThrough(() =>
         {
             state.boatAt = to;
+            state.aboard = false; state.boatX = state.boatY = 0;
             player.X = atoll ? AtollJettyX + 4 : SaltJettyX - 4;
             player.Y = atoll ? AtollJettyY + 1 : SaltJettyY + 1;
             player.Face = atoll ? "right" : "left";

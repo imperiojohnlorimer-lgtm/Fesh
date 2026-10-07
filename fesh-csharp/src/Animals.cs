@@ -9,6 +9,40 @@ static class AnimalArt
 
     static readonly Dictionary<string, Sprite> Sprites = new()
     {
+        ["carabao"] = new(new[]
+        {
+            "..........H...H..",
+            "..........HH.HH..",
+            "...........GGG...",
+            "..GGGGGGGGGGeGG..",
+            ".GgGGGGGGGGGGnn..",
+            "GGggggggggGGGG...",
+            "..GgGGGGGGGGG....",
+            "..G.G.....G.G....",
+            "..K.K.....K.K...."
+        }, new() { ['H'] = "#ddd3b0", ['G'] = "#707779", ['g'] = "#525c60", ['e'] = "#f5e9c9", ['n'] = "#3b4144", ['K'] = "#333b40" }),
+        ["tarsier"] = new(new[]
+        {
+            "..B.....B...",
+            "..bBBBBBb...",
+            "..BYYBYYB...",
+            "..BYeBYeB...",
+            "...BBBBB....",
+            "....bbbB....",
+            "B...BbbB....",
+            ".BBBB..BB..."
+        }, new() { ['B'] = "#8a6749", ['b'] = "#bb9872", ['Y'] = "#e5c56b", ['e'] = "#201b1c" }),
+        ["hornbill"] = new(new[]
+        {
+            ".......OOO.....",
+            "......ROOOO....",
+            ".....RReYYYYY..",
+            ".....RRRYYYY...",
+            "..KKKKRR.......",
+            ".KKkkKKR.......",
+            "WWWKKKK........",
+            "WW...L.L......."
+        }, new() { ['O'] = "#c7793f", ['R'] = "#a94e31", ['Y'] = "#e2b959", ['K'] = "#283c3e", ['k'] = "#405456", ['W'] = "#e6dfbf", ['e'] = "#faf1cb", ['L'] = "#6c634c" }),
         ["dog"] = new(new[]
         {
             "........DD...",

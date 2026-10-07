@@ -48,7 +48,7 @@ static class Items
         new("rod_iron", "Iron rod", "rod", "Wider still, faster bites, better luck with rare fish.", Icon: "rod", Tint: "#b9c4cc"),
         new("rod_crystal", "Crystal rod", "rod", "Glowing and light. Rare fish can't resist it.", Icon: "rod", Tint: "#7fe8ff"),
         new("rod_ancient", "Ancient rod", "rod", "Made with abyssite. The rod for a fish older than the islands.", Icon: "rod", Tint: "#9b6be0"),
-        new("boat", "Sailboat", "tool", "Sail from Pip's jetty on Saltmere to places the bridges don't reach.", Icon: "boat"),
+        new("boat", "Sailboat", "tool", "At Pip's or Starfall's jetty, use <alt> to take the helm. Steer with <move> toward Amihan in the east; <act> lands on shore.", Icon: "boat"),
         new("spear", "Fishing spear", "tool", "At reef shallows (coral shallows, the atoll lagoon) press <spear> to spearfish.", Icon: "spear"),
         new("copper_reel", "Copper reel", "tackle", "The catch meter fills 15% faster.", Icon: "reel", Tint: "#d9823f"),
         new("iron_reel", "Iron reel", "tackle", "The catch meter fills 30% faster.", Icon: "reel", Tint: "#c9d4dc"),
@@ -300,6 +300,9 @@ static class Items
 
     public static readonly Dictionary<string, AnimalKind> Animals = new()
     {
+        ["carabao"] = new("carabao", "carabao", 9, "The carabao lowers its broad horns and leans into your hand.", null, null),
+        ["tarsier"] = new("tarsier", "Philippine tarsier", 17, "You stay back. Two enormous eyes watch you from the shade.", null, null),
+        ["hornbill"] = new("hornbill", "rufous hornbill", 21, "You watch quietly as the hornbill tilts its bright bill toward the canopy.", null, null),
         ["dog"] = new("dog", "Biscuit", 26, "Biscuit wags his whole body.", "wood", "Biscuit drops a stick at your feet. (+1 wood)"),
         ["chicken"] = new("chicken", "chicken", 18, "The chicken clucks and lets you pat it.", "egg", "The chicken has laid an egg for you. (+1 egg)"),
         ["sheep"] = new("sheep", "sheep", 12, "The sheep leans into your hand. Its fleece is wonderfully warm.", "wool", "You gently gather some loose wool. (+1 wool)"),
@@ -313,7 +316,10 @@ static class Items
         ("dog", 180, 118), ("chicken", 205, 128), ("chicken", 215, 135), ("chicken", 225, 122),
         ("sheep", 530, 125), ("sheep", 700, 60), ("sheep", 720, 130), ("sheep", 600, 140),
         ("cat", 640, 362), ("cat", 735, 440),
-        ("pig", 95, 330), ("pig", 230, 380), ("pig", 255, 440)
+        ("pig", 95, 330), ("pig", 230, 380), ("pig", 255, 440),
+        ("carabao", 1605, 267), ("carabao", 1705, 247),
+        ("tarsier", 1875, 577), ("tarsier", 1965, 587),
+        ("hornbill", 2075, 107), ("hornbill", 1935, 607)
     };
 }
 

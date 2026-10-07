@@ -24,6 +24,7 @@ static class Music
         ["dunes"] = new(62, PhrygianDominant, 84, new[] { (0, Maj), (1, Maj), (0, Maj), (10, Min) }, "pluck", "tri", null, true, 3, 0.6f, 0.07f),
         ["mire"] = new(55, PentatonicMajor, 100, new[] { (0, Maj), (9, Min), (5, Maj), (7, Maj) }, "marimba", "tri", null, true, 4, 0.75f, 0.1f),
         ["atoll"] = new(64, Major, 112, new[] { (0, Maj), (7, Maj), (9, Min), (5, Maj) }, "steel", "pluck", null, true, 5, 0.8f, 0.08f),
+        ["amihan"] = new(62, PentatonicMajor, 104, new[] { (0, Maj), (5, Maj), (9, Min), (7, Maj) }, "marimba", "pluck", null, true, 19, 0.75f, 0.08f),
         ["cave"] = new(45, Minor, 60, new[] { (0, Min), (0, Min), (8, Maj), (7, Min) }, "bell", "sine", "pad", false, 6, 0.25f, 0.08f),
         ["home"] = new(65, Major, 80, new[] { (0, Maj), (5, Maj), (9, Min), (7, Maj) }, "musicbox", "sine", null, false, 7, 0.55f, 0.08f),
         // The fight with Tidemane: fast, minor and driving.

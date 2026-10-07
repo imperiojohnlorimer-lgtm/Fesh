@@ -27,6 +27,7 @@ partial class Game
     List<Box> Solids()
     {
         var list = StaticSolids();
+        if (scene == "world") list.AddRange(IslandSolids());
         foreach (var b in SceneBuilds()) if (BuildBox(b) is Box r) list.Add(r);
         if (scene == "cave")
             foreach (var n in nodes) if (!NodeMined(n)) list.Add(new Box(n.X * T + 1, n.Y * T + 2, 8, 7));
@@ -96,6 +97,8 @@ partial class Game
             if (BuildAt(tx + i, ty) != null) return "Something is already here";
         }
         var area = new Box(tx * T, ty * T, d.W * T, T);
+        if (scene == "world" && IslandSolids().Any(b => b.Overlaps(area))) return "Keep the island landmarks clear";
+        if (scene == "world" && Islanders.Any(n => area.Overlaps(new Box(n.x - 26, n.y - 38, 52, 62)))) return "Keep the village paths clear";
         if (StaticSolids().Any(r => area.Overlaps(new Box(r.X - 3, r.Y - 3, r.W + 6, r.H + 6)))) return "No room here";
         if (scene == "world" && Dist(tx * T + 5, ty * T + 5, MouthDoorX, MouthDoorY) < 24) return "Keep the cave entrance clear";
         if (scene == "world" && area.Overlaps(new Box(TomasHomeX - 6, TomasHomeY - 6, 13, 9))) return "Keep Tomas's spot clear";
@@ -196,6 +199,7 @@ partial class Game
 
     void EnterBuild()
     {
+        if (Aboard) { Toast("Land your boat before building."); return; }
         if (mode == "panel") ClosePanels();
         if (boss != null) { Sfx.Play("nope"); Toast("Not in the middle of a fight!"); return; }
         if (mode != "play")
@@ -231,6 +235,7 @@ partial class Game
 
     void ToggleBuild()
     {
+        if (Aboard) { Toast("Land your boat before building."); return; }
         if (mode == "build") ExitBuild();
         else EnterBuild();
     }

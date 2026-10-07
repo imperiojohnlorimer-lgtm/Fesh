@@ -12,7 +12,7 @@ sealed record Clue(string Title, string Text, string Finding);
 // a short cast lands in the shallows, a long one in deep water. Weather ("rain", "storm", "clear") and FullMoon limit
 // when it bites. Legend fish bite only once, and only on their Bait (if they name one).
 sealed record CommonFish(string Id, string Name, float Difficulty, int Weight = 4, bool Rare = false, string Time = "any",
-    float Kg = 1, string Style = "dart", string Depth = "any", string Weather = null, bool FullMoon = false, bool Legend = false, string Bait = null);
+    float Kg = 1, string Style = "dart", string Depth = "any", string Weather = null, bool FullMoon = false, bool Legend = false, string Bait = null, int Attack = 0);
 
 // A set of four fish. While all four are on show in your aquariums, its Perk applies.
 sealed record AquaSet(string Id, string Name, string[] Fish, string Perk);
@@ -99,7 +99,8 @@ static class Data
         new("frost", "Frostfang Isle", "Snow", "Frostfang Isle. Snow crunches underfoot."),
         new("dunes", "Sunscald Dunes", "Desert", "Sunscald Dunes. The air shimmers with heat."),
         new("mire", "Mirewood", "Jungle", "Mirewood. Everything here is green and dripping."),
-        new("atoll", "Starfall Atoll", "Tropical", "Starfall Atoll. Warm water, white sand, and something big out past the reef.")
+        new("atoll", "Starfall Atoll", "Tropical", "Starfall Atoll. Warm water, white sand, and something big out past the reef."),
+        new("amihan", "Amihan Archipelago", "Tropical", "Amihan. Palm villages, limestone lagoons, mangroves and volcanic shores.")
     };
 
     // Tidemane, the hippocamp of the Starwell: fished up and fought on the atoll, then ridden as a mount.
@@ -112,6 +113,30 @@ static class Data
 
     public static readonly Dictionary<string, CommonFish[]> Common = new()
     {
+        ["amihanpond"] = new CommonFish[]
+        {
+            new("bangus", "Bangus (milkfish)", 1.3f, Kg: 1.8f, Style: "jumper"),
+            new("banak", "Banak (mullet)", 1.2f, Kg: .8f),
+            new("kitang", "Kitang (spotted scat)", 1.4f, Kg: .5f, Style: "bottom")
+        },
+        ["karstlagoon"] = new CommonFish[]
+        {
+            new("lapu_lapu", "Lapu-lapu (grouper)", 1.9f, Kg: 4f, Style: "bottom"),
+            new("maya_maya", "Maya-maya (snapper)", 1.7f, Kg: 2.5f),
+            new("talakitok", "Talakitok (trevally)", 2.4f, Weight: 2, Rare: true, Kg: 9f, Style: "runner", Attack: 12)
+        },
+        ["bakawanpool"] = new CommonFish[]
+        {
+            new("hito", "Hito (catfish)", 1.5f, Kg: 1.2f, Style: "bottom"),
+            new("dalag", "Dalag (snakehead)", 2f, Kg: 2f, Style: "dart", Attack: 8),
+            new("amihan_mudskipper", "Mangrove mudskipper", 1.1f, Kg: .08f, Depth: "shallow", Style: "jumper")
+        },
+        ["bagareef"] = new CommonFish[]
+        {
+            new("tanigue", "Tanigue (mackerel)", 2.6f, Kg: 12f, Style: "runner", Attack: 14),
+            new("yellowfin_tuna", "Yellowfin tuna", 2.5f, Kg: 35f, Style: "runner", Depth: "deep"),
+            new("amihan_barracuda", "Great barracuda", 2.9f, Weight: 2, Rare: true, Kg: 18f, Style: "dart", Attack: 18)
+        },
         ["lagoon"] = new CommonFish[]
         {
             new("pond_perch", "Pond perch", 1f, Kg: 0.4f, Depth: "shallow"),
@@ -192,7 +217,8 @@ static class Data
         ["frost"] = new CommonFish[] { new("king_crab", "King crab", 1f, Kg: 3f) },
         ["dunes"] = new CommonFish[] { new("ghost_crab", "Ghost crab", 1f, Kg: 0.3f) },
         ["mire"] = new CommonFish[] { new("crayfish", "Crayfish", 1f, Kg: 0.15f) },
-        ["atoll"] = new CommonFish[] { new("spiny_lobster", "Spiny lobster", 1f, Kg: 2.5f) }
+        ["atoll"] = new CommonFish[] { new("spiny_lobster", "Spiny lobster", 1f, Kg: 2.5f) },
+        ["amihan"] = new CommonFish[] { new("alimasag_crab", "Alimasag (blue swimming crab)", 1f, Kg: .5f) }
     };
 
     public static readonly CommonFish[] AllCommon = Common.Values.SelectMany(v => v).Concat(PotCatch.Values.SelectMany(v => v)).ToArray();
@@ -234,6 +260,10 @@ static class Data
 
     public static readonly Spot[] Spots =
     {
+        new("amihanpond", "Village pond", "Fish the village pond", 1640, 240, 39, "amihan"),
+        new("karstlagoon", "Karst lagoon", "Fish the limestone lagoon", 2050, 170, 39, "amihan"),
+        new("bakawanpool", "Mangrove pool", "Fish the mangrove pool", 1900, 540, 44, "amihan"),
+        new("bagareef", "Baga reef", "Fish the volcanic reef", 2315, 307, 36, "amihan"),
         new("lagoon", "The lagoon", "Fish in the lagoon", 100, 66, 38),
         new("rocks", "Rocky shore", "Fish off the rocky shore", 205, 24, 24),
         new("wreck", "Old wreck", "Fish by the old wreck", 76, 164, 26),

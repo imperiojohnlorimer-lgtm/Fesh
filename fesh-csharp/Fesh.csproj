@@ -9,7 +9,7 @@
     <RootNamespace>Fesh</RootNamespace>
     <AssemblyName>Fesh</AssemblyName>
     <Product>Fesh</Product>
-    <Version>1.8.0</Version>
+    <Version>1.9.1</Version>
     <ApplicationIcon>Assets\fesh.ico</ApplicationIcon>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>

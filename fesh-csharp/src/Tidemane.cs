@@ -408,6 +408,7 @@ partial class Game
     // Close by, you hop on. From further away, a whistle brings it galloping (or swimming) over.
     void Mount()
     {
+        if (Aboard) { Toast("Land the boat before calling Tidemane."); return; }
         bool near = Dist(player.X, player.Y, state.mountX, state.mountY) < 26;
         if (!near)
         {

@@ -4,7 +4,7 @@ namespace Fesh;
 
 partial class Game
 {
-    // Biome index: 0 Saltmere (temperate), 1 Frostfang (snow), 2 Sunscald (desert), 3 Mirewood (jungle). Matches Data.Biomes.
+    // Biomes: Saltmere, Frostfang, Sunscald, Mirewood, Starfall, Amihan. Matches Data.Biomes.
     // map is the current scene's tiles; it points at worldMap whenever the player is outdoors.
     char[,] map = new char[ROWS, COLS];
     readonly byte[,] biome = new byte[ROWS, COLS];
@@ -41,8 +41,8 @@ partial class Game
     readonly HashSet<(int, int)> hoofprints = new();
     const float PipX = 210, PipY = 101;
     readonly HashSet<(int, int)> bridgeSet = new();
-    static readonly char[] InnerGround = { 'g', 'n', 'D', 'j', 's' }, ShoreGround = { 's', 'e', 's', 's', 's' }, TreeKind = { 't', 'f', 'c', 'h', 'h' };
-    static readonly float[] TreeDensity = { 0, 0.12f, 0.05f, 0.24f, 0.16f }, BoulderDensity = { 0, 0.025f, 0.03f, 0.015f, 0 };
+    static readonly char[] InnerGround = { 'g', 'n', 'D', 'j', 's', 'j' }, ShoreGround = { 's', 'e', 's', 's', 's', 's' }, TreeKind = { 't', 'f', 'c', 'h', 'h', 'h' };
+    static readonly float[] TreeDensity = { 0, 0.12f, 0.05f, 0.24f, 0.16f, 0.12f }, BoulderDensity = { 0, 0.025f, 0.03f, 0.015f, 0, 0.015f };
     static readonly HashSet<char> Land = new() { 's', 'g', 'p', 't', 'n', 'e', 'i', 'D', 'j', 'f', 'c', 'h', 'R' };
     static readonly HashSet<char> Water = new() { '~', 'w', 'l', 'T', 'x', 'r', 'o', 'm', 'I', 'k' };
 
@@ -103,6 +103,11 @@ partial class Game
             {
                 char t;
                 byte bi = 0;
+                if (x >= EastStart || y >= 56)
+                {
+                    map[y, x] = '~'; biome[y, x] = x >= EastStart ? (byte)5 : (byte)0;
+                    continue;
+                }
                 if (x < 32 && y < 18)
                 {
                     // Saltmere, exactly as it was when it was the whole world.
@@ -248,6 +253,7 @@ partial class Game
                 Place(x, y, palm ? 'h' : boulder ? 'R' : bush ? 'y' : TreeKind[bi]);
             }
 
+        GenerateArchipelago();
         RenderBase();
         mapTexDirty = true;
     }
@@ -562,6 +568,7 @@ partial class Game
 
     void DrawPlayer()
     {
+        if (Aboard) { DrawHelmsman(); return; }
         int x = (int)Math.Floor(player.X + 0.5), y = (int)Math.Floor(player.Y + 0.5);
         bool moving = player.Moving && mode is "play" or "build";
         int step = moving ? (int)(player.WalkT * 8) % 2 : 0;
@@ -937,17 +944,6 @@ partial class Game
         if (!PipOpen) { pix.Rect(X + 2, Y + 11, 18, 6, "#b9a27a"); pix.Rect(X + 2, Y + 11, 18, 1, "#d2bf98"); pix.Rect(X + 9, Y + 12, 1, 5, "#a08a62"); }
     }
 
-    void DrawBoat(float x, float y, float t)
-    {
-        int bob = (int)MathF.Round(MathF.Sin(t * 2) * 0.8f);
-        int X = (int)x - 8, Y = (int)y - 4 + bob;
-        pix.Rect(X, Y + 6, 16, 1, "rgba(230,246,250,0.6)");
-        pix.Rect(X + 1, Y + 3, 14, 3, "#8a5f36"); pix.Rect(X + 2, Y + 6, 12, 1, "#6b4a2b"); pix.Rect(X + 1, Y + 3, 14, 1, "#b58250");
-        pix.Rect(X + 7, Y - 10, 1, 13, "#5b3a24");
-        for (int i = 0; i < 9; i++) pix.Rect(X + 7 - i * 6 / 9, Y - 9 + i, i * 6 / 9, 1, "#f2efe6");
-        pix.Rect(X + 8, Y - 9, 3, 2, "#e04b3a");
-    }
-
     // A snowy rock arch over a dark opening, on Frostfang's north shore.
     void DrawCaveMouth()
     {
@@ -977,9 +973,10 @@ partial class Game
             if (Visible(a.X, a.Y)) list.Add((a.Y, () => DrawAnimal(a)));
         if (Visible(MouthX * T, MouthY * T)) list.Add(((MouthY + 2) * T, DrawCaveMouth));
         if (Visible(PipX, PipY)) { if (PipOpen) list.Add((PipY, DrawPip)); list.Add((PipY + 9, () => DrawStall(t))); }
-        if (Has("boat") > 0)
+        AddArchipelagoObjects(list);
+        if (Has("boat") > 0 && !Aboard)
         {
-            var (bx, by) = state.boatAt == "atoll" ? (AtollJettyX - 14, AtollJettyY) : (SaltJettyX + 14, SaltJettyY);
+            var (bx, by) = BoatPosition();
             if (Visible(bx, by)) list.Add((by - 6, () => DrawBoat(bx, by, t)));
         }
         if (Visible(160, 60)) { list.Add((69, DrawHut)); list.Add((FireY + 2, () => DrawFire(t))); }

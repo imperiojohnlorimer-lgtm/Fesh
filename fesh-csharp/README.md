@@ -30,10 +30,10 @@ These are the defaults. Every one of them can be changed in the menu (Esc, then 
 
 | Keys | Action |
 |------|--------|
-| WASD / arrow keys | Walk |
+| WASD / arrow keys | Walk, or steer your boat while aboard |
 | E or Space | Talk, fish, chop, mine, pet, use, place |
 | Hold E (or the mouse) at a spot | Power up a cast; let go to throw |
-| F | Cook at a campfire, or throw chum at a fishing spot |
+| F | Cook, throw chum, or take the helm at Pip's / Starfall's jetty |
 | G | Spearfish (on a reef, with a spear) |
 | T | Tackle box |
 | Hold Space (or mouse) | Lift the green bar while reeling; tap it for leaps and pumps |
@@ -206,6 +206,37 @@ Make a **sailboat** at a workbench from 20 wood, 4 iron bars and sailcloth from 
 **Pip's jetty** (Saltmere's east beach) and press E to sail to Starfall Atoll, and back from the atoll's jetty.
 You can't sail in a storm; wait for it to pass.
 
+Press **F at either jetty** to take the helm and explore freely. Steer with **WASD / arrow keys** (or the gamepad
+stick). Come alongside a beach or jetty and press **E to land**; E beside your moored boat boards it again.
+**Tab** opens the sea chart, including the boat's location. Boat positions and an ongoing voyage survive saving.
+A storm prevents launching, but a boat already at sea can still steer home at reduced speed.
+The banca-inspired boat has twin bamboo outriggers, a cream sail and a seated fisher at the helm.
+The hull and rider bob together, with a trailing wake while you steer.
+
+## Amihan Archipelago
+New in **1.9.0**: a Philippine-inspired region across the open sea **east of Starfall Atoll**, with its own
+**Amihan chart tab**. Navigate around Starfall's coastline and continue east to the western village landing.
+There are no bridges or wading routes: use the boat or swim there on the secret mount, Tidemane.
+
+| Island | People and wildlife | Fishing |
+|---|---|---|
+| Amihan Village | Lira offers a daily meal; Niko requests two bangus. Carabao graze nearby. | Bangus, banak, kitang |
+| Luntian Karsts | Maya studies the limestone lagoon; rufous hornbills wander the trees. | Lapu-lapu, maya-maya, talakitok |
+| Bakawan Island | Tala watches the mangroves, tarsiers and hornbills. | Hito, dalag, mangrove mudskipper |
+| Baga Island | A volcanic island with a northern fishing jetty. | Tanigue, yellowfin tuna, great barracuda |
+
+Crab pots in the region catch **alimasag**. Catches use the existing records, size, selling, cooking and aquarium systems.
+The village has raised timber houses and woven hats; the region also has its own music.
+
+**Some fish fight back:** talakitok, dalag, tanigue and barracuda telegraph an attack with a red warning.
+Release the reel key **and mouse button** until it passes to duck. The normal reel timer pauses during the warning,
+so dodging does not cost your catch. Holding on takes health damage; shell armour reduces it. A knockout brings you
+to Lira in the village with 35 health and retrieves your owned boat to the village landing.
+
+The islands and combat are fictional. Fish naming draws on [BFAR's Philippine catch records](https://www.bfar.da.gov.ph/wp-content/uploads/2021/05/Species_and_volume_landed.pdf);
+wildlife references include [DENR's tarsier research](https://fasps.denr.gov.ph/projects/special-projects/) and
+[rufous hornbill information](https://ncr.denr.gov.ph/news-events/denr-meo-west-retrieves-luzon-rufous-hornbill-in-makati-city/).
+
 ## Tidemane (spoilers)
 Starfall Atoll hides a secret. A trail of hoofprints leads from the jetty into a ring of palms on the south-east side,
 where a gap opens onto **the Starwell**, a deep blue hole with a coral carving beside it. The Starwell stays off the
@@ -240,7 +271,7 @@ Tidemane. Rain adds its own patter. Like the sound effects, the music is compose
 no audio files. Turn it on or off from the pause menu.
 
 ## Health
-The heart bar (top left, under the clock) is your health. Only cave monsters and Tidemane hurt you. Health comes
+The heart bar (top left, under the clock) is your health. Cave monsters, Tidemane and some Amihan fish can hurt you. Health comes
 back slowly while your food meter is above 30 and nothing has hit you for a few seconds, food heals half of what it
 fills, and resting restores 50. Starving wears health down, but never below 10. If it reaches zero in the caves you
 black out and wake up at the cave mouth with 35 health and 10% fewer coins. At the Starwell you wake on the atoll's
@@ -362,6 +393,9 @@ taking down a shack also packs up everything inside it.
 - `src/Weather.cs`: the daily forecast, rain and storms coming and going, closed bridges
 - `src/Clock.cs`: the island clock: day and night, dusk and dawn, a new day at 6 AM, regrowing trees
 - `src/Tidemane.cs`: the Starwell's secret, the fight with Tidemane, and riding it
+- `src/Archipelago.cs`: Amihan's four islands, village NPCs, landmarks and regional scenery
+- `src/Boating.cs`: boat steering, boarding, safe landings and persistent moorings
+- `src/FishAttacks.cs`: telegraphed fish attacks, dodging and health damage
 - `src/Music.cs`: the music, composed by code on a background thread at startup
 - `src/UiTrade.cs`: the shop and aquarium panels
 - `src/Build.cs`: collision, placing and removing pieces, driftwood and stone spawning
@@ -377,6 +411,7 @@ taking down a shack also packs up everything inside it.
 - `src/Sfx.cs`: sound effects, synthesized at startup
 - `src/State.cs`: the save file and the three save slots
 - `src/AutoTest.cs`: debug-only scripted play-through (see below)
+- `src/AmihanTests.cs`: navigation, village, wildlife, map and fish-attack checks
 - `installer/Fesh.wxs`: the installer definition
 
 ## Automated check

@@ -281,5 +281,5 @@ partial class Game
         else Toast(k.Pet + (k.Gift != null ? " It has nothing more for you today." : ""), 3);
     }
 
-    static string AnimalLabel(Animal a) => a.Kind == "dog" ? "Pet Biscuit" : $"Pet the {Items.Animals[a.Kind].Name}";
+    static string AnimalLabel(Animal a) => a.Kind == "dog" ? "Pet Biscuit" : $"{(a.Kind is "tarsier" or "hornbill" ? "Observe" : "Pet")} the {Items.Animals[a.Kind].Name}";
 }

@@ -594,6 +594,19 @@ partial class Game
         fish = null; reel = null; pointerHold = false;
         panel = null;
         mode = "play";
+        if (InAmihan && boss == null)
+        {
+            LeaveMount();
+            state.aboard = false;
+            FadeThrough(() =>
+            {
+                player.X = 1595; player.Y = 197; player.Face = "down";
+                state.hp = 35;
+                if (Has("boat") > 0) { state.boatX = 1483; state.boatY = 217; }
+                Save();
+            }, () => Toast("Lira found you by the water. You wake in Amihan Village; your boat is at the western landing. Eat and rest before another fierce catch.", 7));
+            return;
+        }
         if (boss != null)
         {
             boss = null;

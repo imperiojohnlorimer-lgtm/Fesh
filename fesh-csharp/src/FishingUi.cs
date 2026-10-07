@@ -36,6 +36,16 @@ partial class Game
         if (Wears("fish_finder") && FinderSpot() is string spot) DrawFinder(spot);
     }
 
+    // Draw after toasts so a forecast or catch message cannot cover a combat warning.
+    void DrawFishAttackWarning()
+    {
+        if (mode != "reeling" || reel?.AttackWarning is not > 0) return;
+        const float x = 350, y = 118, w = 580;
+        Gfx.Box(x, y, w, 76, Pal.C("#572b35"), Pal.C("#ff9a8a"), 3, 6);
+        Gfx.Text("FISH ATTACK! Release to duck", x + 22, y + 12, FontKind.Ui700, 26, Pal.Paper);
+        Gfx.Rect(x + 22, y + 53, (int)((w - 44) * reel.AttackWarning / 1.25f), 8, Pal.Lantern, 2);
+    }
+
     // A power bar over your head, split into shallow, middle and deep water.
     void DrawChargeMeter()
     {

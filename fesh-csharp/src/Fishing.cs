@@ -31,8 +31,8 @@ partial class Game
         && (!f.FullMoon || FullMoon)
         && (!f.Legend || (state.commons.GetValueOrDefault(f.Id) == 0 && (f.Bait == null || f.Bait == bait)));
 
-    static readonly HashSet<string> FreshSpots = new() { "lagoon", "oasis", "swamp", "icehole" };
-    static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff", "starwell" };
+    static readonly HashSet<string> FreshSpots = new() { "lagoon", "oasis", "swamp", "icehole", "amihanpond", "bakawanpool" };
+    static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff", "starwell", "karstlagoon", "bagareef" };
     static readonly HashSet<string> CarpLike = new() { "mud_carp", "moon_carp", "old_whiskers", "oasis_tilapia", "parrotfish" };
 
     // Fish that go for a bait are three times as likely to bite on it.
@@ -498,6 +498,7 @@ partial class Game
         var r = reel;
         bool hold = ReelHeld(), tap = reelTap;
         reelTap = false;
+        if (UpdateFishAttack(r, dt, hold)) return;
         if (r.Roll.Boss)
         {
             // Tidemane switches how it fights every few seconds (never in the middle of a run or a leap).

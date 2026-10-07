@@ -35,7 +35,7 @@ partial class Game
         // Clicking another window during the run mustn't pause it: the run always has focus, as far as the game knows.
         Settings.Data.pauseUnfocused = false;
         Inp.ScriptFocused = true;
-        script = Script();
+        script = Environment.GetEnvironmentVariable("FESH_AMIHAN_TEST") == "1" ? AmihanScript().GetEnumerator() : Script();
     }
 
     partial void AutoTestTick()
@@ -419,7 +419,7 @@ partial class Game
             Check($"{Data.Biomes[b].Name} can be walked to", reach.Any(t => biome[t.Item2, t.Item1] == bb && Buildable.Contains(map[t.Item2, t.Item1])));
         }
         Check("Starfall Atoll can't be walked to (boat only)", !reach.Any(t => biome[t.Item2, t.Item1] == 4));
-        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && s.Biome != "atoll"))
+        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && s.Biome is not ("atoll" or "amihan")))
         {
             bool ok = reach.Any(t => { float cx = t.Item1 * T + 5, cy = t.Item2 * T + 7; return Dist(cx, cy, s.X, s.Y) < s.R - 2 && CanStand(cx, cy); });
             Check($"{s.Label} ({Data.Biomes.First(b => b.Id == s.Biome).Name}) can be fished from land", ok);
@@ -727,8 +727,9 @@ partial class Game
 
         // Health comes back while fed, and food heals
         state.hp = 50; state.food = 80; lastHitT = time - 10;
+        float healingStarted = time;
         yield return 120;
-        Check($"health slowly recovers while you're fed ({state.hp:0.0})", state.hp > 50.6f && state.hp < 52);
+        Check($"health slowly recovers while you're fed ({state.hp:0.0})", state.hp > 50.6f && Math.Abs(state.hp - 50 - (time - healingStarted) * .5f) < .05f);
         state.hp = 50; state.food = 50; Give("grilled_fish");
         Eat("grilled_fish");
         Check($"eating heals too ({state.hp:0.0} health, toast: {toastMsg})", state.hp >= 62 && state.hp <= 63 && toastMsg.Contains("health"));
@@ -1269,7 +1270,9 @@ partial class Game
         Give("waders");
         player.X = 100; player.Y = 98; player.Face = "up"; yield return 2;
         Check("waders let you walk into shallow water", CanStand(100, 75, true) && !CanStand(100, 75));
-        Inp.Hold(KeyboardKey.Up, true); yield return 40; Inp.Hold(KeyboardKey.Up, false); yield return 2;
+        Inp.Hold(KeyboardKey.Up, true);
+        for (int steps = 0; steps < 60 && !InWater; steps++) yield return 1;
+        Inp.Hold(KeyboardKey.Up, false); yield return 2;
         Check($"wading out into the lagoon reaches deeper water ({player.X:0},{player.Y:0})", InWater && CastDepth(0) == 1);
         pendingShot = "51-wading"; yield return 2;
         player.X = 160; player.Y = 115; yield return 2;
@@ -1380,7 +1383,7 @@ partial class Game
         Inp.Tap(KeyboardKey.J); yield return 3;
         dexTab = "log"; logPage = 1; yield return 20;
         pendingShot = "59-fishlog-frost"; yield return 2;
-        logPage = 5; yield return 10;
+        logPage = Data.Biomes.Length; yield return 10;
         pendingShot = "60-fishlog-legends"; yield return 2;
         logPage = 0; dexTab = "creatures";
         Inp.Tap(KeyboardKey.Escape); yield return 3;
@@ -1573,7 +1576,10 @@ partial class Game
         Check($"riding is much faster than walking ({player.X - rx0:0} px in half a second)", player.X - rx0 > 36);
         pendingShot = "72-riding"; yield return 2;
         player.X = AtollJettyX + 4; player.Y = AtollJettyY + 1; player.Face = "left"; yield return 2;
-        Inp.Hold(KeyboardKey.Left, true); yield return 45; Inp.Hold(KeyboardKey.Left, false); yield return 3;
+        Inp.Hold(KeyboardKey.Left, true);
+        // Frame rate varies during screenshot capture. Stop in the channel, before reaching the Dunes.
+        for (int steps = 0; steps < 60 && player.X > 862; steps++) yield return 1;
+        Inp.Hold(KeyboardKey.Left, false); yield return 3;
         Check($"it swims out to sea ({player.X:0},{player.Y:0}, {AreaName()})", Swimming && player.X < AtollJettyX - 20 && AreaName() == "Open sea");
         yield return 10;
         pendingShot = "73-swimming"; yield return 2;
@@ -1628,7 +1634,7 @@ partial class Game
         Inp.Tap(KeyboardKey.J); yield return 3;
         dexTab = "log"; logPage = 4; yield return 15;
         pendingShot = "76-fishlog-atoll"; yield return 2;
-        logPage = 5; yield return 10;
+        logPage = Data.Biomes.Length; yield return 10;
         pendingShot = "77-fishlog-legends"; yield return 2;
         logPage = 0; dexTab = "creatures";
         Inp.Tap(KeyboardKey.Escape); yield return 3;
@@ -1857,6 +1863,7 @@ partial class Game
         SaveFile.Clear(2);
 
         // Ending screen
+        foreach (int frames in AmihanScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;
