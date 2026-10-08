@@ -257,6 +257,13 @@ static class Gfx
     }
 
     public static void Circle(float x, float y, float r, Color c) => DrawCircleV(P(x, y), r * Z, c);
+    public static void Line(float x0, float y0, float x1, float y1, float thick, Color c) => DrawLineEx(P(x0, y0), P(x1, y1), thick * Z, c);
+    // Either winding: raylib only fills counter-clockwise triangles, so both are drawn.
+    public static void Triangle(float ax, float ay, float bx, float by, float cx, float cy, Color c)
+    {
+        DrawTriangle(P(ax, ay), P(bx, by), P(cx, cy), c);
+        DrawTriangle(P(ax, ay), P(cx, cy), P(bx, by), c);
+    }
 
     public static void Cork(float x, float y, float w, float h) =>
         DrawTexturePro(cork, new Rectangle(0, 0, w, h), S(x, y, w, h), Vector2.Zero, 0, Color.White);

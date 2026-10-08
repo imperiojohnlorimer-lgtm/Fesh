@@ -137,6 +137,7 @@ partial class Game
         foreach (var t in slotTex) if (t.Id != 0) UnloadTexture(t);
         AnimalArt.Shutdown();
         ItemArt.Shutdown();
+        FishArt.Shutdown();
         Gfx.Shutdown();
         Music.Shutdown();
         Sfx.Shutdown();
@@ -258,7 +259,8 @@ partial class Game
         else if (Bind.Pressed("ride")) ToggleRide();
         else if (BackPressed())
         {
-            if (mode == "panel") ClosePanels();
+            if (mode == "panel" && panel == "dex" && dexFish != null) dexFish = null;
+            else if (mode == "panel") ClosePanels();
             else if (mode == "catch") CloseCatch();
             else if (mode == "odd") CloseOdd();
             else if (mode == "legend") CloseLegend();
@@ -610,12 +612,14 @@ partial class Game
         Sfx.Play("ui");
         panel = which;
         mode = "panel";
+        if (which == "map") ChooseChart();
         SetPrompt("");
     }
 
     void ClosePanels()
     {
         panel = null;
+        dexFish = null;
         if (mode == "panel") mode = "play";
     }
 
@@ -977,6 +981,7 @@ partial class Game
                 if (Aboard) { state.boatX = player.X; state.boatY = player.Y; }
                 DiscoverArchipelago();
                 if (mode == "play") UpdateTroll(dt);
+                CheckPin();
             }
             // Walking down onto a doorway steps back outside.
             if (InHouse && dy > 0 && TileAt((int)(player.X / T), (int)((player.Y - 1.5f) / T)) == 'Y') { LeaveToWorld(); return; }
@@ -1013,6 +1018,7 @@ partial class Game
     {
         char tile = TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T));
         if (WaterTile(tile)) return;
+        ChartHere();
         byte b = PlayerBiome();
         // Setting foot on the atoll counts as a visit however you came (Sail, your own boat or Tidemane): it puts the
         // atoll on the map and opens Pip's hoofprints story and Tomas's atoll requests.
@@ -1054,6 +1060,8 @@ partial class Game
         // Where you'll be outdoors, so a tree that's due doesn't grow back on top of you (see RegrowBlocked).
         (player.X, player.Y) = state.scene == "world" ? (state.px, state.py) : state.scene == "cave" ? (MouthDoorX, MouthDoorY + 2) : (state.exitX, state.exitY);
         BuildMap();
+        state.charted ??= LegacyCharted();
+        mapTexDirty = true;
         SpawnAnimals();
         int sunk = RescueSunkBuilds();
         player.X = state.px; player.Y = state.py; player.Face = "down";

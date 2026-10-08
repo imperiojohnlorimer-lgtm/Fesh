@@ -666,6 +666,13 @@ partial class Game
             pix.Rect(x - 4, y - 4, 9, 2, "#6b4a2b"); pix.Rect(x - 3, y - 2, 7, 1, "#ffe28a");
             pix.Glow(x + 0.5, y - 2, 9, Pal.Rgba(255, 226, 138, 0.35f));
         }
+        else if (FishArt.Looks.ContainsKey(heldItem))
+        {
+            // Its own picture, wriggling (big ones are held up a bit bigger).
+            bool flip = (int)(time * 7) % 2 == 0;
+            int big = state.big.GetValueOrDefault(heldItem) > 0 && Data.FishById.TryGetValue(heldItem, out var bf) && bf.Kg > 5 ? 1 : 0;
+            FishArt.Draw(pix, heldItem, x - 6 - big, y - 2 - big, 13 + big * 2, 8 + big * 2, flip);
+        }
         else
         {
             string tint = Items.ById.TryGetValue(heldItem, out var d) ? d.Tint ?? "#cfe8ee" : "#cfe8ee";

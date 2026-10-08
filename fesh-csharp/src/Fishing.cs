@@ -435,6 +435,7 @@ partial class Game
 
     void GotAway(string msg)
     {
+        if (mode == "reeling" && fish?.Roll is { Boss: false, Exotic: false, Odd: false, Chest: false } seen) MarkSeen(seen.Id);
         if (fish?.Roll is { Exotic: true }) state.pity[fish.Spot] = 2;
         if (fish?.Roll is { Boss: true })
         {
@@ -745,6 +746,7 @@ partial class Game
         else if (record && !first) Floater("New record!", fx, fy - 7, "#7fd36b");
         GainXp(4 + (int)MathF.Round(f.Difficulty * 4) + (f.Rare ? 8 : 0) + (f.Legend ? 60 : 0) + (perfect ? 3 : 0) + (trophy ? 5 : 0));
         DerbyCatch(f, kg);
+        if (first) CheckPageDone(f.Id);
         return kg;
     }
 

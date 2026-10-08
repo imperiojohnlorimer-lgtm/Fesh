@@ -122,6 +122,27 @@ partial class Game
             ExportImage(img, path.Replace(".png", "-c.png"));
             UnloadImage(img);
         }
+        // Every fish: the Fish log's big picture, its silhouette and its bag icon.
+        {
+            var ids = FishArt.Looks.Keys.ToList();
+            int cols = 6, cw = 84, ch = 34, w = cols * cw, h = (ids.Count + cols - 1) / cols * ch;
+            var fishes = new Pix(w, h);
+            Array.Fill(fishes.Buf, Pal.C("#2a5a7a"));
+            for (int i = 0; i < ids.Count; i++)
+            {
+                int cx = i % cols * cw + 2, cy = i / cols * ch + 3;
+                FishArt.Draw(fishes, ids[i], cx, cy, FishArt.BigW, FishArt.BigH);
+                FishArt.Draw(fishes, ids[i], cx + 50, cy, 12, 12);
+                FishArt.Draw(fishes, ids[i], cx + 64, cy, 12, 12, silhouette: "#1d3550");
+                FishArt.Draw(fishes, ids[i], cx + 50, cy + 15, 11, 7, flip: true);
+            }
+            var img = GenImageColor(w, h, Color.Black);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++) ImageDrawPixel(ref img, x, y, fishes.Buf[y * w + x]);
+            ImageResizeNN(ref img, w * 3, h * 3);
+            ExportImage(img, path.Replace(".png", "-fish.png"));
+            UnloadImage(img);
+        }
         // Two halves (front and back, then the sides), each small enough to judge pixel by pixel.
         for (int half = 0; half < 2; half++)
         {

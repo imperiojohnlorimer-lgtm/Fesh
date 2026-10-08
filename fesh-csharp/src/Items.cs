@@ -344,7 +344,9 @@ static class ItemArt
     {
         if (cache.TryGetValue(itemId, out var tex)) return tex;
         var p = new Pix(S, S);
-        if (Items.ById.TryGetValue(itemId, out var d)) Draw(p, d.Icon ?? itemId, d.Tint);
+        // Every fish has its own picture (FishArt).
+        if (FishArt.Looks.ContainsKey(itemId)) FishArt.Draw(p, itemId, 0, 0, S, S);
+        else if (Items.ById.TryGetValue(itemId, out var d)) Draw(p, d.Icon ?? itemId, d.Tint);
         else Draw(p, itemId, null);
         tex = Gfx.ToTexture(p.Buf, S, S, TextureFilter.Point);
         cache[itemId] = tex;

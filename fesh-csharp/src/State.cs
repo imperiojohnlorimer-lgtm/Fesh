@@ -77,6 +77,11 @@ sealed class State
     public Dictionary<string, int> pots = new();      // crab pot "x,y" -> the day it was set or last hauled
     public int derbyDay, derbyWins;                  // the last day you entered Pip's derby, and how many you've won
     public int chests, perfects;                     // sunken chests opened, perfect hooks
+    public List<string> seen = new();                // fish that got away mid-fight before you ever caught one (a silhouette in the Fish log)
+
+    // The chart
+    public List<string> charted;                     // islands drawn on the chart (Game.RegionAt); null in older saves (StartGame fills it in)
+    public float pinX, pinY;                         // a pin dropped on the chart (0,0: none)
 
     // Tidemane, the mount from the Starwell
     public bool tamed;                               // won the fight at the Starwell

@@ -17,6 +17,7 @@ partial class Game
         if (mode == "create") { DrawCreator(); return; }
         bool title = mode == "title";
         if (!title) DrawHud();
+        if (!title) DrawPinCompass();
         if (!title) DrawFishingUi();
         if (!title && (BossFighting || BossOnLine)) DrawBossBar();
         if (mode == "build") DrawBuildBar();
@@ -425,13 +426,15 @@ partial class Game
     static readonly Dictionary<string, string> BiomeColor = new() { ["saltmere"] = "#5d9b45", ["frost"] = "#8fc3d6", ["dunes"] = "#e0a85a", ["mire"] = "#3f7d3a", ["atoll"] = "#2bb3a3", ["amihan"] = "#d59c4c" };
     int logPage;   // one page per biome, then legends, odd catches and records
 
-    // The Fish log for an island: each fishing spot's fish, then what turns up in crab pots there.
-    List<(string head, List<CommonFish> fish)> LogGroups(int page)
+    // The Fish log for an island: each fishing spot's fish, then what turns up in crab pots there. A filter (the Fish
+    // log's buttons, dexFilter by default) leaves out what doesn't match, and any spot left with nothing.
+    List<(string head, List<CommonFish> fish)> LogGroups(int page, string filter = null)
     {
         var b = Data.Biomes[page];
-        var groups = Data.Spots.Where(s => s.Biome == b.Id).Select(s => (SpotKnown(s) ? s.Label : "???", Data.Common[s.Id].ToList())).ToList();
-        groups.Add(("Crab pots", Data.PotCatch[b.Id].ToList()));
-        return groups;
+        string use = filter ?? dexFilter;
+        var groups = Data.Spots.Where(s => s.Biome == b.Id).Select(s => (SpotKnown(s) ? s.Label : "???", Data.Common[s.Id].Where(f => PassesFilter(f, use)).ToList())).ToList();
+        groups.Add(("Crab pots", Data.PotCatch[b.Id].Where(f => PassesFilter(f, use)).ToList()));
+        return groups.Where(g => g.Item2.Count > 0).ToList();
     }
 
     // When and how a fish bites. Before you've caught it, only the hints that help you find it.
@@ -466,14 +469,23 @@ partial class Game
         return cols;
     }
 
+    // A row of the Fish log: its picture (a silhouette if you've only seen one get away), a green dot if it's biting
+    // right now, and a click opens its card.
     void DrawFishRow(CommonFish f, float x, float y, float w)
     {
         int n = state.commons.GetValueOrDefault(f.Id);
-        bool known = n > 0;
+        bool known = n > 0, seen = Seen(f.Id);
+        if (Gfx.Hover(x - 6, y, w, 26)) Gfx.Rect(x - 6, y, w - 4, 26, Pal.C("rgba(29,79,120,0.07)"), 3);
+        if (Gfx.Click(x - 6, y, w - 4, 26)) { dexFish = f.Id; Sfx.Play("blip"); }
+#if DEBUG
+        Gfx.Seen["fish:" + f.Id] = new Rectangle(x - 6, y, w - 4, 26);   // so the autotest can click a row
+#endif
         if (known) DrawIcon(f.Id, x, y + 1, 22);
+        else if (seen) DrawTexturePro(ItemArt.Icon(f.Id), new Rectangle(0, 0, 12, 12), Gfx.S(x, y + 1, 22, 22), Vector2.Zero, 0, Pal.C("#1d3550"));
         else Gfx.Rect(x + 2, y + 3, 18, 18, Pal.C("rgba(0,0,0,0.08)"), 4);
-        var c = !known ? Pal.C("#9a8a70") : f.Legend ? Pal.C("#9a6a1a") : f.Rare ? Rust : Pal.PaperInk;
-        Gfx.Text(Gfx.Ellipsize(known ? $"{f.Name} ×{n}" : "???", FontKind.Ui600, 17, 200), x + 30, y + 3, FontKind.Ui600, 17, c);
+        if (BitingNow(f)) { Gfx.Circle(x + 21, y + 4, 4.5f, Pal.C("#fffaf0")); Gfx.Circle(x + 21, y + 4, 3.2f, Pal.C("#3fae5a")); }
+        var c = !known && !seen ? Pal.C("#9a8a70") : !known ? Pal.C("#5a6a80") : f.Legend ? Pal.C("#9a6a1a") : f.Rare ? Rust : Pal.PaperInk;
+        Gfx.Text(Gfx.Ellipsize(known ? $"{f.Name} ×{n}" : seen ? $"{f.Name} (seen)" : "???", FontKind.Ui600, 17, 200), x + 30, y + 3, FontKind.Ui600, 17, c);
         string cond = Conditions(f, known);
         if (cond != "") Gfx.Text(Gfx.Ellipsize(cond, FontKind.Ui500, 14, w - 360), x + 240, y + 5, FontKind.Ui500, 14, Muted);
         if (state.records.TryGetValue(f.Id, out float kg))
@@ -495,6 +507,7 @@ partial class Game
     void DrawDex()
     {
         Backdrop();
+        if (dexFish != null) { DrawFishCard(); return; }
         const float nx = 50, nw = 1180, padT = 21, padR = 24, padB = 27, padL = 64, gap = 18;
         float innerW = nw - padL - padR;
         bool log = dexTab == "log";
@@ -519,7 +532,7 @@ partial class Game
         var groups = log && logPage < Data.Biomes.Length ? LogGroups(logPage) : new();
         var heights = groups.Select(g => (int)(headH + g.fish.Count * rowH + 8)).ToList();
         var cols = TwoColumns(heights);
-        float logH = logPage < Data.Biomes.Length ? cols.Max(c => c.Sum(i => heights[i] + cardGap)) : 380;
+        float logH = logPage < Data.Biomes.Length ? Math.Max(60, cols.Max(c => c.Sum(i => heights[i] + cardGap))) : 380;
 
         float contentH = log ? 50 + 34 + logH : cardH + 24 + 30 + 32;
         float h = padT + 46 + 10 + lead.Count * 28 + 16 + contentH + padB + 6;
@@ -572,6 +585,15 @@ partial class Game
             float w = Gfx.Measure(label, FontKind.Ui700, 18) + 30;
             var fill = logPage == p ? Pal.Lantern : p < Data.Biomes.Length ? Lighten(Pal.C(BiomeColor[Data.Biomes[p].Id]), 0.55f) : Pal.Sand;
             if (Button(label, bx, y, w, 40, FontKind.Ui700, 18, fill, Pal.Ink, 3, 2, 5)) { logPage = p; Sfx.Play("blip"); return; }
+            if (p < Data.Biomes.Length)
+            {
+                // How much of the island's page you've caught; a star once it's all done.
+                var all = PageFish(p);
+                float frac = all.Count(f => state.commons.GetValueOrDefault(f.Id) > 0) / (float)Math.Max(1, all.Count);
+                Gfx.Rect(bx + 8, y + 31, w - 16, 4, Pal.C("rgba(16,36,58,0.18)"), 2);
+                if (frac > 0) Gfx.Rect(bx + 8, y + 31, (w - 16) * frac, 4, frac >= 1 ? Pal.C("#c9962a") : Pal.C("#3fae5a"), 2);
+                if (frac >= 1) DrawIcon("star", bx + w - 14, y - 8, 20);
+            }
             bx += w + 8;
         }
         y += 50;
@@ -579,11 +601,28 @@ partial class Game
         var biggest = state.records.OrderByDescending(kv => kv.Value).FirstOrDefault();
         string stats = $"Fishing level {FishLevel}   ·   {kinds} of {Data.AllCommon.Length} kinds caught   ·   {trophies} {(trophies == 1 ? "trophy" : "trophies")}"
             + (biggest.Key != null ? $"   ·   Biggest: {Items.ById[biggest.Key].Name} ({Kg(biggest.Value)})" : "");
+        if (logPage < Data.Biomes.Length)
+        {
+            var all = PageFish(logPage);
+            stats = $"{Data.Biomes[logPage].Name.Split(' ')[0]}: {all.Count(f => state.commons.GetValueOrDefault(f.Id) > 0)} of {all.Count}"
+                + (state.Hinted("dexdone:" + Data.Biomes[logPage].Id) ? " (complete!)" : "") + "   ·   " + stats;
+            // Filters, on the right.
+            float fx = x + innerW;
+            foreach (var (id, label) in new[] { ("now", "Biting now"), ("rare", "Rare"), ("missing", "Not caught"), ("all", "All") })
+            {
+                float fw = Gfx.Measure(label, FontKind.Ui700, 15) + 20;
+                fx -= fw;
+                if (Button(label, fx, y - 6, fw, 30, FontKind.Ui700, 15, dexFilter == id ? Pal.Lantern : Pal.Sand, Pal.Ink, 3, 2, 4)) { dexFilter = id; Sfx.Play("blip"); return; }
+                fx -= 6;
+            }
+            stats = Gfx.Ellipsize(stats, FontKind.Ui600, 17, fx - x - 16);
+        }
         Gfx.Text(stats, x, y, FontKind.Ui600, 17, Muted);
         y += 34;
 
         if (logPage < Data.Biomes.Length)
         {
+            if (groups.Count == 0) Gfx.Text("Nothing on this page matches. Try another filter.", x, y + 8, FontKind.Note, 20, Muted);
             for (int c = 0; c < 2; c++)
             {
                 float cx = x + c * (colW + gap), cy = y;
@@ -806,6 +845,7 @@ partial class Game
         foreach (var n in Islanders) DrawBahay(n.x, n.y - 5, n.shirt);
         DrawKarst(2085, 107, 41); DrawKarst(1995, 141, 32); DrawBagaCone();
         (pix, scene, map, basePix, buildIndex) = (savedPix, savedScene, savedMap, savedBase, savedIndex);
+        FogUncharted(img);
         if (mapTex.Id != 0) UnloadTexture(mapTex);
         mapTex = Gfx.ToTexture(img.Buf, img.W, img.H, TextureFilter.Point);
         mapTexDirty = false;
@@ -815,84 +855,6 @@ partial class Game
     {
         Gfx.Text(s, x + 2, y + 2, k, size, Pal.C("rgba(0,0,0,0.6)"));
         Gfx.Text(s, x, y, k, size, c);
-    }
-
-    void DrawMap()
-    {
-        Backdrop();
-        RefreshMapTexture();
-        const float pad = 18, head = 54;
-        float origin = chartEast ? EastStart * T : 0, chartW = chartEast ? (COLS - EastStart) * T : EastStart * T;
-        float chartH = ROWS * T;
-        float scale = Math.Min(1120f / chartW, 550f / chartH);
-        float mw = chartW * scale, mh = chartH * scale, bw = mw + pad * 2, bh = mh + pad * 2 + head;
-        float bx = (Gfx.LW - bw) / 2, by = (Gfx.LH - bh) / 2;
-        Gfx.Box(bx, by, bw, bh, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text(chartEast ? "Amihan sea chart" : "Map of the islands", bx + pad, by + pad, FontKind.Ui700, 28, Pal.PaperInk);
-        string other = chartEast ? "Saltmere" : "Amihan";
-        if (SmallButton(other, bx + bw - pad - SmallW("Close") - SmallW(other) - 14, by + pad - 4)) { chartEast = !chartEast; return; }
-        if (SmallButton("Close", bx + bw - pad - SmallW("Close"), by + pad - 4)) { ClosePanels(); return; }
-        float mx = bx + pad, my = by + pad + head;
-        Gfx.Rect(mx - 2, my - 2, mw + 4, mh + 4, Pal.Ink);
-        DrawTexturePro(mapTex, new Rectangle(origin, 0, chartW, chartH), Gfx.S(mx, my, mw, mh), Vector2.Zero, 0, Color.White);
-        Vector2 M(float wx, float wy) => new(mx + (wx - origin) * scale, my + wy * scale);
-        bool OnChart(float wx, float wy) => wx >= origin && wx < origin + chartW && wy >= 0 && wy < chartH;
-
-        bool atollKnown = state.Hinted("visitedAtoll");
-        foreach (var (name, wx, wy) in new[] { ("Saltmere Island", 255f, 182f), ("Frostfang Isle", 560f, 186f), ("Sunscald Dunes", 760f, 292f),
-                     ("Mirewood", 100f, 236f), (atollKnown ? "Starfall Atoll" : "Unknown island", 1120f, 170f) })
-        {
-            if (!OnChart(wx, wy)) continue;
-            var p = M(wx, wy);
-            Shadowed(name, p.X - Gfx.Measure(name, FontKind.Ui700, 22) / 2, p.Y, FontKind.Ui700, 22, White);
-        }
-        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && (s.Biome != "atoll" || atollKnown) && SpotKnown(s)))
-        {
-            if (!OnChart(s.X, s.Y)) continue;
-            var p = M(s.X, s.Y);
-            bool open = SpotOpen(s.Id);
-            Gfx.Circle(p.X, p.Y, 6.5f, Pal.Ink);
-            Gfx.Circle(p.X, p.Y, 5, open ? Pal.C("#7fd6f0") : Pal.C("#8a8f93"));
-            string label = open ? s.Label : s.Label + " (closed)";
-            Shadowed(label, p.X - Gfx.Measure(label, FontKind.Ui600, 14) / 2, p.Y + 8, FontKind.Ui600, 14, Pal.Paper);
-        }
-        var places = new List<(string, float, float)> { ("Frostfang Caverns", MouthDoorX, MouthDoorY - 26), ("Pip's stall", PipX, PipY - 6), ("Pip's jetty", SaltJettyX, SaltJettyY) };
-        if (chartEast)
-        {
-            foreach (var isle in AmihanIslands)
-            {
-                var p = M(isle.cx * T, (isle.cy + isle.ry + 2) * T);
-                Shadowed(isle.name, p.X - Gfx.Measure(isle.name, FontKind.Ui700, 20) / 2, p.Y, FontKind.Ui700, 20, White);
-            }
-            places.Add(("Village landing", 1495, 217));
-            foreach (var n in Islanders) places.Add((n.name, n.x, n.y));
-        }
-        if (Has("boat") > 0 && !Aboard) { var bp = BoatPosition(); places.Add(("Your boat", bp.x, bp.y)); }
-        if (Wears("echo_sounder") && scene == "world") foreach (var sc in schools) places.Add(("Feeding fish", sc.X, sc.Y));
-        if (state.tamed && !state.riding) places.Add((Data.MountName, state.mountX, state.mountY - 6));
-        foreach (var (label, wx, wy) in places)
-        {
-            if (!OnChart(wx, wy)) continue;
-            var p = M(wx, wy);
-            Gfx.Circle(p.X, p.Y, 5, Pal.Ink);
-            Gfx.Circle(p.X, p.Y, 3.5f, Pal.Lantern);
-            Shadowed(label, p.X - Gfx.Measure(label, FontKind.Ui600, 14) / 2, p.Y + 7, FontKind.Ui600, 14, Pal.Lantern);
-        }
-        // Indoors you're shown at the door you came in by; underground, at the cave mouth.
-        var (youX, youY, youLabel) = scene == "world" ? (player.X, player.Y - 6, "You")
-            : scene == "cave" ? (MouthDoorX, MouthDoorY + 2, caveFloor == AncientFloor ? "You (Ancient Floor)" : $"You (floor {caveFloor})")
-            : (state.exitX, state.exitY - 9, "You");
-        if (OnChart(youX, youY))
-        {
-            var you = M(youX, youY);
-            float pulse = 1 + 0.3f * MathF.Sin(time * 6);
-            Gfx.Circle(you.X, you.Y, 10 * pulse, Pal.WithAlpha(Pal.Buoy, 0.35f));
-            Gfx.Circle(you.X, you.Y, 6.5f, White);
-            Gfx.Circle(you.X, you.Y, 5, Pal.Buoy);
-            // Underground the label goes below the dot so it doesn't cover the caverns' own label.
-            Shadowed(youLabel, you.X - Gfx.Measure(youLabel, FontKind.Ui700, 16) / 2, you.Y + (scene == "cave" ? 12 : -28), FontKind.Ui700, 16, White);
-        }
-        if (Gfx.PressedOutside(bx, by, bw, bh)) ClosePanels();
     }
 
     /* ---------- Case board ---------- */

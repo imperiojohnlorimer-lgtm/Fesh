@@ -42,7 +42,7 @@ These are the defaults. Every one of them can be changed in the menu (Esc, then 
 | B | Build outdoors, or furnish your shack |
 | 1–9, X | Pick a piece, take-down tool |
 | Click a nearby tile | Build there |
-| Tab | Map of the islands |
+| Tab | Map of the islands (click the chart to drop a pin) |
 | J / C | Fesh-dex (creatures and Fish log) / case board |
 | M | Sound on or off |
 | R | Get on and off your boat: board it from beside it, land it beside a shore. Ride Tidemane, or hop off (once you have it); from anywhere outdoors it whistles Tidemane over |
@@ -116,6 +116,26 @@ The mystery stays on Saltmere; the other three are there to explore and fish.
 
 Each odd catch has a 7% chance per bite at its spot. You get a card for it, then the animal runs off.
 Everything you catch is tracked in the Fesh-dex's **Fish log**, island by island, with your heaviest catch of each.
+
+### The Fish log
+- **Every fish has its own picture**, in the log, in your bag and held up over your head when you land it.
+- **Click a fish** for its card: a big picture, a line about it, where and when it bites, how it fights, the baits it
+  likes, your heaviest against trophy size, and what Pip pays. Back (or Esc) returns to the page.
+- A **green dot** marks fish whose time, weather and moon are right just now; the **Biting now** filter shows only
+  those. The other filters are **Not caught** and **Rare**.
+- A fish that **gets away mid-fight** counts as seen: its silhouette and name appear before you've caught one.
+- Each island's tab shows how much of its page you've caught. Catch them all and you get a **star** on the tab and
+  **200 coins** from Pip for the collection.
+
+### The map
+- The map opens on the chart you're on (Saltmere or Amihan). On the other chart, an arrow at the edge shows which way
+  you are.
+- Islands are only **charted** once you set foot on them; until then they're a rough outline, with no spots marked.
+- Labels move apart instead of piling up, with a short line back to their dot when they have to.
+- **Hover a dot** to see what's there: whether a spot is open (and why not), how many of its fish you've caught, and
+  what's biting there now; Pip's hours; whether your crab pots are ready; where Tidemane and your boat are waiting.
+- **Click the chart to drop a pin.** An arrow at the edge of the view points to it with the distance, and it goes
+  when you get there (or click it again). The header shows the weather, and the derby clock when one's on.
 
 ## Fishing
 - **Power cast:** hold E at a spot to power up, let go to throw. A short cast lands in **shallow** water, a long one in
@@ -433,7 +453,10 @@ taking down a shack also packs up everything inside it.
 - `src/World.cs`: outdoor map generation (islands, bridges, trees), the camera, and the pixel-art drawing, including snow, fireflies and night lighting
 - `src/Look.cs`: appearance options and how people are drawn: the four-frame walk, glances, and the rod and overhead poses
 - `src/Animals.cs`: pixel sprites for the animals
-- `src/Ui.cs`: HUD, prompts, dialogue box, build bar, end screen, catch cards, Fesh-dex and Fish log, map, case board
+- `src/Ui.cs`: HUD, prompts, dialogue box, build bar, end screen, catch cards, Fesh-dex and Fish log, case board
+- `src/Dex.cs`: the Fish log's fish cards, biting now, seen fish, filters and each island's reward
+- `src/FishArt.cs`: every fish's own picture (a body shape, colours and a pattern each) and the line about it
+- `src/Chart.cs`: the map: charting as you explore, label placement, hover details, the pin and its compass
 - `src/UiMenu.cs`: the title screen, the save slots, and the menu (Game, Settings and Controls tabs)
 - `src/Settings.cs`: settings (`settings.json`) and the rebindable controls
 - `src/UiPanels.cs`: the bag, crafting stations and the character creator

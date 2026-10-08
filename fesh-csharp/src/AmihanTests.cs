@@ -279,6 +279,111 @@ partial class Game
         Check("Tomas only asks for sea fish once you can get out there", HasSeaRequestsGated());
         foreach (int frames in BoatUpgradesScript()) yield return frames;
         foreach (int frames in FolkScript()) yield return frames;
+        foreach (int frames in ChartDexScript()) yield return frames;
+    }
+
+    // The chart (opening where you are, charting, hover details, the pin) and the Fish log (cards, seen fish, biting
+    // now, filters, a finished page's reward).
+    IEnumerable<int> ChartDexScript()
+    {
+        Note("The chart and the Fish log");
+        state.aboard = state.riding = false; ClearSkies(); SetNight(false); Inp.ScriptMouse = Offscreen;
+        // Charting: only where you've been.
+        state.charted = new() { "saltmere" }; mapTexDirty = true;
+        player.X = 595; player.Y = 120; player.Face = "down"; yield return 3;
+        Check($"setting foot on Frostfang charts it ({string.Join(", ", state.charted)})", state.charted.Contains("frost") && !Charted("dunes"));
+        var img = new Pix(PW, PH);
+        img.CopyFrom(worldBase, 0, 0);
+        FogUncharted(img);
+        var duneLand = Enumerable.Range(0, 400).Select(i => (x: 700 + i % 20 * 5, y: 330 + i / 20 * 5)).First(p => !Wet(shape[p.y * PW + p.x]));
+        var fogged = img.Buf[duneLand.y * PW + duneLand.x];
+        Check($"uncharted land is a rough outline on the chart ({fogged.R},{fogged.G},{fogged.B})", fogged.R > 180 && fogged.G > 160 && fogged.B > 110 && fogged.B < 180);
+        var old = state.charted; state.charted = null;
+        state.commons["oasis_tilapia"] = 1;
+        var legacy = LegacyCharted();
+        Check($"older saves are charted from what you've caught ({string.Join(", ", legacy)})", legacy.Contains("saltmere") && legacy.Contains("dunes"));
+        state.commons.Remove("oasis_tilapia"); state.charted = old;
+        player.X = 2040; player.Y = 112; yield return 3;
+        Check("landing on one of Amihan's islands charts that island", state.charted.Contains("amihan:Luntian Karsts") && !Charted("amihan:Baga Island"));
+
+        // The map opens where you are, with an arrow at the edge from the other chart.
+        player.X = 1595; player.Y = 205; yield return 2;
+        Inp.Tap(KeyboardKey.Tab); yield return 6;
+        Check("in Amihan the map opens on the Amihan chart", mode == "panel" && panel == "map" && chartEast);
+        pendingShot = "101-chart-amihan"; yield return 2;
+        ClickButton("Saltmere"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 3;
+        pendingShot = "102-chart-offchart"; yield return 2;
+        ClosePanels(); yield return 2;
+        player.X = 160; player.Y = 115; yield return 2;
+        Inp.Tap(KeyboardKey.Tab); yield return 6;
+        Check("on Saltmere it opens on the Saltmere chart", mode == "panel" && panel == "map" && !chartEast);
+        // Hovering a dot: what's there.
+        if (Gfx.Seen.TryGetValue("dot:The lagoon", out var lagoon))
+        {
+            Inp.ScriptMouse = new System.Numerics.Vector2(lagoon.X + 4, lagoon.Y + 4); yield return 3;
+            Check($"hovering a spot shows what's there ({mapHover})", mapHover == "The lagoon");
+            pendingShot = "103-chart-tip"; yield return 2;
+        }
+        else Check("the lagoon has a dot on the chart", false);
+        // A click on the chart drops a pin.
+        var chartRect = Gfx.Seen["chart"];
+        Inp.ScriptMouse = new System.Numerics.Vector2(chartRect.X + chartRect.Width * 0.6f, chartRect.Y + chartRect.Height * 0.7f);
+        Inp.ScriptClickNext = true; yield return 3; Inp.ScriptMouse = Offscreen; yield return 2;
+        Check($"clicking the chart drops a pin ({state.pinX:0},{state.pinY:0})", HasPin && state.pinX > 700 && state.pinX < 1000 && mode == "panel");
+        pendingShot = "104-chart-pin"; yield return 2;
+        ClosePanels(); yield return 3;
+        pendingShot = "105-pin-compass"; yield return 2;
+        player.X = state.pinX; player.Y = state.pinY; yield return 3;
+        Check($"reaching the pin takes it away ({toastMsg})", !HasPin && toastMsg.Contains("pin"));
+
+        // The Fish log: a fish that gets away mid-fight is seen.
+        state.commons.Remove("pond_perch"); state.seen.Clear();
+        player.X = 100; player.Y = 100;
+        TestBite("lagoon", "pond_perch"); Hook(); yield return 2;
+        GotAway("It got away."); yield return 2;
+        Check("one that gets away mid-fight is seen", Seen("pond_perch"));
+        TestBite("lagoon", "mud_carp"); fish.BiteT = 0.01f; yield return 4;
+        Check("one that's never hooked isn't", !Seen("mud_carp") && !state.seen.Contains("mud_carp"));
+        // Biting now follows the time, weather and moon.
+        var pike = Data.FishById["crystal_pike"];
+        SetNight(false); bool day = BitingNow(pike); SetNight(true); bool night = BitingNow(pike); SetNight(false);
+        Check("the night-only pike is biting at night and not by day", !day && night);
+        // Filters.
+        state.commons["arctic_char"] = 1;
+        var missing = LogGroups(1, "missing").SelectMany(g => g.fish).ToList();
+        var rare = LogGroups(1, "rare").SelectMany(g => g.fish).ToList();
+        var now = LogGroups(1, "now").SelectMany(g => g.fish).ToList();
+        Check("the filters show what isn't caught, what's rare, and what's biting now",
+            missing.All(f => state.commons.GetValueOrDefault(f.Id) == 0) && !missing.Any(f => f.Id == "arctic_char")
+            && rare.All(f => f.Rare || f.Legend) && rare.Count > 0 && now.All(BitingNow) && now.Count < PageFish(1).Count);
+        // The card, opened by clicking a row, and Esc back to the page.
+        TogglePanel("dex"); dexTab = "log"; logPage = 0; dexFilter = "all"; yield return 4;
+        bool clicked = ClickButton("fish:pond_perch"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 3;
+        Check("clicking a row opens that fish's card", clicked && dexFish == "pond_perch" && mode == "panel");
+        pendingShot = "106-dex-card-seen"; yield return 2;
+        Inp.Tap(KeyboardKey.Escape); yield return 3;
+        Check("Esc goes back to the page, not out of the log", dexFish == null && mode == "panel" && panel == "dex");
+        state.commons["pond_perch"] = 3; state.records["pond_perch"] = 0.52f;
+        dexFish = "pond_perch"; yield return 3;
+        pendingShot = "107-dex-card"; yield return 2;
+        dexFish = "ironbill"; state.commons["ironbill"] = 1; yield return 3;
+        pendingShot = "108-dex-card-legend"; yield return 2;
+        dexFish = null; dexFilter = "now"; yield return 3;
+        pendingShot = "109-dex-biting-now"; yield return 2;
+        dexFilter = "all"; ClosePanels(); yield return 2;
+        // Catching the last fish on a page pays out once.
+        var amihanPage = Array.FindIndex(Data.Biomes, b => b.Id == "amihan");
+        var pageFish = PageFish(amihanPage);
+        foreach (var f in pageFish.Skip(1)) state.commons[f.Id] = 1;
+        state.commons.Remove(pageFish[0].Id); state.hinted.Remove("dexdone:amihan");
+        int coins = state.coins;
+        AddCatch(pageFish[0]);
+        Check($"catching every fish on an island's page pays {PageReward} coins ({state.coins - coins})", state.coins == coins + PageReward && state.Hinted("dexdone:amihan"));
+        AddCatch(pageFish[0]);
+        Check("and only once", state.coins == coins + PageReward);
+        TogglePanel("dex"); dexTab = "log"; logPage = amihanPage; yield return 4;
+        pendingShot = "110-dex-page-done"; yield return 2;
+        ClosePanels(); yield return 2;
     }
 
     IEnumerable<int> BoatUpgradesScript()
