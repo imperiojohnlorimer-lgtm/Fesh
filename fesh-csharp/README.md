@@ -31,9 +31,9 @@ These are the defaults. Every one of them can be changed in the menu (Esc, then 
 | Keys | Action |
 |------|--------|
 | WASD / arrow keys | Walk, or steer your boat while aboard |
-| E or Space | Talk, fish, chop, mine, pet, use, place |
+| E or Space | Talk, fish (from the boat too, anywhere over deep water), chop, mine, pet, use, place |
 | Hold E (or the mouse) at a spot | Power up a cast; let go to throw |
-| F | Cook, throw chum, or take the helm at Pip's / Starfall's jetty |
+| F | Cook, throw chum, take the helm at Pip's / Starfall's jetty, or (at the helm over deep water) troll a lure |
 | G | Spearfish (on a reef, with a spear) |
 | T | Tackle box |
 | Hold Space (or mouse) | Lift the green bar while reeling; tap it for leaps and pumps |
@@ -45,13 +45,15 @@ These are the defaults. Every one of them can be changed in the menu (Esc, then 
 | Tab | Map of the islands |
 | J / C | Fesh-dex (creatures and Fish log) / case board |
 | M | Sound on or off |
-| R | Board your moored boat when it's beside you. Ride Tidemane, or hop off (once you have it); from anywhere outdoors it whistles Tidemane over |
+| R | Get on and off your boat: board it from beside it, land it beside a shore. Ride Tidemane, or hop off (once you have it); from anywhere outdoors it whistles Tidemane over |
 | F11 | Fullscreen |
 | Esc | Back, reel in, stop spearfishing, or the menu (also the button at the top right): save, change your look, quit to the title, Settings and Controls |
 
 ## Your fisher
 A new game starts with character creation: name, skin, hair, hair colour, hat, shirt and trousers.
 Saves from older versions ask you to make your fisher once. You can change your look any time from the menu.
+Your fisher walks with a proper stride (arms swinging against the legs), looks about and now and then stretches
+when you stand still, leans back to load a cast and into the throw, and pumps the rod as you reel.
 
 ## Day, night and the menu
 An island clock runs while you play: the HUD shows the day and the time. A whole day and night takes 24 minutes of play
@@ -65,6 +67,9 @@ morning). **Tomas** goes to bed in his hut at 10 PM and is up at 6; you can stil
 the story ever has to wait. Once a day, Tomas or Pip will tell you **tomorrow's weather**, and it comes true; after
 that the menu and the clock's tooltip remember it. Outdoors you hear a dawn chorus that thins to the odd bird by day,
 and crickets after dark (not on snowy Frostfang, and hushed by rain).
+
+Nobody stands rooted to the spot any more: **Tomas** potters about his camp, **Pip** shuffles about behind the counter,
+and the **Amihan villagers** stroll up and down in front of their houses. Come over and they stop and turn to you.
 
 The game pauses itself when you switch to another window (or unplug the gamepad you were using), even in the middle of
 a cast or a fight, and Resume picks up exactly where you were. Turn that off in Settings if you like.
@@ -135,9 +140,21 @@ Everything you catch is tracked in the Fesh-dex's **Fish log**, island by island
   fish shadow (WASD or the mouse) and press E. Three spears, 25 seconds.
 - **Crab pots:** set one in shallow water with B (it's in the outdoor build bar). The next morning face its float and
   press E to haul it up: a crab or lobster for that island, often seaweed, now and then an old boot or a pearl.
+- **The open sea:** from your boat (or swimming on Tidemane), press E anywhere over deep water to fish the open sea.
+  West of Amihan: flying fish, mahi-mahi, *swordfish* (rare, night, fights back) and *ocean sunfish* (rare, clear
+  days). In Amihan's waters: galunggong, tulingan, *pating* (rare, night, fights back) and *malasugi* (rare, day,
+  fights back). Out there, **feeding frenzies** come and go: dark, splashing water with birds wheeling over it by day.
+  Your cast aims for one in reach, and a bait that lands in it gets a much quicker bite. A named spot in reach of the
+  boat (the deep water, Baga reef and so on) can be fished from the boat too.
+- **Trolling:** at the helm over deep water, with a spinner or fly lure, press F to let a line out behind the boat and
+  keep sailing (slowly). Fish that chase (runners and jumpers) strike the moving lure, much sooner when you steer it
+  through a feeding frenzy; then it's a normal bite and fight. E or F winds the line in, and landing or shallow water
+  winds it in for you.
 - **Chum:** at a fishing spot press F to throw it. For two minutes fish bite twice as fast, with a little more rare luck.
 - **Legends:** each island has one legendary fish that bites once, under the right conditions and only on the right
-  bait. The Fish log's "Legends & more" page has a hint for each.
+  bait. The Fish log's "Legends & more" page has a hint for each. The open sea has one too: **Ironbill**, a giant black
+  marlin that only chases a lure trolled through a feeding frenzy by day, and tows your boat across the sea while you
+  fight it.
 - **The moon and the weather:** the moon goes through a cycle every eight days (the HUD shows it at night, and the menu
   and the clock's tooltip say when it's next full). Some fish only bite under a full moon, some only in storms.
 - **Pip's derby:** once a day, from the Derby tab at Pip's stall. Catch the heaviest fish you can in three minutes to beat
@@ -207,13 +224,21 @@ Make a **sailboat** at a workbench from 20 wood, 4 iron bars and sailcloth from 
 You can't sail in a storm; wait for it to pass.
 
 Press **F at either jetty** to take the helm and explore freely. Steer with **WASD / arrow keys** (or the gamepad
-stick). Come alongside a beach or jetty and press **E to land**. Beside your moored boat, **R** (RT on a gamepad)
-boards it again, and so does E when there's nothing else to do there: a fishing spot, a villager or the storm shelter
-next to the boat keeps E.
+stick). **R** (RT on a gamepad) gets you on and off: come alongside a beach or jetty and press R to land, and press R
+beside your moored boat to board it again. E does the same when there's nothing else to do there; over deep water E
+fishes the open sea instead (see Fishing), and a fishing spot, a villager or the storm shelter next to the moored boat
+keeps E.
 **Tab** opens the sea chart, including the boat's location. Boat positions and an ongoing voyage survive saving.
 A storm prevents launching, but a boat already at sea can still steer home at reduced speed.
-The banca-inspired boat has twin bamboo outriggers, a cream sail and a seated fisher at the helm.
-The hull and rider bob together, with a trailing wake while you steer.
+The banca-inspired boat has twin bamboo outriggers, a cream sail and a seated fisher at the helm. Under way the sail
+fills, the pennant streams back, spray flies off the bow and a wake spreads behind; stop and the sail flaps loose while
+the water laps at the floats; stop to fish (or tie up) and the sail comes down onto its boom. A storm rocks it harder.
+If a fish knocks you out at sea west of Amihan, a passing boat tows you home to Pip's jetty, your boat with you.
+
+**Boat upgrades** (workbench, Gear tab): a **big sail** (2 sailcloth, 4 wood, 1 iron bar) stands taller and sails a third
+faster. An **echo sounder** (2 copper bar, 1 gold bar, 1 crystal) finds more feeding frenzies, further out: a sonar ping
+spreads round the boat, little arrows at the edge of the view point to frenzies out of sight, and the sea chart marks
+them as "Feeding fish".
 
 ## Amihan Archipelago
 New in **1.9.0**: a Philippine-inspired region across the open sea **east of Starfall Atoll**, with its own
@@ -226,11 +251,13 @@ There are no bridges or wading routes: use the boat or swim there on the secret 
 | Luntian Karsts | Maya studies the limestone lagoon; rufous hornbills wander the trees. | Lapu-lapu, maya-maya, talakitok |
 | Bakawan Island | Tala watches the mangroves, tarsiers and hornbills. | Hito, dalag, mangrove mudskipper |
 | Baga Island | A volcanic island with a northern fishing jetty. | Tanigue, yellowfin tuna, great barracuda |
+| The open sea between them | From the boat or Tidemane, over deep water. | Galunggong, tulingan, pating, malasugi |
 
 Crab pots in the region catch **alimasag**. Catches use the existing records, size, selling, cooking and aquarium systems.
 The village has raised timber houses and woven hats; the region also has its own music.
 
-**Some fish fight back:** talakitok, dalag, tanigue and barracuda telegraph an attack with a red warning.
+**Some fish fight back:** talakitok, dalag, tanigue, barracuda, pating and malasugi (and, west of Amihan, the
+swordfish) telegraph an attack with a red warning.
 Release the reel key **and mouse button** until it passes to duck. The normal reel timer pauses during the warning,
 so dodging does not cost your catch. Holding on takes health damage; shell armour reduces it. A knockout brings you
 to Lira in the village with 35 health and retrieves your owned boat to the village landing.
@@ -342,7 +369,7 @@ Your own shacks start empty: go inside and press B to place a workbench, furnace
 | Workbench: Tools | Stone axe (3 wood, 2 stone), pickaxes: stone (3 wood, 3 stone), copper (2 wood, 2 copper bar), iron (2 wood, 3 iron bar), gold (2 wood, 3 gold bar), crystal (2 gold bar, 3 crystal, 1 shadow essence); sailboat (20 wood, 4 iron bar, 1 sailcloth); fishing spear (2 wood, 1 copper bar); crab pot (4 wood, 1 wool) |
 | Workbench: Rods | Copper rod (2 wood, 3 copper bar), iron rod (copper rod, 3 iron bar), crystal rod (iron rod, 1 iron bar, 3 crystal), Ancient rod (crystal rod, 2 gold bar, 3 abyssite) |
 | Workbench: Tackle | Reels: copper (1 wood, 2 copper bar), iron (copper reel, 2 iron bar), gold (iron reel, 2 gold bar). Lines: silk (3 wool), crystal (silk line, 1 crystal, 1 slime gel). Hooks: barbed (1 copper bar), big-game (barbed hook, 2 iron bar). Bobbers: cork (2 wood), glow (cork bobber, 2 slime gel). Sinkers: stone (3 stone), iron (stone sinker, 1 iron bar). Lures: spinner (1 copper bar), fly (1 wool, 1 bat wing) |
-| Workbench: Gear | Sunglasses (1 copper bar, 1 crystal), fish finder (2 copper bar, 1 iron bar, 1 crystal), waders (3 slime gel, 2 wool), abyssite charm (2 abyssite, 1 gold bar), headlamp (2 copper bar, 1 crystal), cooler (6 wood, 1 iron bar, 1 wool) |
+| Workbench: Gear | Big sail (2 sailcloth, 4 wood, 1 iron bar), echo sounder (2 copper bar, 1 gold bar, 1 crystal), sunglasses (1 copper bar, 1 crystal), fish finder (2 copper bar, 1 iron bar, 1 crystal), waders (3 slime gel, 2 wool), abyssite charm (2 abyssite, 1 gold bar), headlamp (2 copper bar, 1 crystal), cooler (6 wood, 1 iron bar, 1 wool) |
 | Workbench: Combat | Swords: copper (1 wood, 2 copper bar), iron (1 wood, 3 iron bar), gold (1 wood, 3 gold bar); crystal blade (2 gold bar, 3 crystal, 2 shadow essence); shell armour (4 crab shell, 2 iron bar) |
 | Workbench: Bait | Glow bait ×3 (2 bait, 1 slime gel), cut bait ×4 (1 raw fish), chum ×2 (1 raw fish, 1 berries) |
 | Furnace | Copper bar (2 copper ore, 1 wood), iron bar (2 iron ore, 1 wood), gold bar (2 gold ore, 1 wood) |
@@ -396,13 +423,15 @@ taking down a shack also packs up everything inside it.
 - `src/Clock.cs`: the island clock: day and night, dusk and dawn, a new day at 6 AM, regrowing trees
 - `src/Tidemane.cs`: the Starwell's secret, the fight with Tidemane, and riding it
 - `src/Archipelago.cs`: Amihan's four islands, village NPCs, landmarks and regional scenery
-- `src/Boating.cs`: boat steering, boarding, safe landings and persistent moorings
+- `src/Boating.cs`: boat steering, boarding, safe landings, persistent moorings, and how the boat moves (sail, pennant, spray, wake)
+- `src/OpenSea.cs`: fishing the open sea from the boat or Tidemane, feeding frenzies, trolling, Ironbill's tow and the echo sounder
+- `src/Folk.cs`: Tomas, Pip and the villagers strolling about near home
 - `src/FishAttacks.cs`: telegraphed fish attacks, dodging and health damage
 - `src/Music.cs`: the music, composed by code on a background thread at startup
 - `src/UiTrade.cs`: the shop and aquarium panels
 - `src/Build.cs`: collision, placing and removing pieces, driftwood and stone spawning
 - `src/World.cs`: outdoor map generation (islands, bridges, trees), the camera, and the pixel-art drawing, including snow, fireflies and night lighting
-- `src/Look.cs`: appearance options and how the player is drawn
+- `src/Look.cs`: appearance options and how people are drawn: the four-frame walk, glances, and the rod and overhead poses
 - `src/Animals.cs`: pixel sprites for the animals
 - `src/Ui.cs`: HUD, prompts, dialogue box, build bar, end screen, catch cards, Fesh-dex and Fish log, map, case board
 - `src/UiMenu.cs`: the title screen, the save slots, and the menu (Game, Settings and Controls tabs)
@@ -432,5 +461,7 @@ one can be crossed (hole, ore and pool all reachable), saves screenshots, writes
 ```
 $env:FESH_AUTOTEST = "$PWD\test-output"; $env:FESH_SAVE = "$PWD\test-output\save.json"; dotnet run
 ```
+For pixel work, `FESH_SPRITES` set to a `.png` path draws every person pose and the boat in each state to zoomed
+sheets next to it (`-a`, `-b` and `-c`), touches no saves, and quits.
 
 Fonts: Pixelify Sans and Special Elite, both under the SIL Open Font License.

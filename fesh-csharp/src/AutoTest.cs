@@ -16,6 +16,8 @@ partial class Game
 
     partial void AutoTestStart()
     {
+        // FESH_SPRITES=file.png draws the people and boats in every pose to a zoomed sheet and quits (no saves touched).
+        if (Environment.GetEnvironmentVariable("FESH_SPRITES") is { Length: > 0 } sheet) { ExportSprites(sheet); quit = true; return; }
         testDir = Environment.GetEnvironmentVariable("FESH_AUTOTEST");
         if (string.IsNullOrEmpty(testDir)) return;
         Directory.CreateDirectory(testDir);
@@ -35,6 +37,8 @@ partial class Game
         // Clicking another window during the run mustn't pause it: the run always has focus, as far as the game knows.
         Settings.Data.pauseUnfocused = false;
         Inp.ScriptFocused = true;
+        // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
+        standStill = true;
         script = Environment.GetEnvironmentVariable("FESH_AMIHAN_TEST") == "1" ? AmihanScript().GetEnumerator() : Script();
     }
 
@@ -62,6 +66,73 @@ partial class Game
         ExportImage(img, Path.Combine(testDir, pendingShot + ".png"));
         UnloadImage(img);
         pendingShot = null;
+    }
+
+    // A sheet of every person pose (rows: facing and look; columns: standing, the four walk frames, then the rod,
+    // overhead, leaning, glancing and blinking poses), drawn 5x so single pixels can be judged.
+    void ExportSprites(string path)
+    {
+        var keep = pix;
+        var sheet = new Pix(W, H);
+        pix = sheet;
+        Array.Fill(sheet.Buf, Pal.C("#86b86a"));
+        var looks = new[]
+        {
+            new Look { skin = 1, hair = 0, hairColor = 1, hat = 1, shirt = 0, pants = 0 },
+            new Look { skin = 3, hair = 1, hairColor = 0, hat = 0, shirt = 1, pants = 2 }
+        };
+        int row = 0;
+        foreach (string face in new[] { "down", "up", "right", "left" })
+            foreach (var look in looks)
+            {
+                int y = 17 + row++ * 20, col = 0;
+                void At(int step, int arms = 0, int swing = 0, int lean = 0, string head = null, bool blink = false) =>
+                    LookData.DrawPerson(sheet, look, 9 + col++ * 13, y, face, step, arms: arms, swing: swing, lean: lean, head: head, blink: blink);
+                for (int s = 0; s <= 4; s++) At(s);
+                At(0, arms: 3); At(0, arms: 3, swing: 1); At(0, arms: 2); At(0, arms: 1);
+                At(0, lean: -1); At(0, lean: 1); At(0, head: "left"); At(0, head: "right"); At(0, blink: true);
+            }
+        // The boat, out at sea: rows facing right, facing left, then moored and in a storm. Columns step through time.
+        var boats = new Pix(W, H) { CamX = 1150, CamY = 380 };
+        pix = boats;
+        Array.Fill(boats.Buf, Pal.C("#1d5f8c"));
+        state.inv["boat"] = 1; state.aboard = true; scene = "world";
+        for (int r = 0; r < 4; r++)
+            for (int c = 0; c < 8; c++)
+            {
+                player.X = boats.CamX + 22 + c * 37; player.Y = boats.CamY + 24 + r * 38;
+                boatDir = r == 1 ? -1 : 1; player.Face = r == 1 ? "left" : "right";
+                state.weather = r == 3 ? "storm" : "clear";
+                bool sailing = c is >= 2 and <= 4 || r == 3, fishingNow = c >= 6;
+                player.Moving = sailing; mode = fishingNow ? (c == 7 ? "reeling" : "waiting") : "play";
+                sailFurl = fishingNow ? 1 : c == 5 ? .5f : 0;
+                fish = fishingNow ? new FishCast { Spot = "opensea", Bx = player.X + 30 * boatDir, By = player.Y + 4, Tx = player.X + 30 * boatDir, Ty = player.Y + 4 } : null;
+                float t = c * .37f;
+                if (r == 2) { state.aboard = false; DrawBoat(player.X, player.Y, t); state.aboard = true; }
+                else { time = t; DrawBoat(player.X, player.Y, t, occupied: true); if (fish != null) DrawFishing(t); }
+            }
+        fish = null; mode = "title"; state.aboard = false; state.weather = "clear";
+        pix = keep;
+        {
+            int w = 300, h = 154;
+            var img = GenImageColor(w, h, Color.Black);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++) ImageDrawPixel(ref img, x, y, boats.Buf[y * W + x]);
+            ImageResizeNN(ref img, w * 5, h * 5);
+            ExportImage(img, path.Replace(".png", "-c.png"));
+            UnloadImage(img);
+        }
+        // Two halves (front and back, then the sides), each small enough to judge pixel by pixel.
+        for (int half = 0; half < 2; half++)
+        {
+            int w = 184, h = 82, top = half * 80;
+            var img = GenImageColor(w, h, Color.Black);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++) ImageDrawPixel(ref img, x, y, sheet.Buf[(top + y) * W + x]);
+            ImageResizeNN(ref img, w * 7, h * 7);
+            ExportImage(img, path.Replace(".png", half == 0 ? "-a.png" : "-b.png"));
+            UnloadImage(img);
+        }
     }
 
     // Noon or ten at night, straight away (no dusk or dawn in between: the day doesn't change).
@@ -864,6 +935,8 @@ partial class Game
         var (ux, uy, _) = due[1];
         player.X = ux * T + 5; player.Y = uy * T + 7;
         int dayD = state.day;
+        // A fair tomorrow, so a storm warning first thing can't replace the morning's toast.
+        state.tomorrow = new() { new WeatherSpell { at = 0, w = "clear" } };
         state.clock = 5 * 60 + 59; yield return 60;
         Check($"dawn starts a new day by itself (day {state.day}, {toastMsg})", state.day == dayD + 1 && toastMsg.StartsWith($"Morning of day {state.day}"));
         Check("a felled tree that's due grows back at dawn", worldMap[due[0].y, due[0].x] == 't' && !state.felled.ContainsKey($"{due[0].x},{due[0].y}"));

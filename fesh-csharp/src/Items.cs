@@ -48,7 +48,7 @@ static class Items
         new("rod_iron", "Iron rod", "rod", "Wider still, faster bites, better luck with rare fish.", Icon: "rod", Tint: "#b9c4cc"),
         new("rod_crystal", "Crystal rod", "rod", "Glowing and light. Rare fish can't resist it.", Icon: "rod", Tint: "#7fe8ff"),
         new("rod_ancient", "Ancient rod", "rod", "Made with abyssite. The rod for a fish older than the islands.", Icon: "rod", Tint: "#9b6be0"),
-        new("boat", "Sailboat", "tool", "At Pip's or Starfall's jetty, use <alt> to take the helm. Steer with <move> toward Amihan in the east; <act> lands on shore.", Icon: "boat"),
+        new("boat", "Sailboat", "tool", "At Pip's or Starfall's jetty, use <alt> to take the helm. Steer with <move> toward Amihan in the east; <ride> lands on shore. Over deep water <act> fishes the open sea, and with a lure <alt> trolls.", Icon: "boat"),
         new("spear", "Fishing spear", "tool", "At reef shallows (coral shallows, the atoll lagoon) press <spear> to spearfish.", Icon: "spear"),
         new("copper_reel", "Copper reel", "tackle", "The catch meter fills 15% faster.", Icon: "reel", Tint: "#d9823f"),
         new("iron_reel", "Iron reel", "tackle", "The catch meter fills 30% faster.", Icon: "reel", Tint: "#c9d4dc"),
@@ -70,6 +70,8 @@ static class Items
         new("lucky_charm", "Abyssite charm", "accessory", "Rare luck +2 when fishing.", Icon: "charm"),
         new("headlamp", "Headlamp", "accessory", "A much bigger circle of light at night and in the caves.", Icon: "headlamp"),
         new("cooler", "Cooler", "accessory", "Keeps your catch fresh: Pip pays 25% more for fish.", Icon: "cooler"),
+        new("big_sail", "Big sail", "accessory", "A taller sail for your boat. It sails a third faster (trolling stays slow).", Icon: "bigsail"),
+        new("echo_sounder", "Echo sounder", "accessory", "For your boat: it pings feeding frenzies further out, points to them from the edge of the view, and marks them on the sea chart.", Icon: "sonar"),
         new("bait", "Bait", "gear", "One is used each time you cast. Fish bite much faster, and rare ones a little more often.", Icon: "bait"),
         new("glow_bait", "Glow bait", "gear", "Bait soaked in slime gel. Used before plain bait: even faster bites and much better rare luck.", Icon: "glowbait"),
         new("worm", "Worms", "gear", "Dug from little mounds of earth. Freshwater fish and bottom feeders love them. Pick them in the tackle box (<tackle>).", Icon: "worm"),
@@ -114,15 +116,22 @@ static class Items
     static Items()
     {
         int i = 0;
-        foreach (var s in Data.Spots)
-            foreach (var f in Data.Common[s.Id])
-            {
-                string where = f.Legend ? $"A legend of {s.Label.ToLowerInvariant()}." : $"Caught at {s.Label}.";
-                All.Add(new ItemDef(f.Id, f.Name, "fish", $"{where} Eat it raw in a pinch, or cook it.", 6, FishIcon(f.Id), FishTints[i++ % FishTints.Length]));
-            }
+        void Spots(bool sea)
+        {
+            foreach (var s in Data.Spots.Where(s => (s.Scene == "sea") == sea))
+                foreach (var f in Data.Common[s.Id])
+                {
+                    string place = !sea ? s.Label.ToLowerInvariant() : s.Id == "opensea" ? "the open sea" : "the " + s.Label;
+                    string where = f.Legend ? $"A legend of {place}." : sea ? $"Caught on {place}, from a boat." : $"Caught at {s.Label}.";
+                    All.Add(new ItemDef(f.Id, f.Name, "fish", $"{where} Eat it raw in a pinch, or cook it.", 6, FishIcon(f.Id), FishTints[i++ % FishTints.Length]));
+                }
+        }
+        Spots(false);
         foreach (var (biome, list) in Data.PotCatch)
             foreach (var f in list)
                 All.Add(new ItemDef(f.Id, f.Name, "fish", $"Found in a crab pot on {Data.Biomes.First(b => b.Id == biome).Name}.", 6, FishIcon(f.Id), FishTints[i++ % FishTints.Length]));
+        // The open sea's fish come last, so adding them changed nobody else's colour.
+        Spots(true);
         ById = All.ToDictionary(d => d.Id);
     }
 
@@ -252,6 +261,8 @@ static class Items
         new("fly_lure", 1, "workbench", N(("wool", 1), ("bat_wing", 1))),
         new("sunglasses", 1, "workbench", N(("copper_bar", 1), ("crystal", 1))),
         new("fish_finder", 1, "workbench", N(("copper_bar", 2), ("iron_bar", 1), ("crystal", 1))),
+        new("big_sail", 1, "workbench", N(("sailcloth", 2), ("wood", 4), ("iron_bar", 1))),
+        new("echo_sounder", 1, "workbench", N(("copper_bar", 2), ("gold_bar", 1), ("crystal", 1))),
         new("waders", 1, "workbench", N(("slime_gel", 3), ("wool", 2))),
         new("lucky_charm", 1, "workbench", N(("abyssite", 2), ("gold_bar", 1))),
         new("headlamp", 1, "workbench", N(("copper_bar", 2), ("crystal", 1))),
@@ -501,6 +512,17 @@ static class ItemArt
             case "sunglasses":
                 p.Rect(1, 4, 4, 3, "#1b1b1b"); p.Rect(7, 4, 4, 3, "#1b1b1b"); p.Rect(5, 4, 2, 1, "#1b1b1b");
                 p.Rect(2, 5, 1, 1, "#5fa9c9"); p.Rect(8, 5, 1, 1, "#5fa9c9"); p.Rect(0, 4, 1, 1, "#1b1b1b"); p.Rect(11, 4, 1, 1, "#1b1b1b");
+                break;
+            case "bigsail":
+                p.Rect(5, 0, 1, 11, "#6c4c32");
+                for (int i = 0; i < 9; i++) p.Rect(6, 1 + i, 1 + i * 5 / 8, 1, i == 7 ? "#58a5a1" : "#f4edce");
+                p.Rect(1, 10, 10, 2, "#916039"); p.Rect(1, 10, 10, 1, "#c48b51");
+                break;
+            case "sonar":
+                p.Rect(1, 2, 10, 9, "#3b3b3b"); p.Rect(2, 3, 8, 7, "#0f3b3a");
+                p.Rect(5, 6, 1, 1, "#7fe8c0"); p.Rect(3, 4, 5, 1, "#2f7d6a"); p.Rect(3, 8, 5, 1, "#2f7d6a");
+                p.Rect(2, 5, 1, 3, "#2f7d6a"); p.Rect(8, 5, 1, 3, "#2f7d6a"); p.Rect(7, 5, 1, 1, "#f3c25b");
+                p.Rect(5, 0, 1, 2, "#9aa0a5");
                 break;
             case "finder":
                 p.Rect(2, 1, 8, 10, "#3b3b3b"); p.Rect(3, 2, 6, 6, "#12304a"); p.Rect(4, 5, 2, 1, "#7fd36b"); p.Rect(6, 3, 2, 1, "#f3c25b");

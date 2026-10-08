@@ -102,6 +102,8 @@ partial class Game
         if (StaticSolids().Any(r => area.Overlaps(new Box(r.X - 3, r.Y - 3, r.W + 6, r.H + 6)))) return "No room here";
         if (scene == "world" && Dist(tx * T + 5, ty * T + 5, MouthDoorX, MouthDoorY) < 24) return "Keep the cave entrance clear";
         if (scene == "world" && area.Overlaps(new Box(TomasHomeX - 6, TomasHomeY - 6, 13, 9))) return "Keep Tomas's spot clear";
+        // He potters about his camp (Folk.cs), so not on top of him wherever he's got to either.
+        if (scene == "world" && !TomasInBed && area.Overlaps(new Box(tomasX - 4, tomasY - 4, 9, 5))) return "Tomas is standing there";
         if (BuildBox(new Build { id = d.Id, x = tx, y = ty }) is Box box && box.Overlaps(new Box(player.X - 3, player.Y - 3, 6, 3)))
             return "Step back to make room";
         if (SceneBuilds().Count >= MaxBuilds) return "That's plenty of building for one place";

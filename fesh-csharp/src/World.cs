@@ -549,21 +549,25 @@ partial class Game
     }
 
     // Tomas breathes, blinks, and turns his eyes toward you when you're close.
+    // Tomas in his navy cap and white beard: pottering round his camp (Folk.cs), and turning his head to you when
+    // you're close by.
     void DrawTomas()
     {
         int x = (int)MathF.Round(tomasX), y = (int)MathF.Round(tomasY);
-        int u = y - ((time + 0.7f) % 2.4f > 1.5f ? 1 : 0);
-        bool blink = (time + 1.3f) % 3.9f < 0.13f;
-        int look = Dist(player.X, player.Y, tomasX, tomasY) < 50 ? Math.Sign(MathF.Round((player.X - tomasX) / 12)) : 0;
-        pix.Rect(x - 3, y, 7, 1, "rgba(0,0,0,0.2)");
-        pix.Rect(x - 2, y - 3, 2, 3, "#2b3a4a"); pix.Rect(x + 1, y - 3, 2, 3, "#2b3a4a");
-        pix.Rect(x - 3, u - 8, 7, 5, "#2f5d8a");
-        pix.Rect(x - 4, u - 8, 1, 4, "#2f5d8a"); pix.Rect(x + 4, u - 8, 1, 4, "#2f5d8a");
-        pix.Rect(x - 4, u - 4, 1, 1, "#e0b07d"); pix.Rect(x + 4, u - 4, 1, 1, "#e0b07d");
-        pix.Rect(x - 2, u - 11, 5, 3, "#e0b07d");
-        pix.Rect(x - 2, u - 9, 5, 2, "#e8e8e8");
-        pix.Rect(x - 3, u - 13, 7, 2, "#1d2f45");
-        if (!blink) { pix.Rect(x - 1 + look, u - 10, 1, 1, "#1b1b1b"); pix.Rect(x + 1 + look, u - 10, 1, 1, "#1b1b1b"); }
+        var s = tomasWalk;
+        bool walking = s.Moving && TomasAtCamp;
+        int step = walking ? s.Step : 0, bob = walking ? 0 : (time + 0.7f) % 2.4f > 1.5f ? 1 : 0;
+        string face = TomasAtCamp ? s.Face : "down";
+        string head = !walking && face == "down" && Dist(player.X, player.Y, tomasX, tomasY) < 50
+            ? (player.X < tomasX - 12 ? "left" : player.X > tomasX + 12 ? "right" : null) : null;
+        LookData.DrawFigure(pix, "#e0b07d", "#e8e8e8", "#2f5d8a", "#2b3a4a", false, 3, "#1d2f45", x, y, face, step,
+            bob: bob, blink: (time + 1.3f) % 3.9f < 0.13f, head: head);
+        string hf = head ?? face;
+        if (hf != "up")
+        {
+            int up = bob + (step is 2 or 4 ? 1 : 0), fo = hf == "left" ? -1 : hf == "right" ? 1 : 0;
+            pix.Rect(x - 2 + fo, y - up - 9, 4, 2, "#e8e8e8");
+        }
     }
 
     void DrawPlayer()
@@ -571,21 +575,29 @@ partial class Game
         if (Aboard) { DrawHelmsman(); return; }
         int x = (int)Math.Floor(player.X + 0.5), y = (int)Math.Floor(player.Y + 0.5);
         bool moving = player.Moving && mode is "play" or "build";
-        int step = moving ? (int)(player.WalkT * 8) % 2 : 0;
+        int step = moving ? (int)(player.WalkT * 8) % 2 : 0;       // Tidemane's gallop
+        int walk = moving ? 1 + (int)(player.WalkT * 9) % 4 : 0;   // your own four-frame walk
         string f = player.Face;
         if (iframes > 0 && (int)(time * 16) % 2 == 0) return; // blink while recovering from a hit
         bool holding = heldT > 0 && heldItem != null;
-        // Breathing when still, a bounce on each step, an arm swing, and the odd blink.
-        int bob = moving ? step : mode == "reeling" ? 0 : (time % 2.2f > 1.4f ? 1 : 0);
+        // Breathing when still, and the odd blink. The walk adds its own bounce.
+        int bob = moving || mode == "reeling" ? 0 : (time % 2.2f > 1.4f ? 1 : 0);
         bool blink = time % 3.7f < 0.12f;
         bool rod = fish != null || mode == "charging";
+        var (arms, pump, lean, glance) = PlayerPose(rod, holding);
+        int rise = 0, side = f == "left" ? -1 : 1;
         if (Riding)
         {
             // In the saddle: everything you hold or swing is up where you sit.
-            DrawRider(x, y, moving, step);
+            DrawRider(x, y, moving, step, arms, pump);
             y -= 8;
+            lean = 0;
         }
-        else LookData.DrawPerson(pix, state.look, x, y, f, step, bob: bob, blink: blink, arms: holding ? 2 : 0, swing: moving && !rod ? (step == 0 ? 1 : -1) : 0);
+        else
+        {
+            LookData.DrawPerson(pix, state.look, x, y, f, walk, bob: bob, blink: blink, arms: arms, swing: pump, lean: lean, head: glance);
+            rise = bob + (walk is 2 or 4 ? 1 : 0);
+        }
         if (InWater && !Riding)
         {
             // Wading: the water comes up past your knees, with a ripple around you.
@@ -603,9 +615,10 @@ partial class Game
         }
         if (rod)
         {
+            // From the hand holding it (see LookData.SideArm and FrontArms).
             var tip = RodTip();
-            int hx = f == "left" ? x - 3 : x + 2;
-            pix.Line(hx, y - 6, tip.X, tip.Y, "#6b4a2b");
+            int hx = (f == "left" ? x - 3 : x + 2) + (f is "left" or "right" ? lean * side : 0);
+            pix.Line(hx, y - 6 - rise + pump, tip.X, tip.Y, "#6b4a2b");
         }
         if (mode == "spear" && thrown == null && spears > 0)
         {
@@ -615,6 +628,31 @@ partial class Game
             pix.Rect(x + dir * 5, y - 16, 1, 1, "#e8f0f4");
         }
         if (holding) DrawHeld(x, y - 17);
+    }
+
+    // How you hold yourself: the rod out in front while fishing (pumping it as you reel, leaning back as you pull and
+    // forward when a runner takes line, back to load a cast and forward to throw it), a catch held overhead, or, after
+    // standing about for a few seconds, a glance around and now and then a stretch.
+    (int arms, int pump, int lean, string head) PlayerPose(bool rod, bool holding)
+    {
+        if (holding) return (2, 0, 0, null);
+        if (rod)
+        {
+            int lean = mode switch
+            {
+                "charging" => charge > 0.4f ? -1 : 0,
+                "casting" => fish != null && fish.T < 0.35f ? 1 : 0,
+                "reeling" => reel?.Running > 0 ? 1 : ReelHeld() ? -1 : 0,
+                _ => 0
+            };
+            return (3, mode == "reeling" && ReelHeld() ? (int)(time * 10) % 2 : 0, lean, null);
+        }
+        if (mode != "play" || player.Moving || idleT < 3) return (0, 0, 0, null);
+        if (idleT > 10 && (idleT - 10) % 15 < 0.9f) return (2, 0, 0, null);
+        float ph = (idleT - 3) % 6;
+        string glance = ph < 1 ? (player.Face == "down" ? "left" : player.Face == "up" ? "right" : "down")
+            : ph is >= 3 and < 4 ? (player.Face is "down" ? "right" : player.Face == "up" ? "left" : "down") : null;
+        return (0, 0, 0, glance);
     }
 
     // What you hold over your head after a catch: the fish (wriggling), or a chest spilling light.
@@ -1238,6 +1276,8 @@ partial class Game
             DrawLoose(t);
             DrawBugs(t);
             DrawSpots(t);
+            DrawSchools(t);
+            DrawSonar(t);
             DrawStarwell(t);
             DrawIceCap();
             DrawSpearing(t);

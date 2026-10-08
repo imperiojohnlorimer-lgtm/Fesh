@@ -32,7 +32,7 @@ partial class Game
         && (!f.Legend || (state.commons.GetValueOrDefault(f.Id) == 0 && (f.Bait == null || f.Bait == bait)));
 
     static readonly HashSet<string> FreshSpots = new() { "lagoon", "oasis", "swamp", "icehole", "amihanpond", "bakawanpool" };
-    static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff", "starwell", "karstlagoon", "bagareef" };
+    static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff", "starwell", "karstlagoon", "bagareef", "opensea", "amihansea" };
     static readonly HashSet<string> CarpLike = new() { "mud_carp", "moon_carp", "old_whiskers", "oasis_tilapia", "parrotfish" };
 
     // Fish that go for a bait are three times as likely to bite on it.
@@ -60,13 +60,14 @@ partial class Game
     }
 
     // Every fish that could bite at a spot right now, with its relative chance. Depth is 0 shallow, 1 middle, 2 deep.
-    List<(CommonFish f, double w)> FishWeights(string spot, string bait, int depth)
+    // Trolled is for a lure trolled behind the boat, the only thing Troll fish take.
+    List<(CommonFish f, double w)> FishWeights(string spot, string bait, int depth, bool trolled = false)
     {
         int luck = Luck(spot, bait);
         var list = new List<(CommonFish, double)>();
         foreach (var f in Data.Common[spot])
         {
-            if (!Bites(f, bait)) continue;
+            if (!Bites(f, bait) || f.Troll && !trolled) continue;
             double w = f.Weight;
             if (f.Depth == "shallow") w *= depth == 0 ? 2 : depth == 2 ? 0.5 : 1;
             else if (f.Depth == "deep") w *= depth == 2 ? 2 : depth == 0 ? 0.3 : 1;
@@ -216,12 +217,20 @@ partial class Game
     (float X, float Y) RodTip()
     {
         int dir = player.Face == "left" ? -1 : 1;
-        float forward = player.X + dir * 7, up = player.Y - 15 - (Riding ? 8 : 0);
-        if (mode == "charging") return (player.X - dir * (1 + charge * 5), up - 2 - charge * 3);
+        // Where the body is: standing, up in the saddle, or sitting at the boat's stern. From the boat the rod reaches
+        // out low past the bow (or, held up or down, stays short of the mast), so it doesn't read as rigging.
+        float bx = player.X, up = player.Y - 15 - (Riding ? 8 : 0), reach = 7;
+        if (Aboard)
+        {
+            bool sideways = player.Face is "left" or "right";
+            bx = BoatSeatX; up = MathF.Round(player.Y) + BoatBob(time) - (sideways ? 10 : 13); reach = sideways ? 14 : 4;
+        }
+        float forward = bx + dir * reach;
+        if (mode == "charging") return (bx - dir * (1 + charge * 5), up - 2 - charge * 3);
         if (mode == "casting" && fish != null && fish.T < 0.25f)
         {
             float k = fish.T / 0.25f;
-            return (player.X - dir * 6 + (forward - player.X + dir * 6) * k, up - 5 + 5 * k);
+            return (bx - dir * 6 + (forward - bx + dir * 6) * k, up - 5 + 5 * k);
         }
         if (mode == "reeling") return (forward + dir * MathF.Sin(time * 23) * 0.6f, up + 3 + (reel?.Running > 0 ? 2 : 0));
         if (mode == "bite") return (forward, up + 1);
@@ -267,7 +276,7 @@ partial class Game
     // gets a quick bite, and the big one (when it's there) gives a heavier fish.
     (float x, float y, bool big)? ShadowPos(Spot s, int k, float t)
     {
-        if (s.Id == "icehole") return null;
+        if (s.Id == "icehole" || s.Scene == "sea") return null;
         var (sx, sy) = SpotPos(s);
         float w = 0.22f + k * 0.07f, ph = k * 1.9f + s.R * 0.37f;
         float x = sx + MathF.Cos(t * w + ph) * s.R * 0.5f, y = sy + MathF.Sin(t * w * 1.3f + ph) * s.R * 0.28f;
@@ -294,9 +303,10 @@ partial class Game
         bool onShadow = false, big = false;
         for (int k = 0; k < 4; k++)
             if (ShadowPos(s, k, time) is (float hx, float hy, bool hb) && Dist(lx, ly, hx, hy) < 8) { onShadow = true; big |= hb; }
+        if (s.Scene == "sea" && InSchool(lx, ly)) onShadow = true;
         float wait = (baitBox ? Rand(0.5f, 1.2f) : Rand(1.6f, 3.6f)) * Rod.Bite * WeatherBite * (bait != null ? Items.Baits[bait].Bite : 1)
             * (Perk(3) ? 0.9f : 1) * (Chummed(spotId) ? 0.5f : 1) * (onShadow ? 0.55f : 1) * (spotId == "icehole" ? 1.6f : 1)
-            * (s.Biome == "saltmere" && SetActive("saltmere") ? 0.85f : 1);
+            * (s.Biome == "saltmere" && s.Scene != "sea" && SetActive("saltmere") ? 0.85f : 1);
         fish = new FishCast
         {
             Spot = spotId, Sx = tip.X, Sy = tip.Y, Tx = lx, Ty = ly, Bx = tip.X, By = tip.Y, Bait = bait, Power = power,
@@ -398,6 +408,15 @@ partial class Game
             Sfx.Play("neigh");
             quake = 0.4f;
             Toast("Something enormous takes the coconut and the line screams off the reel! It fights every way a fish can.", 5);
+            return;
+        }
+        if (roll.Id == TowFish)
+        {
+            // Ironbill: a long fight while it tows the boat (UpdateTow).
+            reel.Pull = 0.7f;
+            quake = 0.3f;
+            Sfx.Play("splash");
+            Toast("Ironbill! The legend takes the lure and tows your boat away. Hang on!", 5);
             return;
         }
         string hint = reel.Style switch

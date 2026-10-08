@@ -8,9 +8,9 @@ partial class Game
 {
     // Pip keeps the stall open from 7 AM to 9 PM. Tomas goes to bed in his hut at 10 PM and is up again at 6 AM;
     // you can still go in and wake him (nothing in the story ever has to wait for morning). He isn't in bed while
-    // he's away from his camp (the ending, down on the dock).
+    // he's away from his camp (the ending, down on the dock); pottering round it (Folk.cs) still counts as at camp.
     bool PipOpen => state.clock >= 7 * 60 && state.clock < 21 * 60;
-    bool TomasInBed => (state.clock >= 22 * 60 || state.clock < DawnMin) && tomasX == TomasHomeX && tomasY == TomasHomeY;
+    bool TomasInBed => (state.clock >= 22 * 60 || state.clock < DawnMin) && TomasAtCamp;
     // His pillow, in his hut (the bed is the first piece of TomasRoom).
     const float TomasBedX = 20, TomasBedY = 33;
 
@@ -32,12 +32,14 @@ partial class Game
         }
     }
 
-    // Pip bobs and blinks behind the stall, and waves when you come near.
+    // Pip shuffles about behind the stall, bobs and blinks, and turns to wave when you come near.
     void DrawPip()
     {
         bool near = Dist(player.X, player.Y, PipX, PipY + 12) < 42;
-        LookData.DrawPerson(pix, PipLook, (int)PipX, (int)PipY, "down", 0,
-            bob: (time + 0.4f) % 2.6f > 1.6f ? 1 : 0, blink: (time + 2.1f) % 4.3f < 0.13f, arms: near ? 1 : 0, swing: (int)(time * 4) % 2);
+        var s = pipWalk;
+        int x = (int)MathF.Round(s.X == 0 ? PipX : s.X);
+        LookData.DrawPerson(pix, PipLook, x, (int)PipY, near ? "down" : s.Face, s.Step,
+            bob: !s.Moving && (time + 0.4f) % 2.6f > 1.6f ? 1 : 0, blink: (time + 2.1f) % 4.3f < 0.13f, arms: near ? 1 : 0, swing: near ? (int)(time * 4) % 2 : 0);
     }
 
     // Gulls drift across the sky by day (their shadows sweep over the ground), and butterflies flutter over

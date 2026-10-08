@@ -54,7 +54,7 @@ partial class Game
             for (int x = EastStart + 1; x < COLS - 1; x++)
             {
                 if (map[y, x] != 'j') continue;
-                if (Data.Spots.Any(s => s.Biome == "amihan" && Dist(x * T + 5, y * T + 5, s.X, s.Y) < s.R + 12)) continue;
+                if (Data.Spots.Any(s => s.Scene == "world" && s.Biome == "amihan" && Dist(x * T + 5, y * T + 5, s.X, s.Y) < s.R + 12)) continue;
                 if (Islanders.Any(n => Dist(x * T + 5, y * T + 5, n.x, n.y) < 48)) continue;
                 double roll = Pix.Hash(x, y, 183);
                 char kind = roll < .12 ? 'h' : roll < .16 ? 'R' : '\0';
@@ -89,8 +89,11 @@ partial class Game
     {
         if (!InAmihan || Aboard) return null;
         foreach (var n in Islanders)
-            if (Dist(player.X, player.Y, n.x, n.y + 8) < 15)
+        {
+            var s = IslanderWalk(n.id);
+            if (Dist(player.X, player.Y, s.X, s.Y + 6) < 15)
                 return new Target { Type = "islander", Id = n.id, Label = $"Talk to {n.name}" };
+        }
         return null;
     }
 
@@ -170,14 +173,17 @@ partial class Game
         {
             if (Math.Abs(n.x - player.X) > W && pix.W == W || Math.Abs(n.y - player.Y) > H && pix.H == H) continue;
             list.Add((n.y - 3, () => DrawBahay(n.x, n.y - 5, n.shirt)));
-            list.Add((n.y + 2, () =>
+            var s = IslanderWalk(n.id);
+            list.Add((s.Y, () =>
             {
                 var look = new Look { skin = 2, shirt = n.id == "niko" ? 2 : n.id == "tala" ? 3 : 1, hat = 0, hair = 1 };
-                LookData.DrawPerson(pix, look, (int)n.x, (int)n.y + 2, "down", 0, bob: (int)(time % 3 / 2));
-                // A woven salakot and a sash distinguish the village fishers.
-                pix.Rect(n.x - 5, n.y - 12, 11, 2, "#ddbc78");
-                pix.Rect(n.x - 3, n.y - 14, 7, 2, "#f0d596");
-                pix.Rect(n.x - 2, n.y - 5, 5, 2, n.shirt);
+                int x = (int)MathF.Round(s.X), y = (int)MathF.Round(s.Y), bob = s.Moving ? 0 : (int)(time % 3 / 2);
+                LookData.DrawPerson(pix, look, x, y, s.Face, s.Step, bob: bob);
+                // A woven salakot and a sash distinguish the village fishers; both ride the walk's bounce.
+                int up = bob + (s.Step is 2 or 4 ? 1 : 0);
+                pix.Rect(x - 5, y - 14 - up, 11, 2, "#ddbc78");
+                pix.Rect(x - 3, y - 16 - up, 7, 2, "#f0d596");
+                pix.Rect(x - 2, y - 7 - up, 4, 2, n.shirt);
             }));
         }
     }

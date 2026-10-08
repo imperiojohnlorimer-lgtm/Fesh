@@ -339,7 +339,7 @@ partial class Game
     }
 
     /* ---------- Fishing spots that move with the floor ---------- */
-    (float x, float y) SpotPos(Spot s) => s.Scene != "cave" ? (s.X, s.Y) : s.Id == "ancientpool" ? (AncientPoolX, AncientPoolY) : poolPos ?? (-999, -999);
+    (float x, float y) SpotPos(Spot s) => s.Scene == "sea" ? seaSpot : s.Scene != "cave" ? (s.X, s.Y) : s.Id == "ancientpool" ? (AncientPoolX, AncientPoolY) : poolPos ?? (-999, -999);
 
     bool SpotHere(Spot s) => s.Scene == scene && SpotOpen(s.Id)
         && (s.Scene != "cave" || (s.Id == "ancientpool" ? caveFloor == AncientFloor : caveFloor != AncientFloor && poolPos != null));
@@ -605,6 +605,19 @@ partial class Game
                 if (Has("boat") > 0) { state.boatX = 1483; state.boatY = 217; }
                 Save();
             }, () => Toast("Lira found you by the water. You wake in Amihan Village; your boat is at the western landing. Eat and rest before another fierce catch.", 7));
+            return;
+        }
+        if (scene == "world" && (Aboard || Swimming) && boss == null)
+        {
+            LeaveMount();
+            state.aboard = false;
+            FadeThrough(() =>
+            {
+                player.X = SaltJettyX - 4; player.Y = SaltJettyY + 1; player.Face = "left";
+                state.hp = 35;
+                if (Has("boat") > 0) { state.boatAt = "saltmere"; state.boatX = state.boatY = 0; }
+                Save();
+            }, () => Toast("A passing fishing boat towed you home. You wake on Pip's jetty with your boat tied up beside it. Eat and rest before heading back out.", 7));
             return;
         }
         if (boss != null)

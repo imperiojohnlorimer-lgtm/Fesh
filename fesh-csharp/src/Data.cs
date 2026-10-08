@@ -10,9 +10,11 @@ sealed record Clue(string Title, string Text, string Finding);
 // Style is how it fights: "dart" (darts about), "runner" (makes runs that snap a tight line), "jumper" (leaps you time a
 // press for) or "bottom" (sulks deep; pump it up with short taps). Depth ("shallow", "any", "deep") is where it feeds:
 // a short cast lands in the shallows, a long one in deep water. Weather ("rain", "storm", "clear") and FullMoon limit
-// when it bites. Legend fish bite only once, and only on their Bait (if they name one).
+// when it bites. Legend fish bite only once, and only on their Bait (if they name one). Troll fish only strike a lure
+// trolled behind the boat (OpenSea.cs).
 sealed record CommonFish(string Id, string Name, float Difficulty, int Weight = 4, bool Rare = false, string Time = "any",
-    float Kg = 1, string Style = "dart", string Depth = "any", string Weather = null, bool FullMoon = false, bool Legend = false, string Bait = null, int Attack = 0);
+    float Kg = 1, string Style = "dart", string Depth = "any", string Weather = null, bool FullMoon = false, bool Legend = false, string Bait = null, int Attack = 0,
+    bool Troll = false);
 
 // A set of four fish. While all four are on show in your aquariums, its Perk applies.
 sealed record AquaSet(string Id, string Name, string[] Fish, string Perk);
@@ -20,7 +22,8 @@ sealed record AquaSet(string Id, string Name, string[] Fish, string Perk);
 // The legendary card: which portrait to draw, what it is, and how it was caught.
 sealed record LegendInfo(string Art, string Desc, string Where, string Hint);
 
-// Scene is where the spot is: "world" or "cave". Coordinates are in that scene.
+// Scene is where the spot is: "world" or "cave", or "sea" for the open sea (no fixed place; see Game.SpotPos).
+// Coordinates are in that scene.
 sealed record Spot(string Id, string Label, string Action, float X, float Y, float R, string Biome = "saltmere", string Scene = "world");
 
 sealed record Biome(string Id, string Name, string Climate, string Enter);
@@ -207,6 +210,22 @@ static class Data
             new("seafoam_goby", "Seafoam goby", 1.2f, Kg: 0.3f, Style: "bottom", Depth: "shallow"),
             new("blue_hole_grouper", "Blue hole grouper", 1.9f, Kg: 14f, Style: "bottom", Depth: "deep"),
             new("moonglass_fish", "Moonglass fish", 2.8f, 1, true, "night", Kg: 1.5f, Style: "jumper")
+        },
+        // Out on the open sea, fished from the boat or from Tidemane's back.
+        ["opensea"] = new CommonFish[]
+        {
+            new("flying_fish", "Flying fish", 1.2f, Time: "day", Kg: 0.3f, Style: "jumper", Depth: "shallow"),
+            new("mahi_mahi", "Mahi-mahi", 1.9f, Kg: 9f, Style: "jumper"),
+            new("swordfish", "Swordfish", 3f, 1, true, "night", Kg: 65f, Style: "runner", Depth: "deep", Attack: 14),
+            new("ocean_sunfish", "Ocean sunfish", 2.7f, 1, true, "day", Kg: 250f, Style: "bottom", Weather: "clear"),
+            new("ironbill", "Ironbill", 4.7f, 1, true, "day", Kg: 360f, Style: "jumper", Depth: "deep", Legend: true, Troll: true)
+        },
+        ["amihansea"] = new CommonFish[]
+        {
+            new("galunggong", "Galunggong (round scad)", 1.1f, Kg: 0.2f, Depth: "shallow"),
+            new("tulingan", "Tulingan (bullet tuna)", 1.7f, Kg: 2f, Style: "runner"),
+            new("pating", "Pating (blacktip shark)", 2.7f, 2, true, "night", Kg: 25f, Style: "runner", Attack: 15),
+            new("malasugi", "Malasugi (blue marlin)", 3.2f, 1, true, "day", Kg: 140f, Style: "jumper", Depth: "deep", Attack: 16)
         }
     };
 
@@ -255,7 +274,11 @@ static class Data
             "Hooked in the mangrove swamp at night, on worms.", "The mangrove swamp after dark. It roots in the mud for worms."),
         ["starfall_ray"] = new("starray",
             "A manta whose back glitters with points of light, as if the night sky fell into the sea. It only rises when the moon is full.",
-            "Hooked at the deep drop-off under a full moon, on a glow shrimp.", "The deep drop-off on a full-moon night. It follows things that glow.")
+            "Hooked at the deep drop-off under a full moon, on a glow shrimp.", "The deep drop-off on a full-moon night. It follows things that glow."),
+        ["ironbill"] = new("marlin",
+            "A black marlin as long as your boat, its bill notched from old fights with sharks. When it rises, the whole frenzy scatters.",
+            "Hooked trolling through a feeding frenzy on the open sea, then fought while it towed your boat across the waves.",
+            "The open sea by day. It only chases a lure trolled through a feeding frenzy.")
     };
 
     public static readonly Spot[] Spots =
@@ -280,7 +303,10 @@ static class Data
         new("atolllagoon", "Atoll lagoon", "Fish the atoll lagoon", 1060, 272, 32, "atoll"),
         new("dropoff", "Deep drop-off", "Fish the deep drop-off", 1135, 76, 36, "atoll"),
         // A blue hole hidden in a ring of palms on the atoll. It stays off the map and out of the Fish log until you find it.
-        new("starwell", "The Starwell", "Fish the Starwell", Game.StarwellX, Game.StarwellY, 40, "atoll")
+        new("starwell", "The Starwell", "Fish the Starwell", Game.StarwellX, Game.StarwellY, 40, "atoll"),
+        // Anywhere over deep water, from the boat or Tidemane's back: west of Amihan, and in Amihan's own waters.
+        new("opensea", "Open sea", "Fish the open sea", 0, 0, 30, "saltmere", "sea"),
+        new("amihansea", "Amihan Sea", "Fish the open sea", 0, 0, 30, "amihan", "sea")
     };
     public static readonly Dictionary<string, Spot> SpotById = Spots.ToDictionary(s => s.Id);
 

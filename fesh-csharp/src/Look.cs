@@ -23,87 +23,178 @@ static class LookData
         return $"#{(int)Math.Min(255, c.R * k):x2}{(int)Math.Min(255, c.G * k):x2}{(int)Math.Min(255, c.B * k):x2}";
     }
 
-    // Draws a person standing with their feet at (x, y). Step 0 or 1 is the walking frame.
-    // Bob lifts the upper body a pixel (breathing, or the bounce of a step), blink closes the eyes, swing (-1, 0, 1)
-    // swings the arms, and arms is 0 at their sides, 1 one arm waving (swing is the wave frame), 2 both raised overhead.
-    public static void DrawPerson(Pix p, Look look, int x, int y, string face, int step, bool shadow = true, int bob = 0, bool blink = false, int arms = 0, int swing = 0)
+    // Draws a person with their feet at (x, y).
+    // Step is 0 standing, or 1-4 through a walk: on 1 and 3 one foot is down and the other leg reaches (the arms swing
+    // against the legs), and on 2 and 4 the legs pass under the body, which rides a pixel higher.
+    // Bob lifts the upper body (breathing), lean tips it a pixel forward (+) or back (-) in a side view, blink closes the
+    // eyes, and head turns only the head (a glance about while standing). Arms: 0 at the sides, 1 one arm waving (swing is
+    // the wave frame), 2 both raised overhead, 3 holding a rod out in front (swing pumps it a pixel).
+    public static void DrawPerson(Pix p, Look look, int x, int y, string face, int step, bool shadow = true, int bob = 0,
+        bool blink = false, int arms = 0, int swing = 0, int lean = 0, string head = null) =>
+        DrawFigure(p, Skins[look.skin % Skins.Length], HairColors[look.hairColor % HairColors.Length], Shirts[look.shirt % Shirts.Length],
+            Pants[look.pants % Pants.Length], look.hair == 1, look.hat % Hats.Length, null, x, y, face, step, shadow, bob, blink, arms, swing, lean, head);
+
+    // The same, in any colours (Tomas isn't in the creator's palettes). Cap is the cap's colour (hat 3), else the shirt's.
+    public static void DrawFigure(Pix p, string skin, string hair, string shirt, string pants, bool longHair, int hat, string cap,
+        int x, int y, string face, int step, bool shadow = true, int bob = 0, bool blink = false, int arms = 0, int swing = 0,
+        int lean = 0, string head = null)
     {
-        string skin = Skins[look.skin % Skins.Length], hair = HairColors[look.hairColor % HairColors.Length];
-        string shirt = Shirts[look.shirt % Shirts.Length], pants = Pants[look.pants % Pants.Length];
-        bool longHair = look.hair == 1;
-        int hat = look.hat % Hats.Length;
-        int fo = face == "left" ? -1 : face == "right" ? 1 : 0;
+        string farPants = Shade(pants, 0.72f), shirtShade = Shade(shirt, 0.82f), hem = Shade(shirt, 0.9f);
+        const string shoe = "#2e2420", farShoe = "#1f1815";
+        bool side = face is "left" or "right";
+        int dir = face == "left" ? -1 : 1;
+        string hf = head ?? face;
+        int fo = hf == "left" ? -1 : hf == "right" ? 1 : 0;
+        int up = bob + (step is 2 or 4 ? 1 : 0);
+        int ux = side ? x + lean * dir : x, uy = y - up;
+        // Side views mirror about x - 0.5, the middle of the body. S draws the legs, U the upper body (bob and lean).
+        void S(int dx, int dy, int w, int h, string c) => p.Rect(dir > 0 ? x + dx : x - dx - w, y + dy, w, h, c);
+        void U(int dx, int dy, int w, int h, string c) => p.Rect(dir > 0 ? ux + dx : ux - dx - w, uy + dy, w, h, c);
 
         if (shadow) { p.Rect(x - 3, y, 6, 1, "rgba(16,40,44,0.3)"); p.Rect(x - 2, y + 1, 4, 1, "rgba(16,40,44,0.14)"); }
-        p.Rect(x - 2, y - 3 + step, 2, 3 - step, pants);
-        p.Rect(x + 1, y - 3 + (1 - step), 2, 3 - (1 - step), pants);
-        y -= bob;   // everything above the legs
-        if (bob > 0) { p.Rect(x - 2, y - 3 + step, 2, 1, pants); p.Rect(x + 1, y - 3 + (1 - step), 2, 1, pants); }
-        if (longHair && face == "up") p.Rect(x - 3, y - 11, 6, 6, hair);
-        p.Rect(x - 3, y - 8, 6, 5, shirt);
-        p.Rect(x - 3, y - 5, 6, 1, Shade(shirt, 0.7f));
-        Arms(p, x, y, face, arms, swing, shirt, skin);
-        if (longHair && face != "up") { p.Rect(x - 3, y - 11, 1, 5, hair); p.Rect(x + 2, y - 11, 1, 5, hair); }
-        p.Rect(x - 2 + fo, y - 11, 4, 3, face == "up" ? hair : skin);
+
+        // Legs, with a darker shoe on each foot so the steps read.
+        if (side)
+        {
+            switch (step)
+            {
+                case 1: // near leg reaching forward, far leg pushing off behind
+                    S(-2, -3, 2, 1, farPants); S(-3, -2, 2, 1, farPants); S(-4, -1, 2, 1, farShoe);
+                    S(-1, -3, 2, 1, pants); S(0, -2, 2, 1, pants); S(1, -1, 2, 1, shoe);
+                    break;
+                case 3:
+                    S(-1, -3, 2, 1, farPants); S(0, -2, 2, 1, farPants); S(1, -1, 2, 1, farShoe);
+                    S(-2, -3, 2, 1, pants); S(-3, -2, 2, 1, pants); S(-4, -1, 2, 1, shoe);
+                    break;
+                case 2: // near leg planted, far foot lifting behind it
+                    S(-2, -3, 2, 1, farPants); S(-3, -2, 2, 1, farShoe);
+                    S(-1, -3, 2, 2, pants); S(-1, -1, 3, 1, shoe);
+                    break;
+                case 4:
+                    S(-1, -3, 2, 2, farPants); S(-1, -1, 3, 1, farShoe);
+                    S(-2, -3, 2, 1, pants); S(-3, -2, 2, 1, shoe);
+                    break;
+                default:
+                    S(-2, -3, 1, 2, farPants); S(-2, -1, 1, 1, farShoe);
+                    S(-1, -3, 2, 2, pants); S(-1, -1, 3, 1, shoe);
+                    break;
+            }
+            if (up > 0) S(-2, -3 - up, 3, up, pants);
+        }
+        else
+        {
+            // Front and back: the leg that isn't taking the weight lifts its foot.
+            int liftL = step == 3 ? 1 : 0, liftR = step == 1 ? 1 : 0;
+            p.Rect(x - 2, y - 3 - up, 2, 2 - liftL + up, pants); p.Rect(x - 2, y - 1 - liftL, 2, 1, shoe);
+            p.Rect(x + 1, y - 3 - up, 2, 2 - liftR + up, pants); p.Rect(x + 1, y - 1 - liftR, 2, 1, shoe);
+        }
+
+        // Arms swing against the legs: a stride on the near leg puts the near arm back.
+        int armSwing = arms == 0 ? (step == 1 ? -1 : step == 3 ? 1 : swing) : 0;
+        if (longHair && hf == "up") p.Rect(ux - 3, uy - 11, 6, 6, hair);
+        if (side)
+        {
+            // Profile: a narrower body with a shaded back, the far arm behind it and the near arm over it.
+            string farSkin = Shade(skin, 0.8f);
+            if (arms == 3) U(1, -6 + swing, 1, 1, farSkin);
+            else if (arms == 0 && armSwing < 0) U(2, -5, 1, 1, farSkin);
+            else if (arms == 0 && armSwing > 0) U(-4, -5, 1, 1, farSkin);
+            U(-3, -4, 5, 1, pants);
+            U(-2, -8, 4, 1, shirt);
+            U(-3, -7, 5, 3, shirt);
+            U(-3, -7, 1, 3, shirtShade);
+            U(-3, -5, 5, 1, hem);
+            SideArm(U, arms, armSwing, swing, shirtShade, skin);
+        }
+        else
+        {
+            U(-3, -4, 6, 1, pants);
+            U(-2, -8, 4, 1, shirt);
+            U(-3, -7, 6, 3, shirt);
+            U(2, -7, 1, 3, shirtShade);
+            U(-3, -5, 6, 1, hem);
+            if (face == "down") U(-1, -8, 2, 1, skin);   // the neckline
+            FrontArms(p, ux, uy, arms, armSwing, swing, shirtShade, skin);
+        }
+        if (longHair && hf != "up")
+        {
+            if (hf is "left" or "right") { p.Rect(hf == "right" ? ux - 3 : ux + 1, uy - 11, 2, 4, hair); p.Rect(hf == "right" ? ux - 3 : ux + 2, uy - 7, 1, 1, hair); }
+            else { p.Rect(ux - 3, uy - 11, 1, 5, hair); p.Rect(ux + 2, uy - 11, 1, 5, hair); }
+        }
+        p.Rect(ux - 2 + fo, uy - 11, 4, 3, hf == "up" ? hair : skin);
 
         switch (hat)
         {
             case 1: // straw hat
-                p.Rect(x - 3, y - 13, 6, 2, "#f3c25b");
-                p.Rect(x - 4, y - 11, 8, 1, "#d9a83a");
+                p.Rect(ux - 3, uy - 13, 6, 2, "#f3c25b");
+                p.Rect(ux - 4, uy - 11, 8, 1, "#d9a83a");
                 break;
             case 2: // beanie in the shirt colour
-                p.Rect(x - 2, y - 14, 4, 1, shirt);
-                p.Rect(x - 3, y - 13, 6, 2, shirt);
-                p.Rect(x - 3, y - 11, 6, 1, Shade(shirt, 0.7f));
-                p.Rect(x, y - 15, 1, 1, "#ffffff");
+                p.Rect(ux - 2, uy - 14, 4, 1, shirt);
+                p.Rect(ux - 3, uy - 13, 6, 2, shirt);
+                p.Rect(ux - 3, uy - 11, 6, 1, Shade(shirt, 0.7f));
+                p.Rect(ux, uy - 15, 1, 1, "#ffffff");
                 break;
             case 3: // cap with a brim facing forward
-                p.Rect(x - 3, y - 13, 6, 2, shirt);
-                if (face == "right") p.Rect(x + 2, y - 11, 3, 1, Shade(shirt, 0.7f));
-                else if (face == "left") p.Rect(x - 5, y - 11, 3, 1, Shade(shirt, 0.7f));
-                else if (face == "down") p.Rect(x - 3, y - 11, 6, 1, Shade(shirt, 0.7f));
+                p.Rect(ux - 3, uy - 13, 6, 2, cap ?? shirt);
+                if (hf == "right") p.Rect(ux + 2, uy - 11, 3, 1, Shade(cap ?? shirt, 0.7f));
+                else if (hf == "left") p.Rect(ux - 5, uy - 11, 3, 1, Shade(cap ?? shirt, 0.7f));
+                else if (hf == "down") p.Rect(ux - 3, uy - 11, 6, 1, Shade(cap ?? shirt, 0.7f));
                 break;
             default: // hair only
-                p.Rect(x - 2, y - 13, 4, 1, hair);
-                p.Rect(x - 3, y - 12, 6, 1, hair);
-                if (face != "up") p.Rect(x - 2 + fo, y - 11, 4, 1, hair);
-                p.Rect(x - 3, y - 11, 1, 1, hair); p.Rect(x + 2, y - 11, 1, 1, hair);
+                p.Rect(ux - 2, uy - 13, 4, 1, hair);
+                p.Rect(ux - 3, uy - 12, 6, 1, hair);
+                if (hf != "up") p.Rect(ux - 2 + fo, uy - 11, 4, 1, hair);
+                p.Rect(ux - 3, uy - 11, 1, 1, hair); p.Rect(ux + 2, uy - 11, 1, 1, hair);
                 break;
         }
         if (blink) return;
-        if (face == "down") { p.Rect(x - 1, y - 10, 1, 1, "#1b1b1b"); p.Rect(x + 1, y - 10, 1, 1, "#1b1b1b"); }
-        else if (face == "left") p.Rect(x - 2, y - 10, 1, 1, "#1b1b1b");
-        else if (face == "right") p.Rect(x + 1, y - 10, 1, 1, "#1b1b1b");
+        if (hf == "down") { p.Rect(ux - 1, uy - 10, 1, 1, "#1b1b1b"); p.Rect(ux + 1, uy - 10, 1, 1, "#1b1b1b"); }
+        else if (hf == "left") p.Rect(ux - 2, uy - 10, 1, 1, "#1b1b1b");
+        else if (hf == "right") p.Rect(ux + 1, uy - 10, 1, 1, "#1b1b1b");
     }
 
-    // Sleeves in a slightly darker shirt colour with a hand at the end.
-    static void Arms(Pix p, int x, int u, string face, int arms, int swing, string shirt, string skin)
+    // The near arm in a side view (U mirrors it for facing left): hanging, swinging forward (+1) or back (-1),
+    // holding a rod out in front, or the two-arm and waving poses.
+    static void SideArm(Action<int, int, int, int, string> U, int arms, int armSwing, int pump, string sleeve, string skin)
     {
-        string sleeve = Shade(shirt, 0.82f);
+        if (arms == 2) { U(-1, -11, 1, 4, sleeve); U(-1, -12, 1, 1, skin); return; }
+        if (arms == 3) { U(0, -7, 1, 1, sleeve); U(1, -6 + pump, 1, 1, sleeve); U(2, -6 + pump, 1, 1, skin); return; }
+        if (arms == 1) { U(0, -9, 1, 2, sleeve); U(pump & 1, -10, 1, 1, skin); return; }
+        if (armSwing > 0) { U(0, -7, 1, 1, sleeve); U(1, -6, 1, 1, sleeve); U(2, -5, 1, 1, skin); }
+        else if (armSwing < 0) { U(-2, -7, 1, 1, sleeve); U(-3, -6, 1, 1, sleeve); U(-4, -5, 1, 1, skin); }
+        else { U(-1, -7, 1, 2, sleeve); U(-1, -5, 1, 1, skin); }
+    }
+
+    // Front and back views: an arm each side. A swing lifts one hand and lowers the other.
+    static void FrontArms(Pix p, int x, int u, int arms, int armSwing, int pump, string sleeve, string skin)
+    {
         if (arms == 2)
         {
             foreach (int ax in new[] { x - 4, x + 3 }) { p.Rect(ax, u - 11, 1, 4, sleeve); p.Rect(ax, u - 12, 1, 1, skin); }
             return;
         }
-        if (face is "left" or "right")
+        void Arm(int ax, int drop)
         {
-            int dir = face == "right" ? 1 : -1, ax = x + (dir > 0 ? 0 : -1) + swing * dir;
-            p.Rect(ax, u - 8, 1, 3, sleeve);
-            p.Rect(ax, u - 5, 1, 1, skin);
+            p.Rect(ax, u - 7, 1, 2 + drop, sleeve);
+            p.Rect(ax, u - 5 + drop, 1, 1, skin);
+        }
+        if (arms == 3)
+        {
+            // The rod is held out to the right, both hands on it.
+            Arm(x - 4, 0);
+            p.Rect(x + 3, u - 7, 1, 1, sleeve);
+            p.Rect(x + 2, u - 6 + pump, 1, 1, skin);
             return;
         }
-        p.Rect(x - 4, u - 8 + Math.Max(0, swing), 1, 3, sleeve);
-        p.Rect(x - 4, u - 5 + Math.Max(0, swing), 1, 1, skin);
         if (arms == 1)
         {
+            Arm(x - 4, 0);
             p.Rect(x + 3, u - 10, 1, 3, sleeve);
-            p.Rect(x + 3 + (swing & 1), u - 11, 1, 1, skin);
+            p.Rect(x + 3 + (pump & 1), u - 11, 1, 1, skin);
+            return;
         }
-        else
-        {
-            p.Rect(x + 3, u - 8 + Math.Max(0, -swing), 1, 3, sleeve);
-            p.Rect(x + 3, u - 5 + Math.Max(0, -swing), 1, 1, skin);
-        }
+        Arm(x - 4, armSwing > 0 ? 1 : armSwing < 0 ? -1 : 0);
+        Arm(x + 3, armSwing < 0 ? 1 : armSwing > 0 ? -1 : 0);
     }
 }

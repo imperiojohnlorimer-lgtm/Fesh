@@ -596,6 +596,28 @@ static class CreatureArt
                 g.FillStyle = Paint.Of("#e8f0ff"); Circ(g, -6, -12, 1.4f); Circ(g, 6, -12, 1.4f);
             }
         }
+        else if (id == "marlin")
+        {
+            // Ironbill: a black marlin with a raised sail of a dorsal fin, a long notched bill and a crescent tail.
+            g.FillStyle = C("#18263f");
+            Poly(g, -30, 0, -48, -19, -41, 0, -48, 19);
+            g.FillStyle = C("#22365a");
+            g.BeginPath(); g.MoveTo(-20, -7); g.QuadTo(-12, -28, 8, -25); g.QuadTo(14, -15, 12, -8); g.ClosePath(); g.Fill();
+            Poly(g, 6, 5, -2, 19, 13, 7);
+            g.FillStyle = sil ? Sil : Paint.Linear(0, -11, 0, 10, (0, "#16233c"), (0.45f, "#34507c"), (0.7f, "#a9bccf"), (1, "#e8eef4"));
+            g.BeginPath(); g.MoveTo(-33, 0); g.QuadTo(-12, -12, 14, -10); g.QuadTo(30, -8, 35, -2); g.QuadTo(30, 7, 14, 8); g.QuadTo(-12, 10, -33, 0); g.Fill();
+            g.FillStyle = C("#253552");
+            Poly(g, 33, -4, 54, -2.5f, 33, 1);
+            if (!sil)
+            {
+                g.StrokeStyle = Paint.Of("rgba(140,200,255,0.35)"); g.LineWidth = 1.3f;
+                for (int i = 0; i < 6; i++) Seg(g, -21 + i * 7, -8, -23 + i * 7, 5);
+                g.FillStyle = Paint.Of("rgba(255,255,255,0.18)"); Ell(g, 2, -6, 20, 2);
+                g.StrokeStyle = Paint.Of("rgba(235,235,235,0.7)"); g.LineWidth = 0.9f;
+                Seg(g, 40, -3.4f, 41, -1.4f); Seg(g, 45, -3, 46, -1.6f);
+                Eye(g, 28, -3, 2.4f, "#e8f0ff");
+            }
+        }
         else if (id == "tidemane")
         {
             // Tidemane: a horse's head, neck and forelegs with fin-edged hooves, coral horns, a mane of sea foam,
@@ -665,7 +687,7 @@ static class CreatureArt
     // Draws the underwater portrait at logical size w x h onto a canvas that is already scaled to device pixels.
     public static void Scene(VCanvas g, float w, float h, string id, bool sil)
     {
-        bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan" or "tidemane";
+        bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan" or "tidemane" or "marlin";
         g.FillStyle = Paint.Linear(0, 0, 0, h, (0, deep ? "#1d3a5a" : "#3a8db0"), (1, deep ? "#050d18" : "#12304a"));
         g.BeginPath(); g.RectPath(0, 0, w, h); g.Fill();
         g.FillStyle = Paint.Of("rgba(255,255,255,0.06)");

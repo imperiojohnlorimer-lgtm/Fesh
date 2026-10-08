@@ -441,6 +441,7 @@ partial class Game
         if (f.Attack > 0) bits.Add("fights back!");
         if (f.Legend) bits.Add("legendary");
         else if (f.Rare) bits.Add("rare");
+        if (f.Troll) bits.Add("trolling");
         if (f.Time != "any") bits.Add(f.Time);
         if (f.FullMoon) bits.Add("full moon");
         if (f.Weather != null) bits.Add(f.Weather == "clear" ? "clear days" : f.Weather);
@@ -602,7 +603,7 @@ partial class Game
         {
             // Legends, with a hint for each one still out there.
             float cx = x, cy = y;
-            Gfx.Box(cx, cy, colW, 350, CardBg, Pal.C("#c9b48f"), 2, 5);
+            Gfx.Box(cx, cy, colW, 48 + (Data.Legends.Count + 1) * 46, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text($"Legends: {Data.Legends.Keys.Count(id => state.commons.GetValueOrDefault(id) > 0)} of {Data.Legends.Count}", cx + 12, cy + 8, FontKind.Ui700, 18, Pal.PaperInk);
             cy += 38;
             foreach (var (id, info) in Data.Legends)
@@ -612,7 +613,7 @@ partial class Game
                 Gfx.Text(got ? Data.FishById[id].Name : "???", cx + 42, cy + 1, FontKind.Ui700, 17, got ? Pal.C("#9a6a1a") : Pal.C("#9a8a70"));
                 string note = got && state.records.TryGetValue(id, out float kg) ? $"{Kg(kg)}. {info.Where}" : info.Hint;
                 Gfx.Text(Gfx.Ellipsize(note, FontKind.Note, 15, colW - 54), cx + 42, cy + 22, FontKind.Note, 15, Muted);
-                cy += 50;
+                cy += 46;
             }
             // Not a fish, but the atoll's other legend.
             Gfx.Rect(cx + 10, cy - 6, colW - 20, 1, Pal.C("#e0d0b0"));
@@ -867,6 +868,7 @@ partial class Game
             foreach (var n in Islanders) places.Add((n.name, n.x, n.y));
         }
         if (Has("boat") > 0 && !Aboard) { var bp = BoatPosition(); places.Add(("Your boat", bp.x, bp.y)); }
+        if (Wears("echo_sounder") && scene == "world") foreach (var sc in schools) places.Add(("Feeding fish", sc.X, sc.Y));
         if (state.tamed && !state.riding) places.Add((Data.MountName, state.mountX, state.mountY - 6));
         foreach (var (label, wx, wy) in places)
         {

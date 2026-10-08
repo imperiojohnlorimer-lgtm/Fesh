@@ -19,6 +19,7 @@ partial class Game
     readonly List<(short x, short y, sbyte nx, sbyte ny, char w)> shore = new();
     readonly List<Leaf> leaves = new();
     readonly Random fxRng = new();   // for looks only, so scenery never changes what the game's own rng gives
+    float FxRand(float a, float b) => a + (float)fxRng.NextDouble() * (b - a);
     float leafT;
 
     static readonly int[] Bayer = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };

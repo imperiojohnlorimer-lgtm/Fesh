@@ -62,25 +62,27 @@ partial class Game
         Inp.Hold(KeyboardKey.Left, true); yield return 12; Inp.Hold(KeyboardKey.Left, false); yield return 2;
         Check("a storm at sea still allows steering home", Aboard && player.X < bx - 5);
         Inp.Hold(KeyboardKey.Right, true); yield return 20; Inp.Hold(KeyboardKey.Right, false); yield return 2;
-        Inp.Tap(KeyboardKey.E); yield return 4;
-        Check($"E lands safely during a storm ({player.X:0},{player.Y:0})", !Aboard && CanStand(player.X, player.Y));
+        Inp.Tap(KeyboardKey.R); yield return 4;
+        Check($"the ride key lands safely during a storm ({player.X:0},{player.Y:0})", !Aboard && CanStand(player.X, player.Y));
         // In a storm E is the shelter (a tied-up boat can't hide it), so try the ride key, which boards in fair weather.
         Inp.Tap(KeyboardKey.R); yield return 3;
         Check("the boat will not set out again during the storm", !Aboard && mode == "play");
         ClearSkies();
         yield return 3; Inp.Tap(KeyboardKey.E); yield return 4;
         Check("E boards the moored boat again in fair weather", Aboard);
-        Inp.Tap(KeyboardKey.E); yield return 3;
+        Inp.Tap(KeyboardKey.R); yield return 3;
         Save(); state = SaveFile.Read(SaveFile.Slot); StartGame(false); yield return 3;
         Check("a landed boat and player survive reload", !Aboard && CanStand(player.X, player.Y) && BoatPosition().x > 1400);
         pendingShot = "84-banca-moored"; yield return 2;
         Inp.Tap(KeyboardKey.E); yield return 3;
         Check("the saved mooring can be boarded after reload", Aboard);
-        Inp.Tap(KeyboardKey.E); yield return 3;
+        Inp.Tap(KeyboardKey.R); yield return 3;
         state.tamed = true; state.riding = true;
         player.X = 1385; player.Y = 395;
         Inp.Hold(KeyboardKey.Right, true); yield return 30; Inp.Hold(KeyboardKey.Right, false); yield return 2;
         Check("Tidemane can cross the same deep channel", Riding && player.X > 1400 && Swimming);
+        yield return 2;
+        Check($"swimming on Tidemane over deep water, you can fish the open sea (prompt: {prompt.Text})", target?.Type == "spot" && target.Id is "amihansea" or "opensea");
         state.riding = false; state.tamed = false;
 
         // Each island is reached by transport, then its spot must be fishable from that island's connected land.
@@ -91,7 +93,7 @@ partial class Game
             var s = Data.SpotById[spot];
             Check($"{s.Label} is fishable from its island's reachable dry land", positions.Any(p => CanStand(p.x, p.y) && Dist(p.x, p.y, s.X, s.Y) < s.R - 4));
         }
-        Check("the region has thirteen catchable species registered in the bag", Data.Spots.Where(s => s.Biome == "amihan").Sum(s => Data.Common[s.Id].Length) + Data.PotCatch["amihan"].Length == 13
+        Check("the region has seventeen catchable species registered in the bag", Data.Spots.Where(s => s.Biome == "amihan").Sum(s => Data.Common[s.Id].Length) + Data.PotCatch["amihan"].Length == 17
             && Data.Common.Where(k => Data.SpotById[k.Key].Biome == "amihan").SelectMany(k => k.Value).All(f => Items.ById.ContainsKey(f.Id)));
         Check("carabao, tarsiers and hornbills spawn on safe ground", new[] { "carabao", "tarsier", "hornbill" }.All(k => animals.Any(a => a.Kind == k && CanStand(a.X, a.Y))));
         player.X = 1595; player.Y = 198; yield return 3;
@@ -179,7 +181,7 @@ partial class Game
         ClearSkies(); state.hinted.Remove("visitedAtoll"); state.aboard = true;
         player.X = state.boatX = AtollJettyX - 30; player.Y = state.boatY = AtollJettyY;
         Inp.Hold(KeyboardKey.Right, true); yield return 25; Inp.Hold(KeyboardKey.Right, false); yield return 3;
-        Inp.Tap(KeyboardKey.E); yield return 4;
+        Inp.Tap(KeyboardKey.R); yield return 4;
         Check("landing manually at Starfall unlocks its chart, clues and requests", !Aboard && PlayerBiome() == 4 && state.Hinted("visitedAtoll"));
 
         // Find a valid shoreline position whose rounded feet would fall into the next water tile.
@@ -209,6 +211,192 @@ partial class Game
         Check($"a fish attack cannot refill a nearly empty catch meter ({afterHit:0.000})", state.hp < 100 && afterHit <= .03f);
         if (reel != null) GotAway("It got away.");
         yield return 3;
+        foreach (int frames in OpenSeaScript()) yield return frames;
+    }
+
+    IEnumerable<int> OpenSeaScript()
+    {
+        Note("The open sea: fishing from the boat over deep water, feeding frenzies, and being towed home");
+        ClearSkies(); SetNight(false); state.riding = state.tamed = false; state.hp = 100;
+        schools.Clear(); state.inv["boat"] = 1;
+        // Deep water west of Amihan, between the atoll and the archipelago.
+        state.aboard = true; player.X = state.boatX = 1385; player.Y = state.boatY = 395; player.Face = "right";
+        yield return 3;
+        Check($"at the helm over deep water, E fishes the open sea (prompt: {prompt.Text})", target?.Type == "spot" && target.Id == "opensea" && Aboard);
+        Check("a long way from shore there is no landing offered", target?.RideLabel == null);
+        Inp.Hold(KeyboardKey.Left, true); yield return 20; Inp.Hold(KeyboardKey.Left, false);
+        Check($"the sail is up while you steer ({sailFurl:0.00})", sailFurl < 0.1f);
+        yield return 2;
+        Inp.Hold(KeyboardKey.E, true); yield return 30; Inp.Hold(KeyboardKey.E, false);
+        for (int i = 0; i < 90 && mode is "charging" or "casting"; i++) yield return 1;
+        Check($"a cast from the boat lands in the water ({mode}, {fish?.Tx:0},{fish?.Ty:0})", mode is "waiting" or "bite" && fish?.Spot == "opensea" && IsWater(fish.Tx, fish.Ty) && Aboard);
+        yield return 40;
+        Check($"the sail comes down while you fish ({sailFurl:0.00})", sailFurl > 0.9f);
+        pendingShot = "91-boat-fishing"; yield return 2;
+        TestBite("opensea", "mahi_mahi"); yield return 1;
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        Check("a bite at sea starts the fight", mode == "reeling" && reel != null);
+        LandCatch(); yield return 4;
+        Check($"an open-sea fish lands in the bag, held up in the boat ({mode})", Has("mahi_mahi") >= 1 && heldItem == "mahi_mahi" && heldT > 0);
+        pendingShot = "93-boat-catch"; yield return 2;
+        while (mode is "catch" or "legend") { Inp.Tap(KeyboardKey.E); yield return 3; }
+        Check("after the catch you're still at the helm", mode == "play" && Aboard);
+        var westAllowed = Data.Common["opensea"].Select(f => f.Id).Append("chest").ToHashSet();
+        Check("the open sea only gives its own catches", Enumerable.Range(0, 400).All(_ => westAllowed.Contains(RollCatch("opensea").Id)));
+
+        // A feeding frenzy close by: the cast goes to it, and it bites quicker.
+        schools.Add(new School { X = player.X + 44, Y = player.Y - 4, Age = 5, Life = 60, Seed = 7 });
+        yield return 3;
+        Check($"a feeding frenzy in reach draws the cast (prompt: {prompt.Text})", target?.Label.Contains("feeding frenzy") == true && Dist(SpotPos(Data.SpotById["opensea"]).x, SpotPos(Data.SpotById["opensea"]).y, player.X + 44, player.Y - 4) < 1);
+        pendingShot = "92-feeding-frenzy"; yield return 2;
+        float slow = 0, fast = 0;
+        for (int i = 0; i < 40; i++)
+        {
+            Cast("opensea", 0.7f); fast += fish.Timer; fish = null; mode = "play";
+            schools.Clear(); seaSpot = (player.X + 30, player.Y - 6);
+            Cast("opensea", 0.7f); slow += fish.Timer; fish = null; mode = "play";
+            schools.Add(new School { X = player.X + 44, Y = player.Y - 4, Age = 5, Life = 60, Seed = 7 }); seaSpot = (player.X + 44, player.Y - 4);
+        }
+        Check($"fish bite quicker in a feeding frenzy ({fast / 40:0.00}s against {slow / 40:0.00}s)", fast < slow * 0.75f);
+        schools.Clear();
+        state.inv.Remove("bait"); state.inv.Remove("glow_bait");
+
+        // Amihan's own waters have their own fish.
+        player.X = state.boatX = 1440; player.Y = state.boatY = 395; yield return 3;
+        Check($"over Amihan's deep water the open sea is Amihan's (target {target?.Id})", target?.Id == "amihansea");
+        var eastAllowed = Data.Common["amihansea"].Select(f => f.Id).Append("chest").ToHashSet();
+        Check("the Amihan Sea only gives its own catches", Enumerable.Range(0, 400).All(_ => eastAllowed.Contains(RollCatch("amihansea").Id)));
+
+        // A swordfish's lunge can knock you out at sea: a passing boat tows you home to Pip's jetty.
+        player.X = state.boatX = 1385; player.Y = state.boatY = 395; state.hp = 1; yield return 2;
+        TestBite("opensea", "swordfish"); Hook();
+        reel.Progress = 0.8f; reel.AttackTimer = 0;
+        Inp.Hold(KeyboardKey.E, true); yield return 150; Inp.Hold(KeyboardKey.E, false);
+        for (int i = 0; i < 120 && mode == "fade"; i++) yield return 1;
+        yield return 2;
+        Check($"fainting at sea west of Amihan wakes you on Pip's jetty ({player.X:0},{player.Y:0})", mode == "play" && !Aboard && Dist(player.X, player.Y, SaltJettyX - 4, SaltJettyY + 1) < 2 && state.hp >= 35);
+        Check("and your boat is tied up there", state.boatAt == "saltmere" && state.boatX == 0 && BoatCanStand(BoatPosition().x, BoatPosition().y));
+        Check("Tomas only asks for sea fish once you can get out there", HasSeaRequestsGated());
+        foreach (int frames in BoatUpgradesScript()) yield return frames;
+        foreach (int frames in FolkScript()) yield return frames;
+    }
+
+    IEnumerable<int> BoatUpgradesScript()
+    {
+        Note("Trolling, Ironbill, the big sail and the echo sounder");
+        ClearSkies(); SetNight(false); state.hp = 100; schools.Clear();
+        state.inv["boat"] = 1; state.inv.Remove("spinner_lure"); state.inv.Remove("fly_lure"); state.inv.Remove("big_sail"); state.inv.Remove("echo_sounder");
+        state.aboard = true; player.X = state.boatX = 1385; player.Y = state.boatY = 395; player.Face = "right";
+        yield return 3;
+        Check($"over deep water the helm offers trolling (prompt: {prompt.Text})", target?.AltType == "troll" && prompt.Text.Contains("Troll a lure"));
+        Inp.Tap(KeyboardKey.F); yield return 3;
+        Check($"trolling needs a lure ({toastMsg})", !trolling && toastMsg.Contains("lure"));
+        state.inv["spinner_lure"] = 1;
+        Inp.Tap(KeyboardKey.F); yield return 3;
+        Check($"F lets out a trolling line (prompt: {prompt.Text})", trolling && target?.Type == "trolling");
+        Check($"trolling is slow ({BoatSpeed:0})", BoatSpeed < 70);
+        trollT = 99;
+        Inp.Hold(KeyboardKey.Left, true); yield return 40;
+        Check($"the lure trails behind the stern ({lure.x:0} vs the boat at {player.X:0})", lure.x > player.X + 15);
+        pendingShot = "94-trolling"; yield return 2;
+        trollT = 0.01f; yield return 3;
+        Inp.Hold(KeyboardKey.Left, false); yield return 1;
+        var struck = fish?.Roll;
+        Check($"something that chases strikes the moving lure ({struck?.Id})", mode == "bite" && struck != null && Data.FishById[struck.Id].Style is "runner" or "jumper" && !trolling);
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        Check("the strike becomes a normal fight", mode == "reeling" && reel != null);
+        if (reel != null) GotAway("It got away.");
+        yield return 3;
+        Check("trolled catches only come from fish that chase, and never the legend outside a frenzy",
+            Enumerable.Range(0, 400).Select(_ => RollTroll("opensea", false).Id).All(id => Data.FishById[id].Style is "runner" or "jumper" && id != "ironbill"));
+        int legends = Enumerable.Range(0, 3000).Count(_ => RollTroll("opensea", true).Id == "ironbill");
+        Check($"in a feeding frenzy by day, Ironbill can take a trolled lure ({legends} of 3000)", legends > 0);
+        Check("Ironbill never takes an ordinary cast", Enumerable.Range(0, 3000).All(_ => RollCatch("opensea").Id != "ironbill"));
+
+        // Ironbill tows the boat.
+        float bx0 = player.X, by0 = player.Y;
+        TestBite("opensea", "ironbill"); Hook(); yield return 2;
+        Check("Ironbill's fight is a long one", mode == "reeling" && reel?.Pull < 1);
+        reel.Running = 3; reel.RunT = 99; reel.Progress = 0.5f;
+        yield return 45;
+        Check($"Ironbill tows the boat ({Dist(player.X, player.Y, bx0, by0):0} px)", Dist(player.X, player.Y, bx0, by0) > 6 && Aboard && BoatCanStand(player.X, player.Y));
+        pendingShot = "95-ironbill-tow"; yield return 2;
+        if (reel != null) { LandCatch(); yield return 4; }
+        Check("landing Ironbill shows its legend card", mode == "legend" && legendId == "ironbill" && Has("ironbill") == 1);
+        pendingShot = "96-ironbill-card"; yield return 2;
+        while (mode == "legend") { Inp.Tap(KeyboardKey.E); yield return 3; }
+
+        // The big sail.
+        float plain = BoatSpeed;
+        state.inv["big_sail"] = 1;
+        Check($"the big sail is a third faster ({plain:0} to {BoatSpeed:0})", BoatSpeed > plain * 1.25f);
+        Inp.Hold(KeyboardKey.Right, true); yield return 12;
+        pendingShot = "97-big-sail"; yield return 2;
+        Inp.Hold(KeyboardKey.Right, false); yield return 2;
+
+        // The echo sounder: more frenzies, further out, pointed to and charted.
+        player.X = state.boatX = 1385; player.Y = state.boatY = 395; schools.Clear();
+        for (int i = 0; i < 200; i++) { schoolT = 0; yield return 0; }
+        int without = schools.Count;
+        state.inv["echo_sounder"] = 1; schools.Clear();
+        for (int i = 0; i < 200; i++) { schoolT = 0; yield return 0; }
+        Check($"an echo sounder finds more feeding frenzies ({without} without, {schools.Count} with)", without <= 2 && schools.Count == 3);
+        schools.Clear();
+        schools.Add(new School { X = player.X + 200, Y = player.Y - 30, Age = 5, Life = 60, Seed = 3 });
+        yield return 3;
+        pendingShot = "98-sonar"; yield return 2;
+        Inp.Tap(KeyboardKey.Tab); yield return 6;
+        Check("the sea chart opens with the frenzy on it", mode == "panel" && panel == "map");
+        pendingShot = "99-sonar-chart"; yield return 2;
+        ClosePanels(); yield return 2;
+        schools.Clear(); state.inv.Remove("big_sail"); state.inv.Remove("echo_sounder");
+    }
+
+    // Tomas, Pip and the villagers stroll about near home, and stop for you.
+    IEnumerable<int> FolkScript()
+    {
+        Note("Tomas, Pip and the villagers stroll about");
+        state.aboard = false; state.riding = false; ClearSkies(); SetNight(false);
+        tomasX = TomasHomeX; tomasY = TomasHomeY;
+        player.X = 160; player.Y = 130; player.Face = "down";
+        standStill = false;
+        float far = 0, wander = 0;
+        bool clear = true;
+        for (int i = 0; i < 480; i++)
+        {
+            yield return 0;
+            far = Math.Max(far, Dist(tomasX, tomasY, TomasHomeX, TomasHomeY));
+            wander = Math.Max(wander, Math.Abs(pipWalk.X - PipX));
+            if (tomasWalk.Moving && !FolkCanStand(tomasX, tomasY, tomas: true)) clear = false;
+        }
+        Check($"Tomas potters about his camp ({far:0} px at most)", far > 3 && far < 26 && clear);
+        Check($"Pip shuffles about behind the counter ({wander:0} px)", wander > 0.5f && wander <= 6.01f);
+        pendingShot = "100-tomas-strolling"; yield return 2;
+        player.X = tomasX; player.Y = tomasY + 12; player.Face = "up"; yield return 4;
+        Check($"he stops and turns to you when you come over ({target?.Label})", !tomasWalk.Moving && target?.Type == "npc");
+        state.clock = 23 * 60; yield return 2;
+        Check("at bedtime he's back in his hut", TomasInBed && tomasX == TomasHomeX && tomasY == TomasHomeY);
+        SetNight(false);
+        var lira = IslanderWalk("lira");
+        player.X = 1595; player.Y = 260; yield return 2;
+        float liraFar = 0;
+        for (int i = 0; i < 480; i++) { yield return 0; liraFar = Math.Max(liraFar, Dist(lira.X, lira.Y, lira.HomeX, lira.HomeY)); }
+        Check($"the villagers stroll in front of their houses ({liraFar:0} px at most)", liraFar > 3 && liraFar < 16);
+        player.X = lira.X; player.Y = lira.Y + 8; yield return 4;
+        Check($"and stop to talk ({target?.Label})", target?.Type == "islander" && target.Id == "lira" && !lira.Moving);
+        standStill = true; yield return 2;
+        Check("pinned for the other checks, everyone is back home", tomasX == TomasHomeX && lira.X == lira.HomeX && pipWalk.X == PipX);
+    }
+
+    // With no boat and no Tidemane, none of Tomas's random requests come from the open sea.
+    bool HasSeaRequestsGated()
+    {
+        int boat = state.inv.GetValueOrDefault("boat"); bool tamed = state.tamed; int done = state.reqDone;
+        state.inv.Remove("boat"); state.tamed = false; state.reqDone = Items.RequestChain.Length;
+        var seaFish = Data.Common["opensea"].Concat(Data.Common["amihansea"]).Select(f => f.Id).ToHashSet();
+        bool ok = Enumerable.Range(0, 300).All(_ => !seaFish.Contains(NextRequest().item));
+        state.inv["boat"] = boat; state.tamed = tamed; state.reqDone = done;
+        return ok;
     }
 }
 #endif

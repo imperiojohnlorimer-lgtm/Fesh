@@ -25,7 +25,8 @@ sealed class ReelState
 sealed record Say(string S, string T);
 sealed class DialogueState { public List<Say> Lines; public int I; public float Shown; public string Full = ""; public Action OnDone; }
 // Something the player can act on with E, and optionally second actions with F (cook, throw chum) and G (spearfish).
-sealed class Target { public string Type, Id, Label, AltType, AltLabel, Alt2Type, Alt2Label; public int Tx, Ty; public object Ref; }
+// RideLabel is what the ride key does here (landing the boat while E fishes, for one).
+sealed class Target { public string Type, Id, Label, AltType, AltLabel, Alt2Type, Alt2Label, RideLabel; public int Tx, Ty; public object Ref; }
 sealed class Ghost { public int Tx, Ty; public Build Target; public string Reason = ""; }
 sealed class Actor { public float X, Y, WalkT; public string Face = "down"; public bool Moving; }
 
@@ -52,6 +53,7 @@ partial class Game
 
     string mode = "title";
     float time;
+    float idleT;   // seconds standing about in play (for glances and stretches)
     Target target;
     float fade, fadeDir;
     Action fadeCb, fadeAfter;
@@ -766,6 +768,8 @@ partial class Game
         // A moored boat comes last: it mustn't hide anything else, and <ride> boards it from beside them anyway.
         // In a storm it stays tied up, which leaves the shelter.
         if (!Stormy && BoatInReach()) return new Target { Type = "boat", Label = "Board your boat" };
+        // Swimming on Tidemane over deep water, you can fish the open sea from the saddle (not in a storm: shelter).
+        if (!Stormy && SeaTarget() is Target sea) return sea;
         // A storm can strand you on another island, so you can always shelter and wait it out.
         if (Stormy) return new Target { Type = "rest", Id = "shelter", Label = "Shelter until the storm passes" };
         return null;
@@ -801,6 +805,7 @@ partial class Game
         if (target?.AltType == "cook") OpenCraft("fire");
         else if (target?.AltType == "chum") ThrowChum(target.Id);
         else if (target?.AltType == "launch") LaunchBoat();
+        else if (target?.AltType == "troll") ToggleTroll();
     }
 
     void OnAlt2()
@@ -830,6 +835,7 @@ partial class Game
                     case "sail": Sail(target.Id); break;
                     case "boat": BoardBoat(); break;
                     case "land": LandBoat(); break;
+                    case "trolling": WindIn("You wind the trolling line in."); break;
                     case "islander": TalkIslander(target.Id); break;
                     case "tank": OpenTank((Build)target.Ref); break;
                     case "planter": PickPlanter((Build)target.Ref); break;
@@ -883,11 +889,15 @@ partial class Game
             UpdateAnimals(dt);
             UpdateBugs(dt);
             UpdateParticles(dt);
+            UpdateBoat(dt);
+            UpdateSchools(dt);
+            UpdateStrollers(dt);
             UpdateLeaves(dt);
             UpdateWeather(dt);
             heldT = Math.Max(0, heldT - dt);
         }
         if (mode is not ("title" or "create" or "pause")) state.playSecs += dt;
+        if (mode != "pause") idleT = mode == "play" && !player.Moving ? idleT + dt : 0;
         if (ActiveModes.Contains(mode))
         {
             TickClock(dt);
@@ -946,15 +956,16 @@ partial class Game
             {
                 // On Tidemane you gallop on land and swim through any water; on foot, waders slow you in the shallows.
                 bool wet = InWater, ride = Riding;
-                float speed = Aboard ? (Stormy ? 64 : 96) : ride ? (Swimming ? 74 : 92) : wet ? 52 * 0.7f : 52;
+                float speed = Aboard ? BoatSpeed : ride ? (Swimming ? 74 : 92) : wet ? 52 * 0.7f : 52;
                 float len = MathF.Sqrt(dx * dx + dy * dy), sp = speed * push * dt * (Starving ? 0.6f : 1f);
                 float mx = dx / len * sp, my = dy / len * sp;
                 if (Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, ride)) player.X += mx;
                 if (Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, ride)) player.Y += my;
                 player.Face = MathF.Abs(dx) > MathF.Abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
-                int stepBefore = (int)(player.WalkT * 8);
-                player.WalkT += dt;
-                if (!Aboard && (int)(player.WalkT * 8) != stepBefore) Footstep();
+                int frameBefore = (int)(player.WalkT * 9);
+                player.WalkT += dt * push * (wet && !ride ? 0.75f : 1);
+                int frame = (int)(player.WalkT * 9);
+                if (!Aboard && frame != frameBefore && frame % 2 == 0) Footstep();
                 heldT = 0;
             }
             if (scene == "world")
@@ -965,6 +976,7 @@ partial class Game
                 if (Riding) { state.mountX = player.X; state.mountY = player.Y; }
                 if (Aboard) { state.boatX = player.X; state.boatY = player.Y; }
                 DiscoverArchipelago();
+                if (mode == "play") UpdateTroll(dt);
             }
             // Walking down onto a doorway steps back outside.
             if (InHouse && dy > 0 && TileAt((int)(player.X / T), (int)((player.Y - 1.5f) / T)) == 'Y') { LeaveToWorld(); return; }
@@ -983,6 +995,7 @@ partial class Game
                 string label = target?.Label ?? "";
                 if (target?.AltLabel != null) label += $"   [<alt>] {target.AltLabel}";
                 if (target?.Alt2Label != null) label += $"   [<spear>] {target.Alt2Label}";
+                if (target?.RideLabel != null) label += $"   [<ride>] {target.RideLabel}";
                 if (target?.Type != "boat" && !Stormy && BoatInReach()) label += "   [<ride>] Board your boat";
                 SetPrompt(label, target != null ? "<act>" : null);
             }
@@ -991,6 +1004,7 @@ partial class Game
             return;
         }
 
+        UpdateTow(dt);
         UpdateFishing(dt);
     }
 
@@ -1027,7 +1041,8 @@ partial class Game
         tomasX = TomasHomeX; tomasY = TomasHomeY;
         // Nothing carries over from a game played earlier in this session (quitting to the title and loading another slot).
         fish = null; reel = null; panel = null; boss = null; dlg = null;
-        bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear();
+        bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear();
+        trolling = towing = false;
         derbyT = 0; heldT = 0; iframes = 0; hurtFlash = 0; quake = 0; pointerHold = false; caveFloor = 1;
         mapTexDirty = true;
         titleView = "main";

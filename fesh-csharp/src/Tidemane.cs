@@ -399,8 +399,9 @@ partial class Game
 
     void ToggleRide()
     {
-        // R also boards your moored boat beside you, since E may belong to a fishing spot there. In a storm the boat
-        // stays tied up, so if you have Tidemane, R calls it instead.
+        // R gets you on and off the boat: from beside it (E may belong to a fishing spot there), and at the helm it lands
+        // (E fishes over deep water). In a storm the boat stays tied up, so if you have Tidemane, R calls it instead.
+        if (mode == "play" && Aboard) { LandBoat(); return; }
         if (mode == "play" && boss == null && BoatInReach() && !(Stormy && state.tamed)) { BoardBoat(); return; }
         if (!state.tamed || mode != "play" || boss != null) return;
         if (scene != "world") { Toast($"{Data.MountName} is waiting for you outside."); return; }
@@ -569,7 +570,7 @@ partial class Game
     }
 
     // You in the saddle, sitting up over its back.
-    void DrawRider(int x, int y, bool moving, int step)
+    void DrawRider(int x, int y, bool moving, int step, int arms = 0, int pump = 0)
     {
         if (player.Face is "left" or "right") mountDir = player.Face == "right" ? 1 : -1;
         bool swim = Swimming;
@@ -577,7 +578,7 @@ partial class Game
         DrawTidemane(x, y, mountDir, pose, step, moving: moving);
         int bob = swim ? FloatBob(x) : moving && step == 1 ? -1 : 0;
         LookData.DrawPerson(pix, state.look, x - mountDir, y - 8 + bob, player.Face, 0, shadow: false, blink: time % 3.7f < 0.12f,
-            arms: heldT > 0 && heldItem != null ? 2 : 0);
+            arms: arms, swing: pump);
     }
 
     // Tidemane waiting for you: it shifts its weight, flicks its tail and now and then shakes out its mane.
