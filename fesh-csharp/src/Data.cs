@@ -11,10 +11,11 @@ sealed record Clue(string Title, string Text, string Finding);
 // press for) or "bottom" (sulks deep; pump it up with short taps). Depth ("shallow", "any", "deep") is where it feeds:
 // a short cast lands in the shallows, a long one in deep water. Weather ("rain", "storm", "clear") and FullMoon limit
 // when it bites. Legend fish bite only once, and only on their Bait (if they name one). Troll fish only strike a lure
-// trolled behind the boat (OpenSea.cs).
+// trolled behind the boat (OpenSea.cs). Need is a story flag (a key in state.hinted) that has to be set before it bites:
+// the Parola squid only come once its lamp is lit.
 sealed record CommonFish(string Id, string Name, float Difficulty, int Weight = 4, bool Rare = false, string Time = "any",
     float Kg = 1, string Style = "dart", string Depth = "any", string Weather = null, bool FullMoon = false, bool Legend = false, string Bait = null, int Attack = 0,
-    bool Troll = false);
+    bool Troll = false, string Need = null);
 
 // A set of four fish. While all four are on show in your aquariums, its Perk applies.
 sealed record AquaSet(string Id, string Name, string[] Fish, string Perk);
@@ -103,7 +104,8 @@ static class Data
         new("dunes", "Sunscald Dunes", "Desert", "Sunscald Dunes. The air shimmers with heat."),
         new("mire", "Mirewood", "Jungle", "Mirewood. Everything here is green and dripping."),
         new("atoll", "Starfall Atoll", "Tropical", "Starfall Atoll. Warm water, white sand, and something big out past the reef."),
-        new("amihan", "Amihan Archipelago", "Tropical", "Amihan. Palm villages, limestone lagoons, mangroves and volcanic shores.")
+        new("amihan", "Amihan Archipelago", "Tropical", "Amihan. Palm villages, limestone lagoons, mangroves and volcanic shores."),
+        new("habagat", "Habagat Islands", "Tropical", "Habagat. Salt beds, a scatter of limestone islets and an old lighthouse, where the southwest wind blows.")
     };
 
     // Tidemane, the hippocamp of the Starwell: fished up and fought on the atoll, then ridden as a mount.
@@ -226,6 +228,32 @@ static class Data
             new("tulingan", "Tulingan (bullet tuna)", 1.7f, Kg: 2f, Style: "runner"),
             new("pating", "Pating (blacktip shark)", 2.7f, 2, true, "night", Kg: 25f, Style: "runner", Attack: 15),
             new("malasugi", "Malasugi (blue marlin)", 3.2f, 1, true, "day", Kg: 140f, Style: "jumper", Depth: "deep", Attack: 16)
+        },
+        // Habagat: the salt flats of Asinan, the islet reefs of Daang Pulo, the pier under the Parola lighthouse, and its sea.
+        ["asinan"] = new CommonFish[]
+        {
+            new("danggit", "Danggit (rabbitfish)", 1.2f, Kg: .25f, Style: "bottom", Depth: "shallow", Time: "day"),
+            new("sapsap", "Sapsap (ponyfish)", 1f, Kg: .12f, Depth: "shallow"),
+            new("pagi", "Pagi (blue-spotted stingray)", 2.4f, 2, true, Kg: 2.5f, Style: "bottom", Attack: 10)
+        },
+        ["pulo"] = new CommonFish[]
+        {
+            new("labahita", "Labahita (surgeonfish)", 1.4f, Kg: 1f),
+            new("bisugo", "Bisugo (threadfin bream)", 1.3f, Kg: .4f, Style: "bottom", Depth: "deep"),
+            new("pugita", "Pugita (octopus)", 2.5f, 2, true, "night", Kg: 2f, Style: "bottom")
+        },
+        ["parola"] = new CommonFish[]
+        {
+            new("tamban", "Tamban (sardine)", 1f, Kg: .12f, Depth: "shallow"),
+            new("pusit", "Pusit (bigfin reef squid)", 1.5f, 5, Time: "night", Kg: .6f, Need: "parolaLit"),
+            new("buan_buan", "Buan-buan (tarpon)", 2.7f, 2, true, "night", Kg: 6f, Style: "jumper", Need: "parolaLit"),
+            new("haring_buan", "Haring Buan-buan", 4.6f, 1, true, "night", Kg: 45f, Style: "jumper", FullMoon: true, Legend: true, Bait: "tamban", Need: "moonReturned")
+        },
+        ["habagatsea"] = new CommonFish[]
+        {
+            new("alumahan", "Alumahan (Indian mackerel)", 1.4f, Kg: .3f, Style: "runner"),
+            new("matang_baka", "Matang-baka (bigeye scad)", 1.3f, Time: "night", Kg: .25f),
+            new("talang_talang", "Talang-talang (queenfish)", 2.6f, 1, true, "day", Kg: 4f, Style: "jumper")
         }
     };
 
@@ -237,7 +265,13 @@ static class Data
         ["dunes"] = new CommonFish[] { new("ghost_crab", "Ghost crab", 1f, Kg: 0.3f) },
         ["mire"] = new CommonFish[] { new("crayfish", "Crayfish", 1f, Kg: 0.15f) },
         ["atoll"] = new CommonFish[] { new("spiny_lobster", "Spiny lobster", 1f, Kg: 2.5f) },
-        ["amihan"] = new CommonFish[] { new("alimasag_crab", "Alimasag (blue swimming crab)", 1f, Kg: .5f) }
+        ["amihan"] = new CommonFish[] { new("alimasag_crab", "Alimasag (blue swimming crab)", 1f, Kg: .5f) },
+        // Habagat's pots bring up one of three (by Weight).
+        ["habagat"] = new CommonFish[]
+        {
+            new("alimango_crab", "Alimango (mud crab)", 1f, 5, Kg: .8f), new("curacha_crab", "Curacha (spanner crab)", 1f, 3, Kg: .6f),
+            new("sugpo_shrimp", "Sugpo (tiger prawn)", 1f, 3, Kg: .06f)
+        }
     };
 
     public static readonly CommonFish[] AllCommon = Common.Values.SelectMany(v => v).Concat(PotCatch.Values.SelectMany(v => v)).ToArray();
@@ -246,7 +280,7 @@ static class Data
     public static readonly Dictionary<string, string> SpotOfFish = Common.SelectMany(kv => kv.Value.Select(f => (f.Id, kv.Key))).ToDictionary(p => p.Id, p => p.Key);
 
     // Shallow reef water you can spearfish in.
-    public static readonly string[] ReefSpots = { "coral", "atolllagoon" };
+    public static readonly string[] ReefSpots = { "coral", "atolllagoon", "pulo" };
 
     public static readonly AquaSet[] AquaSets =
     {
@@ -255,7 +289,8 @@ static class Data
         new("dunes", "Desert springs", new[] { "oasis_tilapia", "desert_pupfish", "sun_mackerel", "sand_ray" }, "Pip pays 10% more for fish"),
         new("mire", "Jungle waters", new[] { "mudskipper", "swamp_catfish", "parrotfish", "jungle_piranha" }, "15% more fishing XP"),
         new("atoll", "Coral reef", new[] { "clownfish", "moorish_idol", "pearl_angelfish", "spiny_lobster" }, "Fish are 10% heavier"),
-        new("cave", "Deep dark", new[] { "blind_cavefish", "glow_shrimp", "ghost_eel", "abyssal_lanternfish" }, "Reel bar +3")
+        new("cave", "Deep dark", new[] { "blind_cavefish", "glow_shrimp", "ghost_eel", "abyssal_lanternfish" }, "Reel bar +3"),
+        new("habagat", "Salt and islets", new[] { "danggit", "sapsap", "labahita", "tamban" }, "Fish dry twice as fast on drying racks")
     };
 
     public static readonly Dictionary<string, LegendInfo> Legends = new()
@@ -278,7 +313,32 @@ static class Data
         ["ironbill"] = new("marlin",
             "A black marlin as long as your boat, its bill notched from old fights with sharks. When it rises, the whole frenzy scatters.",
             "Hooked trolling through a feeding frenzy on the open sea, then fought while it towed your boat across the waves.",
-            "The open sea by day. It only chases a lure trolled through a feeding frenzy.")
+            "The open sea by day. It only chases a lure trolled through a feeding frenzy."),
+        ["haring_buan"] = new("tarpon",
+            "The king of the tarpon: a silver giant whose scales are as wide as your palm. Parola's old keepers said it only rises under a moon "
+            + "that Bakunawa has given back, and that every scale is a little piece of moonlight.",
+            "Hooked off the Parola pier under a full moon, on a live tamban, after the moon came back.",
+            "The Parola pier on a full-moon night, once the moon is safe. It chases a live sardine.")
+    };
+
+    // The vanishing moon over Habagat (Bakunawa.cs): four clues, found on each island, then the eclipse.
+    // Each one is a hinted key; the Case board's Habagat tab shows them in this order.
+    public static readonly (string Key, string Title, string Finding, string Source)[] MoonClues =
+    {
+        ("bk:scale", "A scale like a mirror", "A huge round scale turned up in Asinan's salt beds, too big for any fish on the island. It shines like the moon on water.", "Raked out of Manang Rosa's salt beds"),
+        ("bk:tale", "The seven moons", "Lola Pacing's story: Bathala made seven moons, and the sea serpent Bakunawa swallowed six. People banged pots and gongs until it spat the last one out.", "Told over a game of sungka"),
+        ("bk:log", "The keeper's log", "\"The night the lamp failed, the moon's reflection went out on the strait. We beat the agong on the pier until it came back.\"", "Tatay Celso's old logbook"),
+        ("bk:agong", "The regatta agong", "Dado's lolo's old bronze gong, beaten every full moon when the lighthouse was young, to keep the moon safe. Nobody has beaten it since.", "Won by beating the regatta record")
+    };
+    // By how many clues you have (any of them), then the last once the moon is back.
+    public static readonly string[] MoonTheories =
+    {
+        "No leads yet. Fishers say the moon's reflection sometimes goes out over the Habagat sea on full-moon nights.",
+        "Something is happening to the moon over Habagat, and the islanders know more than they say.",
+        "The old story of Bakunawa, the sea serpent that swallows moons, keeps coming up. Could it be real?",
+        "Bakunawa comes for the moon when the islands go quiet and dark. Light and noise drive it off.",
+        "Light Parola's lamp, bring the agong to the lighthouse on a full-moon night, and make a lot of noise.",
+        "Case closed. Bakunawa came for the moon, the islands made their noise, and it gave the moon back."
     };
 
     public static readonly Spot[] Spots =
@@ -306,7 +366,12 @@ static class Data
         new("starwell", "The Starwell", "Fish the Starwell", Game.StarwellX, Game.StarwellY, 40, "atoll"),
         // Anywhere over deep water, from the boat or Tidemane's back: west of Amihan, and in Amihan's own waters.
         new("opensea", "Open sea", "Fish the open sea", 0, 0, 30, "saltmere", "sea"),
-        new("amihansea", "Amihan Sea", "Fish the open sea", 0, 0, 30, "amihan", "sea")
+        new("amihansea", "Amihan Sea", "Fish the open sea", 0, 0, 30, "amihan", "sea"),
+        // Habagat (Habagat.cs). Their fish take their colours last (Items), so nothing older changes colour.
+        new("asinan", "Asinan flats", "Fish the salt flats", Game.AsinanSpotX, Game.AsinanSpotY, 30, "habagat"),
+        new("pulo", "Islet reef", "Fish the islet reef", Game.PuloSpotX, Game.PuloSpotY, 30, "habagat"),
+        new("parola", "Parola pier", "Fish off the pier", Game.ParolaSpotX, Game.ParolaSpotY, 30, "habagat"),
+        new("habagatsea", "Habagat Sea", "Fish the open sea", 0, 0, 30, "habagat", "sea")
     };
     public static readonly Dictionary<string, Spot> SpotById = Spots.ToDictionary(s => s.Id);
 
@@ -327,7 +392,10 @@ static class Data
             "The pig snorts, rolls in the mud once more, and trundles off."),
         new("parrot", "Parrot", "atolllagoon", 1.7f, "A parrot?!",
             "A soaked and furious parrot. It has a lot to say about this, and it says all of it.",
-            "The parrot shakes itself off, squawks something rude, and stalks off toward the palms.")
+            "The parrot shakes itself off, squawks something rude, and stalks off toward the palms."),
+        new("goat", "Goat", "asinan", 1.6f, "A goat?!",
+            "A dripping goat, chewing something it found on the bottom. It does not look sorry.",
+            "The goat shakes itself, bleats at you, and wanders back to the salt beds.")
     };
     public static readonly Dictionary<string, OddCatch> OddById = Odd.ToDictionary(o => o.Id);
 
@@ -353,6 +421,8 @@ static class Data
             Tip: "Press <act> at the smoking rack to smoke fish."),
         new("crabpot", "Crab pot", Cost(("crab_pot", 1)), "Set it in shallow water; haul it up each morning.", Water: true,
             Tip: "Come back tomorrow, face the float and press <act> to haul up the pot."),
+        new("dryrack", "Drying rack", Cost(("wood", 4), ("stone", 2)), "Salt fish and dry them in the sun.", Box: new[] { 1, 3, 8, 6 },
+            Tip: "Press <act> at the rack to lay out salted fish. They dry in clear daylight; rain stops them."),
 
         new("workbench", "Workbench", Cost(("wood", 6), ("stone", 2)), "Craft tools and rods.", W: 2, Box: new[] { 1, 3, 18, 6 }, Indoor: true, Station: "workbench",
             Tip: "Press <act> at the workbench to craft."),

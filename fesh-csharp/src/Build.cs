@@ -27,7 +27,7 @@ partial class Game
     List<Box> Solids()
     {
         var list = StaticSolids();
-        if (scene == "world") list.AddRange(IslandSolids());
+        if (scene == "world") { list.AddRange(IslandSolids()); list.AddRange(HabagatSolids()); }
         foreach (var b in SceneBuilds()) if (BuildBox(b) is Box r) list.Add(r);
         if (scene == "cave")
             foreach (var n in nodes) if (!NodeMined(n)) list.Add(new Box(n.X * T + 1, n.Y * T + 2, 8, 7));
@@ -97,8 +97,11 @@ partial class Game
             if (BuildAt(tx + i, ty) != null) return "Something is already here";
         }
         var area = new Box(tx * T, ty * T, d.W * T, T);
-        if (scene == "world" && IslandSolids().Any(b => b.Overlaps(area))) return "Keep the island landmarks clear";
+        if (scene == "world" && IslandSolids().Concat(HabagatSolids()).Any(b => b.Overlaps(area))) return "Keep the island landmarks clear";
         if (scene == "world" && Islanders.Any(n => area.Overlaps(new Box(n.x - 26, n.y - 38, 52, 62)))) return "Keep the village paths clear";
+        if (scene == "world" && HabagatFolk.Any(n => area.Overlaps(new Box(n.x - 26, n.y - 38, 52, 62)))) return "Keep the village paths clear";
+        if (scene == "world" && area.Overlaps(new Box(JoyX - 12, JoyY - 14, 24, 20))) return "Keep the warden's platform clear";
+        if (scene == "world" && d.Water && InSanctuary(tx * T + 5, ty * T + 5)) return "No traps inside the marine sanctuary";
         if (StaticSolids().Any(r => area.Overlaps(new Box(r.X - 3, r.Y - 3, r.W + 6, r.H + 6)))) return "No room here";
         if (scene == "world" && Dist(tx * T + 5, ty * T + 5, MouthDoorX, MouthDoorY) < 24) return "Keep the cave entrance clear";
         if (scene == "world" && area.Overlaps(new Box(TomasHomeX - 6, TomasHomeY - 6, 13, 9))) return "Keep Tomas's spot clear";
@@ -172,6 +175,11 @@ partial class Game
         foreach (var (id, n) in d.Cost) Give(id, n);
         string extra = "";
         if (b.id == "aquarium" && EmptyTank(TankKey(b)) is int fishBack && fishBack > 0) extra = $" The {fishBack} fish went back in your bag.";
+        if (b.id == "dryrack" && state.racks.Remove(RackKey(b), out var load) && load.fish.Count > 0)
+        {
+            foreach (var f in load.fish) Give(f);
+            extra = $" The {load.fish.Count} fish on it went back in your bag.";
+        }
         // Taking down a shack also packs up everything inside it, aquarium fish included.
         if (d.Door && state.rooms.Remove(ShackKey(b), out var room) && room.Count > 0)
         {
@@ -204,6 +212,7 @@ partial class Game
         if (Aboard) { Toast("Land your boat before building."); return; }
         if (mode == "panel") ClosePanels();
         if (boss != null) { Sfx.Play("nope"); Toast("Not in the middle of a fight!"); return; }
+        if (eclipse != null) { Sfx.Play("nope"); Toast("Not now: Bakunawa has the moon!"); return; }
         if (mode != "play")
         {
             if (FishingModes.Contains(mode)) Toast("Finish fishing first.");
@@ -273,13 +282,15 @@ partial class Game
     bool SpawnLoose(string kind)
     {
         if (scene != "world" || kind == "worm" && quietWildlife) return false;
+        // Gleaning finds only turn up at low tide, on Habagat's beaches by the water.
+        if (kind == "glean" && (!LowTide || !InHabagat || !GleanLeft)) return false;
         var cands = new List<(int x, int y)>();
         int px = (int)(player.X / T), py = (int)(player.Y / T);
         foreach (var (x, y) in Reachable())
         {
             if (Math.Abs(x - px) > 15 || Math.Abs(y - py) > 9) continue;
             char t = map[y, x];
-            if (kind == "wood" ? !WoodGround.Contains(t) : kind == "worm" ? t is not ('g' or 'j') : !Buildable.Contains(t)) continue;
+            if (kind == "glean" ? !GleanGround(x, y) : kind == "wood" ? !WoodGround.Contains(t) : kind == "worm" ? t is not ('g' or 'j') : !Buildable.Contains(t)) continue;
             if (BuildAt(x, y) != null || state.loose.Any(l => l.tx == x && l.ty == y)) continue;
             if (Dist(x * T + 5, y * T + 6, player.X, player.Y) < 24 || !CanStand(x * T + 5, y * T + 7)) continue;
             cands.Add((x, y));
@@ -303,6 +314,8 @@ partial class Game
     void TickLoose(float dt)
     {
         looseTimer += dt;
+        // The tide coming in (or a tide gleaned clean) takes what's left on the flats straight away.
+        if (!LowTide || !GleanLeft) state.loose.RemoveAll(l => l.kind == "glean");
         if (looseTimer > 9)
         {
             looseTimer = 0;
@@ -310,12 +323,16 @@ partial class Game
             state.loose.RemoveAll(l => Dist(l.x, l.y, player.X, player.Y) > 400);
             var need = LooseMax.Keys.Where(k => LooseCount(k) < LooseMax[k]).ToArray();
             if (need.Length > 0) SpawnLoose(need[rng.Next(need.Length)]);
+            // At low tide on Habagat, a second try for the flats so they fill up while you walk them.
+            if (LooseCount("glean") < LooseMax["glean"]) SpawnLoose("glean");
         }
         for (int i = state.loose.Count - 1; i >= 0; i--)
         {
             var l = state.loose[i];
             if (l.kind == "worm" || Dist(player.X, player.Y - 2, l.x, l.y) > 7) continue;
+            if (l.kind == "glean" && (!LowTide || !GleanLeft)) continue;   // the top of the next frame clears it
             state.loose.RemoveAt(i);
+            if (l.kind == "glean") { PickGlean(l); continue; }
             Give(l.kind);
             Sfx.Play("pickup");
             if (!state.Hinted("buildTip"))

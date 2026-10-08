@@ -618,6 +618,64 @@ static class CreatureArt
                 Eye(g, 28, -3, 2.4f, "#e8f0ff");
             }
         }
+        else if (id == "tarpon")
+        {
+            // Haring Buan-buan: a huge silver tarpon, its scales outlined like coins, a long trailing dorsal ray and an
+            // upturned jaw, with a pale glow of moonlight about it.
+            g.FillStyle = C("#8a98a2");
+            Poly(g, -30, 0, -46, -16, -40, 0, -46, 16);
+            g.BeginPath(); g.MoveTo(-2, -12); g.QuadTo(4, -24, 10, -26); g.QuadTo(-6, -22, -10, -12); g.ClosePath(); g.Fill();
+            Poly(g, -6, 10, -14, 18, 4, 11);
+            g.FillStyle = sil ? Sil : Paint.Linear(0, -14, 0, 13, (0, "#7f8f9c"), (0.4f, "#c8d4dc"), (0.75f, "#eef3f6"), (1, "#ffffff"));
+            g.BeginPath(); g.MoveTo(-32, 0); g.QuadTo(-14, -15, 12, -13); g.QuadTo(30, -10, 36, -3); g.QuadTo(30, 9, 12, 11); g.QuadTo(-14, 13, -32, 0); g.Fill();
+            g.FillStyle = C("#6f7f8a");
+            Poly(g, 30, -2, 40, -9, 37, 2);
+            if (!sil)
+            {
+                g.StrokeStyle = Paint.Of("rgba(110,130,150,0.55)"); g.LineWidth = 0.8f;
+                for (int r = 0; r < 3; r++)
+                    for (int c = 0; c < 8; c++) { g.BeginPath(); g.Arc(-20 + c * 6 + r * 3, -6 + r * 6, 3, -1.6f, 1.6f); g.Stroke(); }
+                g.Save(); g.ShadowColor = Paint.Of("#fff6d0"); g.ShadowBlur = 8 * s / 3.4f;
+                g.FillStyle = Paint.Of("rgba(255,246,208,0.25)"); Ell(g, 0, -2, 30, 9);
+                g.Restore();
+                Eye(g, 27, -4, 3.2f);
+            }
+        }
+        else if (id == "bakunawa")
+        {
+            // Bakunawa: a sea serpent with a dragon's head, its body looping in and out of the waves, fins down its back,
+            // and the full moon held in its open jaws.
+            g.StrokeStyle = C("#1f4a52"); g.LineWidth = 9;
+            g.BeginPath(); g.MoveTo(-50, 14); g.QuadTo(-40, -8, -28, 8); g.QuadTo(-18, 24, -8, 8); g.QuadTo(0, -6, 8, 2); g.Stroke();
+            g.StrokeStyle = C("#2f6a6a"); g.LineWidth = 4;
+            g.BeginPath(); g.MoveTo(-50, 12); g.QuadTo(-40, -10, -28, 6); g.QuadTo(-18, 22, -8, 6); g.Stroke();
+            g.FillStyle = C("#3fa0a0");
+            foreach (var (fx, fy) in new[] { (-42f, -4f), (-34f, -2f), (-14f, 16f), (-4f, 2f) }) Poly(g, fx - 3, fy, fx, fy - 7, fx + 3, fy);
+            // Neck and head, rearing up on the right.
+            g.FillStyle = sil ? Sil : Paint.Linear(0, -30, 0, 10, (0, "#2f6a6a"), (1, "#1a3a40"));
+            g.BeginPath(); g.MoveTo(4, 6); g.QuadTo(14, -10, 18, -22); g.LineTo(28, -20); g.QuadTo(22, -6, 14, 8); g.ClosePath(); g.Fill();
+            Ell(g, 28, -24, 12, 7, -0.2f);
+            g.FillStyle = C("#1a3a40");
+            Poly(g, 30, -18, 46, -14, 32, -12);
+            g.FillStyle = C("#3fa0a0");
+            Poly(g, 18, -30, 14, -40, 22, -31); Poly(g, 24, -31, 24, -42, 29, -31);
+            if (!sil)
+            {
+                // The moon in its jaws.
+                g.Save(); g.ShadowColor = Paint.Of("#fff6d0"); g.ShadowBlur = 12 * s / 3.4f;
+                g.FillStyle = Paint.Of("#fff6d0"); Circ(g, 40, -16, 6.5f);
+                g.Restore();
+                g.FillStyle = Paint.Of("rgba(220,210,170,0.6)"); Circ(g, 38, -18, 1.6f); Circ(g, 42, -14, 1.2f);
+                g.FillStyle = Paint.Of("#2f6a6a"); Poly(g, 30, -22, 46, -22, 34, -19);
+                g.FillStyle = Paint.Of("#ffd76a"); Circ(g, 26, -27, 1.8f);
+                g.FillStyle = Paint.Of("#10243a"); Circ(g, 26.4f, -27, 0.8f);
+                g.StrokeStyle = Paint.Of("rgba(235,248,252,0.7)"); g.LineWidth = 1.2f;
+                foreach (var wx in new[] { -50f, -28f, -8f })
+                {
+                    g.BeginPath(); g.MoveTo(wx - 8, 18); g.QuadTo(wx, 14, wx + 8, 18); g.Stroke();
+                }
+            }
+        }
         else if (id == "tidemane")
         {
             // Tidemane: a horse's head, neck and forelegs with fin-edged hooves, coral horns, a mane of sea foam,
@@ -687,7 +745,7 @@ static class CreatureArt
     // Draws the underwater portrait at logical size w x h onto a canvas that is already scaled to device pixels.
     public static void Scene(VCanvas g, float w, float h, string id, bool sil)
     {
-        bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan" or "tidemane" or "marlin";
+        bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan" or "tidemane" or "marlin" or "tarpon" or "bakunawa";
         g.FillStyle = Paint.Linear(0, 0, 0, h, (0, deep ? "#1d3a5a" : "#3a8db0"), (1, deep ? "#050d18" : "#12304a"));
         g.BeginPath(); g.RectPath(0, 0, w, h); g.Fill();
         g.FillStyle = Paint.Of("rgba(255,255,255,0.06)");

@@ -11,7 +11,9 @@ static class Music
 {
     const int Rate = 22050;
     static readonly int[] Major = { 0, 2, 4, 5, 7, 9, 11 }, Minor = { 0, 2, 3, 5, 7, 8, 10 },
-        PhrygianDominant = { 0, 1, 4, 5, 7, 8, 10 }, PentatonicMajor = { 0, 2, 4, 7, 9 };
+        PhrygianDominant = { 0, 1, 4, 5, 7, 8, 10 }, PentatonicMajor = { 0, 2, 4, 7, 9 },
+        // A five-note gong-chime scale with a narrow step at the bottom, in the spirit of the kulintang.
+        Kulintang = { 0, 1, 5, 7, 8 };
     static readonly int[] Maj = { 0, 4, 7 }, Min = { 0, 3, 7 };
 
     sealed record TrackDef(int Root, int[] Scale, int Bpm, (int semis, int[] chord)[] Prog, string Lead, string Bass, string Pad,
@@ -25,6 +27,10 @@ static class Music
         ["mire"] = new(55, PentatonicMajor, 100, new[] { (0, Maj), (9, Min), (5, Maj), (7, Maj) }, "marimba", "tri", null, true, 4, 0.75f, 0.1f),
         ["atoll"] = new(64, Major, 112, new[] { (0, Maj), (7, Maj), (9, Min), (5, Maj) }, "steel", "pluck", null, true, 5, 0.8f, 0.08f),
         ["amihan"] = new(62, PentatonicMajor, 104, new[] { (0, Maj), (5, Maj), (9, Min), (7, Maj) }, "marimba", "pluck", null, true, 19, 0.75f, 0.08f),
+        // Habagat: a row of little gongs over a deep hanging agung, kulintang-style.
+        ["habagat"] = new(60, Kulintang, 108, new[] { (0, Min), (5, Min), (7, Maj), (0, Min) }, "gong", "agung", null, true, 23, 0.85f, 0.075f),
+        // Bakunawa holds the moon: faster, darker, the gongs hammering.
+        ["eclipse"] = new(55, Kulintang, 80, new[] { (0, Min), (1, Maj), (0, Min), (8, Maj) }, "gong", "agung", "pad", true, 29, 0.95f, 0.08f),
         ["cave"] = new(45, Minor, 60, new[] { (0, Min), (0, Min), (8, Maj), (7, Min) }, "bell", "sine", "pad", false, 6, 0.25f, 0.08f),
         ["home"] = new(65, Major, 80, new[] { (0, Maj), (5, Maj), (9, Min), (7, Maj) }, "musicbox", "sine", null, false, 7, 0.55f, 0.08f),
         // The fight with Tidemane: fast, minor and driving.
@@ -170,7 +176,7 @@ static class Music
     {
         int s0 = (int)(start * Rate), n = (int)(dur * Rate);
         bool pad = inst == "pad";
-        float decaySec = inst switch { "bell" => 1.6f, "pluck" => 0.25f, "marimba" => 0.35f, "steel" => 0.6f, "musicbox" => 0.9f, "pulse" => 0.45f, _ => dur };
+        float decaySec = inst switch { "bell" => 1.6f, "pluck" => 0.25f, "marimba" => 0.35f, "steel" => 0.6f, "musicbox" => 0.9f, "pulse" => 0.45f, "gong" => 0.8f, "agung" => 1.4f, _ => dur };
         double decay = Math.Exp(Math.Log(0.001) / (decaySec * Rate));
         double ph = 0, g = 1, step = freq / Rate;
         int attack = pad ? (int)(0.3f * Rate) : (int)(0.005f * Rate), release = (int)(0.3f * Rate);
@@ -186,6 +192,9 @@ static class Music
                 "marimba" => Math.Sin(ph * Math.Tau) + 0.25 * Math.Sin(ph * Math.Tau * 4),
                 "steel" => Math.Sin(ph * Math.Tau) + 0.5 * Math.Sin(ph * Math.Tau * 2) + 0.2 * Math.Sin(ph * Math.Tau * 3),
                 "musicbox" => Math.Sin(ph * Math.Tau * 2) + 0.3 * Math.Sin(ph * Math.Tau * 4),
+                // Bossed gongs: a round fundamental with clanging, out-of-tune overtones that die away first.
+                "gong" => Math.Sin(ph * Math.Tau) + 0.45 * Math.Sin(ph * Math.Tau * 2.41) * g + 0.2 * Math.Sin(ph * Math.Tau * 3.93) * g * g,
+                "agung" => Math.Sin(ph * Math.Tau) + 0.3 * Math.Sin(ph * Math.Tau * 2.02) + 0.15 * Math.Sin(ph * Math.Tau * 0.5),
                 _ => Math.Sin(ph * Math.Tau)
             };
             double env = i < attack ? (double)i / attack : 1;

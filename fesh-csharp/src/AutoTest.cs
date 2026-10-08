@@ -39,7 +39,9 @@ partial class Game
         Inp.ScriptFocused = true;
         // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
         standStill = true;
-        script = Environment.GetEnvironmentVariable("FESH_AMIHAN_TEST") == "1" ? AmihanScript().GetEnumerator() : Script();
+        script = Environment.GetEnvironmentVariable("FESH_DIRECTION_TEST") == "1" ? DirectionScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_HABAGAT_TEST") == "1" ? HabagatScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_AMIHAN_TEST") == "1" ? AmihanScript().GetEnumerator() : Script();
     }
 
     partial void AutoTestTick()
@@ -72,6 +74,7 @@ partial class Game
     // overhead, leaning, glancing and blinking poses), drawn 5x so single pixels can be judged.
     void ExportSprites(string path)
     {
+        ExportDirectionSprites(path);
         var keep = pix;
         var sheet = new Pix(W, H);
         pix = sheet;
@@ -101,12 +104,12 @@ partial class Game
             for (int c = 0; c < 8; c++)
             {
                 player.X = boats.CamX + 22 + c * 37; player.Y = boats.CamY + 24 + r * 38;
-                boatDir = r == 1 ? -1 : 1; player.Face = r == 1 ? "left" : "right";
+                boatFace = r == 1 ? "left" : "right"; player.Face = boatFace;
                 state.weather = r == 3 ? "storm" : "clear";
                 bool sailing = c is >= 2 and <= 4 || r == 3, fishingNow = c >= 6;
                 player.Moving = sailing; mode = fishingNow ? (c == 7 ? "reeling" : "waiting") : "play";
                 sailFurl = fishingNow ? 1 : c == 5 ? .5f : 0;
-                fish = fishingNow ? new FishCast { Spot = "opensea", Bx = player.X + 30 * boatDir, By = player.Y + 4, Tx = player.X + 30 * boatDir, Ty = player.Y + 4 } : null;
+                fish = fishingNow ? new FishCast { Spot = "opensea", Bx = player.X + 30 * BoatDir, By = player.Y + 4, Tx = player.X + 30 * BoatDir, Ty = player.Y + 4 } : null;
                 float t = c * .37f;
                 if (r == 2) { state.aboard = false; DrawBoat(player.X, player.Y, t); state.aboard = true; }
                 else { time = t; DrawBoat(player.X, player.Y, t, occupied: true); if (fish != null) DrawFishing(t); }
@@ -511,7 +514,7 @@ partial class Game
             Check($"{Data.Biomes[b].Name} can be walked to", reach.Any(t => biome[t.Item2, t.Item1] == bb && Buildable.Contains(map[t.Item2, t.Item1])));
         }
         Check("Starfall Atoll can't be walked to (boat only)", !reach.Any(t => biome[t.Item2, t.Item1] == 4));
-        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && s.Biome is not ("atoll" or "amihan")))
+        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && s.Biome is not ("atoll" or "amihan" or "habagat")))
         {
             bool ok = reach.Any(t => { float cx = t.Item1 * T + 5, cy = t.Item2 * T + 7; return Dist(cx, cy, s.X, s.Y) < s.R - 2 && CanStand(cx, cy); });
             Check($"{s.Label} ({Data.Biomes.First(b => b.Id == s.Biome).Name}) can be fished from land", ok);
@@ -1958,6 +1961,7 @@ partial class Game
 
         // Ending screen
         foreach (int frames in AmihanScript()) yield return frames;
+        foreach (int frames in DirectionScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

@@ -607,6 +607,20 @@ partial class Game
             }, () => Toast("Lira found you by the water. You wake in Amihan Village; your boat is at the western landing. Eat and rest before another fierce catch.", 7));
             return;
         }
+        if (InHabagat && boss == null)
+        {
+            LeaveMount();
+            state.aboard = false;
+            race = null; eclipse = null;
+            FadeThrough(() =>
+            {
+                player.X = AsinanWakeX; player.Y = AsinanWakeY; player.Face = "down";
+                state.hp = 35;
+                if (Has("boat") > 0) { state.boatAt = "asinan"; state.boatX = state.boatY = 0; }
+                Save();
+            }, () => Toast("Manang Rosa found you and brought you to her house on Asinan. Your boat is tied up at the Asinan landing. Eat and rest before heading back out.", 7));
+            return;
+        }
         if (scene == "world" && (Aboard || Swimming) && boss == null)
         {
             LeaveMount();

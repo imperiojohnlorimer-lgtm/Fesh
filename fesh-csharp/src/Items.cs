@@ -49,7 +49,7 @@ static class Items
         new("rod_crystal", "Crystal rod", "rod", "Glowing and light. Rare fish can't resist it.", Icon: "rod", Tint: "#7fe8ff"),
         new("rod_ancient", "Ancient rod", "rod", "Made with abyssite. The rod for a fish older than the islands.", Icon: "rod", Tint: "#9b6be0"),
         new("boat", "Sailboat", "tool", "At Pip's or Starfall's jetty, use <alt> to take the helm. Steer with <move> toward Amihan in the east; <ride> lands on shore. Over deep water <act> fishes the open sea, and with a lure <alt> trolls.", Icon: "boat"),
-        new("spear", "Fishing spear", "tool", "At reef shallows (coral shallows, the atoll lagoon) press <spear> to spearfish.", Icon: "spear"),
+        new("spear", "Fishing spear", "tool", "At reef shallows (coral shallows, the atoll lagoon, the islet reef of Daang Pulo) press <spear> to spearfish.", Icon: "spear"),
         new("copper_reel", "Copper reel", "tackle", "The catch meter fills 15% faster.", Icon: "reel", Tint: "#d9823f"),
         new("iron_reel", "Iron reel", "tackle", "The catch meter fills 30% faster.", Icon: "reel", Tint: "#c9d4dc"),
         new("gold_reel", "Gold reel", "tackle", "The catch meter fills 45% faster.", Icon: "reel", Tint: "#f3c25b"),
@@ -110,15 +110,27 @@ static class Items
         new("egg", "Egg", "food", "Better cooked.", 5, "egg"),
         new("truffle", "Truffle", "food", "A pig found this. It smells wonderful.", 12, "truffle"),
         new("coconut", "Coconut", "food", "From a palm tree. Sweet enough to use as bait, if you know who's hungry for it.", 10, "coconut"),
-        new("cactus_fruit", "Cactus fruit", "food", "Juicy, once you get past the spines.", 8, "cactusfruit")
+        new("cactus_fruit", "Cactus fruit", "food", "Juicy, once you get past the spines.", 8, "cactusfruit"),
+        // Habagat
+        new("salt", "Salt", "material", "Raked from Asinan's salt beds on a dry day. Fish need salting before they dry on a rack.", Icon: "salt"),
+        new("calamansi", "Calamansi", "food", "A little green citrus from the Habagat bushes. Sour enough to cook fish without a fire.", 4, "calamansi"),
+        new("cowrie", "Cowrie (sigay)", "material", "A glossy shell gleaned at low tide. Sungka is played with them.", Icon: "cowrie"),
+        new("sea_urchin", "Sea urchin (tuyom)", "food", "Gleaned at low tide. Crack it open carefully and eat the roe.", 12, "urchin"),
+        new("sea_grapes", "Sea grapes (lato)", "food", "Tiny green beads of seaweed, gleaned at low tide. They pop like the sea.", 8, "seagrapes"),
+        new("daing", "Daing", "food", "Salted fish dried in the sun on a rack. Keeps for a long voyage and sells well.", 28, "daing"),
+        new("kinilaw", "Kinilaw", "food", "Fresh fish cured in calamansi and salt. No fire needed.", 40, "kinilaw"),
+        new("sinigang", "Sinigang na isda", "food", "Fish in a sour calamansi broth. Warms you right through.", 60, "sinigang"),
+        new("ginataan", "Ginataang isda", "food", "Fish simmered in coconut milk.", 45, "ginataan"),
+        new("agong", "Agong", "tool", "Dado's old bronze gong from the regatta. Tatay Celso says it was beaten on full-moon nights, to keep the moon safe.", Icon: "agong"),
+        new("moon_charm", "Moonscale charm", "accessory", "A scale Bakunawa left behind, on a cord. Rare luck +1 at night.", Icon: "mooncharm")
     };
 
     static Items()
     {
         int i = 0;
-        void Spots(bool sea)
+        void Spots(bool sea, bool late)
         {
-            foreach (var s in Data.Spots.Where(s => (s.Scene == "sea") == sea))
+            foreach (var s in Data.Spots.Where(s => (s.Scene == "sea") == sea && Late(s.Biome) == late))
                 foreach (var f in Data.Common[s.Id])
                 {
                     string place = !sea ? s.Label.ToLowerInvariant() : s.Id == "opensea" ? "the open sea" : "the " + s.Label;
@@ -126,14 +138,26 @@ static class Items
                     All.Add(new ItemDef(f.Id, f.Name, "fish", $"{where} Eat it raw in a pinch, or cook it.", 6, FishIcon(f.Id), FishTints[i++ % FishTints.Length]));
                 }
         }
-        Spots(false);
-        foreach (var (biome, list) in Data.PotCatch)
-            foreach (var f in list)
-                All.Add(new ItemDef(f.Id, f.Name, "fish", $"Found in a crab pot on {Data.Biomes.First(b => b.Id == biome).Name}.", 6, FishIcon(f.Id), FishTints[i++ % FishTints.Length]));
-        // The open sea's fish come last, so adding them changed nobody else's colour.
-        Spots(true);
+        void Pots(bool late)
+        {
+            foreach (var (biome, list) in Data.PotCatch.Where(p => Late(p.Key) == late))
+                foreach (var f in list)
+                    All.Add(new ItemDef(f.Id, f.Name, "fish", $"Found in a crab pot on {Data.Biomes.First(b => b.Id == biome).Name}.", 6, FishIcon(f.Id), FishTints[i++ % FishTints.Length]));
+        }
+        Spots(false, false);
+        Pots(false);
+        // The open sea's fish come after the pots, so adding them changed nobody else's colour; Habagat's come after
+        // everything, for the same reason (land spots, then its pots, then its sea).
+        Spots(true, false);
+        Spots(false, true);
+        Pots(true);
+        Spots(true, true);
         ById = All.ToDictionary(d => d.Id);
     }
+
+    // Regions added after the open sea, whose fish are given their colours last.
+    static bool Late(string biome) => biome == "habagat";
+    public static string TintAt(int i) => FishTints[i % FishTints.Length];
 
     // Crabs, shrimp, squid, rays and eels get their own little icons; everything else is a fish.
     static string FishIcon(string id) =>
@@ -172,7 +196,9 @@ static class Items
         ["berries"] = new(0.7f, 0, false, "Carp and other plant-eaters like a berry."),
         ["coconut"] = new(0.8f, 0, false, "Sweet and white. Hardly any fish care for it."),
         ["spinner_lure"] = new(0.85f, 0, true, "Never used up. Fish that run chase it."),
-        ["fly_lure"] = new(0.85f, 0, true, "Never used up. Jumpers snap at it.")
+        ["fly_lure"] = new(0.85f, 0, true, "Never used up. Jumpers snap at it."),
+        // A fish you catch at the Parola pier, used live.
+        ["tamban"] = new(0.6f, 1, false, "A live sardine. Sea fish that run or leap chase it.")
     };
 
     // What Pip pays for one. Tools, rods, bait, saplings and sailcloth can't be sold.
@@ -182,7 +208,9 @@ static class Items
         ["gold_ore"] = 12, ["gold_bar"] = 35, ["abyssite"] = 60, ["slime_gel"] = 4, ["bat_wing"] = 6, ["crab_shell"] = 10, ["shadow_essence"] = 25,
         ["wool"] = 6, ["egg"] = 3, ["berries"] = 1, ["truffle"] = 15, ["coconut"] = 4, ["cactus_fruit"] = 3,
         ["grilled_fish"] = 10, ["fried_egg"] = 6, ["fish_stew"] = 25, ["smoked_fish"] = 20, ["fish_jerky"] = 12, ["sushi_roll"] = 30, ["maki_platter"] = 70,
-        ["seaweed"] = 2, ["pearl"] = 80, ["old_boot"] = 1
+        ["seaweed"] = 2, ["pearl"] = 80, ["old_boot"] = 1,
+        ["salt"] = 2, ["calamansi"] = 2, ["cowrie"] = 4, ["sea_urchin"] = 6, ["sea_grapes"] = 3, ["daing"] = 22,
+        ["kinilaw"] = 30, ["sinigang"] = 42, ["ginataan"] = 34
     };
 
     // Pip's base price for one. Game.PriceOf adds bonuses (cooler, collections) and Game.SaleValue big fish.
@@ -279,7 +307,10 @@ static class Items
         new("fried_egg", 1, "fire", N(("egg", 1))),
         new("fish_stew", 1, "stove", N(("fish", 2), ("berries", 1))),
         new("sushi_roll", 1, "stove", N(("fish", 1), ("seaweed", 1))),
-        new("maki_platter", 1, "stove", N(("fish", 3), ("seaweed", 2), ("berries", 1)))
+        new("maki_platter", 1, "stove", N(("fish", 3), ("seaweed", 2), ("berries", 1))),
+        new("kinilaw", 1, "stove", N(("fish", 1), ("calamansi", 1), ("salt", 1))),
+        new("sinigang", 1, "stove", N(("fish", 2), ("calamansi", 2))),
+        new("ginataan", 1, "stove", N(("fish", 1), ("coconut", 1)))
     };
 
     public static readonly Dictionary<string, string> StationName = new()
@@ -314,6 +345,7 @@ static class Items
         ["carabao"] = new("carabao", "carabao", 9, "The carabao lowers its broad horns and leans into your hand.", null, null),
         ["tarsier"] = new("tarsier", "Philippine tarsier", 17, "You stay back. Two enormous eyes watch you from the shade.", null, null),
         ["hornbill"] = new("hornbill", "rufous hornbill", 21, "You watch quietly as the hornbill tilts its bright bill toward the canopy.", null, null),
+        ["goat"] = new("goat", "goat", 13, "The goat nibbles your sleeve, then bleats at you.", null, null),
         ["dog"] = new("dog", "Biscuit", 26, "Biscuit wags his whole body.", "wood", "Biscuit drops a stick at your feet. (+1 wood)"),
         ["chicken"] = new("chicken", "chicken", 18, "The chicken clucks and lets you pat it.", "egg", "The chicken has laid an egg for you. (+1 egg)"),
         ["sheep"] = new("sheep", "sheep", 12, "The sheep leans into your hand. Its fleece is wonderfully warm.", "wool", "You gently gather some loose wool. (+1 wool)"),
@@ -328,6 +360,7 @@ static class Items
         ("sheep", 530, 125), ("sheep", 700, 60), ("sheep", 720, 130), ("sheep", 600, 140),
         ("cat", 640, 362), ("cat", 735, 440),
         ("pig", 95, 330), ("pig", 230, 380), ("pig", 255, 440),
+        ("goat", 150, 655), ("goat", 300, 640),
         ("carabao", 1605, 267), ("carabao", 1705, 247),
         ("tarsier", 1875, 577), ("tarsier", 1965, 587),
         ("hornbill", 2075, 107), ("hornbill", 1935, 607)
@@ -622,6 +655,54 @@ static class ItemArt
             case "eel":
                 p.Rect(1, 6, 3, 2, tint); p.Rect(3, 5, 3, 2, tint); p.Rect(5, 6, 3, 2, tint); p.Rect(7, 5, 3, 2, tint); p.Rect(9, 4, 2, 2, tint);
                 p.Rect(10, 4, 1, 1, "#10243a");
+                break;
+            case "salt":
+                // A little heap of white crystals.
+                p.Rect(2, 8, 8, 2, "#d9dde0"); p.Rect(3, 6, 6, 2, "#eef1f3"); p.Rect(4, 4, 4, 2, "#f8fafb"); p.Rect(5, 3, 2, 1, "#ffffff");
+                p.Rect(3, 9, 1, 1, "#ffffff"); p.Rect(7, 7, 1, 1, "#ffffff"); p.Rect(1, 10, 10, 1, "#b8bec2");
+                break;
+            case "calamansi":
+                p.Rect(2, 5, 4, 4, "#5f9a2e"); p.Rect(3, 4, 2, 6, "#5f9a2e"); p.Rect(6, 4, 4, 4, "#7fb53a"); p.Rect(7, 3, 2, 6, "#7fb53a");
+                p.Rect(3, 5, 1, 1, "#c8e070"); p.Rect(7, 4, 1, 1, "#e0f08a"); p.Rect(5, 1, 2, 2, "#3f6a22"); p.Rect(8, 8, 1, 1, "#f2c94a");
+                break;
+            case "cowrie":
+                p.Rect(3, 3, 6, 7, "#e8d2a8"); p.Rect(2, 4, 8, 5, "#e8d2a8"); p.Rect(4, 3, 4, 2, "#f6e6c4");
+                p.Rect(4, 5, 1, 1, "#a8743f"); p.Rect(7, 6, 1, 1, "#a8743f"); p.Rect(5, 8, 1, 1, "#a8743f"); p.Rect(6, 4, 1, 6, "#8a5f36");
+                break;
+            case "urchin":
+                p.Rect(3, 4, 6, 5, "#3a2a4a"); p.Rect(4, 3, 4, 7, "#3a2a4a"); p.Rect(5, 5, 2, 2, "#5a4a6e");
+                foreach (var (ux, uy) in new[] { (1, 6), (10, 6), (6, 1), (6, 11), (2, 2), (10, 2), (2, 10), (10, 10) }) p.Rect(ux, uy, 1, 1, "#4a3a5e");
+                break;
+            case "seagrapes":
+                foreach (var (gx, gy) in new[] { (5, 2), (4, 4), (6, 4), (5, 6), (3, 6), (7, 6), (4, 8), (6, 8), (5, 10) })
+                { p.Rect(gx, gy, 2, 2, "#5fb04f"); p.Rect(gx, gy, 1, 1, "#a6e08a"); }
+                p.Line(5, 11, 5, 1, "#3f7a32");
+                break;
+            case "daing":
+                // A split, flattened fish, golden from the sun.
+                p.Rect(3, 3, 6, 7, "#c99a52"); p.Rect(2, 4, 8, 5, "#c99a52"); p.Rect(5, 3, 2, 7, "#a87a3a");
+                p.Rect(1, 9, 3, 2, "#b5854a"); p.Rect(8, 9, 3, 2, "#b5854a"); p.Rect(4, 4, 1, 1, "#f2d08a"); p.Rect(7, 6, 1, 1, "#f2d08a");
+                break;
+            case "kinilaw":
+                p.Rect(1, 6, 10, 4, "#e8e2d6"); p.Rect(2, 10, 8, 1, "#b8b2a6"); p.Rect(2, 5, 8, 2, "#f2ece0");
+                p.Rect(3, 5, 2, 2, "#f2c8b8"); p.Rect(6, 5, 2, 2, "#f2c8b8"); p.Rect(5, 4, 1, 1, "#7fb53a"); p.Rect(8, 4, 1, 1, "#e04b3a");
+                break;
+            case "sinigang":
+                p.Rect(1, 6, 10, 4, "#8a5f36"); p.Rect(2, 10, 8, 1, "#6b4a2b"); p.Rect(2, 5, 8, 2, "#e0c070"); p.Rect(3, 5, 2, 1, "#5f9a2e");
+                p.Rect(7, 5, 2, 1, "#c98b3a"); p.Rect(4, 1, 1, 3, "#dfe9ee"); p.Rect(7, 2, 1, 2, "#dfe9ee");
+                break;
+            case "ginataan":
+                p.Rect(1, 6, 10, 4, "#8a5f36"); p.Rect(2, 10, 8, 1, "#6b4a2b"); p.Rect(2, 5, 8, 2, "#f4ead2"); p.Rect(4, 5, 3, 1, "#e8a060");
+                p.Rect(4, 1, 1, 3, "#dfe9ee"); p.Rect(7, 2, 1, 2, "#dfe9ee");
+                break;
+            case "agong":
+                // A bronze gong with a raised boss in the middle, hanging from a cord.
+                p.Rect(2, 3, 8, 8, "#a8742a"); p.Rect(3, 2, 6, 10, "#a8742a"); p.Rect(3, 4, 6, 6, "#c98b3a");
+                p.Rect(5, 6, 2, 2, "#f2c94a"); p.Rect(5, 6, 1, 1, "#ffe8a0"); p.Rect(5, 0, 1, 2, "#6b4a2b"); p.Rect(6, 0, 1, 1, "#6b4a2b");
+                break;
+            case "mooncharm":
+                p.Line(3, 1, 6, 4, "#c9a06a"); p.Line(9, 1, 6, 4, "#c9a06a");
+                p.Rect(3, 5, 7, 6, "#c8d8f0"); p.Rect(4, 4, 5, 8, "#c8d8f0"); p.Rect(5, 6, 3, 3, "#ffffff"); p.Rect(4, 9, 2, 1, "#9fb8e8");
                 break;
             case "tidemane":
                 // A hippocamp's head: teal, a foam mane, coral horns and a gold eye.

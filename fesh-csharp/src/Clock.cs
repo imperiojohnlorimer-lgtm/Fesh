@@ -37,10 +37,11 @@ partial class Game
         return (Smooth(Bump(19.5f * 60, 90)), Smooth(Bump(6 * 60, 75)));
     }
 
+    // Time stands still while Bakunawa holds the moon.
     void TickClock(float dt)
     {
         float rate = Settings.GameMinutesPerSecond;
-        if (rate > 0) Advance(dt * rate, quiet: false);
+        if (rate > 0 && eclipse == null) Advance(dt * rate, quiet: false);
     }
 
     // Moves the clock forward, stopping at each dusk and dawn on the way so nothing is skipped (resting can cross both).
@@ -50,7 +51,8 @@ partial class Game
         while (mins > 0)
         {
             float toDusk = Until(DuskMin), toDawn = Until(DawnMin), hit = Math.Min(toDusk, toDawn);
-            if (mins < hit) { state.clock = Wrap(state.clock + mins); FollowForecast(quiet); return; }
+            if (mins < hit) { DryRacks(state.clock, mins); state.clock = Wrap(state.clock + mins); FollowForecast(quiet); return; }
+            DryRacks(state.clock, hit);
             state.clock = toDusk < toDawn ? DuskMin : DawnMin;
             mins -= hit;
             if (toDusk < toDawn) { FollowForecast(quiet); if (!quiet) Toast(FullMoon ? "Night falls. The moon is full tonight." : "Night falls.", 3); }

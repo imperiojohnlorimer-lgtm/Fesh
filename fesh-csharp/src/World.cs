@@ -41,8 +41,9 @@ partial class Game
     readonly HashSet<(int, int)> hoofprints = new();
     const float PipX = 210, PipY = 101;
     readonly HashSet<(int, int)> bridgeSet = new();
-    static readonly char[] InnerGround = { 'g', 'n', 'D', 'j', 's', 'j' }, ShoreGround = { 's', 'e', 's', 's', 's', 's' }, TreeKind = { 't', 'f', 'c', 'h', 'h', 'h' };
-    static readonly float[] TreeDensity = { 0, 0.12f, 0.05f, 0.24f, 0.16f, 0.12f }, BoulderDensity = { 0, 0.025f, 0.03f, 0.015f, 0, 0.015f };
+    // Per biome, in Data.Biomes order (Habagat, the last, places its own trees in GenerateHabagat).
+    static readonly char[] InnerGround = { 'g', 'n', 'D', 'j', 's', 'j', 'g' }, ShoreGround = { 's', 'e', 's', 's', 's', 's', 's' }, TreeKind = { 't', 'f', 'c', 'h', 'h', 'h', 'h' };
+    static readonly float[] TreeDensity = { 0, 0.12f, 0.05f, 0.24f, 0.16f, 0.12f, 0.1f }, BoulderDensity = { 0, 0.025f, 0.03f, 0.015f, 0, 0.015f, 0.02f };
     static readonly HashSet<char> Land = new() { 's', 'g', 'p', 't', 'n', 'e', 'i', 'D', 'j', 'f', 'c', 'h', 'R' };
     static readonly HashSet<char> Water = new() { '~', 'w', 'l', 'T', 'x', 'r', 'o', 'm', 'I', 'k' };
 
@@ -103,9 +104,11 @@ partial class Game
             {
                 char t;
                 byte bi = 0;
-                if (x >= EastStart || y >= 56)
+                // Amihan to the east, and the Habagat band along the bottom, are carved later (GenerateArchipelago,
+                // GenerateHabagat); the open sea there belongs to them.
+                if (x >= EastStart || y >= HabagatTop)
                 {
-                    map[y, x] = '~'; biome[y, x] = x >= EastStart ? (byte)5 : (byte)0;
+                    map[y, x] = '~'; biome[y, x] = x >= EastStart ? (byte)5 : (byte)6;
                     continue;
                 }
                 if (x < 32 && y < 18)
@@ -254,6 +257,7 @@ partial class Game
             }
 
         GenerateArchipelago();
+        GenerateHabagat();
         RenderBase();
         mapTexDirty = true;
     }
@@ -277,8 +281,23 @@ partial class Game
     // The ground drawn under a tree, bush or the cave mouth.
     char Ground(char t, int x, int y) => t switch
     {
-        't' => 'g', 'f' => 'n', 'c' => 'D', 'C' => 'n', 'h' => biome[y, x] switch { 2 => 'g', 4 => 's', _ => 'j' }, 'R' or 'y' => InnerGround[biome[y, x]], _ => t
+        't' => 'g', 'f' => 'n', 'c' => 'D', 'C' => 'n', 'h' => biome[y, x] switch { 2 => 'g', 4 => 's', 6 => HabagatPalmGround(x, y), _ => 'j' }, 'R' or 'y' => InnerGround[biome[y, x]], _ => t
     };
+
+    // Habagat's palms grow on the beaches and inland too: they stand on whichever their neighbours mostly are.
+    char HabagatPalmGround(int x, int y)
+    {
+        int grass = 0, sand = 0;
+        foreach (var (ox, oy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+        {
+            int nx = x + ox, ny = y + oy;
+            if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
+            char c = worldMap[ny, nx];
+            if (c is 'g' or 'y' or 'R') grass++;
+            else if (c is 's') sand++;
+        }
+        return grass > sand ? 'g' : 's';
+    }
 
     // The whole outdoor base layer: depth, the rounded coast, every tile's ground and details, then where the foam goes.
     void RenderBase()
@@ -590,7 +609,7 @@ partial class Game
         {
             // In the saddle: everything you hold or swing is up where you sit.
             DrawRider(x, y, moving, step, arms, pump);
-            y -= 8;
+            (x, y) = RiderSeat(x, y);
             lean = 0;
         }
         else
@@ -797,6 +816,27 @@ partial class Game
                     }
                 break;
             }
+            case "dryrack":
+            {
+                // A low bamboo frame with a net across it; salted fish laid on it go from silver to sun-dried gold.
+                pix.Rect(X + 1, Y + 9, 9, 1, "rgba(0,0,0,0.22)");
+                pix.Rect(X + 1, Y + 3, 1, 6, "#8a6440"); pix.Rect(X + 8, Y + 3, 1, 6, "#8a6440");
+                pix.Rect(X, Y + 3, 10, 2, "#c9a06a"); pix.Rect(X, Y + 3, 10, 1, "#e0c088");
+                for (int i = 1; i < 10; i += 2) pix.Rect(X + i, Y + 4, 1, 1, "#a8844e");
+                pix.Rect(X + 2, Y + 7, 6, 1, "#a8844e");
+                var load = scene == "world" ? Rack(b) : null;
+                if (load != null)
+                {
+                    float k = Math.Min(1, load.dry / DryGoal);
+                    var c = Pal.Rgba((byte)(200 - (200 - 201) * k), (byte)(212 - (212 - 154) * k), (byte)(220 - (220 - 82) * k), 1);
+                    for (int i = 0; i < load.fish.Count; i++)
+                    {
+                        pix.Rect(X + 1 + i * 3, Y + 1, 2, 3, c);
+                        pix.Rect(X + 1 + i * 3, Y + 4, 2, 1, Pal.Rgba(c.R, c.G, c.B, 0.6f));
+                    }
+                }
+                break;
+            }
             case "path": DrawPath(X, Y); break;
             case "fence": DrawFence(X, Y, b.x, b.y); break;
             case "lantern": DrawLantern(X, Y); break;
@@ -906,7 +946,15 @@ partial class Game
                 if (w != 2) { pix.Rect(x + (w == 0 ? 0 : 1), y - 2, 1, 1, "#e8939a"); pix.Rect(x, y - 3 + w, 1, 1, "#d9788e"); }
                 continue;
             }
-            if (l.kind == "wood")
+            if (l.kind == "glean")
+            {
+                // A little wet patch with a shell, a dark urchin and a sprig of sea grapes in it, glinting.
+                pix.Rect(x - 3, y + 1, 7, 2, "rgba(40,90,110,0.25)");
+                pix.Rect(x - 2, y, 2, 1, "#e8d2a8"); pix.Rect(x - 2, y - 1, 2, 1, "#f6e6c4");
+                pix.Rect(x + 1, y, 2, 2, "#3a2a4a"); pix.Rect(x + 3, y - 1, 1, 1, "#4a3a5e");
+                pix.Rect(x, y - 2, 1, 1, "#5fb04f");
+            }
+            else if (l.kind == "wood")
             {
                 pix.Rect(x - 3, y + 2, 7, 1, "rgba(0,0,0,0.15)");
                 pix.Rect(x - 3, y, 6, 2, "#8a6440"); pix.Rect(x - 3, y, 6, 1, "#b08458"); pix.Rect(x + 3, y, 1, 2, "#6b4a2b");
@@ -1019,6 +1067,7 @@ partial class Game
         if (Visible(MouthX * T, MouthY * T)) list.Add(((MouthY + 2) * T, DrawCaveMouth));
         if (Visible(PipX, PipY)) { if (PipOpen) list.Add((PipY, DrawPip)); list.Add((PipY + 9, () => DrawStall(t))); }
         AddArchipelagoObjects(list);
+        if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
         if (Has("boat") > 0 && !Aboard)
         {
             var (bx, by) = BoatPosition();
@@ -1197,7 +1246,8 @@ partial class Game
     void DrawNight(float t)
     {
         float k = Darkness;
-        Array.Fill(dark, 0.63f * k);
+        // With the moon swallowed, the night is darker still.
+        Array.Fill(dark, (eclipse is { Phase: "rise" or "bang" } ? 0.74f : 0.63f) * k);
         LightHole(player.X, player.Y - 6, Wears("headlamp") ? 58 : 32, 0.85f);
         LightHole(FireX, FireY - 3, 44 + MathF.Sin(t * 9) * 2, 1);
         LightHole(165, 61, 12, 0.7f);
@@ -1212,8 +1262,13 @@ partial class Game
         // The Starwell glows after dark, enough to light a fight around it (and to catch your eye through the palms).
         LightHole(StarwellX, StarwellY, 62 + MathF.Sin(t * 1.3f) * 4, 0.8f);
         if (boss != null) LightHole(boss.X, boss.Y - 8, 34, 0.7f);
+        LightParola(t);
+        LightEclipse();
         ApplyDark(new Color(8, 16, 40, 255));
-        DrawMoonlitShore(t, k);
+        // With the moon in Bakunawa's jaws, the surf doesn't catch any moonlight.
+        if (eclipse == null || eclipse.Phase == "spit") DrawMoonlitShore(t, k);
+        GlowParola(t, k);
+        GlowEclipse(k);
         pix.Glow(StarwellX, StarwellY, 30, Pal.Rgba(120, 220, 255, (0.22f + 0.06f * MathF.Sin(t * 1.3f)) * k));
 
         var warm = Pal.Rgba(243, 150, 60, 0.18f * k);
@@ -1259,8 +1314,11 @@ partial class Game
     void UpdateCamera()
     {
         int sw = SCols * T, sh = SRows * T;
-        camX = sw <= W ? -(W - sw) / 2 : Math.Clamp((int)MathF.Round(player.X) - W / 2, 0, sw - W);
-        camY = sh <= H ? -(H - sh) / 2 : Math.Clamp((int)MathF.Round(player.Y - 8) - H / 2, 0, sh - H);
+        // Under Bakunawa the view frames you and the serpent out in the channel together.
+        float fx = player.X, fy = player.Y - 8;
+        if (eclipse != null && scene == "world") { fx = (player.X + SerpentX) / 2; fy = (player.Y - 8 + SerpentY - 12) / 2; }
+        camX = sw <= W ? -(W - sw) / 2 : Math.Clamp((int)MathF.Round(fx) - W / 2, 0, sw - W);
+        camY = sh <= H ? -(H - sh) / 2 : Math.Clamp((int)MathF.Round(fy) - H / 2, 0, sh - H);
         // Big impacts (Tidemane landing, charging into a palm, stomping) shake the view, unless that is turned off in Settings.
         if (quake > 0 && Settings.Data.shake && mode is not ("pause" or "panel"))
         {
@@ -1280,17 +1338,23 @@ partial class Game
             DrawWater(t);
             DrawTufts(t);
             foreach (var b in state.builds) if (b.id == "path") DrawBuild(b, t);
+            DrawSaltBeds();
             DrawLoose(t);
             DrawBugs(t);
             DrawSpots(t);
             DrawSchools(t);
+            DrawSeaLife(t);
+            DrawBuoys(t);
+            DrawRaceBuoys(t);
             DrawSonar(t);
             DrawStarwell(t);
             DrawIceCap();
             DrawSpearing(t);
+            DrawEclipse(t);
             DrawObjects(t);
             DrawBossEffects(t);
             DrawFishing(t);
+            DrawEclipseRing();
             DrawParticles();
             DrawLeaves();
             DrawCloudShadows(t);
@@ -1299,6 +1363,7 @@ partial class Game
             DrawWeatherTint();
             DrawSunGlow();
             if (Darkness > 0) DrawNight(t);
+            DrawEclipseSky();
             DrawRain(t);
             DrawGhost(t);
         }

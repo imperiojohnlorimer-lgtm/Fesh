@@ -155,9 +155,9 @@ static class Bind
     public static bool PressedNotTyping(string id) => keys[id].Any(k => k != KeyboardKey.Null && !Typing(k) && Inp.Pressed(k));
     static bool Typing(KeyboardKey k) => (int)k is >= 32 and <= 126 || k >= KeyboardKey.Kp0 && k <= KeyboardKey.KpEqual;
 
-    // Esc, Enter, Backspace (clears a key while rebinding) and the number keys can't be taken.
+    // Esc, Enter, Backspace (clears a key while rebinding) and the number keys (the build bar's) can't be taken.
     public static bool IsBindable(KeyboardKey k) => k is not (KeyboardKey.Null or KeyboardKey.Escape or KeyboardKey.Enter or KeyboardKey.KpEnter
-        or KeyboardKey.Backspace) && !(k >= KeyboardKey.One && k <= KeyboardKey.Nine);
+        or KeyboardKey.Backspace) && !(k >= KeyboardKey.Zero && k <= KeyboardKey.Nine);
 
     // Puts a key on an action. Whatever had that key before gets this slot's old key instead, so no key does two things.
     public static void Set(string id, int slot, KeyboardKey k)

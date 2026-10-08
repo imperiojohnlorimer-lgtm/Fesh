@@ -46,6 +46,9 @@ static class Sfx
         Add("stomp", 0.3f, b => { Tone(b, 95, 0.26f, "sine", 0.14f, -45); Noise(b, 0.14f, 0.12f); });
         Add("whistle", 0.4f, b => { Tone(b, 1500, 0.12f, "sine", 0.05f, 500); Tone(b, 2000, 0.2f, "sine", 0.05f, -350, 0.15f); });
         Add("bolt", 0.25f, b => { Noise(b, 0.12f, 0.1f); Tone(b, 760, 0.14f, "triangle", 0.035f, -380); });
+        // The agong (a deep, ringing bong) and the villagers' pots and pans (a bright clank).
+        Add("gong", 1.2f, b => { Tone(b, 196, 1.1f, "sine", 0.12f, -6); Tone(b, 472, 0.6f, "sine", 0.05f, -10); Tone(b, 770, 0.3f, "triangle", 0.025f); Noise(b, 0.04f, 0.12f); });
+        Add("clang", 0.25f, b => { Tone(b, 1250, 0.18f, "square", 0.02f, -80); Tone(b, 1900, 0.1f, "triangle", 0.025f); Noise(b, 0.05f, 0.1f); });
     }
 
     // A horse's whinny: a bright, wobbling cry that slides down and breaks into a snort.

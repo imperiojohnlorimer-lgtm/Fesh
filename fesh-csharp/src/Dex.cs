@@ -16,7 +16,8 @@ partial class Game
         Data.SpotOfFish.ContainsKey(f.Id)
         && (f.Time == "any" || (f.Time == "night") == Night)
         && (f.Weather == null || (f.Weather == "storm" ? Stormy : f.Weather == "rain" ? state.weather != "clear" : state.weather == "clear"))
-        && (!f.FullMoon || FullMoon);
+        && (!f.FullMoon || FullMoon)
+        && (f.Need == null || state.Hinted(f.Need));
 
     bool Seen(string id) => state.seen.Contains(id) && state.commons.GetValueOrDefault(id) == 0;
 
@@ -154,6 +155,8 @@ partial class Game
         var bits = new List<string> { f.Time == "any" ? "day or night" : f.Time == "night" ? "at night" : "by day" };
         if (f.Weather != null) bits.Add(f.Weather == "clear" ? "on clear days" : f.Weather == "rain" ? "in the rain" : "in storms");
         if (f.FullMoon) bits.Add("under a full moon");
+        if (f.Need == "parolaLit") bits.Add("once the Parola lamp is lit");
+        if (f.Need == "moonReturned") bits.Add("once the moon is safe");
         if (f.Legend) bits.Add("only once");
         return string.Join(", ", bits);
     }

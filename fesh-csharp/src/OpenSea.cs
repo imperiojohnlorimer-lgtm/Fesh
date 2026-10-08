@@ -1,7 +1,7 @@
 namespace Fesh;
 
 // Fishing the open sea: from the boat (or from Tidemane's back) anywhere over deep water. The sea spots ("opensea" west
-// of Amihan, "amihansea" in it) have no fixed place; SpotPos gives where you're casting. Out there, feeding frenzies
+// of Amihan, "amihansea" in it, "habagatsea" along the bottom) have no fixed place; SpotPos gives where you're casting. Out there, feeding frenzies
 // come and go: bait fish balled up under circling birds. Cast into one for a much quicker bite.
 sealed class School { public float X, Y, Age, Life; public int Seed; }
 
@@ -36,12 +36,18 @@ partial class Game
         return (player.X, player.Y);
     }
 
-    // The open-sea target: whichever sea you're in, aimed at the fish.
+    // Which sea you're on: Amihan's to the east, Habagat's along the bottom of the map, the open sea between.
+    string SeaSpotHere => InAmihan ? "amihansea" : InHabagat ? "habagatsea" : "opensea";
+
+    // The open-sea target: whichever sea you're in, aimed at the fish. Nothing is fished inside the sanctuary.
     Target SeaTarget()
     {
         if (!OverDeepSea) return null;
-        var s = Data.SpotById[InAmihan ? "amihansea" : "opensea"];
+        if (InSanctuary(player.X, player.Y) || InSanctuary(player.X, player.Y - 6)) return new Target { Type = "info", Label = "No fishing in the marine sanctuary (the buoys mark it)" };
+        var s = Data.SpotById[SeaSpotHere];
         seaSpot = SeaCastPoint();
+        // Right by the buoys, facing in, the cast would land inside.
+        if (InSanctuary(seaSpot.x, seaSpot.y)) return new Target { Type = "info", Label = "No fishing in the marine sanctuary (turn away from the buoys)" };
         string what = SchoolInReach() != null ? "Cast into the feeding frenzy" : s.Action;
         return new Target { Type = "spot", Id = s.Id, Label = what + " (hold to cast further)" };
     }
@@ -53,6 +59,10 @@ partial class Game
         bool canLand = LandingSpot() != null;
         // With a trolling line out, E (or F) winds it in; R still lands.
         if (trolling) return new Target { Type = "trolling", Label = "Wind in the trolling line", AltType = "troll", RideLabel = canLand ? "Land on shore" : null };
+        // Racing: no stopping to fish (it would stop the clock with you).
+        if (race != null) return new Target { Type = "info", Label = "Racing! Steer for the flashing gate", RideLabel = canLand ? "Land (ends the race)" : null };
+        // A sea turtle, a dugong or the whale shark alongside comes first: you watch them from the boat.
+        if (SeaLifeInReach() is SeaCreature sc) return new Target { Type = "watch", Ref = sc, Label = SeaKinds[sc.Kind].label, RideLabel = canLand ? "Land on shore" : null };
         Target fishing = null;
         foreach (var s in Data.Spots)
             if (s.Scene == "world" && SpotOpen(s.Id) && SpotKnown(s) && s.Id != "icehole" && Dist(player.X, player.Y, s.X, s.Y) < s.R)
@@ -64,7 +74,7 @@ partial class Game
         if (fishing == null && SeaTarget() is Target sea)
         {
             fishing = sea;
-            fishing.AltType = "troll"; fishing.AltLabel = "Troll a lure";
+            if (sea.Type == "spot") { fishing.AltType = "troll"; fishing.AltLabel = "Troll a lure"; }
         }
         if (fishing != null)
         {
@@ -94,7 +104,7 @@ partial class Game
         {
             float a = Rand(0, MathF.Tau), d = Rand(40, sounder ? 190 : 110);
             float x = player.X + MathF.Cos(a) * d, y = player.Y + MathF.Sin(a) * d * 0.7f;
-            if (TileUnder(x - 8, y) != '~' || TileUnder(x + 8, y) != '~' || TileUnder(x, y - 5) != '~' || TileUnder(x, y + 5) != '~') continue;
+            if (TileUnder(x - 8, y) != '~' || TileUnder(x + 8, y) != '~' || TileUnder(x, y - 5) != '~' || TileUnder(x, y + 5) != '~' || InSanctuary(x, y)) continue;
             if (schools.Any(o => Dist(o.X, o.Y, x, y) < 40)) continue;
             schools.Add(new School { X = x, Y = y, Life = Rand(30, 50), Seed = rng.Next(1000) });
             break;
@@ -172,6 +182,7 @@ partial class Game
     void ToggleTroll()
     {
         if (trolling) { WindIn("You wind the trolling line in."); return; }
+        if (race != null) { Sfx.Play("nope"); Toast("Not in the middle of a race!"); return; }
         string l = TrollLureOwned();
         if (l == null)
         {
@@ -201,6 +212,7 @@ partial class Game
     {
         if (!trolling) return;
         if (!Aboard) { trolling = false; return; }
+        if (race != null) { WindIn("You wind the trolling line in for the race."); return; }
         if (player.Moving)
             trollDir = (player.Face == "left" ? -1 : player.Face == "right" ? 1 : 0, player.Face == "up" ? -1 : player.Face == "down" ? 1 : 0);
         // It trails well behind and swings wide round the turns.
@@ -208,6 +220,7 @@ partial class Game
         lure = (lure.x + (tx - lure.x) * k, lure.y + (ty - lure.y) * k);
         trollShallowT = TileUnder(player.X, player.Y) == '~' ? 0 : trollShallowT + dt;
         if (trollShallowT > 1.2f) { WindIn("Too shallow to troll here: you wind the line in before it snags."); return; }
+        if (InSanctuary(lure.x, lure.y) || InSanctuary(player.X, player.Y)) { WindIn("You wind the line in: no trolling inside the sanctuary's buoys."); return; }
         if (!player.Moving) return;
         bool frenzy = InSchool(lure.x, lure.y);
         trollT -= dt * (frenzy ? 6 : 1);
@@ -216,7 +229,7 @@ partial class Game
 
     void TrollStrike(bool frenzy)
     {
-        string spot = InAmihan ? "amihansea" : "opensea";
+        string spot = SeaSpotHere;
         trolling = false;
         player.Moving = false;
         FaceToward(lure.x, lure.y);
@@ -263,15 +276,14 @@ partial class Game
         if (BoatCanStand(player.X, player.Y + my)) { player.Y += my; moved = true; }
         if (!moved) towAng += dt * 2;
         state.boatX = player.X; state.boatY = player.Y;
-        if (MathF.Abs(dx) > 4) boatDir = dx > 0 ? 1 : -1;
         FaceToward(fx, fy);
+        boatFace = player.Face;
     }
 
     // The trolling rod in its holder at the stern, the line streaming back, and the lure skipping in the wake.
-    void DrawTroll(int X, int Y, int dir, float t)
+    void DrawTroll(int hx, int hy, int rx, int ry, float t)
     {
-        int rx = X - 15 * dir, ry = Y - 9;
-        pix.Line(X - 10 * dir, Y - 1, rx, ry, "#6b4a2b");
+        pix.Line(hx, hy, rx, ry, "#6b4a2b");
         int n = Math.Max(6, (int)Dist(rx, ry, lure.x, lure.y));
         var line = Pal.Rgba(240, 240, 240, 0.7f);
         for (int i = 0; i <= n; i++)

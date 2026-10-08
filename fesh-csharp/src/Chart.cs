@@ -14,17 +14,21 @@ partial class Game
     sealed record MapMark(string Label, float X, float Y, Color Dot, Color Text, float Size, bool HasDot, List<string> Tip, int Prio);
 
     /* ---------- Charting ---------- */
-    // An island: one of the five original biomes, or one of Amihan's four islands by name.
+    // An island: one of the five original biomes, one of Amihan's four islands by name, or a Habagat island (Asinan,
+    // Parola, or an islet of Daang Pulo by number).
     string RegionAt(int tx, int ty)
     {
         byte b = BiomeAt(tx, ty);
         if (b < 5) return Data.Biomes[b].Id;
+        if (b == 6) return HabagatRegion(tx, ty);
         var isle = AmihanIslands.OrderBy(i => (i.cx - tx) * (i.cx - tx) / (i.rx * i.rx) + (i.cy - ty) * (i.cy - ty) / (i.ry * i.ry)).First();
         return "amihan:" + isle.name;
     }
 
     string RegionOf(float wx, float wy) => RegionAt((int)MathF.Floor(wx / T), (int)MathF.Floor(wy / T));
-    string SpotRegion(Spot s) => s.Biome == "amihan" ? RegionOf(s.X, s.Y) : s.Biome;
+    // A Habagat spot can sit in water north of HabagatTop (the Parola pier's end), so it's asked of Habagat directly.
+    string SpotRegion(Spot s) => s.Biome == "habagat" ? HabagatRegion((int)MathF.Floor(s.X / T), (int)MathF.Floor(s.Y / T))
+        : s.Biome == "amihan" ? RegionOf(s.X, s.Y) : s.Biome;
     bool Charted(string region) => state.charted == null || state.charted.Contains(region);
 
     // Standing on an island's land charts it.
@@ -32,12 +36,14 @@ partial class Game
     {
         if (scene != "world" || state.charted == null) return;
         int tx = (int)MathF.Floor(player.X / T), ty = (int)MathF.Floor((player.Y - 1.5f) / T);
-        if (WaterTile(TileAt(tx, ty))) return;
+        // The sanctuary's watch platform stands in open sea: it isn't part of any island.
+        if (WaterTile(TileAt(tx, ty)) || InSanctuary(player.X, player.Y)) return;
         string r = RegionAt(tx, ty);
         if (state.charted.Contains(r)) return;
         state.charted.Add(r);
         mapTexDirty = true;
         if (r.StartsWith("amihan:")) Toast($"You've charted {r[7..]}.", 2.5f);
+        else if (r.StartsWith("habagat:") && !r.StartsWith("habagat:islet:")) Toast($"You've charted {r[8..]}.", 2.5f);
     }
 
     // Saves from before charting: Saltmere, plus anywhere you've clearly been (caught a fish there, gone down the
@@ -48,7 +54,7 @@ partial class Game
         foreach (var s in Data.Spots.Where(s => s.Scene != "sea"))
             if (Data.Common[s.Id].Any(f => state.commons.GetValueOrDefault(f.Id) > 0)) c.Add(s.Scene == "cave" ? "frost" : SpotRegion(s));
         foreach (var (biome, list) in Data.PotCatch)
-            if (biome != "amihan" && list.Any(f => state.commons.GetValueOrDefault(f.Id) > 0)) c.Add(biome);
+            if (biome is not ("amihan" or "habagat") && list.Any(f => state.commons.GetValueOrDefault(f.Id) > 0)) c.Add(biome);
         if (state.caveDeepest > 0) c.Add("frost");
         if (state.Hinted("visitedAtoll")) c.Add("atoll");
         if (state.Hinted("niko_request") || state.gifts.ContainsKey("lira_meal")) c.Add("amihan:Amihan Village");
@@ -176,11 +182,19 @@ partial class Game
             ("mire", "Mirewood", 100, 236), ("atoll", "Starfall Atoll", 1120, 170)
         };
         foreach (var i in AmihanIslands) isles.Add(("amihan:" + i.name, i.name, i.cx * T, (i.cy + i.ry + 2) * T));
+        foreach (var h in HabagatIslands.Where(h => h.name != "Daang Pulo")) isles.Add(("habagat:" + h.name, h.name, h.cx * T, (h.cy + h.ry + 1.5f) * T));
         foreach (var (region, name, wx, wy) in isles)
         {
             if (!OnChart(wx, wy)) continue;
             var p = M(wx, wy);
             marks.Add(new(Charted(region) ? name : "Uncharted island", p.X, p.Y, white, Charted(region) ? white : Pal.C("#f1e6c8"), 22, false, null, 0));
+        }
+        // Daang Pulo's islets share one name, with how many you've charted.
+        if (OnChart(0, 0))
+        {
+            var p = M(68 * T, 74.5f * T);
+            int n = IsletsCharted;
+            marks.Add(new(n == 0 ? "Uncharted islets" : $"Daang Pulo ({n} of {IsletCount} islets)", p.X, p.Y, white, n > 0 ? white : Pal.C("#f1e6c8"), n > 0 ? 20 : 22, false, null, 0));
         }
         // Fishing spots, where you've charted them.
         foreach (var s in Data.Spots.Where(s => s.Scene == "world" && SpotKnown(s) && Charted(SpotRegion(s))))
@@ -205,7 +219,25 @@ partial class Game
             Place("Village landing", 1495, 217, new() { "Village landing", "Moor here for Amihan Village" });
             foreach (var n in Islanders)
                 if (Charted(RegionOf(n.x, n.y + 10))) Place(n.name, n.x, n.y, new() { n.name, IslanderNote(n.id) });
+            // The sanctuary's name sits in its middle, and Bantay Joy on her platform.
+            var sp = M(SanctCX * T, (SanctCY + SanctRY + 1.2f) * T);
+            marks.Add(new("Marine sanctuary", sp.X, sp.Y, white, Pal.C("#bff4ff"), 20, false, null, 0));
+            Place("Bantay Joy", JoyX, JoyY, new() { "Bantay Joy, the sea warden", "No fishing or traps inside the buoys", $"Seen: {SeaKinds.Keys.Count(k => state.sightings.GetValueOrDefault(k) > 0)} of 3 animals" });
         }
+        else if (state.Hinted("habagat"))
+        {
+            Place("Asinan landing", AsinanJettyX, AsinanJettyY - 16, new() { "Asinan landing", Has("boat") > 0 ? "E sails from here; F takes the helm" : "You'll need a boat" });
+            foreach (var n in HabagatFolk)
+                if (Charted(RegionOf(n.x, n.y + 10))) Place(n.name, n.x, n.y, new() { n.name, HabagatNote(n.id) });
+            if (race != null || raceArmed)
+                for (int i = 0; i < RaceGates.Length; i++)
+                {
+                    bool next = race != null ? (race.Next < RaceGates.Length ? race.Next : 0) == i : i == 0;
+                    Place(i == 0 ? "Start" : $"Gate {i}", RaceGates[i].x, RaceGates[i].y, new() { i == 0 ? "Start and finish" : $"Regatta gate {i}", next ? "Next!" : "" }, next ? 1 : 4);
+                }
+        }
+        foreach (var b in state.builds.Where(b => b.id == "dryrack" && Rack(b) is RackLoad r && r.fish.Count > 0))
+            Place(RackDone(Rack(b)) ? "Rack (dry!)" : "Drying rack", b.x * T + 5, b.y * T + 5, new() { "Your drying rack", RackDone(Rack(b)) ? "The daing is ready" : $"{(int)((DryGoal - Rack(b).dry) / DryRate)} minutes of sun to go" }, 2);
         if (Has("boat") > 0 && !Aboard) { var bp = BoatPosition(); Place("Your boat", bp.x, bp.y, new() { "Your boat", "Moored here. R beside it to board." }, 1); }
         if (state.tamed && !state.riding) Place(Data.MountName, state.mountX, state.mountY - 6, new() { Data.MountName, "Waiting here. R whistles it over from anywhere outdoors." }, 1);
         foreach (var b in state.builds.Where(b => b.id == "crabpot"))
@@ -329,6 +361,15 @@ partial class Game
         else tip.Add("Biting now: " + (known.Count > 0 ? string.Join(", ", known) : "") + (unknown > 0 ? (known.Count > 0 ? $", and {unknown} you haven't caught" : $"{unknown} you haven't caught") : ""));
         return tip;
     }
+
+    string HabagatNote(string id) => id switch
+    {
+        "rosa" => RakedToday ? "Makes salt; you've raked the beds today" : "Makes salt; rake the beds on a dry day",
+        "pacing" => "Plays sungka, and knows the old stories",
+        "dado" => state.Hinted("isletsCharted") ? "Runs the regatta round the islets" : "Wants you to chart every islet first",
+        "celso" => state.parola >= 3 ? "Keeps the Parola light" : $"Needs help to light the lighthouse ({state.parola} of 3)",
+        _ => ""
+    };
 
     static string IslanderNote(string id) => id switch
     {

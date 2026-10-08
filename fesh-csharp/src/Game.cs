@@ -9,7 +9,7 @@ sealed class Critter { public string Id; public float X, Y, Vx, Vy, T; }
 // One cast. Depth is 0 shallow, 1 middle, 2 deep. WaitT counts up while waiting (the ice hole's jig rhythm uses it).
 sealed class FishCast
 {
-    public string Spot, Bait; public float T, Sx, Sy, Tx, Ty, Bx, By, Timer, BiteT, WaitT, Power; public int Depth, Jigs; public bool BigShadow;
+    public string Spot, Bait; public float T, Sx, Sy, Tx, Ty, Bx, By, Timer, BiteT, WaitT, Power; public int Depth, Jigs; public bool BigShadow, Spill;
     public bool Baited => Bait != null; public Catchable Roll;
 }
 // The reel fight. Style is the fish's fighting style (see CommonFish). Runners build Tension while you hold during a run;
@@ -38,7 +38,7 @@ partial class Game
     const int MaxBuilds = 150;
     static readonly HashSet<char> Buildable = new() { 's', 'g', 'n', 'e', 'D', 'j' };
     static readonly HashSet<char> WoodGround = new() { 's', 'e' };
-    static readonly Dictionary<string, int> LooseMax = new() { ["wood"] = 5, ["stone"] = 4, ["worm"] = 3 };
+    static readonly Dictionary<string, int> LooseMax = new() { ["wood"] = 5, ["stone"] = 4, ["worm"] = 3, ["glean"] = 5 };
     static readonly string[] FishingModes = { "charging", "casting", "waiting", "bite", "reeling", "chest", "spear", "drill" };
     // Modes where the world keeps going: food, health, monsters and the derby clock all tick.
     static readonly string[] ActiveModes = { "play", "build", "charging", "casting", "waiting", "bite", "reeling", "chest", "spear", "drill" };
@@ -148,7 +148,7 @@ partial class Game
     void PickMusic(float dt)
     {
         // lastBiome only changes on land, so crossing a bridge or standing on a jetty keeps the island's tune.
-        string track = mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine ? "boss" : scene == "cave" ? "cave" : InHouse ? "home"
+        string track = mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine ? "boss" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
             : Data.Biomes[lastBiome < Data.Biomes.Length ? lastBiome : PlayerBiome()].Id;
         Music.Want(track, Night && mode is not ("title" or "create") ? 0.3f : 0.42f);
         // The rain loop swells and fades with the rain on screen.
@@ -260,11 +260,13 @@ partial class Game
         else if (BackPressed())
         {
             if (mode == "panel" && panel == "dex" && dexFish != null) dexFish = null;
+            else if (mode == "panel" && panel == "sungka") CloseSungka();
             else if (mode == "panel") ClosePanels();
             else if (mode == "catch") CloseCatch();
             else if (mode == "odd") CloseOdd();
             else if (mode == "legend") CloseLegend();
             else if (mode == "tamed") CloseTamed();
+            else if (mode == "moon") CloseMoon();
             else if (mode == "build") ExitBuild();
             else if (mode is "waiting" or "charging") ReelIn("You reeled in.");
             else if (mode == "spear") EndSpear();
@@ -276,9 +278,11 @@ partial class Game
     // Esc, or Start on a gamepad, or B anywhere but plain play (where Start is the way into the menu).
     bool BackPressed() => Inp.Pressed(KeyboardKey.Escape) || Inp.PadPressed(GamepadButton.MiddleRight) || mode != "play" && Inp.PadPressed(GamepadButton.RightFaceRight);
 
+    // 1-9 pick the first nine pieces in the build bar, and 0 the tenth.
     static int? DigitPressed()
     {
         for (int i = 0; i < 9; i++) if (Inp.Pressed((KeyboardKey)((int)KeyboardKey.One + i))) return i;
+        if (Inp.Pressed(KeyboardKey.Zero)) return 9;
         return null;
     }
 
@@ -330,8 +334,17 @@ partial class Game
         if (Dist(x, y, SaltJettyX - 10, SaltJettyY) < 22) return "Pip's jetty";
         if (Dist(x, y, AtollJettyX + 20, AtollJettyY) < 34) return "Atoll jetty";
         char tile = TileAt((int)MathF.Floor(x / T), (int)MathF.Floor((y - 1.5f) / T));
-        if (Aboard) return InAmihan ? "Amihan sea · at the helm" : "Open sea · at the helm";
+        if (race != null) return $"Regatta · {RaceTime(race.T)}";
+        if (InAmihan && InSanctuary(x, y)) return Aboard ? "Marine sanctuary · at the helm" : "Marine sanctuary";
+        if (Aboard) return InAmihan ? "Amihan sea · at the helm" : InHabagat ? "Habagat sea · at the helm" : "Open sea · at the helm";
         if (InAmihan && !WaterTile(tile)) return AmihanIslands.OrderBy(i => Dist(x, y, i.cx * T, i.cy * T)).First().name;
+        if (InHabagat && !WaterTile(tile))
+        {
+            if (new Box(SaltBedX - 20, SaltBedY - 20, SaltBedW + 40, SaltBedH + 40).Overlaps(new Box(x - 3, y - 3, 6, 3))) return "Asinan salt beds";
+            if (Dist(x, y, LighthouseX, LighthouseY) < 50) return "Parola lighthouse";
+            string r = HabagatRegion((int)MathF.Floor(x / T), (int)MathF.Floor((y - 1.5f) / T));
+            return r.StartsWith("habagat:islet:") ? "Daang Pulo" : r[8..];
+        }
         if (Riding && tile == '~' && Dist(x, y, StarwellX, StarwellY) > 40) return "Open sea";
         var b = Data.Biomes[PlayerBiome()];
         if (b.Id == "saltmere")
@@ -726,18 +739,24 @@ partial class Game
             return null;
         }
 
-        // In the middle of the fight at the Starwell there's nothing to do but fight.
+        // In the middle of the fight at the Starwell there's nothing to do but fight; under Bakunawa, only beat the agong.
         if (boss != null) return BossTarget();
+        if (eclipse != null) return EclipseTarget();
         if (Aboard) return HelmTarget();
         if (ArchipelagoTarget() is Target islandTarget) return islandTarget;
+        if (HabagatTarget() is Target habagatTarget) return habagatTarget;
+        if (SanctuaryTarget() is Target sanctuaryTarget) return sanctuaryTarget;
         if (Dist(x, y, tomasX, tomasY) < 16)
             return TomasInBed ? new Target { Type = "info", Label = "Tomas has gone to bed in his hut" }
                 : new Target { Type = "npc", Label = CanHandIn ? $"Give Tomas the {Items.Amount(state.req.item, state.req.count)}" : "Talk to Tomas" };
         if (Dist(x, y, PipX, PipY + 14) < 12)
             return PipOpen ? new Target { Type = "pip", Label = "Trade with Pip" } : new Target { Type = "info", Label = $"Pip's stall is closed for the night. Pip opens at {HourText(7 * 60)}" };
         if (Dist(x, y, SaltJettyX, SaltJettyY) < 10)
-            return new Target { Type = "sail", Id = "atoll", Label = Has("boat") > 0 ? "Sail to Starfall Atoll" : "Pip's jetty (you need a boat to sail)", AltType = "launch", AltLabel = "Take the helm / explore east" };
-        if (Dist(x, y, AtollJettyX, AtollJettyY) < 10) return new Target { Type = "sail", Id = "saltmere", Label = "Sail back to Saltmere", AltType = "launch", AltLabel = "Take the helm / explore east" };
+            return new Target { Type = "sail", Id = "atoll", Label = Has("boat") == 0 ? "Pip's jetty (you need a boat to sail)" : VoyageChoice ? "Sail somewhere" : "Sail to Starfall Atoll", AltType = "launch", AltLabel = "Take the helm / explore east" };
+        if (Dist(x, y, AtollJettyX, AtollJettyY) < 10)
+            return new Target { Type = "sail", Id = "saltmere", Label = VoyageChoice ? "Sail somewhere" : "Sail back to Saltmere", AltType = "launch", AltLabel = "Take the helm / explore" };
+        if (Dist(x, y, AsinanJettyX, AsinanJettyY) < 10)
+            return new Target { Type = "sail", Id = "saltmere", Label = Has("boat") > 0 ? "Sail somewhere" : "Asinan landing (you need a boat to sail)", AltType = "launch", AltLabel = "Take the helm" };
         if (Dist(x, y, 160, 72) < 10) return new Target { Type = "door", Id = "house:tomas", Label = "Go inside Tomas's hut" };
         if (Dist(x, y, MouthDoorX, MouthDoorY) < 14) return new Target { Type = "cave", Label = "Enter Frostfang Caverns" };
         if (Dist(x, y, FireX, FireY) < 16) return new Target { Type = "rest", Label = restLabel, AltType = "cook", AltLabel = "Cook" };
@@ -750,6 +769,7 @@ partial class Game
                 return new Target { Type = "rest", Label = restLabel, AltType = d.Station == "fire" ? "cook" : null, AltLabel = d.Station == "fire" ? "Cook" : null };
             if (d.Station == "smoker" && Dist(x, y, b.x * T + 5, b.y * T + 10) < 13)
                 return new Target { Type = "craft", Id = "smoker", Label = "Use the smoking rack" };
+            if (b.id == "dryrack" && Dist(x, y, b.x * T + 5, b.y * T + 10) < 13) return RackTarget(b);
         }
         // Facing your own crab pot beats a chicken wandering past.
         if (BuildAt(fx, fy) is Build pot && pot.id == "crabpot")
@@ -762,7 +782,7 @@ partial class Game
         if (state.loose.FirstOrDefault(l => l.kind == "worm" && Dist(l.x, l.y, x, y - 2) < 10) is Loose mound)
             return new Target { Type = "dig", Ref = mound, Label = "Dig for worms" };
         char k = TileAt(fx, fy);
-        if (k == 'y') return new Target { Type = "bush", Tx = fx, Ty = fy, Label = "Pick berries" };
+        if (k == 'y') return new Target { Type = "bush", Tx = fx, Ty = fy, Label = BiomeAt(fx, fy) == 6 ? "Pick calamansi" : "Pick berries" };
         if (BuildAt(fx, fy) is Build planted && planted.id == "berrybush") return new Target { Type = "planter", Ref = planted, Label = "Pick berries" };
         if (k is 't' or 'f' or 'h' or 'c' or 'R')
             return new Target { Type = "tree", Tx = fx, Ty = fy, Label = k == 'R' ? "Break the boulder" : $"Chop the {TreeName(k)}" };
@@ -810,6 +830,7 @@ partial class Game
         else if (target?.AltType == "chum") ThrowChum(target.Id);
         else if (target?.AltType == "launch") LaunchBoat();
         else if (target?.AltType == "troll") ToggleTroll();
+        else if (target?.AltType == "unrack") UnloadRack((Build)target.Ref);
     }
 
     void OnAlt2()
@@ -826,6 +847,7 @@ partial class Game
             case "odd": CloseOdd(); return;
             case "legend": CloseLegend(); return;
             case "tamed": CloseTamed(); return;
+            case "moon": CloseMoon(); return;
             case "build": BuildAction(); return;
             case "play":
                 if (target == null) return;
@@ -836,11 +858,17 @@ partial class Game
                         else { FaceToward(tomasX, tomasY); TalkTomasWithRequests(); }
                         break;
                     case "pip": FaceToward(PipX, PipY); TalkPip(); break;
-                    case "sail": Sail(target.Id); break;
+                    case "sail": if (Has("boat") > 0 && (VoyageChoice || Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 12)) OpenVoyage(); else Sail(target.Id); break;
                     case "boat": BoardBoat(); break;
                     case "land": LandBoat(); break;
                     case "trolling": WindIn("You wind the trolling line in."); break;
                     case "islander": TalkIslander(target.Id); break;
+                    case "habagatfolk": TalkHabagat(target.Id); break;
+                    case "saltbed": RakeSalt(); break;
+                    case "rack": UseRack((Build)target.Ref); break;
+                    case "watch": Watch((SeaCreature)target.Ref); break;
+                    case "joy": TalkJoy(); break;
+                    case "agong": BeatAgong(); break;
                     case "tank": OpenTank((Build)target.Ref); break;
                     case "planter": PickPlanter((Build)target.Ref); break;
                     case "info": Sfx.Play("nope"); break;
@@ -896,10 +924,12 @@ partial class Game
             UpdateBoat(dt);
             UpdateSchools(dt);
             UpdateStrollers(dt);
+            UpdateSeaLife(dt);
             UpdateLeaves(dt);
             UpdateWeather(dt);
             heldT = Math.Max(0, heldT - dt);
         }
+        if (mode == "panel" && panel == "sungka") UpdateSungka(dt);
         if (mode is not ("title" or "create" or "pause")) state.playSecs += dt;
         if (mode != "pause") idleT = mode == "play" && !player.Moving ? idleT + dt : 0;
         if (ActiveModes.Contains(mode))
@@ -909,6 +939,7 @@ partial class Game
             TickHealth(dt);
             UpdateMonsters(dt);
             UpdateBoss(dt);
+            UpdateEclipse(dt);
             TickDerby(dt);
         }
         else { iframes = Math.Max(0, iframes - dt); hurtFlash = Math.Max(0, hurtFlash - dt); }
@@ -955,6 +986,8 @@ partial class Game
                 (dx, dy) = (Inp.Stick.X, Inp.Stick.Y);
                 push = Math.Clamp(0.35f + 0.65f * (Inp.Stick.Length() - 0.35f) / 0.5f, 0.35f, 1);
             }
+            // Under Bakunawa you stand your ground with the agong.
+            if (eclipse != null) dx = dy = 0;
             player.Moving = dx != 0 || dy != 0;
             if (player.Moving)
             {
@@ -966,6 +999,7 @@ partial class Game
                 if (Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, ride)) player.X += mx;
                 if (Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, ride)) player.Y += my;
                 player.Face = MathF.Abs(dx) > MathF.Abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+                if (Aboard) boatFace = player.Face;
                 int frameBefore = (int)(player.WalkT * 9);
                 player.WalkT += dt * push * (wet && !ride ? 0.75f : 1);
                 int frame = (int)(player.WalkT * 9);
@@ -980,7 +1014,9 @@ partial class Game
                 if (Riding) { state.mountX = player.X; state.mountY = player.Y; }
                 if (Aboard) { state.boatX = player.X; state.boatY = player.Y; }
                 DiscoverArchipelago();
-                if (mode == "play") UpdateTroll(dt);
+                DiscoverHabagat();
+                ChartNearIslets();
+                if (mode == "play") { UpdateTroll(dt); UpdateRegatta(dt); CheckEclipse(); }
                 CheckPin();
             }
             // Walking down onto a doorway steps back outside.
@@ -1046,9 +1082,11 @@ partial class Game
         if (state.aboard) state.riding = false;
         tomasX = TomasHomeX; tomasY = TomasHomeY;
         // Nothing carries over from a game played earlier in this session (quitting to the title and loading another slot).
-        fish = null; reel = null; panel = null; boss = null; dlg = null;
-        bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear();
+        fish = null; reel = null; panel = null; boss = null; dlg = null; eclipse = null; race = null; raceArmed = false; sungka = null;
+        bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear(); seaLife.Clear();
+        habagatWalk.Clear();
         trolling = towing = false;
+        boatFace = "right"; sailFurl = 1; sprayT = 0; mountDir = 1;
         derbyT = 0; heldT = 0; iframes = 0; hurtFlash = 0; quake = 0; pointerHold = false; caveFloor = 1;
         mapTexDirty = true;
         titleView = "main";
@@ -1064,7 +1102,7 @@ partial class Game
         mapTexDirty = true;
         SpawnAnimals();
         int sunk = RescueSunkBuilds();
-        player.X = state.px; player.Y = state.py; player.Face = "down";
+        player.X = state.px; player.Y = state.py; player.Face = Aboard ? boatFace : "down";
         // Cave floors aren't saved, so a game saved underground carries on at the cave mouth.
         if (state.scene == "cave") { player.X = MouthDoorX; player.Y = MouthDoorY + 2; }
         else if (state.scene != "world" && SceneExists(state.scene)) LoadScene(state.scene);
@@ -1077,6 +1115,7 @@ partial class Game
             bool atoll = state.boatAt == "atoll" && Has("boat") > 0;
             player.X = atoll ? AtollJettyX + 4 : 160; player.Y = atoll ? AtollJettyY + 1 : 115;
         }
+        int rescued = RescueStranded();
         if (state.tamed && !state.riding && state.mountX == 0 && state.mountY == 0) { state.mountX = player.X + 12; state.mountY = player.Y; }
         ReindexBuilds();
         if (scene == "world") FillLoose();
@@ -1094,7 +1133,9 @@ partial class Game
         }
         else if (sunk > 0)
             Toast($"Starfall Atoll has grown since you were last there, and the sea took the old shoreline. The {sunk} thing{(sunk == 1 ? "" : "s")} you built there {(sunk == 1 ? "is" : "are")} back in your bag.", 7);
-        else Toast($"Welcome back to {(InAmihan ? "Amihan" : "Saltmere")}. Day {state.day}, {ClockText(state.clock, 10)}.");
+        else if (rescued > 0)
+            Toast($"New islands have risen in the south since you were last out there. Your boat was found and tied up at {(state.boatAt == "atoll" ? "the atoll's jetty" : "Pip's jetty")}.", 7);
+        else Toast($"Welcome back to {(InAmihan ? "Amihan" : InHabagat ? "Habagat" : "Saltmere")}. Day {state.day}, {ClockText(state.clock, 10)}.");
         hasSave = true;
         Save();
     }

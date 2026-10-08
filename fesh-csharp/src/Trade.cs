@@ -35,6 +35,18 @@ partial class Game
             }, () => OpenShop());
             return;
         }
+        // Once you can sail the open sea from the atoll, Pip passes on where the southern islands are.
+        if (state.Hinted("visitedAtoll") && Has("boat") > 0 && !state.Hinted("habagat") && !state.Hinted("pipHabagat"))
+        {
+            state.hinted["pipHabagat"] = true;
+            Talk(new()
+            {
+                P("A boat of your own! Then listen: the fishers from the south say there are islands down past the Dunes and Mirewood."),
+                P("Salt beds, a hundred little islets, and an old lighthouse that's gone dark. They call the wind there the habagat."),
+                P("You can't get there from my jetty, it's all bridges this side. Take the helm at the atoll's jetty and head south.")
+            }, () => OpenShop());
+            return;
+        }
         // Once a day Pip passes on what the boats say about tomorrow's weather.
         if (!KnowTomorrow)
         {
@@ -115,9 +127,9 @@ partial class Game
             return new Req { item = r.Item, count = r.Count, coins = r.Coins, bonus = r.Bonus, bonusCount = r.BonusCount };
         }
         // After the set list: any ordinary fish from somewhere you can already reach.
-        var pool = Data.Spots.Where(s => (s.Biome != "atoll" || state.Hinted("visitedAtoll")) && (s.Biome != "amihan" || state.Hinted("amihan")) && SpotKnown(s)
-                && (s.Scene != "sea" || Has("boat") > 0 || state.tamed))
-            .SelectMany(s => Data.Common[s.Id]).Where(f => !f.Rare).ToList();
+        var pool = Data.Spots.Where(s => (s.Biome != "atoll" || state.Hinted("visitedAtoll")) && (s.Biome != "amihan" || state.Hinted("amihan"))
+                && (s.Biome != "habagat" || state.Hinted("habagat")) && SpotKnown(s) && (s.Scene != "sea" || Has("boat") > 0 || state.tamed))
+            .SelectMany(s => Data.Common[s.Id]).Where(f => !f.Rare && (f.Need == null || state.Hinted(f.Need))).ToList();
         var fish = pool[rng.Next(pool.Count)];
         int count = 2 + rng.Next(3);
         return new Req
@@ -218,28 +230,75 @@ partial class Game
             return;
         }
         if (state.weather == "storm") { Sfx.Play("nope"); Toast("Far too rough to sail in a storm. Wait for it to pass."); return; }
-        bool atoll = to == "atoll";
+        bool atoll = to == "atoll", asinan = to == "asinan";
         LeaveMount();
+        race = null; raceArmed = false;
         Sfx.Play("splash");
         FadeThrough(() =>
         {
             state.boatAt = to;
             state.aboard = false; state.boatX = state.boatY = 0;
-            player.X = atoll ? AtollJettyX + 4 : SaltJettyX - 4;
-            player.Y = atoll ? AtollJettyY + 1 : SaltJettyY + 1;
-            player.Face = atoll ? "right" : "left";
-            lastBiome = (byte)(atoll ? 4 : 0);
+            player.X = atoll ? AtollJettyX + 4 : asinan ? AsinanJettyX : SaltJettyX - 4;
+            player.Y = atoll ? AtollJettyY + 1 : asinan ? AsinanJettyY + 6 : SaltJettyY + 1;
+            player.Face = atoll ? "right" : asinan ? "down" : "left";
+            lastBiome = (byte)(atoll ? 4 : asinan ? 6 : 0);
             Save();
         }, () =>
         {
             var b = Data.Biomes[lastBiome];
-            Toast(atoll ? $"{b.Enter} ({b.Climate})" : b.Enter, 3.5f);
+            Toast(atoll || asinan ? $"{b.Enter} ({b.Climate})" : b.Enter, 3.5f);
             if (atoll && !state.Hinted("visitedAtoll"))
             {
                 state.hinted["visitedAtoll"] = true;
                 Save();
             }
         });
+    }
+
+    // Once you've found the Habagat islands, a jetty asks where you'd like to sail (the panel "voyage").
+    bool VoyageChoice => state.Hinted("habagat") && Has("boat") > 0;
+
+    void OpenVoyage()
+    {
+        Sfx.Play("ui");
+        panel = "voyage";
+        mode = "panel";
+        SetPrompt("");
+    }
+
+    void DrawVoyage()
+    {
+        Backdrop();
+        // Where you are now isn't offered.
+        string here = Dist(player.X, player.Y, AtollJettyX, AtollJettyY) < 14 ? "atoll" : Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 14 ? "asinan" : "saltmere";
+        var places = new List<(string id, string name, string sub)>
+        {
+            ("saltmere", "Saltmere", "Pip's jetty, by Tomas's camp"), ("atoll", "Starfall Atoll", "The atoll's jetty, out east"),
+            ("asinan", "Asinan", "The landing by the salt beds, in the Habagat islands")
+        };
+        places.RemoveAll(p => p.id == here || p.id == "asinan" && !state.Hinted("habagat"));
+        const float w = 620, pad = 24, rowH = 62, gap = 10;
+        float h = pad + 44 + 8 + 26 + 18 + places.Count * (rowH + gap) - gap + pad;
+        float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
+        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        Gfx.Text("Set sail", x + pad, y + pad, FontKind.Ui700, 32, Pal.PaperInk);
+        if (SmallButton("Close", x + w - pad - SmallW("Close"), y + pad - 4)) { ClosePanels(); return; }
+        float cy = y + pad + 44 + 8;
+        Gfx.Text("Where to? (Or press F at the jetty to take the helm yourself.)", x + pad, cy, FontKind.Ui500, 18, Muted);
+        cy += 26 + 18;
+        foreach (var (id, name, sub) in places)
+        {
+            float rx = x + pad, rw = w - pad * 2;
+            Gfx.Box(rx, cy, rw, rowH, Gfx.Hover(rx, cy, rw, rowH) ? Lighten(Pal.Sand, 0.14f) : Pal.Sand, Pal.Ink, 3, 6, 4);
+            Gfx.Text(name, rx + 18, cy + (rowH - 24) / 2 - 1, FontKind.Ui700, 24, Pal.Ink);
+            Gfx.Text(sub, rx + rw - 18 - Gfx.Measure(sub, FontKind.Ui500, 16), cy + (rowH - 16) / 2, FontKind.Ui500, 16, Muted);
+#if DEBUG
+            Gfx.Seen["voyage:" + id] = new Raylib_cs.Rectangle(rx, cy, rw, rowH);
+#endif
+            if (Gfx.Click(rx, cy, rw, rowH)) { ClosePanels(); Sail(id); return; }
+            cy += rowH + gap;
+        }
+        if (Gfx.PressedOutside(x, y, w, h)) ClosePanels();
     }
 
     void PickPlanter(Build b)

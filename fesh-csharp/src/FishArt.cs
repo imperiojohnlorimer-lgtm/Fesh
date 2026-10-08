@@ -94,7 +94,24 @@ static class FishArt
         ["swordfish"] = new("billed", "#3a3a4a", "#c8c8d0", "#2a2a36", null, null, "It slashes through schools of fish with a flat bill like a sword."),
         ["ocean_sunfish"] = new("mola", "#9aa8b0", "#e0e6ea", "#7a8890", "specks", "#c8d0d6", "A giant swimming head that lies flat on the surface, basking in the sun."),
         ["ironbill"] = new("billed", "#16233c", "#a9bccf", "#22365a", "bars", "#8cc8ff", "A black marlin as long as your boat, its bill notched from fights with sharks."),
-        ["alimasag_crab"] = new("crab", "#4a7ab8", "#8fb0e0", "#2f5a8a", "specks", "#bfd8f8", "A blue swimming crab, paddling along with its flat back legs.")
+        ["alimasag_crab"] = new("crab", "#4a7ab8", "#8fb0e0", "#2f5a8a", "specks", "#bfd8f8", "A blue swimming crab, paddling along with its flat back legs."),
+        // Habagat
+        ["danggit"] = new("fish", "#8a8a5a", "#d8d2a8", "#6a6a3e", "spots", "#5a5a32", "A mottled rabbitfish that grazes the seagrass. Split, salted and sun-dried, it's the islands' favourite breakfast."),
+        ["sapsap"] = new("deep", "#c8d4dc", "#f2f6f8", "#9fb0bc", null, null, "A tiny silver ponyfish, all shine and no weight. Slippery as soap."),
+        ["pagi"] = new("ray", "#c9a46a", "#e8d4b0", "#8a6a3a", "spots", "#3f9ae8", "A stingray dotted with bright blue spots. Mind the tail: it stings."),
+        ["labahita"] = new("deep", "#6a6a72", "#a8a8b0", "#3f3f48", "bands", "#e8e2c8", "A surgeonfish with a sharp blade by its tail, grazing the reef between the islets."),
+        ["bisugo"] = new("fish", "#e8a0a8", "#f8e0e2", "#d87880", "bands", "#f2d04a", "A pink threadfin bream with yellow stripes and a long thread trailing from its tail."),
+        ["pugita"] = new("squid", "#b5603a", "#d88a60", "#8a3e22", "specks", "#f2b890", "An octopus from the reef. It changes colour while you watch, and tries to climb out of the bucket."),
+        ["tamban"] = new("torpedo", "#3f7a8a", "#e8f0f2", "#2f5a68", null, null, "A little sardine that swims in shoals of thousands. Every big fish in the strait hunts it."),
+        ["pusit"] = new("squid", "#d8b8d8", "#f2e0f2", "#a87aa8", "glow", "#fff0c0", "A bigfin reef squid, see-through and flickering. It rises to the lighthouse's lamp at night."),
+        ["buan_buan"] = new("fish", "#b8c4cc", "#eef2f4", "#8a98a2", "specks", "#ffffff", "A tarpon with scales like silver coins. It leaps clear of the water and shakes its head."),
+        ["haring_buan"] = new("fish", "#d8e2ec", "#ffffff", "#a8b8c8", "glow", "#fff6d0", "The king of the tarpon: every scale a little piece of moonlight."),
+        ["alumahan"] = new("torpedo", "#3f8a8a", "#e8eef0", "#2f6a6a", "spots", "#1f3a4a", "An Indian mackerel, striped with dark spots along its green back. Best grilled whole."),
+        ["matang_baka"] = new("torpedo", "#6a8aa8", "#e6edf3", "#d8c04a", null, null, "Its name means \"cow's eye\": a scad with enormous eyes for hunting in the dark."),
+        ["talang_talang"] = new("fish", "#b8c8d0", "#eef3f5", "#e3c04a", "spots", "#3a4a5a", "A queenfish: silver, spotted along the flank, and a great leaper."),
+        ["alimango_crab"] = new("crab", "#4f6a3a", "#8aa070", "#33461f", null, null, "A heavy mud crab with big claws. Keep your fingers clear."),
+        ["curacha_crab"] = new("crab", "#e0603a", "#f2a080", "#a83a1e", "specks", "#ffd0b0", "A spanner crab, bright red and shaped like a little shield."),
+        ["sugpo_shrimp"] = new("shrimp", "#4a5a5a", "#a8b8b0", "#2a3434", "specks", "#e8d84a", "A tiger prawn, banded dark and grey, with a fan of a tail.")
     };
 
     // The fish in the box (x, y, w, h), facing right (flip faces left). Silhouette draws it all in one colour.

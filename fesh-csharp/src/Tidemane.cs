@@ -401,6 +401,7 @@ partial class Game
     {
         // R gets you on and off the boat: from beside it (E may belong to a fishing spot there), and at the helm it lands
         // (E fishes over deep water). In a storm the boat stays tied up, so if you have Tidemane, R calls it instead.
+        if (eclipse != null) return;   // you stand your ground with the agong
         if (mode == "play" && Aboard) { LandBoat(); return; }
         if (mode == "play" && boss == null && BoatInReach() && !(Stormy && state.tamed)) { BoardBoat(); return; }
         if (!state.tamed || mode != "play" || boss != null) return;
@@ -569,16 +570,130 @@ partial class Game
         }
     }
 
+    // Front and back views keep the same sea-green body, coral horns and foam mane as the side view. The rider
+    // sits behind the neck coming toward us, and in front of it going away; the tail trails along the water.
+    void DrawTidemaneEndOn(int x, int y, bool away, bool swim, bool moving, int frame, Action rider = null)
+    {
+        int bob = swim ? FloatBob(x) : moving && frame == 1 ? -1 : 0;
+        const string body = "#2a9d8f", shade = "#1d6f68", belly = "#8fd3c4", mane = "#f2fbff",
+            mane2 = "#bfe6f0", horn = "#ff8a7a", fin = "#5fd6c9", finDark = "#3fb5a8";
+        void R(int ox, int oy, int w, int h, string c) => pix.Rect(x + ox, y + oy + bob, w, h, c);
+        int sway = (int)MathF.Round(MathF.Sin(time * (moving ? 9 : 3.2f)) * (moving ? 2 : 1));
+        int flow = (int)(time * (moving ? 10 : 3)) % 2;
+        void Tail()
+        {
+            if (away)
+            {
+                R(-2, -7, 5, 5, shade); R(-1, -5, 3, 5, body);
+                R(sway - 1, -1, 3, 4, body); R(sway, 2, 2, 3, shade);
+                R(sway - 3, 3, 3, 3, fin); R(sway + 2, 3, 3, 3, fin);
+                R(sway - 4, 2, 1, 3, finDark); R(sway + 5, 2, 1, 3, finDark);
+                R(sway - 2, 6, 2, 1, finDark); R(sway + 2, 6, 2, 1, finDark);
+            }
+            else
+            {
+                R(-1, -16, 3, 5, shade); R(sway - 1, -20, 3, 5, body);
+                R(sway - 4, -23, 3, 3, fin); R(sway + 2, -23, 3, 3, fin);
+                R(sway - 5, -24, 1, 3, finDark); R(sway + 5, -24, 1, 3, finDark);
+                R(sway - 2, -21, 5, 2, finDark);
+            }
+        }
+        if (!swim) pix.Rect(x - 6, y + 1, 13, 2, Pal.Rgba(0, 0, 0, .22f));
+        if (!away) Tail();
+        // Paired forelegs alternate their reach. There are no legs in the swimming silhouette.
+        if (!swim)
+            foreach (int side in new[] { -1, 1 })
+            {
+                int stride = moving ? (frame == 0 ? side : -side) : 0;
+                R(side < 0 ? -5 : 3, -6 + stride, 2, 5, side < 0 ? shade : body);
+                R(side < 0 ? -6 : 3, -1 + stride, 3, 1, fin);
+            }
+        R(-3, -15, 7, 2, body); R(-5, -13, 11, 6, body);
+        R(-4, -7, 9, 2, swim ? shade : belly); R(-3, -5, 7, 1, shade);
+        R(-5, -12, 2, 4, shade); R(4, -11, 1, 3, finDark);
+        foreach (var (sx, sy) in new[] { (-3, -11), (3, -10), (-2, -8), (2, -13) })
+            R(sx, sy, 1, 1, (int)(time * 3 + sx) % 3 == 0 ? "#ffffff" : "#fff6d0");
+        if (!away) rider?.Invoke();
+        if (away)
+        {
+            // Seen from behind, a white crest falls from the horns down the neck; no eyes on the back of the head.
+            R(-2, -21, 5, 9, body); R(-3, -24, 7, 4, body);
+            R(-4, -25, 2, 2, body); R(3, -25, 2, 2, shade);
+            R(-3, -27, 1, 3, horn); R(-4, -28, 1, 1, horn);
+            R(3, -27, 1, 3, horn); R(4, -28, 1, 1, horn);
+            R(-1, -25, 3, 4, mane); R(-2, -21, 4, 3, mane2);
+            R(-1 + flow, -18, 3, 3, mane); R(-1, -15, 2, 3, mane2);
+            rider?.Invoke();
+            Tail();
+        }
+        else
+        {
+            // Coming toward us, the broad muzzle, both gold eyes and the pale chest sit in front of the rider.
+            R(-3, -16, 7, 7, body); R(-2, -10, 5, 3, belly);
+            R(-4, -18, 2, 3, mane); R(3, -18, 2, 3, mane2);
+            R(-4 - flow, -15, 2, 4, mane2); R(4, -14, 1 + flow, 3, mane);
+            R(-3, -19, 1, 3, horn); R(-4, -20, 1, 1, horn);
+            R(3, -19, 1, 3, horn); R(4, -20, 1, 1, horn);
+            R(-1, -17, 3, 2, mane); R(0, -15, 1, 2, mane2);
+            R(-3, -14, 1, 1, "#ffd76a"); R(3, -14, 1, 1, "#ffd76a");
+            R(-3, -12, 7, 3, body); R(-2, -9, 5, 1, shade);
+            R(-2, -11, 1, 1, "#16514b"); R(2, -11, 1, 1, "#16514b");
+        }
+        if (swim) DrawEndOnSwimWater(x, y, away, moving);
+    }
+
+    void DrawEndOnSwimWater(int x, int y, bool away, bool moving)
+    {
+        bool IsWater(int px, int py) => px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py));
+        void Foam(int px, int py, float alpha)
+        {
+            if (IsWater(px, py)) pix.Rect(px, py, 1, 1, Pal.Rgba(232, 246, 250, alpha));
+        }
+        // Only the bottom of the body is submerged. The up-facing tail and its fan are on the surface behind it.
+        for (int py = y - 5; py <= y + 1; py++)
+            for (int px = x - 6; px <= x + 6; px++)
+                if ((!away || Math.Abs(px - x) > 2) && IsWater(px, py)) pix.Rect(px, py, 1, 1, worldBase.Buf[py * PW + px]);
+        int lap = (int)(time * 5), ahead = away ? -1 : 1;
+        for (int k = -5; k <= 5; k++)
+            if ((k + lap) % 3 != 0) Foam(x + k, y - 5 + Math.Abs(k) / 3, .6f);
+        for (int k = 0; k < 8; k++)
+        {
+            int spread = moving ? 6 + k : 6 + (int)(time * 3 % 4);
+            int wy = y - 5 - ahead * (9 + k * 2);
+            if ((k + lap) % 4 == 0) continue;
+            Foam(x - spread, wy, .48f * (1 - k / 8f));
+            Foam(x + spread, wy, .48f * (1 - k / 8f));
+        }
+    }
+
+    // The saddle is the common anchor for the rider, their rod and anything held overhead.
+    (int x, int y) RiderSeat(int x, int y)
+    {
+        bool moving = player.Moving && mode is "play" or "build";
+        int bob = Swimming ? FloatBob(x) : moving && (int)(player.WalkT * 8) % 2 == 1 ? -1 : 0;
+        return player.Face switch
+        {
+            "up" => (x, y - 7 + bob), "down" => (x, y - 10 + bob),
+            _ => (x + (player.Face == "left" ? 1 : -1), y - 8 + bob)
+        };
+    }
+
     // You in the saddle, sitting up over its back.
     void DrawRider(int x, int y, bool moving, int step, int arms = 0, int pump = 0)
     {
         if (player.Face is "left" or "right") mountDir = player.Face == "right" ? 1 : -1;
         bool swim = Swimming;
+        var seat = RiderSeat(x, y);
+        void Rider() => LookData.DrawPerson(pix, state.look, seat.x, seat.y, player.Face, 0, shadow: false,
+            blink: time % 3.7f < 0.12f, arms: arms, swing: pump);
+        if (player.Face is "up" or "down")
+        {
+            DrawTidemaneEndOn(x, y, player.Face == "up", swim, moving, step, Rider);
+            return;
+        }
         string pose = swim ? "swim" : moving ? "run" : "stand";
         DrawTidemane(x, y, mountDir, pose, step, moving: moving);
-        int bob = swim ? FloatBob(x) : moving && step == 1 ? -1 : 0;
-        LookData.DrawPerson(pix, state.look, x - mountDir, y - 8 + bob, player.Face, 0, shadow: false, blink: time % 3.7f < 0.12f,
-            arms: arms, swing: pump);
+        Rider();
     }
 
     // Tidemane waiting for you: it shifts its weight, flicks its tail and now and then shakes out its mane.
@@ -586,6 +701,11 @@ partial class Game
     {
         if (!state.tamed || state.riding || boss != null) return;
         bool swim = Swimmable(TileUnder(state.mountX, state.mountY));
+        if (Math.Abs(player.Y - state.mountY) > Math.Abs(player.X - state.mountX))
+        {
+            DrawTidemaneEndOn((int)MathF.Round(state.mountX), (int)MathF.Round(state.mountY), player.Y < state.mountY, swim, false, 0);
+            return;
+        }
         int dir = player.X < state.mountX ? -1 : 1;
         DrawTidemane(state.mountX, state.mountY, dir, swim ? "swim" : (time % 6 < 0.5f ? "rear" : "stand"), 0);
     }

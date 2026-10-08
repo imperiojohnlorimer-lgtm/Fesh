@@ -101,7 +101,7 @@ partial class Game
             "copper_sword" or "iron_sword" or "gold_sword" or "crystal_blade" => " Your best weapon is used automatically in the caves.",
             "shell_armor" => " You wear it automatically. Cave monsters hurt less.",
             "glow_bait" => " It's used before plain bait when you cast.",
-            "spear" => " At the coral shallows or the atoll lagoon, press <spear> to spearfish.",
+            "spear" => " At the coral shallows, the atoll lagoon or Daang Pulo's islet reef, press <spear> to spearfish.",
             "crab_pot" => " Press <build> outdoors to set it in shallow water.",
             "cut_bait" or "fly_lure" or "spinner_lure" => " Pick it as your bait in the tackle box (<tackle>).",
             "chum" => " At a fishing spot, press <alt> to throw it.",
@@ -192,13 +192,15 @@ partial class Game
     void PickBush(int x, int y)
     {
         string key = $"{x},{y}";
-        if (state.picked.GetValueOrDefault(key) == state.day) { Toast("No berries left. They grow back by tomorrow."); return; }
+        // The wild bushes of Habagat are calamansi.
+        bool calamansi = BiomeAt(x, y) == 6;
+        if (state.picked.GetValueOrDefault(key) == state.day) { Toast(calamansi ? "None left. The calamansi ripen again by tomorrow." : "No berries left. They grow back by tomorrow."); return; }
         int n = 2 + rng.Next(2);
         state.picked[key] = state.day;
-        Give("berries", n);
+        Give(calamansi ? "calamansi" : "berries", n);
         Sfx.Play("pickup");
-        Burst(x * T + 5, y * T + 4, "#e04b3a", 6);
-        Toast($"Picked {n} berries.");
+        Burst(x * T + 5, y * T + 4, calamansi ? "#7fb53a" : "#e04b3a", 6);
+        Toast(calamansi ? $"Picked {n} calamansi." : $"Picked {n} berries.");
     }
 
     /* ---------- Animals ---------- */

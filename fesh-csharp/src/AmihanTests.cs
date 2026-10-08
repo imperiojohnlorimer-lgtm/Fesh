@@ -36,7 +36,9 @@ partial class Game
         Check("movement keys steer the boat through water", Aboard && player.X > bx + 10);
         foreach (string face in new[] { "right", "left", "up", "down" })
         {
-            player.Face = face; pendingShot = "83-banca-" + face; yield return 2;
+            var key = face switch { "left" => KeyboardKey.Left, "right" => KeyboardKey.Right, "up" => KeyboardKey.Up, _ => KeyboardKey.Down };
+            Inp.Hold(key, true); yield return 2;
+            Inp.Hold(key, false); pendingShot = "83-banca-" + face; yield return 2;
         }
         Save(); float savedX = player.X, savedY = player.Y;
         state = SaveFile.Read(SaveFile.Slot); StartGame(false); yield return 3;
@@ -280,6 +282,7 @@ partial class Game
         foreach (int frames in BoatUpgradesScript()) yield return frames;
         foreach (int frames in FolkScript()) yield return frames;
         foreach (int frames in ChartDexScript()) yield return frames;
+        foreach (int frames in HabagatScript()) yield return frames;
     }
 
     // The chart (opening where you are, charting, hover details, the pin) and the Fish log (cards, seen fish, biting

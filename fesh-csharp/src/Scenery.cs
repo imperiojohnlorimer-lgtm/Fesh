@@ -347,7 +347,7 @@ partial class Game
                 char g = map[y, x];
                 double h = Pix.Hash(x, y, 150);
                 byte bi = BiomeAt(x, y);
-                bool tuft = g switch { 'g' => h < 0.38, 'j' => h < 0.45, 'D' => h < 0.06, 's' => bi is 0 or 4 && h < 0.04, _ => false };
+                bool tuft = g switch { 'g' => h < 0.38, 'j' => h < 0.45, 'D' => h < 0.06, 's' => bi is 0 or 4 or 6 && h < 0.04, _ => false };
                 if (!tuft || BuildAt(x, y) != null) continue;
                 int bx = x * T + 2 + (int)(Pix.Hash(x, y, 151) * 6), by = y * T + 4 + (int)(Pix.Hash(x, y, 152) * 5);
                 int s = (int)MathF.Round(MathF.Sin(t * wind + bx * 0.21f + by * 0.17f) * amp);
@@ -596,7 +596,7 @@ partial class Game
             pix.Rect(x - 1, by - i - 1, 1, 1, i % 3 == 0 ? Bark : BarkLight);
         }
         float cx = bx + lean + sw, cy = by - n - 1;
-        if (bi is 2 or 4) { Disc(cx - 1.5f, cy + 2, 1.3f, Pal.C("#5b3e24")); Disc(cx + 1.5f, cy + 2, 1.3f, Pal.C("#6b4a2b")); pix.Rect(cx + 1, cy + 1, 1, 1, BarkLight); }
+        if (bi is 2 or 4 or 6) { Disc(cx - 1.5f, cy + 2, 1.3f, Pal.C("#5b3e24")); Disc(cx + 1.5f, cy + 2, 1.3f, Pal.C("#6b4a2b")); pix.Rect(cx + 1, cy + 1, 1, 1, BarkLight); }
         // Six fronds that droop at the tips, with leaflets underneath; the tips sway most.
         Span<float> angles = stackalloc float[] { -2.85f, -2.15f, -1.2f, -0.45f, 0.3f, 2.75f };
         for (int f = 0; f < angles.Length; f++)
@@ -626,11 +626,13 @@ partial class Game
         foreach (var l in lobes) Disc(bx + l.ox, by + l.oy + 0.5f, l.r, BushLeaf[1]);
         foreach (var l in lobes) Disc(bx + l.ox - 0.5f, by + l.oy - 0.5f, l.r - 0.9f, BushLeaf[2]);
         Disc(bx - 1.5f, by - 6.5f, 1.6f, BushLeaf[3]);
+        // Red berries, or little green calamansi on Habagat's bushes.
+        bool calamansi = BiomeAt(tx, ty) == 6;
         if (state.picked.GetValueOrDefault($"{tx},{ty}") != state.day)
             foreach (var (ox, oy) in new[] { (-4, -3), (1, -6), (-1, -2), (3, -3), (-2, -6), (4, -5) })
             {
-                pix.Rect(bx + ox, by + oy, 1, 1, "#e04b3a");
-                if (ox % 2 == 0) pix.Rect(bx + ox, by + oy - 1, 1, 1, "#ff9a8a");
+                pix.Rect(bx + ox, by + oy, 1, 1, calamansi ? "#9ccc3a" : "#e04b3a");
+                if (ox % 2 == 0) pix.Rect(bx + ox, by + oy - 1, 1, 1, calamansi ? "#e0f08a" : "#ff9a8a");
             }
     }
 

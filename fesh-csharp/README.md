@@ -128,7 +128,7 @@ Everything you catch is tracked in the Fesh-dex's **Fish log**, island by island
   **200 coins** from Pip for the collection.
 
 ### The map
-- The map opens on the chart you're on (Saltmere or Amihan). On the other chart, an arrow at the edge shows which way
+- The map opens on the chart you're on (Saltmere, which also shows the Habagat islands along its bottom, or Amihan). On the other chart, an arrow at the edge shows which way
   you are.
 - Islands are only **charted** once you set foot on them; until then they're a rough outline, with no spots marked.
 - Labels move apart instead of piling up, with a short line back to their dot when they have to.
@@ -156,7 +156,7 @@ Everything you catch is tracked in the Fesh-dex's **Fish log**, island by island
   bait, pearls, and sometimes a golden hook.
 - **The ice hole** freezes over again by each morning. Mash E to chip it open (much faster with a pickaxe). While you wait, jig
   with E each time the ring closes on the bobber; off the beat scares the fish.
-- **Spearfishing:** with a fishing spear, press G at the coral shallows or the atoll lagoon. Steer the target onto a
+- **Spearfishing:** with a fishing spear, press G at the coral shallows, the atoll lagoon or Daang Pulo's islet reef. Steer the target onto a
   fish shadow (WASD or the mouse) and press E. Three spears, 25 seconds.
 - **Crab pots:** set one in shallow water with B (it's in the outdoor build bar). The next morning face its float and
   press E to haul it up: a crab or lobster for that island, often seaweed, now and then an old boot or a pearl.
@@ -194,6 +194,7 @@ are three times as likely to bite on it.
 | Slime gel | Cave slimes | Cave fish |
 | Berries | Berry bushes | Carp and other plant-eaters |
 | Spinner lure / fly lure | Workbench (never used up) | Runners / jumpers |
+| Tamban (a live sardine) | Caught at the Parola pier | Sea fish that run or leap |
 
 ### Tackle and accessories
 Your best tackle is equipped automatically until you choose in the tackle box (sinkers are only ever chosen).
@@ -218,7 +219,8 @@ Your best tackle is equipped automatically until you choose in the tackle box (s
 ### Aquarium collections
 Put all four fish of a set on show (in any of your aquariums) for a bonus while they're displayed:
 Saltmere shore (bites 15% faster on Saltmere), Frozen north (rare luck on Frostfang), Desert springs (Pip pays 10% more
-for fish), Jungle waters (15% more XP), Coral reef (fish 10% heavier), Deep dark (reel bar +3). The aquarium panel shows
+for fish), Jungle waters (15% more XP), Coral reef (fish 10% heavier), Deep dark (reel bar +3), Salt and islets (fish dry
+twice as fast on drying racks). The aquarium panel shows
 each set's progress.
 
 ## Pip, coins and Tomas's requests
@@ -241,6 +243,7 @@ falls as snow.
 ## The boat
 Make a **sailboat** at a workbench from 20 wood, 4 iron bars and sailcloth from Pip. Then go to the end of
 **Pip's jetty** (Saltmere's east beach) and press E to sail to Starfall Atoll, and back from the atoll's jetty.
+Once you've found the Habagat islands, E at a jetty asks where to sail: Saltmere, Starfall Atoll or Asinan.
 You can't sail in a storm; wait for it to pass.
 
 Press **F at either jetty** to take the helm and explore freely. Steer with **WASD / arrow keys** (or the gamepad
@@ -253,6 +256,8 @@ A storm prevents launching, but a boat already at sea can still steer home at re
 The banca-inspired boat has twin bamboo outriggers, a cream sail and a seated fisher at the helm. Under way the sail
 fills, the pennant streams back, spray flies off the bow and a wake spreads behind; stop and the sail flaps loose while
 the water laps at the floats; stop to fish (or tie up) and the sail comes down onto its boom. A storm rocks it harder.
+Heading up shows the boat from behind; heading down shows its bow, with the fisher seated at the stern.
+The outriggers, wake, spray and trolling rod follow its heading, which stays put when you stop to fish.
 If a fish knocks you out at sea west of Amihan, a passing boat tows you home to Pip's jetty, your boat with you.
 
 **Boat upgrades** (workbench, Gear tab): a **big sail** (2 sailcloth, 4 wood, 1 iron bar) stands taller and sails a third
@@ -286,6 +291,54 @@ The islands and combat are fictional. Fish naming draws on [BFAR's Philippine ca
 wildlife references include [DENR's tarsier research](https://fasps.denr.gov.ph/projects/special-projects/) and
 [rufous hornbill information](https://ncr.denr.gov.ph/news-events/denr-meo-west-retrieves-luzon-rufous-hornbill-in-makati-city/).
 
+## The Habagat islands
+New in **1.13.0**: a band of Philippine-inspired islands along the **bottom of the Saltmere chart**, south of Mirewood
+and Sunscald, where the southwest wind (the *habagat*) blows. A deep channel keeps waders out: take the helm at the
+atoll's jetty and sail south (a boat launched at Pip's jetty can't get past the bridges), or swim there on Tidemane.
+Pip mentions them once you have a boat and have been to the atoll. After your first visit, any sailing jetty can take
+you straight to the Asinan landing.
+
+| Island | People | What's there | Fishing |
+|---|---|---|---|
+| Asinan (west) | Manang Rosa, the salt maker | Salt beds, calamansi bushes, goats | Asinan flats: danggit, sapsap, *pagi* (stingray, rare, fights back) |
+| Daang Pulo (middle) | Dado (regatta), Lola Pacing (sungka) | A home islet and eleven limestone islets | Islet reef: labahita, bisugo, *pugita* (octopus, rare, night); spearfishing too |
+| Parola (east) | Tatay Celso, the lighthouse keeper | The Parola lighthouse, dark until you help mend it | Parola pier: tamban, pusit (night, once the lamp is lit), *buan-buan* (tarpon, rare, night, once lit), **Haring Buan-buan** (legend) |
+| The Habagat Sea | | From the boat or Tidemane, over deep water | Alumahan, matang-baka (night), *talang-talang* (rare, day) |
+
+Crab pots here bring up **alimango** (mud crab), **curacha** (spanner crab) or **sugpo** (tiger prawn).
+
+- **Salt and daing:** rake Manang Rosa's salt beds once a day for 3 salt, but only if it hasn't rained since the
+  morning (Tomas or Pip can tell you tomorrow's weather). Build a **drying rack** (4 wood, 2 stone; key 0 in the build
+  bar) and press E to lay out up to three raw fish with a salt each. They need six hours of clear daylight (between
+  6 AM and 6 PM) to become **daing**; rain stops them drying. F takes them back.
+- **Food:** Habagat's bushes give **calamansi**. At a stove: **kinilaw** (fish, calamansi, salt), **sinigang na isda**
+  (2 fish, 2 calamansi) and **ginataang isda** (fish, coconut).
+- **Gleaning:** at low tide (4:30-8:30 AM and 4:30-8:30 PM; the clock's tooltip shows it here) walk the wet sand by the water
+  on Habagat's beaches for cowries, sea urchins and sea grapes. Each tide has only so much, and the water coming back
+  takes the rest.
+- **Sungka** with Lola Pacing: seven shells in each little house; sow them round, never into her head. End in your own
+  head and go again; end where there are shells and pick them up and keep going; end in an empty house of yours and take
+  hers across from it. A win pays 40 coins once a day.
+- **The regatta:** sail close by every islet to chart all twelve, then Dado races you round his buoys. The next gate
+  flashes gold. Beat his lolo's record for the old agong; there are medals and a daily prize too.
+- **The lighthouse:** bring Tatay Celso what he needs, three times, and Parola burns again: its beam sweeps the sea at
+  night, and squid and tarpon come to the pier.
+- **The vanishing moon (spoilers):** the Case board gets a second case. Four clues on three islands lead to a full-moon
+  night at Parola, when the old story of **Bakunawa**, the sea serpent that swallows moons, turns out to be true. Nobody
+  fights it: you beat the agong on the beat while everyone bangs their pots, until it gives the moon back.
+- **The marine sanctuary** (on the Amihan chart, south of Bakawan and Baga): yellow buoys mark it. Nothing is fished or
+  trapped inside, but casts just outside bite quicker, with better luck, as fish spill out. Sea turtles, a dugong and,
+  by day, a whale shark live there. You can **watch** them (E, from the boat or the water) for the Fish log's
+  Sightings card; Bantay Joy, the sea warden, rewards you for seeing all three. They are protected in the Philippines,
+  so they're never catches.
+
+Knocked out anywhere in Habagat, you wake at Manang Rosa's, your boat at the Asinan landing. The region has its own
+gong music.
+
+The people and places are fictional, inspired by Philippine traditions: Pangasinan's salt farms, the Hundred Islands,
+Iloilo's paraw regatta, the Visayan story of Bakunawa, and community-run marine sanctuaries with their *bantay dagat*.
+The Moonscale charm and Haring Buan-buan are inventions for the game.
+
 ## Tidemane (spoilers)
 Starfall Atoll hides a secret. A trail of hoofprints leads from the jetty into a ring of palms on the south-east side,
 where a gap opens onto **the Starwell**, a deep blue hole with a coral carving beside it. The Starwell stays off the
@@ -313,6 +366,8 @@ away from the Starwell ends the fight too.
 swims through any water, including the open sea between islands (but not deep water in a storm). From anywhere
 outdoors, R whistles it over. Going indoors, into the caves or out by boat leaves it waiting where you got off; the
 map shows where.
+Tidemane turns to face all four directions, with front and back views while galloping or swimming. Its mane and
+tail move with it, and the rider, fishing rod and held catches share its bounce on land and on the water.
 
 ## Music
 Every island has its own looping tune, and so do Frostfang Caverns, the insides of houses and the fight with
@@ -485,6 +540,9 @@ one can be crossed (hole, ore and pool all reachable), saves screenshots, writes
 $env:FESH_AUTOTEST = "$PWD\test-output"; $env:FESH_SAVE = "$PWD\test-output\save.json"; dotnet run
 ```
 For pixel work, `FESH_SPRITES` set to a `.png` path draws every person pose and the boat in each state to zoomed
-sheets next to it (`-a`, `-b` and `-c`), touches no saves, and quits.
+sheets next to it (`-a`, `-b` and `-c`), touches no saves, and quits. The `-boat-directions` and `-mount-directions`
+sheets show all four headings while moving, fishing and holding a catch (plus the big sail and trolling).
+Set `FESH_DIRECTION_TEST=1` alongside `FESH_AUTOTEST` and `FESH_SAVE` to run only the direction checks; the full
+play-through includes them too.
 
 Fonts: Pixelify Sans and Special Elite, both under the SIL Open Font License.

@@ -29,10 +29,12 @@ partial class Game
         (f.Time == "any" || (f.Time == "night") == Night)
         && (f.Weather == null || (f.Weather == "storm" ? Stormy : f.Weather == "rain" ? state.weather != "clear" : state.weather == "clear"))
         && (!f.FullMoon || FullMoon)
+        && (f.Need == null || state.Hinted(f.Need))
         && (!f.Legend || (state.commons.GetValueOrDefault(f.Id) == 0 && (f.Bait == null || f.Bait == bait)));
 
     static readonly HashSet<string> FreshSpots = new() { "lagoon", "oasis", "swamp", "icehole", "amihanpond", "bakawanpool" };
-    static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff", "starwell", "karstlagoon", "bagareef", "opensea", "amihansea" };
+    static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff", "starwell", "karstlagoon", "bagareef", "opensea", "amihansea",
+        "asinan", "pulo", "parola", "habagatsea" };
     static readonly HashSet<string> CarpLike = new() { "mud_carp", "moon_carp", "old_whiskers", "oasis_tilapia", "parrotfish" };
 
     // Fish that go for a bait are three times as likely to bite on it.
@@ -46,6 +48,7 @@ partial class Game
         "berries" => CarpLike.Contains(f.Id),
         "spinner_lure" => f.Style == "runner",
         "fly_lure" => f.Style == "jumper",
+        "tamban" => SeaSpots.Contains(spot) && f.Style is "runner" or "jumper",
         _ => false
     };
 
@@ -56,6 +59,9 @@ partial class Game
         int l = Rod.Luck + (bait != null ? Items.Baits[bait].Luck : 0) + (Stormy ? 1 : 0) + (Wears("lucky_charm") ? 2 : 0) + (Perk(5) ? 1 : 0) + (Gear("hook")?.Luck ?? 0);
         if (Chummed(spot)) l++;
         if (SpotBiome(spot) == "frost" && SetActive("frost")) l++;
+        // The sanctuary's fish spilling over into the water just outside it, and Bakunawa's scale under the moon.
+        if (fish?.Spill == true) l++;
+        if (Night && Wears("moon_charm")) l++;
         return l;
     }
 
@@ -220,10 +226,16 @@ partial class Game
         // Where the body is: standing, up in the saddle, or sitting at the boat's stern. From the boat the rod reaches
         // out low past the bow (or, held up or down, stays short of the mast), so it doesn't read as rigging.
         float bx = player.X, up = player.Y - 15 - (Riding ? 8 : 0), reach = 7;
+        if (Riding)
+        {
+            var seat = RiderSeat((int)MathF.Round(player.X), (int)MathF.Round(player.Y));
+            bx = seat.x; up = seat.y - 15;
+        }
         if (Aboard)
         {
             bool sideways = player.Face is "left" or "right";
-            bx = BoatSeatX; up = MathF.Round(player.Y) + BoatBob(time) - (sideways ? 10 : 13); reach = sideways ? 14 : 4;
+            var seat = BoatSeat();
+            bx = seat.x; up = seat.y - (sideways ? 12 : 15); reach = sideways ? 14 : 4;
         }
         float forward = bx + dir * reach;
         if (mode == "charging") return (bx - dir * (1 + charge * 5), up - 2 - charge * 3);
@@ -288,8 +300,18 @@ partial class Game
     {
         var s = Data.SpotById[spotId];
         var (spotX, spotY) = SpotPos(s);
-        state.casts++;
         FaceToward(spotX, spotY);
+        var (lx, ly) = LandingPoint(s, power);
+        // From just outside the sanctuary, a long cast toward it falls short of the buoys; if it can't, there's no cast.
+        for (int i = 0; i < 40 && scene == "world" && InSanctuary(lx, ly); i++) { lx += (player.X - lx) * 0.15f; ly += (player.Y + 3 - ly) * 0.15f; }
+        if (scene == "world" && InSanctuary(lx, ly))
+        {
+            mode = "play";
+            Sfx.Play("nope");
+            Toast("No fishing in the marine sanctuary. Turn away from the buoys.");
+            return;
+        }
+        state.casts++;
         var tip = RodTip();
         bool baitBox = scene == "world" && state.builds.Any(b => b.id == "baitbox" && Dist(player.X, player.Y, b.x * T + 5, b.y * T + 6) < 40);
         string bait = NextBait();
@@ -299,19 +321,24 @@ partial class Game
             state.hinted["usedBait"] = true;
             Toast($"Used 1 {Items.ById[bait].Name.ToLowerInvariant()}. {Has(bait)} left.", 2.4f);
         }
-        var (lx, ly) = LandingPoint(s, power);
         bool onShadow = false, big = false;
         for (int k = 0; k < 4; k++)
             if (ShadowPos(s, k, time) is (float hx, float hy, bool hb) && Dist(lx, ly, hx, hy) < 8) { onShadow = true; big |= hb; }
         if (s.Scene == "sea" && InSchool(lx, ly)) onShadow = true;
+        bool spill = scene == "world" && InSpillover(lx, ly);
         float wait = (baitBox ? Rand(0.5f, 1.2f) : Rand(1.6f, 3.6f)) * Rod.Bite * WeatherBite * (bait != null ? Items.Baits[bait].Bite : 1)
             * (Perk(3) ? 0.9f : 1) * (Chummed(spotId) ? 0.5f : 1) * (onShadow ? 0.55f : 1) * (spotId == "icehole" ? 1.6f : 1)
-            * (s.Biome == "saltmere" && s.Scene != "sea" && SetActive("saltmere") ? 0.85f : 1);
+            * (s.Biome == "saltmere" && s.Scene != "sea" && SetActive("saltmere") ? 0.85f : 1) * (spill ? 0.8f : 1);
         fish = new FishCast
         {
             Spot = spotId, Sx = tip.X, Sy = tip.Y, Tx = lx, Ty = ly, Bx = tip.X, By = tip.Y, Bait = bait, Power = power,
-            Depth = CastDepth(power), BigShadow = big, Timer = wait
+            Depth = CastDepth(power), BigShadow = big, Timer = wait, Spill = spill
         };
+        if (spill && !state.Hinted("spillover"))
+        {
+            state.hinted["spillover"] = true;
+            Toast("Fish spill out of the sanctuary into the water round it: bites come quicker here, and rare fish more often.", 5);
+        }
         mode = "casting";
         Sfx.Play("cast");
     }

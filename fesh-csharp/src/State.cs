@@ -11,6 +11,8 @@ sealed class Loose { public string kind; public int tx, ty; public float x, y; }
 sealed class Req { public string item, bonus; public int count, coins, bonusCount; }
 // A stretch of weather in the day's forecast, starting `at` minutes after 06:00 and lasting until the next one.
 sealed class WeatherSpell { public int at; public string w; }
+// Salted fish on a drying rack, and how many minutes of clear daylight they've had.
+sealed class RackLoad { public List<string> fish = new(); public float dry; }
 
 // The player's appearance. Each number is an index into the option lists in Look.cs.
 sealed class Look
@@ -87,6 +89,17 @@ sealed class State
     public bool tamed;                               // won the fight at the Starwell
     public bool riding;                              // in the saddle right now
     public float mountX, mountY;                     // where Tidemane is waiting outdoors when you're not riding
+
+    // Habagat (the story flags are in hinted: "habagat", "isletsCharted", "parolaLit", "moonReturned", "bk:...")
+    public Dictionary<string, RackLoad> racks = new(); // drying rack "x,y" -> what's drying on it
+    public int saltDay;                              // the day you last raked Asinan's salt beds
+    public int parola;                               // how much of the Parola lighthouse is mended (0 to 3; 3 is lit)
+    public Dictionary<string, int> sightings = new(); // sanctuary animal -> times watched
+    public float regattaBest;                        // your fastest regatta, in seconds (0: never finished)
+    public int regattaDay;                           // the day the regatta last paid a prize
+    public int sungkaDay, sungkaWins;                // the day Lola Pacing last paid out for a win, and how many you've won
+    public string gleanTide = "";                    // the low tide you last gleaned in ("day:am" or "day:pm")...
+    public int gleaned;                              // ...and how many finds you picked up in it
 
     // New games and saves from before the clock: day or night becomes a time, and the weather lasts the rest of the day.
     public void FixClock()
@@ -203,6 +216,10 @@ static class SaveFile
             s.picked ??= new(); s.gifts ??= new(); s.rooms ??= new(); s.scene ??= "world";
             s.tanks ??= new(); s.weather ??= "clear"; s.boatAt ??= "saltmere";
             s.tackle ??= new(); s.records ??= new(); s.trophies ??= new(); s.big ??= new(); s.pots ??= new();
+            s.racks ??= new(); s.sightings ??= new(); s.gleanTide ??= "";
+            foreach (var key in s.racks.Keys.ToList())
+                if (s.racks[key] == null) s.racks.Remove(key);
+                else s.racks[key].fish = (s.racks[key].fish ?? new()).Where(f => f != null && Items.ById.ContainsKey(f)).ToList();
             if (s.req != null && (s.req.item == null || !Items.ById.ContainsKey(s.req.item))) s.req = null;
             s.builds = (s.builds ?? new()).Where(b => b?.id != null && Data.BuildById.ContainsKey(b.id)).ToList();
             foreach (var room in s.rooms.Values) room.RemoveAll(b => b?.id == null || !Data.BuildById.ContainsKey(b.id));
