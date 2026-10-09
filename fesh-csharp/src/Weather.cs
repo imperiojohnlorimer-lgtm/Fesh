@@ -11,23 +11,25 @@ partial class Game
     int warnedStorm = -1;             // the forecast entry we've already warned about
 
     // A day's forecast. Clear days (most) may get a passing shower. Rain days rain for a good part of the day. From
-    // day 3, a storm day builds from rain into a storm for a few hours, then eases off.
+    // day 3, a storm day builds from rain into a storm for a few hours, then eases off. The season (Seasons.cs) sets
+    // the odds: the amihan is mostly dry, the habagat wet, with more storms and longer ones.
     List<WeatherSpell> MakeForecast(int day)
     {
         var plan = new List<WeatherSpell>();
         void Add(int at, string w) { if (at < DayMin && (plan.Count == 0 || plan[^1].w != w)) plan.Add(new WeatherSpell { at = at, w = w }); }
         int Pick(int lo, int hi, int step = 15) => lo + rng.Next((hi - lo) / step + 1) * step;
-        double r = rng.NextDouble();
-        if (day >= 3 && r < 0.14)
+        bool wet = SeasonOf(day) == "habagat";
+        double r = rng.NextDouble(), storm = wet ? 0.24 : 0.05, rain = storm + (wet ? 0.5 : 0.2), shower = wet ? 0.4 : 0.25;
+        if (day >= 3 && r < storm)
         {
-            int start = rng.NextDouble() < 0.25 ? 0 : Pick(60, 540), lead = Pick(30, 90), len = Pick(120, 300);
+            int start = rng.NextDouble() < 0.25 ? 0 : Pick(60, 540), lead = Pick(30, 90), len = wet ? Pick(120, 330) : Pick(120, 240);
             Add(0, start == 0 ? "rain" : "clear");
             Add(start, "rain");
             Add(start + lead, "storm");
             Add(start + lead + len, "rain");
             Add(start + lead + len + Pick(60, 180), "clear");
         }
-        else if (r < 0.44)
+        else if (r < rain)
         {
             int start = rng.NextDouble() < 0.5 ? 0 : Pick(60, 420), len = Pick(240, 600);
             Add(0, start == 0 ? "rain" : "clear");
@@ -37,7 +39,7 @@ partial class Game
         else
         {
             Add(0, "clear");
-            if (rng.NextDouble() < 0.3) { int s = Pick(120, 720); Add(s, "rain"); Add(s + Pick(60, 180), "clear"); }
+            if (rng.NextDouble() < shower) { int s = Pick(120, 720); Add(s, "rain"); Add(s + Pick(60, 180), "clear"); }
         }
         return plan;
     }
@@ -52,12 +54,13 @@ partial class Game
         warnedStorm = -1;
     }
 
-    // Tomorrow, in a few words: "fair all day", "rain from about 10 AM until about 4 PM", "a storm around 2 PM".
+    // Tomorrow, in a few words: "fair all day", "rain from about 10 AM until about 4 PM", "a long storm around 2 PM".
+    // Only the plan decides it (not today's season), so what Tomas says still reads the same once it comes true.
     string DescribeDay(List<WeatherSpell> plan)
     {
         string At(int m) => HourText(DawnMin + m);
         var storm = plan.FirstOrDefault(s => s.w == "storm");
-        if (storm != null) return storm.at == 0 ? "a storm from first light" : $"a storm around {At(storm.at)}";
+        if (storm != null) return $"a {StormLength(plan, storm.at)}storm " + (storm.at == 0 ? "from first light" : $"around {At(storm.at)}");
         int i = plan.FindIndex(s => s.w == "rain");
         if (i < 0) return "fair all day";
         int start = plan[i].at, end = i + 1 < plan.Count ? plan[i + 1].at : (int)DayMin;
@@ -98,7 +101,7 @@ partial class Game
                 state.weather = w;
                 news = (was, w) switch
                 {
-                    (_, "storm") => "A storm is raging! The bridges are closed until it passes.",
+                    (_, "storm") => $"{(Season == "habagat" ? "A bagyo" : "A storm")} is raging! The bridges are closed until it passes.",
                     ("storm", "rain") => "The storm is easing off. The bridges are open again.",
                     ("storm", _) => "The storm has passed. The bridges are open again.",
                     (_, "rain") => "It's starting to rain. The fish are biting.",

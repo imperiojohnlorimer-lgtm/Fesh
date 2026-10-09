@@ -138,7 +138,7 @@ partial class Game
         var e = eclipse;
         if (e?.Phase != "bang") return;
         float off = MathF.Min(e.Beat, BeatLen - e.Beat);
-        swingT = 0.2f;
+        Swing("mallet", 0.2f);
         if (off <= BeatWindow && !e.Judged)
         {
             e.Judged = true;

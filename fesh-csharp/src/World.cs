@@ -414,6 +414,7 @@ partial class Game
             }
         DrawRipples(t);
         DrawFoam(t);
+        DrawTideFlats(t);
     }
 
     void DrawSpots(float t)
@@ -604,19 +605,22 @@ partial class Game
         bool blink = time % 3.7f < 0.12f;
         bool rod = fish != null || mode == "charging";
         var (arms, pump, lean, glance) = PlayerPose(rod, holding);
-        int rise = 0, side = f == "left" ? -1 : 1;
+        int side = f == "left" ? -1 : 1;
+        // Where the upper body is (in the saddle, everything you hold or swing is up where you sit), and what's in
+        // your hands there: a tool mid-swing, the rod or the spear (Tools.cs). The arms reach for it.
+        var (bx, by) = Riding ? RiderSeat(x, y) : (x, y);
+        if (Riding) lean = 0;
+        int rise = Riding ? 0 : bob + (walk is 2 or 4 ? 1 : 0);
+        var hands = holding ? null : HandsPose(f, bx + (f is "left" or "right" ? lean * side : 0), by - rise, rod, pump);
+        if (hands != null) arms = 4;
+        if (hands?.ToolBehind == true) DrawToolPose(hands);
         if (Riding)
         {
-            // In the saddle: everything you hold or swing is up where you sit.
-            DrawRider(x, y, moving, step, arms, pump);
-            (x, y) = RiderSeat(x, y);
-            lean = 0;
+            DrawRider(x, y, moving, step, arms, pump, hands);
+            (x, y) = (bx, by);
         }
-        else
-        {
-            LookData.DrawPerson(pix, state.look, x, y, f, walk, bob: bob, blink: blink, arms: arms, swing: pump, lean: lean, head: glance);
-            rise = bob + (walk is 2 or 4 ? 1 : 0);
-        }
+        else LookData.DrawPerson(pix, state.look, x, y, f, walk, bob: bob, blink: blink, arms: arms, swing: pump, lean: lean, head: glance,
+            hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
         if (InWater && !Riding)
         {
             // Wading: the water comes up past your knees, with a ripple around you.
@@ -625,26 +629,17 @@ partial class Game
             pix.Rect(x - 4, y - 3, 9, 1, Pal.Rgba(230, 246, 250, 0.6f));
             pix.Ring(x + 0.5, y - 2, 3 + (time * 2 % 1) * 2, Pal.Rgba(230, 246, 250, 0.5f * (1 - time * 2 % 1)));
         }
-        if (swingT > 0 && mode != "spear")
+        if (hands != null && !hands.ToolBehind)
         {
-            // A quick tool swing toward whatever is being chopped or mined.
-            int dir = f == "left" ? -1 : 1, lift = swingT > 0.12f ? -4 : 0;
-            pix.Line(x + dir * 2, y - 7, x + dir * 6, y - 9 + lift, "#8a6440");
-            pix.Rect(x + dir * 6 - 1, y - 11 + lift, 3, 3, "#9aa0a5");
-        }
-        if (rod)
-        {
-            // From the hand holding it (see LookData.SideArm and FrontArms).
-            var tip = RodTip();
-            int hx = (f == "left" ? x - 3 : x + 2) + (f is "left" or "right" ? lean * side : 0);
-            pix.Line(hx, y - 6 - rise + pump, tip.X, tip.Y, "#6b4a2b");
-        }
-        if (mode == "spear" && thrown == null && spears > 0)
-        {
-            // Spear raised, ready to throw.
-            int dir = aimX < player.X ? -1 : 1;
-            pix.Line(x + dir * 2, y - 5, x + dir * 5, y - 15, "#8a6440");
-            pix.Rect(x + dir * 5, y - 16, 1, 1, "#e8f0f4");
+            DrawToolPose(hands);
+            // The hands close round the handle over the tool: the near one from the side (the far one really is behind
+            // the shaft), both from the front; from behind they're out of sight in front of you.
+            if (!hands.ArmsBehind)
+            {
+                string skin = LookData.Skins[state.look.skin % LookData.Skins.Length];
+                pix.Rect(hands.Hand.x, hands.Hand.y, 1, 1, skin);
+                if (f == "down" && hands.Hand2 is { } h2) pix.Rect(h2.x, h2.y, 1, 1, skin);
+            }
         }
         if (holding) DrawHeld(x, y - 17);
     }
@@ -785,6 +780,26 @@ partial class Game
         }
     }
 
+    // A bahay kubo: woven bamboo walls raised on four stilts, a steep nipa roof, and bamboo steps up to the door.
+    void DrawKubo(int X, int Y)
+    {
+        string win = Night ? "#f3c25b" : "#3a3024";
+        pix.Rect(X, Y + 9, 20, 1, "rgba(0,0,0,0.2)");
+        foreach (int sx in new[] { 2, 7, 12, 17 }) { pix.Rect(X + sx, Y + 3, 1, 7, "#6b4a2b"); pix.Rect(X + sx, Y + 3, 1, 1, "#8a6440"); }
+        pix.Rect(X + 1, Y + 2, 18, 2, "#a8844e");
+        pix.Rect(X + 2, Y - 6, 16, 8, "#d9bf86");
+        for (int i = 0; i < 16; i += 2) pix.Rect(X + 2 + i, Y - 6 + (i / 2 % 2), 1, 7, "#c4a668");
+        pix.Rect(X + 8, Y - 4, 4, 6, "#4a3a2a");
+        pix.Rect(X + 3, Y - 4, 3, 3, win); pix.Rect(X + 14, Y - 4, 3, 3, win);
+        for (int s = 0; s < 3; s++) pix.Rect(X + 8, Y + 4 + s * 2, 4, 1, "#c9a06a");
+        for (int i = 0; i < 9; i++)
+        {
+            int half = 3 + i * 9 / 8;
+            pix.Rect(X + 10 - half, Y - 15 + i, half * 2, 1, i % 3 == 0 ? "#9a7440" : "#c8a25e");
+        }
+        pix.Rect(X - 1, Y - 7, 22, 1, "#80643e");
+    }
+
     void DrawBuild(Build b, float t)
     {
         int X = b.x * T, Y = b.y * T;
@@ -816,6 +831,23 @@ partial class Game
                     }
                 break;
             }
+            case "bubo":
+            {
+                // The woven cone lies just under the surface, its mouth facing the bank; a bamboo stake marks it.
+                pix.Ring(X + 6, Y + 6, 3 + MathF.Sin(t * 2 + b.x) * 0.4, Pal.Rgba(230, 246, 250, 0.35f));
+                pix.Rect(X + 1, Y + 5, 3, 4, Pal.Rgba(170, 125, 70, 0.55f)); pix.Rect(X + 4, Y + 6, 4, 2, Pal.Rgba(150, 110, 60, 0.5f));
+                pix.Rect(X + 1, Y + 5, 1, 4, Pal.Rgba(80, 55, 30, 0.6f));
+                for (int i = 0; i < 3; i++) pix.Rect(X + 3 + i * 2, Y + 5 + (i > 0 ? 1 : 0), 1, i > 0 ? 2 : 4, Pal.Rgba(90, 62, 34, 0.5f));
+                pix.Rect(X + 7, Y - 2, 1, 8, "#c9a06a"); pix.Rect(X + 7, Y - 2, 1, 1, "#e8d0a0"); pix.Rect(X + 7, Y + 1, 1, 1, "#a8844e");
+                pix.Rect(X + 6, Y + 3, 3, 1, "#8a6440");
+                if (scene == "world" && PotReady(b))
+                    for (int k = 0; k < 2; k++)
+                    {
+                        double ph = (t * 0.8 + k * 0.5 + b.y * 0.1) % 1;
+                        pix.Rect(X + 3 + k * 3, Y + 6 - ph * 6, 1, 1, Pal.Rgba(255, 255, 255, (float)(0.9 * (1 - ph))));
+                    }
+                break;
+            }
             case "dryrack":
             {
                 // A low bamboo frame with a net across it; salted fish laid on it go from silver to sun-dried gold.
@@ -825,7 +857,20 @@ partial class Game
                 for (int i = 1; i < 10; i += 2) pix.Rect(X + i, Y + 4, 1, 1, "#a8844e");
                 pix.Rect(X + 2, Y + 7, 6, 1, "#a8844e");
                 var load = scene == "world" ? Rack(b) : null;
-                if (load != null)
+                if (RackIsGuso(load))
+                {
+                    // Guso spread along the rack in tangles, bleaching from green-brown to pale straw as it dries.
+                    float k = Math.Min(1, load.dry / DryGoal);
+                    var c = Pal.Rgba((byte)(95 + (217 - 95) * k), (byte)(110 + (196 - 110) * k), (byte)(46 + (138 - 46) * k), 1);
+                    var tip = Pal.Rgba((byte)(200 + (242 - 200) * k), (byte)(192 + (234 - 192) * k), (byte)(112 + (208 - 112) * k), 1);
+                    for (int i = 0; i < load.fish.Count; i++)
+                    {
+                        int gx = X + 1 + i * 3 / 2, up = i % 2;
+                        pix.Rect(gx, Y + 1 + up, 1, 4 - up, c);
+                        pix.Rect(gx, Y + 1 + up, 1, 1, tip);
+                    }
+                }
+                else if (load != null)
                 {
                     float k = Math.Min(1, load.dry / DryGoal);
                     var c = Pal.Rgba((byte)(200 - (200 - 201) * k), (byte)(212 - (212 - 154) * k), (byte)(220 - (220 - 82) * k), 1);
@@ -843,6 +888,7 @@ partial class Game
             case "baitbox": DrawBaitBox(X, Y, t); break;
             case "campfire": DrawFire(t, X + 5, Y + 6); break;
             case "shack": DrawShack(X, Y); break;
+            case "kubo": DrawKubo(X, Y); break;
             case "workbench":
                 pix.Rect(X + 1, Y + 9, 18, 1, "rgba(0,0,0,0.25)");
                 pix.Rect(X + 2, Y + 4, 2, 5, "#6b4a2b"); pix.Rect(X + 16, Y + 4, 2, 5, "#6b4a2b");
@@ -1257,16 +1303,21 @@ partial class Game
             var d = Data.BuildById[b.id];
             if (d.Light == null) continue;
             float r = d.Light[2] + (b.id == "campfire" ? MathF.Sin(t * 9 + b.x) * 2 : 0);
-            LightHole(b.x * T + d.Light[0], b.y * T + d.Light[1], r, b.id == "shack" ? 0.75f : 1);
+            LightHole(b.x * T + d.Light[0], b.y * T + d.Light[1], r, b.id is "shack" or "kubo" ? 0.75f : 1);
         }
         // The Starwell glows after dark, enough to light a fight around it (and to catch your eye through the palms).
         LightHole(StarwellX, StarwellY, 62 + MathF.Sin(t * 1.3f) * 4, 0.8f);
         if (boss != null) LightHole(boss.X, boss.Y - 8, 34, 0.7f);
         LightParola(t);
         LightEclipse();
+        LightFireflies(t);
         ApplyDark(new Color(8, 16, 40, 255));
         // With the moon in Bakunawa's jaws, the surf doesn't catch any moonlight.
         if (eclipse == null || eclipse.Phase == "spit") DrawMoonlitShore(t, k);
+        // Bakawan's glowing water and its alitaptap (Bakawan.cs).
+        DrawGlowingSurf(t, k);
+        DrawGlowTrail(t, k);
+        DrawFireflies(t, k);
         GlowParola(t, k);
         GlowEclipse(k);
         pix.Glow(StarwellX, StarwellY, 30, Pal.Rgba(120, 220, 255, (0.22f + 0.06f * MathF.Sin(t * 1.3f)) * k));
@@ -1339,6 +1390,7 @@ partial class Game
             DrawTufts(t);
             foreach (var b in state.builds) if (b.id == "path") DrawBuild(b, t);
             DrawSaltBeds();
+            DrawGusoFarm(t);
             DrawLoose(t);
             DrawBugs(t);
             DrawSpots(t);
@@ -1354,6 +1406,7 @@ partial class Game
             DrawObjects(t);
             DrawBossEffects(t);
             DrawFishing(t);
+            DrawRelease(t);
             DrawEclipseRing();
             DrawParticles();
             DrawLeaves();

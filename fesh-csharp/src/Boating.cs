@@ -91,6 +91,7 @@ partial class Game
     }
 
     void DrawHelmsman() => DrawBoat(player.X, player.Y, time, occupied: true);
+    static readonly string[] PaintedPanel = { "#e04b3a", "#f3c25b", "#2f7fa3", "#3f9a5a" };
 
     /* ---------- How the banca moves ---------- */
     // Where the bow points. Left and right are side views (mirrored by BoatDir); up shows the boat from astern, heading
@@ -165,7 +166,7 @@ partial class Game
         int dir = BoatDir;
         bool underWay = occupied && (BoatUnderWay || towing), fishing = occupied && (fish != null || mode == "charging");
         // The big sail stands taller and wider on a taller mast.
-        bool big = Wears("big_sail");
+        bool big = Wears("big_sail"), painted = Wears("painted_sail");
         int rows = big ? 13 : 10, mast = big ? 18 : 15;
         float furl = occupied ? sailFurl : 1;
         int X = (int)MathF.Round(x), waterY = (int)MathF.Round(y);
@@ -251,7 +252,10 @@ partial class Game
                 if (underWay && row >= 2 && row <= rows - 3) width++;
                 else if (!underWay && row >= 3 && row <= rows - 2 && MathF.Sin(t * 7 + row * .9f) > .55f) width++;
                 int sx = mx + 1 + lean * (rows - row) / rows, sy = my - (mast - 1) + row;
-                R(sx, sy, width, 1, row == rows - 2 ? "#58a5a1" : row == rows - 1 ? "#d7cda8" : big && row == rows / 2 ? "#e3c46f" : "#f4edce");
+                // Dado's painted sail (a regatta prize) is panels of red, gold, blue and green.
+                string cloth = row == rows - 2 ? "#58a5a1" : row == rows - 1 ? "#d7cda8"
+                    : painted ? PaintedPanel[row * PaintedPanel.Length / (rows - 2)] : big && row == rows / 2 ? "#e3c46f" : "#f4edce";
+                R(sx, sy, width, 1, cloth);
                 if (underWay && width > 3) R(sx + width / 2, sy, 1, 1, "#e6dcbc");
                 // Seen from astern, the back of the sail is shaded along the mast.
                 if (astern && width > 2 && row < rows - 2) R(sx, sy, 1, 1, "#e6dcbc");

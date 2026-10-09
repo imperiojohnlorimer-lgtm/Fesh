@@ -34,6 +34,32 @@ partial class Game
             }, OpenSungka);
             return;
         }
+        // Out on the flats at the low tide you found her (Tides.cs).
+        if (ReefWalkOn && ReefThanked)
+        {
+            Talk(new() { L("Look, apo: under that rock, something moved! Gently now. We'll go home when the sea comes back.") });
+            return;
+        }
+        if (ReefWalkOn)
+        {
+            ThankReefWalk();
+            Talk(new()
+            {
+                L(FlatsDry ? "You came! And right on the tide. Look how far the sea has gone: you can walk out to where the reef starts."
+                    : "You came! And right on the tide. The sea's not gone far today, but the sand by the water is full of good things."),
+                L("Take the big shells and leave the little ones to grow. If you turn a stone over, turn it back the way it was: there's a whole family living under it."),
+                L("Here, three cowries from my pocket, and 80 coins from the co-op for helping the children. We'll be out here until the tide turns. Come and find me again at the next big low.")
+            });
+            return;
+        }
+        // The second time you come by, she teaches you the tides and gives you the tide table.
+        if (!TidesLearned) { TeachTides(); return; }
+        if (state.Hinted("reefMissed"))
+        {
+            state.hinted.Remove("reefMissed");
+            Talk(new() { L("You missed the low tide, apo! The sea doesn't wait for anyone. Ask me for another riddle tomorrow.") }, OpenSungka);
+            return;
+        }
         OpenSungka();
     }
 

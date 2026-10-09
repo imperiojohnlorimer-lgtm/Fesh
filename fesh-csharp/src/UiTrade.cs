@@ -36,6 +36,8 @@ partial class Game
         if (Gfx.PressedOutside(x, y, cw, ch)) ClosePanels();
     }
 
+    const float DerbyFishW = 520 - 170 - 14;   // a rival's fish and its weight, inside their 520 px row
+
     // Pip's daily derby: today's rivals, the prizes, and the button to start.
     void DrawDerbyTab(float x, float y, float w)
     {
@@ -48,7 +50,7 @@ partial class Game
         {
             Gfx.Box(x, y, 520, 46, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text(name, x + 14, y + 12, FontKind.Ui700, 19, Pal.PaperInk);
-            Gfx.Text($"{fishName}, {Kg(kg)}", x + 170, y + 13, FontKind.Ui500, 18, Muted);
+            Gfx.Text(Gfx.Ellipsize($"{fishName}, {Kg(kg)}", FontKind.Ui500, 18, DerbyFishW), x + 170, y + 13, FontKind.Ui500, 18, Muted);
             y += 54;
         }
         float px = x + 560, py = y - 54 * 3 - 36;
@@ -88,7 +90,13 @@ partial class Game
             DrawIcon(id, rx + 8, ry + 8, 36);
             var d = Items.ById[id];
             bool rare = d.Kind == "fish" && Data.FishById[id].Rare;
-            Gfx.Text(Gfx.Ellipsize($"{d.Name} ×{Has(id)}", FontKind.Ui700, 18, colW - 300), rx + 54, ry + 8, FontKind.Ui700, 18, rare ? Rust : Pal.PaperInk);
+            Gfx.Text(Gfx.Ellipsize($"{d.Name} ×{Has(id)}", FontKind.Ui700, 18, ClosedSeason(id) ? colW - 70 : colW - 300), rx + 54, ry + 8, FontKind.Ui700, 18, rare ? Rust : Pal.PaperInk);
+            // In its closed season Pip won't buy it (Release.cs).
+            if (ClosedSeason(id))
+            {
+                Gfx.Text("Closed season: Pip won't buy it until the habagat", rx + 54, ry + 29, FontKind.Ui500, 15, Rust);
+                continue;
+            }
             int big = d.Kind == "fish" ? BigCount(id) : 0;
             Gfx.Text($"{PriceOf(id)} each" + (big > 0 ? $" ({big} big: {(int)MathF.Round(PriceOf(id) * 1.6f)})" : ""), rx + 54, ry + 29, FontKind.Ui500, 15, big > 0 ? Pal.C("#9a6a1a") : Muted);
             if (Button("Sell 1", rx + colW - 196, ry + 8, 86, 36, FontKind.Ui700, 17, Pal.Sand, Pal.Ink, 3, 2, 5)) Sell(id, 1);
@@ -105,9 +113,10 @@ partial class Game
 
     void DrawBuyList(float x, float y, float w)
     {
-        Gfx.Text("Pip's goods. Sailcloth is the one thing you can't make yourself.", x, y + 8, FontKind.Note, 19, Muted);
+        Gfx.Text("Pip's goods. Sailcloth and vinegar are the only things you can't make yourself.", x, y + 8, FontKind.Note, 19, Muted);
         y += 50;
-        const float rowH = 84, gap = 10;
+        // Six rows of two fit the stall's 620 px.
+        const float rowH = 70, gap = 8;
         float colW = (w - 16) / 2;
         for (int i = 0; i < Items.Shop.Length; i++)
         {
@@ -115,23 +124,27 @@ partial class Game
             var d = Items.ById[id];
             float rx = x + (i % 2) * (colW + 16), ry = y + (i / 2) * (rowH + gap);
             Gfx.Box(rx, ry, colW, rowH, CardBg, Pal.C("#c9b48f"), 2, 5);
-            DrawIcon(id, rx + 10, ry + 10, 44);
-            Gfx.Text(d.Name, rx + 66, ry + 8, FontKind.Ui700, 19, Pal.PaperInk);
-            Gfx.Text($"(have {Has(id)})", rx + 74 + Gfx.Measure(d.Name, FontKind.Ui700, 19), ry + 11, FontKind.Ui500, 14, Muted);
-            Gfx.Text(Gfx.Ellipsize(Bind.Fix(d.Desc), FontKind.Note, 15, colW - 80), rx + 66, ry + 56, FontKind.Note, 15, Pal.PaperInk);
-            DrawIcon("coin", rx + 66, ry + 31, 20);
-            Gfx.Text(price.ToString(), rx + 90, ry + 31, FontKind.Ui700, 18, Pal.C("#9a6a1a"));
+            DrawIcon(id, rx + 10, ry + 9, 40);
+            Gfx.Text(d.Name, rx + 62, ry + 5, FontKind.Ui700, 19, Pal.PaperInk);
+            Gfx.Text($"(have {Has(id)})", rx + 70 + Gfx.Measure(d.Name, FontKind.Ui700, 19), ry + 8, FontKind.Ui500, 14, Muted);
+            Gfx.Text(Gfx.Ellipsize(Bind.Fix(d.Desc), FontKind.Note, 15, colW - 76), rx + 62, ry + 47, FontKind.Note, 15, Pal.PaperInk);
+            DrawIcon("coin", rx + 62, ry + 27, 18);
+            Gfx.Text(price.ToString(), rx + 84, ry + 26, FontKind.Ui700, 18, Pal.C("#9a6a1a"));
             bool can1 = state.coins >= price;
             if (id is "bait" or "chum")
             {
                 bool can10 = state.coins >= price * 10;
-                if (Button("Buy 10", rx + colW - 226, ry + 10, 104, 36, FontKind.Ui700, 17, can10 ? Pal.Buoy : Pal.C("#d9ccb0"), can10 ? White : Muted, 3, 2, 5, can10)) Buy(id, price, 10);
+                if (Button("Buy 10", rx + colW - 226, ry + 6, 104, 34, FontKind.Ui700, 17, can10 ? Pal.Buoy : Pal.C("#d9ccb0"), can10 ? White : Muted, 3, 2, 5, can10)) Buy(id, price, 10);
             }
-            if (Button("Buy 1", rx + colW - 114, ry + 10, 104, 36, FontKind.Ui700, 17, can1 ? Pal.Buoy : Pal.C("#d9ccb0"), can1 ? White : Muted, 3, 2, 5, can1)) Buy(id, price, 1);
+            if (Button("Buy 1", rx + colW - 114, ry + 6, 104, 34, FontKind.Ui700, 17, can1 ? Pal.Buoy : Pal.C("#d9ccb0"), can1 ? White : Muted, 3, 2, 5, can1)) Buy(id, price, 1);
         }
     }
 
     /* ---------- Aquarium ---------- */
+    int tankPage;           // which page of your fish the aquarium shows (21 to a page)
+    float lastTankBottom;   // the lowest thing the aquarium panel drew (the autotest checks it stays inside the panel)
+    const int TankPerPage = 21;
+
     void DrawTank()
     {
         Backdrop();
@@ -139,9 +152,10 @@ partial class Game
         float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
         Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
         Gfx.Text("Aquarium", x + pad, y + pad, FontKind.Ui700, 36, Pal.PaperInk);
-        if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) ClosePanels();
+        if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) { ClosePanels(); return; }
         Gfx.Text("Up to four fish. Rare ones are worth showing off.", x + pad, y + pad + 46, FontKind.Note, 19, Muted);
         var tank = Tank(tankKey);
+        float bottom = 0;
 
         // In the tank
         float sx = x + pad, sy = y + pad + 84;
@@ -160,49 +174,86 @@ partial class Game
             Gfx.TextCenter(Gfx.Ellipsize(Items.ById[id].Name, FontKind.Ui700, 16, 160), cx + 85, cy + 70, FontKind.Ui700, 16, rare ? Pal.Lantern : White);
             if (Button("Take out", cx + 30, cy + 92, 110, 32, FontKind.Ui700, 15, Pal.Sand, Pal.Ink, 3, 2, 5)) TankTake(i);
         }
+        bottom = sy + tankH;
 
-        // From your bag
+        // From your bag: seven to a row, three rows to a page, and the name of the one you point at on the line below.
         float bx = sx + 400, by = sy;
+        const float card = 72, gap = 8;
         Gfx.Text("Your fish", bx, by, FontKind.Ui700, 22, Pal.PaperInk);
         var fish = BagItems().Where(id => Items.ById[id].Kind == "fish").ToList();
+        int pages = Math.Max(1, (fish.Count + TankPerPage - 1) / TankPerPage);
+        tankPage = Math.Clamp(tankPage, 0, pages - 1);
+        if (pages > 1)
+        {
+            float px = bx + 7 * (card + gap) - gap;
+            if (Button(">", px - 40, by - 6, 40, 32, FontKind.Ui700, 18, Pal.Sand, Pal.Ink, 2, 2, 5, tankPage < pages - 1)) tankPage++;
+            if (Button("<", px - 88, by - 6, 40, 32, FontKind.Ui700, 18, Pal.Sand, Pal.Ink, 2, 2, 5, tankPage > 0)) tankPage--;
+            string pg = $"{tankPage + 1} / {pages}";
+            Gfx.Text(pg, px - 100 - Gfx.Measure(pg, FontKind.Ui600, 16), by + 2, FontKind.Ui600, 16, Muted);
+        }
         if (fish.Count == 0) Gfx.Text("No fish in your bag.", bx, by + 40, FontKind.Note, 19, Muted);
         bool full = tank.Count >= 4;
-        for (int i = 0; i < fish.Count && i < 18; i++)
+        string pointed = null;
+        var shown = fish.Skip(tankPage * TankPerPage).Take(TankPerPage).ToList();
+        for (int i = 0; i < shown.Count; i++)
         {
-            string id = fish[i];
-            float fx = bx + (i % 6) * 92, fy = by + 34 + (i / 6) * 92;
-            bool hov = !full && Gfx.Hover(fx, fy, 84, 84);
-            Gfx.Box(fx, fy, 84, 84, hov ? Pal.Lantern : CardBg, Pal.C("#c9b48f"), 2, 5);
-            DrawIcon(id, fx + 14, fy + 6, 56);
-            Gfx.Text($"×{Has(id)}", fx + 8, fy + 62, FontKind.Ui700, 15, Pal.Ink);
-            if (!full && Gfx.Click(fx, fy, 84, 84)) TankPut(id);
+            string id = shown[i];
+            float fx = bx + (i % 7) * (card + gap), fy = by + 34 + (i / 7) * (card + gap);
+            bool hov = Gfx.Hover(fx, fy, card, card);
+            if (hov) pointed = id;
+#if DEBUG
+            Gfx.Seen["tankfish:" + id] = new Rectangle(fx, fy, card, card);
+#endif
+            bool rare = Data.FishById[id].Rare;
+            Gfx.Box(fx, fy, card, card, hov && !full ? Pal.Lantern : CardBg, rare ? Pal.C("#d9a640") : Pal.C("#c9b48f"), 2, 5);
+            DrawIcon(id, fx + 12, fy + 3, 48);
+            Gfx.Text($"×{Has(id)}", fx + 7, fy + 52, FontKind.Ui700, 14, Pal.Ink);
+            if (!full && Gfx.Click(fx, fy, card, card)) TankPut(id);
+            bottom = Math.Max(bottom, fy + card);
         }
-        Gfx.Text(full ? "The tank is full. Take a fish out to swap." : "Click a fish to put it in.", bx, sy + tankH - 22, FontKind.Ui600, 17, Muted);
+        string hint = pointed != null ? $"{Items.ById[pointed].Name} ×{Has(pointed)}" + (full ? ". The tank is full: take one out first." : ". Click to put it in.")
+            : full ? "The tank is full. Take a fish out to swap." : "Click a fish to put it in.";
+        Gfx.Text(Gfx.Ellipsize(hint, FontKind.Ui600, 17, 7 * (card + gap) - gap), bx, sy + tankH - 22, FontKind.Ui600, 17, pointed != null ? Pal.PaperInk : Muted);
 
-        // Collections: a set of four on show (in any of your aquariums) gives a bonus.
+        // Collections: a set of four on show (in any of your aquariums) gives a bonus. Four to a row.
         float cy2 = sy + tankH + 16;
         Gfx.Text("Collections: show all four fish of a set in your aquariums for a bonus", sx, cy2, FontKind.Ui700, 18, Pal.PaperInk);
         cy2 += 30;
-        var shown = Displayed();
-        float setW = (cw - pad * 2 - 24) / 3;
+        var onShow = Displayed();
+        const float setH = 102;
+        float setW = (cw - pad * 2 - 36) / 4;
+        string tip = null;
         for (int i = 0; i < Data.AquaSets.Length; i++)
         {
             var set = Data.AquaSets[i];
-            float qx = sx + (i % 3) * (setW + 12), qy = cy2 + (i / 3) * 98;
-            bool done = set.Fish.All(shown.Contains);
-            Gfx.Box(qx, qy, setW, 90, done ? Pal.C("#e3f3d6") : CardBg, done ? Pal.C("#5fb04f") : Pal.C("#c9b48f"), 2, 5);
-            Gfx.Text(set.Name + (done ? " (complete!)" : ""), qx + 10, qy + 6, FontKind.Ui700, 16, done ? Pal.C("#2f6428") : Pal.PaperInk);
+            float qx = sx + (i % 4) * (setW + 12), qy = cy2 + (i / 4) * (setH + 8);
+            bool done = set.Fish.All(onShow.Contains);
+            Gfx.Box(qx, qy, setW, setH, done ? Pal.C("#e3f3d6") : CardBg, done ? Pal.C("#5fb04f") : Pal.C("#c9b48f"), 2, 5);
+            Gfx.Text(Gfx.Ellipsize(set.Name, FontKind.Ui700, 16, setW - 20 - (done ? 26 : 0)), qx + 10, qy + 6, FontKind.Ui700, 16, done ? Pal.C("#2f6428") : Pal.PaperInk);
+            if (done) DrawIcon("star", qx + setW - 30, qy + 4, 22);
             for (int k = 0; k < 4; k++)
             {
                 string f = set.Fish[k];
                 float ix = qx + 10 + k * 40;
-                if (shown.Contains(f)) DrawIcon(f, ix, qy + 28, 32);
+                if (onShow.Contains(f)) DrawIcon(f, ix, qy + 28, 32);
                 else if (state.commons.GetValueOrDefault(f) > 0) { DrawIcon(f, ix, qy + 28, 32); Gfx.Rect(ix, qy + 28, 32, 32, Pal.C("rgba(241,230,200,0.7)"), 4); }
                 else Gfx.TextCenter("?", ix + 16, qy + 32, FontKind.Ui700, 20, Pal.C("#9a8a70"));
                 if (Gfx.Hover(ix, qy + 28, 32, 32))
-                    Gfx.Text(state.commons.GetValueOrDefault(f) > 0 ? Items.ById[f].Name : "Not caught yet", x + pad, y + ch - pad - 14, FontKind.Ui600, 15, Pal.PaperInk);
+                    tip = state.commons.GetValueOrDefault(f) > 0 ? Items.ById[f].Name + (onShow.Contains(f) ? " (on show)" : "") : "Not caught yet";
             }
-            Gfx.Text(Gfx.Ellipsize(set.Perk, FontKind.Ui500, 14, setW - 20), qx + 10, qy + 66, FontKind.Ui500, 14, Muted);
+            var perk = Gfx.Wrap(set.Perk + (done ? " (on now)" : ""), FontKind.Ui500, 14, setW - 20);
+            if (perk.Count > 2) perk = new List<string> { perk[0], Gfx.Ellipsize(perk[1] + " " + perk[2], FontKind.Ui500, 14, setW - 20) };
+            Lines(perk, qx + 10, qy + 64, 16, FontKind.Ui500, 14, Muted);
+            bottom = Math.Max(bottom, Math.Max(qy + setH, qy + 64 + perk.Count * 16));
+        }
+        lastTankBottom = bottom;
+        // The name of the set fish you point at, beside the mouse, over everything else.
+        if (tip != null)
+        {
+            var m = Gfx.Mouse;
+            float tw = Gfx.Measure(tip, FontKind.Ui600, 15) + 20, tx = Math.Clamp(m.X + 14, 4, Gfx.LW - tw - 4), ty = m.Y + 22 > Gfx.LH - 34 ? m.Y - 34 : m.Y + 22;
+            Gfx.Rect(tx, ty, tw, 28, NavyStrong, 4);
+            Gfx.Text(tip, tx + 10, ty + 5, FontKind.Ui600, 15, Pal.Paper);
         }
         if (Gfx.PressedOutside(x, y, cw, ch)) ClosePanels();
     }

@@ -15,7 +15,7 @@ sealed record Clue(string Title, string Text, string Finding);
 // the Parola squid only come once its lamp is lit.
 sealed record CommonFish(string Id, string Name, float Difficulty, int Weight = 4, bool Rare = false, string Time = "any",
     float Kg = 1, string Style = "dart", string Depth = "any", string Weather = null, bool FullMoon = false, bool Legend = false, string Bait = null, int Attack = 0,
-    bool Troll = false, string Need = null);
+    bool Troll = false, string Need = null, string Season = null);
 
 // A set of four fish. While all four are on show in your aquariums, its Perk applies.
 sealed record AquaSet(string Id, string Name, string[] Fish, string Perk);
@@ -128,7 +128,9 @@ static class Data
         {
             new("lapu_lapu", "Lapu-lapu (grouper)", 1.9f, Kg: 4f, Style: "bottom"),
             new("maya_maya", "Maya-maya (snapper)", 1.7f, Kg: 2.5f),
-            new("talakitok", "Talakitok (trevally)", 2.4f, Weight: 2, Rare: true, Kg: 9f, Style: "runner", Attack: 12)
+            new("talakitok", "Talakitok (trevally)", 2.4f, Weight: 2, Rare: true, Kg: 9f, Style: "runner", Attack: 12),
+            // 1.15: an everyday fish of the lagoon's sandy bottom (its colour is handed out last, Items.AddedLater).
+            new("asohos", "Asohos (silver sillago)", 1f, Weight: 3, Kg: .15f, Depth: "shallow", Style: "dart")
         },
         ["bakawanpool"] = new CommonFish[]
         {
@@ -253,7 +255,10 @@ static class Data
         {
             new("alumahan", "Alumahan (Indian mackerel)", 1.4f, Kg: .3f, Style: "runner"),
             new("matang_baka", "Matang-baka (bigeye scad)", 1.3f, Time: "night", Kg: .25f),
-            new("talang_talang", "Talang-talang (queenfish)", 2.6f, 1, true, "day", Kg: 4f, Style: "jumper")
+            new("talang_talang", "Talang-talang (queenfish)", 2.6f, 1, true, "day", Kg: 4f, Style: "jumper"),
+            // One for each monsoon (Seasons.cs). Added last, so no older fish changes colour.
+            new("dalagang_bukid", "Dalagang-bukid (fusilier)", 1.5f, Kg: .4f, Season: "amihan"),
+            new("salay_salay", "Salay-salay (yellowstripe scad)", 1.4f, Kg: .3f, Style: "runner", Season: "habagat")
         }
     };
 
@@ -423,6 +428,12 @@ static class Data
             Tip: "Come back tomorrow, face the float and press <act> to haul up the pot."),
         new("dryrack", "Drying rack", Cost(("wood", 4), ("stone", 2)), "Salt fish and dry them in the sun.", Box: new[] { 1, 3, 8, 6 },
             Tip: "Press <act> at the rack to lay out salted fish. They dry in clear daylight; rain stops them."),
+        // The eleventh piece has no number key: click it in the build bar, or step to it with the bumpers.
+        new("bubo", "Bubo", Cost(("bubo", 1)), "A bamboo trap for fresh water; lift it each morning.", Water: true,
+            Tip: "Come back tomorrow, face the stake and press <act> to lift the bubo."),
+        // 1.15: the twelfth piece, once you've been to Amihan (Build.BuildTools). A shack on stilts, furnished the same way.
+        new("kubo", "Bahay kubo", Cost(("wood", 10), ("stone", 2)), "A nipa hut on stilts, cool and airy. Furnish it like a shack.", W: 2, Box: new[] { 1, 0, 18, 9 },
+            Light: new[] { 10, 2, 16 }, Tip: "Press <act> at the steps to go inside and furnish it.", Door: true),
 
         new("workbench", "Workbench", Cost(("wood", 6), ("stone", 2)), "Craft tools and rods.", W: 2, Box: new[] { 1, 3, 18, 6 }, Indoor: true, Station: "workbench",
             Tip: "Press <act> at the workbench to craft."),

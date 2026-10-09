@@ -47,11 +47,23 @@ partial class Game
             }, () => OpenShop());
             return;
         }
+        // In the amihan, once you've caught one, Pip explains why she isn't buying galunggong or tamban (Release.cs).
+        if (Season == "amihan" && !state.Hinted("pipClosed") && ClosedFish.Any(f => state.commons.GetValueOrDefault(f) > 0))
+        {
+            state.hinted["pipClosed"] = true;
+            Talk(new()
+            {
+                P("Before you ask: I'm not buying galunggong or tamban while the amihan blows. It's their spawning season, so that's my rule."),
+                P("If nobody buys them, nobody nets them, and the shoals get a few weeks in peace. Some places up north close the season for the big boats by law. There's plenty more come the habagat."),
+                P("Catch one by accident? Let it go quick, while it's still kicking. Now, what can I get you?")
+            }, () => OpenShop());
+            return;
+        }
         // Once a day Pip passes on what the boats say about tomorrow's weather.
         if (!KnowTomorrow)
         {
             TellTomorrow();
-            Talk(new() { P($"Word from the boats about tomorrow: {DescribeDay(state.tomorrow)}. Now, what can I get you?") }, () => OpenShop());
+            Talk(new() { P($"Word from the boats about tomorrow: {DescribeDay(state.tomorrow)}.{SeasonTomorrow()} Now, what can I get you?") }, () => OpenShop());
             return;
         }
         OpenShop();
@@ -69,6 +81,7 @@ partial class Game
 
     void Sell(string id, int n)
     {
+        if (ClosedSeason(id)) { Sfx.Play("nope"); Toast("Pip: Not in the closed season! They're spawning. Ask me again in the habagat."); return; }
         n = Math.Min(n, Has(id));
         int value = SaleValue(id, n);
         if (n <= 0 || value <= 0) return;
@@ -83,7 +96,7 @@ partial class Game
     void SellAllFish()
     {
         int total = 0, count = 0;
-        foreach (var (id, n) in state.inv.Where(kv => Items.ById[kv.Key].Kind == "fish" && !Data.FishById[kv.Key].Rare).ToList())
+        foreach (var (id, n) in state.inv.Where(kv => Items.ById[kv.Key].Kind == "fish" && !Data.FishById[kv.Key].Rare && !ClosedSeason(kv.Key)).ToList())
         {
             total += SaleValue(id, n);
             count += n;
@@ -103,6 +116,7 @@ partial class Game
         state.coins -= price * n;
         Give(id, n);
         Sfx.Play("coin");
+        Learned("buy");
         string tip = id switch
         {
             "bait" when !state.Hinted("bait") => " Bait is used up automatically, one per cast.",
@@ -110,6 +124,7 @@ partial class Game
             "sailcloth" when !state.Hinted("sailcloth") => " A boat is made at a workbench: 20 wood, 4 iron bars and this.",
             "crab_pot" when !state.Hinted("crab_pot") => " Press <build> outdoors and set it in shallow water.",
             "chum" when !state.Hinted("chum") => " At a fishing spot, press <alt> to throw it.",
+            "suka" when !state.Hinted("suka") => " Simmer a fish in it at a cooking stove: paksiw.",
             "cork_bobber" or "spinner_lure" when !state.Hinted("tackleTip") => " Change your tackle with <tackle>.",
             _ => ""
         };
@@ -129,7 +144,7 @@ partial class Game
         // After the set list: any ordinary fish from somewhere you can already reach.
         var pool = Data.Spots.Where(s => (s.Biome != "atoll" || state.Hinted("visitedAtoll")) && (s.Biome != "amihan" || state.Hinted("amihan"))
                 && (s.Biome != "habagat" || state.Hinted("habagat")) && SpotKnown(s) && (s.Scene != "sea" || Has("boat") > 0 || state.tamed))
-            .SelectMany(s => Data.Common[s.Id]).Where(f => !f.Rare && (f.Need == null || state.Hinted(f.Need))).ToList();
+            .SelectMany(s => Data.Common[s.Id]).Where(f => !f.Rare && (f.Need == null || state.Hinted(f.Need)) && f.Season == null).ToList();
         var fish = pool[rng.Next(pool.Count)];
         int count = 2 + rng.Next(3);
         return new Req
@@ -181,6 +196,7 @@ partial class Game
     void OpenTank(Build b)
     {
         tankKey = TankKey(b);
+        tankPage = 0;
         Sfx.Play("ui");
         panel = "tank";
         mode = "panel";

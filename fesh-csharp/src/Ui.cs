@@ -17,6 +17,7 @@ partial class Game
         if (mode == "create") { DrawCreator(); return; }
         bool title = mode == "title";
         if (!title) DrawHud();
+        if (!title) DrawGuideArrow();
         if (!title) DrawPinCompass();
         if (!title) DrawFishingUi();
         if (!title && (BossFighting || BossOnLine)) DrawBossBar();
@@ -44,6 +45,12 @@ partial class Game
         if (mode == "panel" && panel == "tackle") DrawTackle();
         if (mode == "panel" && panel == "sungka") DrawSungka();
         if (mode == "panel" && panel == "voyage") DrawVoyage();
+        if (mode == "panel" && panel == "journal") DrawJournal();
+        if (mode == "panel" && panel == "tides") DrawTides();
+        if (mode == "panel" && panel == "quiz") DrawQuiz();
+        if (mode == "panel" && panel == "sort") DrawSort();
+        if (mode == "panel" && panel == "atlas") DrawAtlas();
+        if (mode == "panel" && panel == "album") DrawAlbum();
         if (mode == "moon") DrawMoonCard();
         if (mode == "pause") DrawMenu();
     }
@@ -144,6 +151,8 @@ partial class Game
         Gfx.Rect(x, m, coinW, h, Navy, 5);
         DrawIcon("coin", x + 8, m + 6, 24);
         Gfx.Text(coins, x + 38, m + (h - fs) / 2 - 1, FontKind.Ui600, fs, Pal.Lantern);
+        // The goal you're following goes under them (Guide.cs), drawn first so the meters' labels show over it.
+        DrawGuideCard();
         // Health and food sit on a second row under the clock.
         DrawHealthMeter(m, m + h + 7, h);
         DrawFoodMeter(m + 136 + 7, m + h + 7, h);
@@ -181,12 +190,13 @@ partial class Game
         var lines = new List<string>
         {
             Night ? $"Night until {HourText(DawnMin)}" : $"Daylight until {HourText(DuskMin)}",
+            SeasonLine(),
             FullMoon ? "The moon is full tonight" : toFull == 0 ? "Full moon tonight" : toFull == 1 ? "Full moon tomorrow night" : $"Full moon in {toFull} days",
             Forecast() ?? "No change in the weather expected today."
         };
         if (KnowTomorrow) lines.Add($"Tomorrow: {DescribeDay(state.tomorrow)}");
-        // On Habagat, the tide matters for gleaning.
-        if (InHabagat) lines.Add(LowTide ? $"Low tide until {ClockText(state.clock < 12 * 60 ? 8.5f * 60 : 20.5f * 60)}: good gleaning" : $"Next low tide at {ClockText(state.clock < 16.5f * 60 && state.clock >= 8.5f * 60 ? 16.5f * 60 : 4.5f * 60)}");
+        // On Habagat (or anywhere with the tide watch), the tide matters for gleaning (Tides.cs).
+        if (InHabagat || Wears("tide_watch") && scene == "world") lines.Add(TideLine());
         float w = lines.Max(l => Gfx.Measure(l, FontKind.Ui500, 17)) + 24;
         Gfx.Rect(x, y, w, lines.Count * 23 + 14, NavyStrong, 5);
         for (int i = 0; i < lines.Count; i++) Gfx.Text(lines[i], x + 12, y + 8 + i * 23, FontKind.Ui500, 17, Pal.Paper);
@@ -205,7 +215,7 @@ partial class Game
         Gfx.Rect(x + 34, y + 12, bw, 12, Pal.C("rgba(0,0,0,0.35)"), 3);
         if (f > 0) Gfx.Rect(x + 34, y + 12, Math.Max(6, bw * f), 12, c, 3);
         Gfx.Block(x, y, w, h);
-        if (Gfx.Hover(x, y, w, h)) Gfx.Text($"Food {state.food:0}/100", x, y + h + 6, FontKind.Ui600, 16, Pal.Paper);
+        if (Gfx.Hover(x, y, w, h)) MeterLabel($"Food {state.food:0}/100", x, y + h + 6);
     }
 
     // A pixel heart and a red bar. It flashes when you're hurt and beats when you're nearly out.
@@ -225,7 +235,14 @@ partial class Game
         Gfx.Rect(x + 34, y + 12, bw, 12, Pal.C("rgba(0,0,0,0.35)"), 3);
         if (f > 0) Gfx.Rect(x + 34, y + 12, Math.Max(6, bw * f), 12, col, 3);
         Gfx.Block(x, y, w, h);
-        if (Gfx.Hover(x, y, w, h)) Gfx.Text($"Health {state.hp:0}/100", x, y + h + 6, FontKind.Ui600, 16, Pal.Paper);
+        if (Gfx.Hover(x, y, w, h)) MeterLabel($"Health {state.hp:0}/100", x, y + h + 6);
+    }
+
+    // A meter's reading under it, on a dark chip so it reads over the goal card.
+    static void MeterLabel(string s, float x, float y)
+    {
+        Gfx.Rect(x, y - 2, Gfx.Measure(s, FontKind.Ui600, 16) + 16, 24, NavyStrong, 4);
+        Gfx.Text(s, x + 8, y + 1, FontKind.Ui600, 16, Pal.Paper);
     }
 
     static void DrawIcon(string itemId, float x, float y, float size) =>
@@ -321,27 +338,33 @@ partial class Game
     }
 
     /* ---------- Build bar ---------- */
+    // The key shown before a piece's name: 1-9 and 0 for the first ten (DigitPressed), none after that.
+    float lastBuildBarW;   // how wide the build bar was last drawn (the autotest checks it fits)
+    static string PieceKey(int i, BuildDef d) => d == null ? Bind.Name("remove") + " " : i < 10 ? $"{(i + 1) % 10} " : "";
+
     void DrawBuildBar()
     {
         const float pad = 5, gap = 5, bh = 56;
-        float fs = 19, small = 15;
+        float fs = 19, small = 15, room = 18;
         var tools = BuildTools();
         var widths = new float[tools.Length];
         float total = 0;
         // Shrink the text if this set of pieces doesn't fit across the screen.
-        for (int pass = 0; pass < 2; pass++)
+        for (int pass = 0; pass < 3; pass++)
         {
             for (int i = 0; i < tools.Length; i++)
             {
                 var d = Data.BuildById.GetValueOrDefault(tools[i]);
-                string name = $"{(d != null ? $"{(i + 1) % 10}" : Bind.Name("remove"))} {(d != null ? d.Name : "Take down")}", cost = d != null ? d.CostText : "refunds all";
-                widths[i] = Math.Max(Gfx.Measure(name, FontKind.Ui600, fs), Gfx.Measure(cost, FontKind.Ui500, small)) + 18;
+                string name = $"{PieceKey(i, d)}{(d != null ? d.Name : "Take down")}", cost = d != null ? d.CostText : "refunds all";
+                widths[i] = Math.Max(Gfx.Measure(name, FontKind.Ui600, fs), Gfx.Measure(cost, FontKind.Ui500, small)) + room;
             }
             total = widths.Sum() + gap * (tools.Length - 1) + pad * 2;
             if (total <= Gfx.LW - 30) break;
-            fs = 16; small = 13;
+            // Still too wide (twelve outdoor pieces): smaller again, with less room round each.
+            (fs, small, room) = pass == 0 ? (16f, 13f, 18f) : (14f, 12f, 12f);
         }
         buildBarH = bh + pad * 2;
+        lastBuildBarW = total;
         float x = Gfx.LW / 2 - total / 2, y = Gfx.LH - 13 - buildBarH;
         Gfx.Rect(x, y, total, buildBarH, NavyStrong, 6);
         Gfx.Block(x, y, total, buildBarH);
@@ -361,7 +384,7 @@ partial class Game
             if (Gfx.Hover(x, y + pad, bw, bh) && !on) fill = Lighten(fill, 0.14f);
             Gfx.Box(x, y + pad, bw, bh, Pal.WithAlpha(fill, a), Pal.WithAlpha(Pal.Ink, a), 2, 5);
             if (on && !remove) Gfx.Box(x + 2, y + pad + 2, bw - 4, bh - 4, fill, Pal.C("#fff8e3"), 2, 3);
-            string num = d != null ? $"{(i + 1) % 10} " : Bind.Name("remove") + " ", name = d != null ? d.Name : "Take down", cost = d != null ? d.CostText : "refunds all";
+            string num = PieceKey(i, d), name = d != null ? d.Name : "Take down", cost = d != null ? d.CostText : "refunds all";
             float nw = Gfx.Measure(num + name, FontKind.Ui600, fs), tx = x + bw / 2 - nw / 2;
             Color main = remove && on ? White : Pal.Ink;
             Color sub = remove && on ? Pal.C("#ffe3dc") : shortOf ? Rust : Muted;
@@ -381,17 +404,21 @@ partial class Game
         var p = Gfx.Wrap("The creatures were taken from the trench beneath Saltmere and loaded onto the Halcyon. Dr. Mara Ilao sank the ship to bring them home, and the Abyssal kept her locket safe until her father could see it again.",
             FontKind.Note, 23, 720);
         var stats = Gfx.Wrap(endStats, FontKind.Ui500, 23, 720);
-        float total = 75 + 22 + p.Count * 32 + 18 + stats.Count * 32 + 26 + 56;
+        // Saltmere's case is only the start: there's a whole sea of islands still to go (and the journal knows where).
+        var more = Gfx.Wrap(Bind.Fix("Saltmere's mystery is solved, but the sea is wide: an atoll to the east, islands beyond it, and more stories waiting. Your journal (<journal>) knows where to start."),
+            FontKind.Ui600, 20, 720);
+        float total = 75 + 22 + p.Count * 32 + 18 + stats.Count * 32 + 22 + more.Count * 28 + 26 + 56;
         float y = (Gfx.LH - total) / 2, cx = Gfx.LW / 2;
         Gfx.TextCenter("Case closed", cx, y, FontKind.Ui700, 75, Pal.Lantern);
         y += 75 + 22;
         for (int i = 0; i < p.Count; i++) Gfx.TextCenter(p[i], cx, y + i * 32, FontKind.Note, 23, Pal.Paper);
         y += p.Count * 32 + 18;
         for (int i = 0; i < stats.Count; i++) Gfx.TextCenter(stats[i], cx, y + i * 32, FontKind.Ui500, 23, Pal.Sand);
-        y += stats.Count * 32 + 26;
-        float w = BigW("Keep fishing") + 13 + BigW("Start a new game"), x = cx - w / 2;
-        if (BigButton("Keep fishing", x, y, true)) KeepFishing();
-        if (BigButton("Start a new game", x + BigW("Keep fishing") + 13, y, false)) RestartFromEnding();
+        y += stats.Count * 32 + 22;
+        for (int i = 0; i < more.Count; i++) Gfx.TextCenter(more[i], cx, y + i * 28, FontKind.Ui600, 20, Pal.C("#bff4ff"));
+        y += more.Count * 28 + 26;
+        // Only one way on from here: back out to sea. (A new game is on the title screen, from the menu.)
+        if (BigButton("Keep exploring", cx - BigW("Keep exploring") / 2, y, true)) KeepFishing();
     }
 
     /* ---------- Catch card ---------- */
@@ -454,6 +481,7 @@ partial class Game
         if (f.Troll) bits.Add("trolling");
         if (f.Time != "any") bits.Add(f.Time);
         if (f.FullMoon) bits.Add("full moon");
+        if (f.Season != null) bits.Add(f.Season);
         if (f.Weather != null) bits.Add(f.Weather == "clear" ? "clear days" : f.Weather);
         if (known)
         {
@@ -491,6 +519,8 @@ partial class Game
         else if (seen) DrawTexturePro(ItemArt.Icon(f.Id), new Rectangle(0, 0, 12, 12), Gfx.S(x, y + 1, 22, 22), Vector2.Zero, 0, Pal.C("#1d3550"));
         else Gfx.Rect(x + 2, y + 3, 18, 18, Pal.C("rgba(0,0,0,0.08)"), 4);
         if (BitingNow(f)) { Gfx.Circle(x + 21, y + 4, 4.5f, Pal.C("#fffaf0")); Gfx.Circle(x + 21, y + 4, 3.2f, Pal.C("#3fae5a")); }
+        // Learned in Ma'am Isay's class (School.cs): a little gold star by the icon.
+        if (Learnt(f.Id)) DrawIcon("star", x - 7, y + 12, 14);
         var c = !known && !seen ? Pal.C("#9a8a70") : !known ? Pal.C("#5a6a80") : f.Legend ? Pal.C("#9a6a1a") : f.Rare ? Rust : Pal.PaperInk;
         Gfx.Text(Gfx.Ellipsize(known ? $"{f.Name} ×{n}" : seen ? $"{f.Name} (seen)" : "???", FontKind.Ui600, 17, 200), x + 30, y + 3, FontKind.Ui600, 17, c);
         string cond = Conditions(f, known);
@@ -541,7 +571,9 @@ partial class Game
         var cols = TwoColumns(heights);
         // The last page: legends (with Tidemane and Bakunawa) on the left; odd catches, records and sightings on the right.
         const float legendRow = 40;
-        float legendsH = 48 + (Data.Legends.Count + 2) * legendRow, oddH = 46 + Data.Odd.Length * 26, sightH = 46 + SeaKinds.Count * 26;
+        // Odd catches and sightings sit in two columns each, so the page fits on the screen.
+        int oddRows = (Data.Odd.Length + 1) / 2, sightRows = Math.Max(SeaKinds.Count, BakawanKinds.Count);
+        float legendsH = 48 + (Data.Legends.Count + 2) * legendRow, oddH = 46 + oddRows * 26, sightH = 46 + 24 + sightRows * 26;
         float extrasH = oddH + 10 + 70 + 10 + sightH;
         float logH = logPage < Data.Biomes.Length ? Math.Max(60, cols.Max(c => c.Sum(i => heights[i] + cardGap))) : Math.Max(legendsH, extrasH);
 
@@ -561,6 +593,12 @@ partial class Game
             if (Button(label, tx, y, w, 44, FontKind.Ui700, 20, dexTab == id ? Pal.Lantern : Pal.Sand, Pal.Ink, 4)) dexTab = id;
             tx += w + 10;
         }
+        // The fish album and the island guide (1.18), for the curious.
+        tx += 14;
+        if (Button("Fish album", tx, y, SmallW("Fish album"), 44, FontKind.Ui700, 20, Pal.C("#d8b47a"), Pal.Ink, 4)) { OpenAlbum(); return; }
+        tx += SmallW("Fish album") + 10;
+        if (Button("Island guide", tx, y, SmallW("Island guide"), 44, FontKind.Ui700, 20, Pal.C("#9fc3d1"), Pal.Ink, 4))
+        { OpenAtlas(dexTab == "log" && logPage < Data.Biomes.Length ? RegionForBiome(Data.Biomes[logPage].Id) : HereRegion()); return; }
         if (SmallButton("Close", nx + nw - padR - SmallW("Close"), y)) ClosePanels();
         y += 46 + 10;
         Lines(lead, x, y, 28, FontKind.Note, 20, Pal.PaperInk);
@@ -628,6 +666,7 @@ partial class Game
             }
             stats = Gfx.Ellipsize(stats, FontKind.Ui600, 17, fx - x - 16);
         }
+        else stats = Gfx.Ellipsize(stats, FontKind.Ui600, 17, innerW);
         Gfx.Text(stats, x, y, FontKind.Ui600, 17, Muted);
         y += 34;
 
@@ -676,32 +715,45 @@ partial class Game
             cx = x + colW + gap; cy = y;
             Gfx.Box(cx, cy, colW, oddH, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text("Odd catches", cx + 12, cy + 8, FontKind.Ui700, 18, Pal.PaperInk);
-            cy += 38;
-            foreach (var o in Data.Odd)
+            float halfW = colW / 2;
+            // A name on the left of its half and where it was hooked on the right, each kept inside the half.
+            void Pair(float hx, float ry, string name, Color nameCol, string where)
             {
+                float ww = Math.Min(Gfx.Measure(where, FontKind.Ui500, 14), halfW * 0.55f);
+                Gfx.Text(Gfx.Ellipsize(name, FontKind.Ui600, 16, halfW - 34 - ww), hx + 14, ry, FontKind.Ui600, 16, nameCol);
+                Gfx.Text(Gfx.Ellipsize(where, FontKind.Ui500, 14, ww), hx + halfW - 12 - ww, ry + 2, FontKind.Ui500, 14, Muted);
+            }
+            for (int i = 0; i < Data.Odd.Length; i++)
+            {
+                var o = Data.Odd[i];
                 int n = state.odd.GetValueOrDefault(o.Id);
-                Gfx.Text(n > 0 ? $"{o.Name} ×{n}" : "???", cx + 14, cy, FontKind.Ui600, 16, n > 0 ? Pal.PaperInk : Pal.C("#9a8a70"));
-                Gfx.Text(n > 0 ? Data.SpotById[o.Spot].Label : "Something that isn't a fish", cx + 180, cy + 2, FontKind.Ui500, 14, Muted);
-                cy += 26;
+                Pair(cx + (i % 2) * halfW, cy + 38 + i / 2 * 26, n > 0 ? $"{o.Name} ×{n}" : "???", n > 0 ? Pal.PaperInk : Pal.C("#9a8a70"),
+                    n > 0 ? Data.SpotById[o.Spot].Label : "Not a fish");
             }
             cy = y + oddH + 10;
             Gfx.Box(cx, cy, colW, 70, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text($"Records: {state.chests} chests · {state.perfects} perfect hooks · {state.derbyWins} derby wins", cx + 12, cy + 10, FontKind.Ui600, 16, Pal.PaperInk);
             Gfx.Text($"Casts: {state.casts}" + (state.regattaBest > 0 ? $"   ·   Fastest regatta: {RaceTime(state.regattaBest)}" : "") + (state.sungkaWins > 0 ? $"   ·   Sungka wins: {state.sungkaWins}" : ""),
                 cx + 12, cy + 38, FontKind.Ui500, 15, Pal.PaperInk);
-            // The sanctuary's animals: watched, never caught.
+            // Watched, never caught: the sanctuary's animals (Bantay Joy's list) and Bakawan's (Tala's).
             cy += 70 + 10;
             Gfx.Box(cx, cy, colW, sightH, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text("Sightings (watched, never caught)", cx + 12, cy + 8, FontKind.Ui700, 18, Pal.PaperInk);
-            cy += 38;
-            foreach (var (id, k) in SeaKinds)
+            void Sightings(float hx, string head, IEnumerable<(string id, string name)> kinds)
             {
-                int n = state.sightings.GetValueOrDefault(id);
-                Gfx.Text(n > 0 ? $"{k.name} ×{n}" : "???", cx + 14, cy, FontKind.Ui600, 16, n > 0 ? Pal.C("#2f6a6a") : Pal.C("#9a8a70"));
-                Gfx.Text(n > 0 ? "Marine sanctuary" : "Somewhere protected", cx + colW - 18 - Gfx.Measure(n > 0 ? "Marine sanctuary" : "Somewhere protected", FontKind.Ui500, 14), cy + 2, FontKind.Ui500, 14, Muted);
-                cy += 26;
+                Gfx.Text(head, hx + 14, cy + 36, FontKind.Ui700, 14, Muted);
+                float ry = cy + 36 + 24;
+                foreach (var (id, name) in kinds)
+                {
+                    int n = state.sightings.GetValueOrDefault(id);
+                    Gfx.Text(Gfx.Ellipsize(n > 0 ? $"{name} ×{n}" : "???", FontKind.Ui600, 16, halfW - 26), hx + 14, ry, FontKind.Ui600, 16, n > 0 ? Pal.C("#2f6a6a") : Pal.C("#9a8a70"));
+                    ry += 26;
+                }
             }
+            Sightings(cx, "Marine sanctuary (Bantay Joy)", SeaKinds.Select(k => (k.Key, k.Value.name)));
+            Sightings(cx + halfW, "Bakawan (Tala)", BakawanKinds.Select(k => (k.Key, k.Value.name)));
         }
+        lastDexBottom = ny + h;
         if (Gfx.PressedOutside(nx, ny, nw, h)) ClosePanels();
     }
 
@@ -902,8 +954,10 @@ partial class Game
         DrawHut();
         DrawFire(0);
         DrawWreck();
-        foreach (var n in Islanders) DrawBahay(n.x, n.y - 5, n.shirt);
+        foreach (var n in Islanders) if (n.id == "isay") DrawSchool(n.x, n.y - 5); else DrawBahay(n.x, n.y - 5, n.shirt);
         DrawKarst(2085, 107, 41); DrawKarst(1995, 141, 32); DrawBagaCone();
+        DrawGusoFarm(0, live: false);
+        foreach (var (fx, fy) in FireflyTrees) DrawPagatpat(fx, fy, live: false);
         // Habagat's landmarks, without the people.
         DrawSaltBeds(live: false);
         var habagat = new List<(float y, Action draw)>();

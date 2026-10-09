@@ -40,7 +40,7 @@ partial class Game
         // No older fish changed colour: they're still handed out in the same order, with Habagat's after them all.
         int ti = 0;
         bool same = true;
-        void Tints(IEnumerable<CommonFish> fs) { foreach (var f in fs) same &= Items.ById[f.Id].Tint == Items.TintAt(ti++); }
+        void Tints(IEnumerable<CommonFish> fs) { foreach (var f in fs.Where(f => !Items.AddedLater.Contains(f.Id))) same &= Items.ById[f.Id].Tint == Items.TintAt(ti++); }
         Tints(Data.Spots.Where(s => s.Scene != "sea" && s.Biome != "habagat").SelectMany(s => Data.Common[s.Id]));
         Tints(Data.PotCatch.Where(p => p.Key != "habagat").SelectMany(p => p.Value));
         Tints(Data.Spots.Where(s => s.Scene == "sea" && s.Biome != "habagat").SelectMany(s => Data.Common[s.Id]));
@@ -186,6 +186,7 @@ partial class Game
         state.builds.Add(pot); ReindexBuilds();
         foreach (var f in Data.PotCatch["habagat"]) state.commons.Remove(f.Id);
         for (int i = 0; i < 60; i++) { state.pots[$"{pot.x},{pot.y}"] = state.day - 1; HaulPot(pot); }
+        ClosePanels();   // the first haul's crabs went on the sorting tray (1.17)
         Check("Habagat's pots bring up mud crabs, spanner crabs and tiger prawns", Data.PotCatch["habagat"].All(f => state.commons.GetValueOrDefault(f.Id) > 0));
         state.builds.Remove(pot); ReindexBuilds();
         int goats = Enumerable.Range(0, 4000).Count(_ => RollCatch("asinan").Id == "goat");
@@ -194,10 +195,10 @@ partial class Game
         /* ---------- Gleaning ---------- */
         Note("Gleaning at low tide");
         state.loose.RemoveAll(l => l.kind == "glean");
-        player.X = 200; player.Y = 668; state.clock = 12 * 60; yield return 2;
+        player.X = 200; player.Y = 668; SetHighTide(); yield return 2;
         FillLoose();
         Check("nothing to glean at high tide", LooseCount("glean") == 0);
-        state.clock = 6 * 60 + 30; yield return 2;
+        SetLowTide(); yield return 2;
         FillLoose();
         Check($"at low tide the flats have finds ({LooseCount("glean")})", LooseCount("glean") > 0 && state.loose.Where(l => l.kind == "glean").All(l => GleanGround(l.tx, l.ty)));
         var find = state.loose.FirstOrDefault(l => l.kind == "glean");
@@ -213,7 +214,7 @@ partial class Game
         Check("each low tide has only so much to glean", state.gleaned == GleanQuota && LooseCount("glean") == 0);
         state.gleaned = 0;
         FillLoose();
-        state.clock = 12 * 60; looseTimer = 99; yield return 3;
+        SetHighTide(); looseTimer = 99; yield return 3;
         Check("the tide coming in takes what's left", LooseCount("glean") == 0);
 
         /* ---------- Sungka ---------- */
@@ -376,7 +377,9 @@ partial class Game
         {
             new SeaCreature { Kind = "pawikan", X = 2060, Y = 690, ToX = 2060, ToY = 690, Wait = 999 },
             new SeaCreature { Kind = "dugong", X = 2100, Y = 705, ToX = 2100, ToY = 705, Wait = 999 },
-            new SeaCreature { Kind = "butanding", X = 2300, Y = 680, ToX = 2300, ToY = 680, Wait = 999 }
+            new SeaCreature { Kind = "butanding", X = 2300, Y = 680, ToX = 2300, ToY = 680, Wait = 999 },
+            new SeaCreature { Kind = "walowalo", X = 2250, Y = 712, ToX = 2250, ToY = 712, Wait = 999 },
+            new SeaCreature { Kind = "taklobo", X = TakloboX, Y = TakloboY, ToX = TakloboX, ToY = TakloboY, Wait = 999 }
         });
         yield return 2;
         Check($"inside the buoys there's no fishing or trolling ({target?.Label})", target?.Type == "info" && target.AltType == null);
@@ -389,6 +392,7 @@ partial class Game
             player.X = state.boatX = c.X - 20; player.Y = state.boatY = c.Y; player.Face = "right"; yield return 2;
             if (c.Kind == "butanding") pendingShot = "132-butanding";
             if (c.Kind == "pawikan") pendingShot = "133-pawikan";
+            if (c.Kind == "taklobo") pendingShot = "133b-taklobo";
             yield return 2;
             Check($"alongside, the boat offers to watch the {c.Kind} ({target?.Label})", target?.Type == "watch" && target.Ref == c);
             Inp.Tap(KeyboardKey.E); yield return 3;
@@ -406,7 +410,7 @@ partial class Game
         while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 2; }
         Inp.Tap(KeyboardKey.E); yield return 3;
         while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 2; }
-        Check($"having seen all three, she pays 150 coins ({state.coins - coins})", state.coins == coins + 150 && state.Hinted("sanctuaryReward"));
+        Check($"having seen all five, she pays 150 coins ({state.coins - coins})", state.coins == coins + 150 && state.Hinted("sanctuaryReward"));
         Check("standing on the platform charts no island", !state.charted.Any(r => r.StartsWith("amihan:")));
         // Just outside the buoys, fish spill over: quicker bites, and better luck.
         state.aboard = true; player.X = state.boatX = 1960; player.Y = state.boatY = 690; player.Face = "left"; schools.Clear(); yield return 3;
@@ -473,7 +477,7 @@ partial class Game
         Note("Codex review: gleaning at the quota, the Parola pier's region, drying with the aquarium set, racing, Tidemane and the buoys");
         ClearSkies(); state.aboard = state.riding = false;
         // The tenth find, with another still on the flats and driftwood about: no crash, and the rest washes away.
-        player.X = 200; player.Y = 668; state.clock = 6 * 60 + 30;
+        player.X = 200; player.Y = 668; SetLowTide();
         state.gleanTide = GleanTide; state.gleaned = GleanQuota - 1;
         state.loose.RemoveAll(l => l.kind == "glean");
         state.loose.Add(new Loose { kind = "wood", tx = 18, ty = 66, x = 185, y = 664 });
@@ -482,7 +486,7 @@ partial class Game
         yield return 3;
         Check("picking up the tide's last find with another still out doesn't crash, and clears the flats", state.gleaned == GleanQuota && LooseCount("glean") == 0);
         // At high tide a find can't be picked up, even if it's still there for a moment.
-        state.gleaned = 0; state.clock = 12 * 60;
+        state.gleaned = 0; SetHighTide();
         int finds = Has("cowrie") + Has("sea_urchin") + Has("sea_grapes");
         state.loose.Add(new Loose { kind = "glean", tx = 20, ty = 66, x = player.X, y = player.Y - 1 });
         yield return 3;
@@ -535,7 +539,7 @@ partial class Game
         Check("a trolling line is wound in when the race starts", race != null && !trolling);
         race = null; raceArmed = false; state.aboard = false;
         // Two finds underfoot at once with one left in the tide's quota: only one counts.
-        player.X = 200; player.Y = 668; state.clock = 6 * 60 + 30;
+        player.X = 200; player.Y = 668; SetLowTide();
         state.gleanTide = GleanTide; state.gleaned = GleanQuota - 1;
         state.loose.RemoveAll(l => l.kind == "glean");
         int before = Has("cowrie") + Has("sea_urchin") + Has("sea_grapes");

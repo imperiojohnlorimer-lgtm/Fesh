@@ -39,7 +39,12 @@ partial class Game
         Inp.ScriptFocused = true;
         // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
         standStill = true;
-        script = Environment.GetEnvironmentVariable("FESH_DIRECTION_TEST") == "1" ? DirectionScript().GetEnumerator()
+        script = Environment.GetEnvironmentVariable("FESH_ATLAS_TEST") == "1" ? AtlasScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_EDU_TEST") == "1" ? EduScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_GUIDE_TEST") == "1" ? GuideScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_GUSO_TEST") == "1" ? GusoScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_SEASON_TEST") == "1" ? SeasonScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_DIRECTION_TEST") == "1" ? DirectionScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_HABAGAT_TEST") == "1" ? HabagatScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_AMIHAN_TEST") == "1" ? AmihanScript().GetEnumerator() : Script();
     }
@@ -74,6 +79,7 @@ partial class Game
     // overhead, leaning, glancing and blinking poses), drawn 5x so single pixels can be judged.
     void ExportSprites(string path)
     {
+        ExportToolSprites(path);
         ExportDirectionSprites(path);
         var keep = pix;
         var sheet = new Pix(W, H);
@@ -961,6 +967,9 @@ partial class Game
         int dayD = state.day;
         // A fair tomorrow, so a storm warning first thing can't replace the morning's toast.
         state.tomorrow = new() { new WeatherSpell { at = 0, w = "clear" } };
+        // Nothing lying on the first tree's tile or wandering over it, which would rightly hold it back a day.
+        state.loose.RemoveAll(l => l.tx == due[0].x && l.ty == due[0].y);
+        animals.RemoveAll(a => Dist(a.X, a.Y, due[0].x * T + 5, due[0].y * T + 5) < 50);
         state.clock = 5 * 60 + 59; yield return 60;
         Check($"dawn starts a new day by itself (day {state.day}, {toastMsg})", state.day == dayD + 1 && toastMsg.StartsWith($"Morning of day {state.day}"));
         Check("a felled tree that's due grows back at dawn", worldMap[due[0].y, due[0].x] == 't' && !state.felled.ContainsKey($"{due[0].x},{due[0].y}"));
@@ -1071,7 +1080,7 @@ partial class Game
         player.X = mid.Item1 * T + 5; player.Y = mid.Item2 * T + 7; player.Face = "down";
         Advance(25, quiet: false);
         SnapWeather();
-        Check($"the storm arrives on time ({state.weather}: {toastMsg})", Stormy && toastMsg.StartsWith("A storm is raging"));
+        Check($"the storm arrives on time ({state.weather}: {toastMsg})", Stormy && toastMsg.StartsWith(Season == "habagat" ? "A bagyo is raging" : "A storm is raging"));
         float yOnBridge = player.Y;
         Inp.Hold(KeyboardKey.Down, true); yield return 40; Inp.Hold(KeyboardKey.Down, false); yield return 2;
         Check($"you can still walk off a bridge the storm caught you on (moved {player.Y - yOnBridge:0}px)", player.Y > yOnBridge + 15);
@@ -1085,12 +1094,13 @@ partial class Game
         Inp.Tap(KeyboardKey.E); yield return 70;
         Check($"sheltering waits out the storm ({ClockText(state.clock)}, {state.weather}, day {state.day})",
             (int)state.clock == 6 * 60 + 400 && state.weather == "clear" && state.day == dayS && toastMsg.StartsWith("You wait out the storm"));
-        // Each morning's forecast: well formed, storms only out of rain and only from day 3.
+        // Each morning's forecast: well formed, storms only out of rain and only from day 3. Every other day in the
+        // sample is in the habagat (days 6-10, 16-20...) and the rest in the amihan (Seasons.cs).
         int keepDayW = state.day, stormDays = 0, wetDays = 0;
         bool plansOk = true, earlyStorm = false;
-        state.day = 10;
         for (int i = 0; i < 2000; i++)
         {
+            state.day = 10 + i % 2 * 5;
             RollWeather();
             var p = state.forecast;
             var pairs = p.Zip(p.Skip(1)).ToList();
@@ -1101,7 +1111,7 @@ partial class Game
         state.day = 2;
         for (int i = 0; i < 300; i++) earlyStorm |= MakeForecast(1).Any(s => s.w == "storm") || MakeForecast(2).Any(s => s.w == "storm");
         Check($"forecasts are well formed ({stormDays / 20.0:0}% storm days, {wetDays / 20.0:0}% rain without a storm, none before day 3)",
-            plansOk && !earlyStorm && stormDays > 180 && stormDays < 420 && wetDays > 600);
+            plansOk && !earlyStorm && stormDays > 180 && stormDays < 420 && wetDays > 500);
         state.day = keepDayW;
         ClearSkies();
         SetNight(false);
@@ -1389,7 +1399,10 @@ partial class Game
         Check($"the next morning it can be hauled up (prompt: {prompt.Text})", target?.Type == "pot");
         int crabs0 = Has("shore_crab");
         Inp.Tap(KeyboardKey.E); yield return 3;
-        Check($"hauling the pot brings up crabs ({toastMsg})", Has("shore_crab") > crabs0 && potB != null && !PotReady(potB));
+        // (They wait on the sorting tray, out of the bag, until you keep them: 1.17.)
+        Check($"hauling the pot brings up crabs ({toastMsg})", Has("shore_crab") + (sorting?.Count ?? 0) > crabs0 && potB != null && !PotReady(potB));
+        // They're on the sorting tray (1.17): closing it sorts them the safe way.
+        if (mode == "panel" && panel == "sort") { Inp.Tap(KeyboardKey.Escape); yield return 3; }
         yield return 10;
         pendingShot = "52-crab-pot"; yield return 2;
         state.day--;
@@ -1962,6 +1975,11 @@ partial class Game
         // Ending screen
         foreach (int frames in AmihanScript()) yield return frames;
         foreach (int frames in DirectionScript()) yield return frames;
+        foreach (int frames in SeasonScript()) yield return frames;
+        foreach (int frames in GusoScript()) yield return frames;
+        foreach (int frames in GuideScript()) yield return frames;
+        foreach (int frames in EduScript()) yield return frames;
+        foreach (int frames in AtlasScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

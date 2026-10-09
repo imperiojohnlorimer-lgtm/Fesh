@@ -219,6 +219,15 @@ partial class Game
             : Bind.Fix(Items.ById[id].Desc);
     }
 
+    // What's in a tackle slot, in the 250 px before its description (the longest, a live tamban, is about 230).
+    const float TackleLabelW = 250;
+    string TackleLabel(string slot, string id)
+    {
+        string label = slot == "bait" ? (id == "auto" ? "Automatic" : $"{Items.ById[id].Name} ({(Items.Baits[id].Reusable ? "reusable" : $"{Has(id)} left")})")
+            : id == null ? "None" : Items.ById[id].Name;
+        return Gfx.Ellipsize(label, FontKind.Ui700, 21, TackleLabelW);
+    }
+
     void DrawTackle()
     {
         Backdrop();
@@ -246,9 +255,7 @@ partial class Game
             if (icon != null) DrawIcon(icon, lx + 10, ly + 7, 48);
             else Gfx.Rect(lx + 14, ly + 11, 40, 40, Pal.C("rgba(0,0,0,0.08)"), 6);
             Gfx.Text(name, lx + 70, ly + 6, FontKind.Ui600, 15, Muted);
-            string label = slot == "bait" ? (id == "auto" ? "Automatic" : $"{Items.ById[id].Name} ({(Items.Baits[id].Reusable ? "reusable" : $"{Has(id)} left")})")
-                : id == null ? "None" : Items.ById[id].Name;
-            Gfx.Text(label, lx + 70, ly + 24, FontKind.Ui700, 21, Pal.PaperInk);
+            Gfx.Text(TackleLabel(slot, id), lx + 70, ly + 24, FontKind.Ui700, 21, Pal.PaperInk);
             float sx = lx + 330;
             Lines(Gfx.Wrap(TackleSummary(slot, id), FontKind.Ui500, 15, lw - 330 - 120).Take(2).ToList(), sx, ly + 12, 19, FontKind.Ui500, 15, Muted);
             int opts = TackleOptions(slot).Count;

@@ -61,13 +61,16 @@ partial class Game
         var d = Items.ById[bagSel];
         float cx = dx + 16, cy = dy + 16;
         DrawIcon(bagSel, cx, cy, 72);
-        Gfx.Text(d.Name, cx + 86, cy + 6, FontKind.Ui700, 24, Pal.PaperInk);
+        // A long name goes onto two lines, with the line below it moved down to match.
+        var (title, ts) = BagTitle(d.Name, dw - 118);
+        float ty = title.Count == 1 ? cy + 6 : cy - 3;
+        foreach (var line in title) { Gfx.Text(line, cx + 86, ty, FontKind.Ui700, ts, Pal.PaperInk); ty += ts + 3; }
         string kind = d.Kind switch
         {
             "tool" => "Tool", "rod" => "Fishing rod", "material" => "Material", "food" => "Food", "tackle" => "Tackle", "accessory" => "Worn automatically",
             "gear" => "Fishing gear", "weapon" => "Weapon", "armor" => "Armour", _ => "Fish"
         };
-        Gfx.Text($"{kind}  ·  You have {Has(bagSel)}", cx + 86, cy + 38, FontKind.Ui500, 16, Muted);
+        Gfx.Text($"{kind}  ·  You have {Has(bagSel)}", cx + 86, title.Count == 1 ? cy + 38 : ty + 5, FontKind.Ui500, 16, Muted);
         cy += 90;
         var desc = Gfx.Wrap(Bind.Fix(d.Desc), FontKind.Note, 18, dw - 32);
         Lines(desc, cx, cy, 25, FontKind.Note, 18, Pal.PaperInk);
@@ -108,8 +111,30 @@ partial class Game
         if (Gfx.PressedOutside(bx, by, bw, bh)) ClosePanels();
     }
 
+    // The selected item's name on the bag card, in the width beside its picture: one line at 24 if it fits, else a size
+    // smaller, else two lines (breaking before the English name in brackets, if there is one), as big as fits.
+    static (List<string> lines, float size) BagTitle(string name, float maxW)
+    {
+        bool Fits(IEnumerable<string> lines, float size) => lines.All(l => Gfx.Measure(l, FontKind.Ui700, size) <= maxW);
+        foreach (float size in new[] { 24f, 21f })
+            if (Fits(new[] { name }, size)) return (new() { name }, size);
+        int bracket = name.IndexOf(" (");
+        foreach (float size in new[] { 21f, 19f, 17f })
+        {
+            var lines = bracket > 0 ? new List<string> { name[..bracket], name[(bracket + 1)..] } : Gfx.Wrap(name, FontKind.Ui700, size, maxW);
+            if (lines.Count <= 2 && Fits(lines, size)) return (lines, size);
+        }
+        var two = Gfx.Wrap(name, FontKind.Ui700, 17, maxW);
+        return (new() { Gfx.Ellipsize(two[0], FontKind.Ui700, 17, maxW), Gfx.Ellipsize(string.Join(" ", two.Skip(1)), FontKind.Ui700, 17, maxW) }, 17);
+    }
+    public const float BagNameW = 202;   // the bag card is 320 wide: the name starts 102 in and keeps 16 clear of the edge
+
     /* ---------- Crafting ---------- */
-    string IngredientName(string id) => id == "fish" ? "raw fish" : Items.ById[id].Name.ToLowerInvariant();
+    string IngredientName(string id) => id == "fish" ? "raw fish" : id == Items.TinapaFishId ? "fish for tinapa" : id == Items.SeaweedId ? "seaweed"
+        : Items.ById[id].Name.ToLowerInvariant();
+
+    // The bubo only shows at the workbench once Tala has shown you how it's woven.
+    bool RecipeKnown(Recipe r) => r.Out != "bubo" || state.Hinted("bubo");
 
     // The workbench makes too much for one list, so it's split into tabs.
     static readonly string[] CraftTabs = { "Tools", "Rods", "Tackle", "Gear", "Combat", "Bait" };
@@ -121,7 +146,7 @@ partial class Game
     {
         Backdrop();
         bool tabs = craftStation == "workbench";
-        var all = Items.Recipes.Where(r => Items.StationMakes(craftStation, r)).ToList();
+        var all = Items.Recipes.Where(r => Items.StationMakes(craftStation, r) && RecipeKnown(r)).ToList();
         var inTab = tabs ? all.Where(r => Items.Category(r) == craftTab).ToList() : all;
         int pages = Math.Max(1, (inTab.Count + CraftPerPage - 1) / CraftPerPage);
         craftPage = Math.Clamp(craftPage, 0, pages - 1);
@@ -145,7 +170,7 @@ partial class Game
                 _ => "Stronger pickaxes mine rarer ore deeper in Frostfang Caverns."
             },
             "furnace" => "Two ore and a piece of wood for fuel make one bar.",
-            "smoker" => $"Smoked fish keeps well and sells for double. You have {FishCount()} raw fish.",
+            "smoker" => $"Smoked fish sells for double. Tinapa: galunggong, tamban, sapsap, bangus or tilapia, with salt.",
             _ => $"Cook any raw fish from your bag. You have {FishCount()} raw fish."
         };
         Gfx.Text(Bind.Fix(hint), x + pad, y + pad + 48, FontKind.Note, 18, Muted);

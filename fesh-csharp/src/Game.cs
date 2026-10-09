@@ -145,11 +145,13 @@ partial class Game
     }
 
     // Each island has its own tune; the cave and houses have theirs. Rain adds its own patter outdoors.
+    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine ? "boss" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
+        : RondallaPlaying ? "rondalla" : Data.Biomes[lastBiome < Data.Biomes.Length ? lastBiome : PlayerBiome()].Id;
+
     void PickMusic(float dt)
     {
         // lastBiome only changes on land, so crossing a bridge or standing on a jetty keeps the island's tune.
-        string track = mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine ? "boss" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
-            : Data.Biomes[lastBiome < Data.Biomes.Length ? lastBiome : PlayerBiome()].Id;
+        string track = WantedTrack();
         Music.Want(track, Night && mode is not ("title" or "create") ? 0.3f : 0.42f);
         // The rain loop swells and fades with the rain on screen.
         bool wet = scene == "world" && rainAmt > 0.02f && mode is not ("title" or "create");
@@ -255,12 +257,14 @@ partial class Game
         else if (Bind.Pressed("dex")) TogglePanel("dex");
         else if (Bind.Pressed("case")) TogglePanel("case");
         else if (Bind.Pressed("map")) TogglePanel("map");
+        else if (Bind.Pressed("journal")) TogglePanel("journal");
         else if (Bind.Pressed("mute")) ToggleSound();
         else if (Bind.Pressed("ride")) ToggleRide();
         else if (BackPressed())
         {
             if (mode == "panel" && panel == "dex" && dexFish != null) dexFish = null;
             else if (mode == "panel" && panel == "sungka") CloseSungka();
+            else if (mode == "panel" && panel == "tides") CloseTides();
             else if (mode == "panel") ClosePanels();
             else if (mode == "catch") CloseCatch();
             else if (mode == "odd") CloseOdd();
@@ -413,6 +417,9 @@ partial class Game
         {
             Talk(new() { Tm("The water feels calmer now. Fish as long as you like, friend.") });
         }
+        // The first conversation is always the introduction, even if you've already caught something strange
+        // (before 1.16 an early Glowgill skipped it, and Tomas never asked for anything).
+        else if (!state.flags.metTomas) MeetTomas();
         else if (Has("mirror_ray"))
         {
             Talk(new()
@@ -455,20 +462,22 @@ partial class Game
                 Tm("Something's been clicking around the rocky shore up north. Only in daylight. Might be worth a cast.")
             });
         }
-        else if (!state.flags.metTomas)
-        {
-            state.flags.metTomas = true;
-            Save();
-            Talk(new()
-            {
-                Tm($"Ahoy there. You must be {state.look.name}, the new fisher. I'm Tomas, I keep the camp on Saltmere."),
-                Tm("Fair warning: the fish here have been strange since the storm three years back. The night the Halcyon went down."),
-                Tm("Folks say something glows in the lagoon after dark. Rest by my campfire if you want to wait for night."),
-                Tm("And my hut's open, if you need the workbench or the stove. Keep yourself fed out there."),
-                Tm("Pip has a stall just east of here, too. Pip pays good coin for fish.")
-            }, () => Toast("Tip: <bag> opens your bag, <dex> your Fesh-dex and <case> the case board.", 4));
-        }
         else Talk(new() { Tm("The lagoon glows after dark. Rest by the fire if you want to wait for night.") });
+    }
+
+    void MeetTomas()
+    {
+        Say Tm(string t) => new("Tomas", t);
+        state.flags.metTomas = true;
+        Save();
+        Talk(new()
+        {
+            Tm($"Ahoy there. You must be {state.look.name}, the new fisher. I'm Tomas, I keep the camp on Saltmere."),
+            Tm("Fair warning: the fish here have been strange since the storm three years back. The night the Halcyon went down."),
+            Tm(state.Caught("glowgill") ? "And you've already hooked one of the strange ones, I hear. Come and tell me what you find." : "Folks say something glows in the lagoon after dark. Rest by my campfire if you want to wait for night."),
+            Tm("And my hut's open, if you need the workbench or the stove. Keep yourself fed out there."),
+            Tm("Pip has a stall just east of here, too. Pip pays good coin for fish.")
+        }, () => Toast("Tip: <bag> opens your bag, <dex> your Fesh-dex and <case> the case board. <journal> opens your journal.", 5));
     }
 
     // Tomas's requests ride along with whatever he has to say about the mystery.
@@ -481,7 +490,7 @@ partial class Game
         // And, once a day, what tomorrow's weather will do.
         if (dlg != null && !KnowTomorrow)
         {
-            dlg.Lines.Add(new Say("Tomas", $"Tomorrow? My old knee says {DescribeDay(state.tomorrow)}."));
+            dlg.Lines.Add(new Say("Tomas", $"Tomorrow? My old knee says {DescribeDay(state.tomorrow)}.{SeasonTomorrow()}"));
             TellTomorrow();
         }
     }
@@ -610,6 +619,7 @@ partial class Game
     {
         tomasX = TomasHomeX; tomasY = TomasHomeY;
         mode = "play";
+        Toast("The case is closed, but the sea isn't. Your journal (<journal>) has what's next.", 5);
     }
 
     /* ---------- Panels and menus ---------- */
@@ -626,11 +636,16 @@ partial class Game
         panel = which;
         mode = "panel";
         if (which == "map") ChooseChart();
+        if (which is "dex" or "map") Learned(which);
         SetPrompt("");
     }
 
     void ClosePanels()
     {
+        // A crab still on the sorting tray goes the safe way (Release.cs); a lesson left halfway is just left.
+        if (panel == "sort") FinishSort();
+        if (panel == "quiz") { quiz = null; lessonPrizes = null; }
+        riddle = null;
         panel = null;
         dexFish = null;
         if (mode == "panel") mode = "play";
@@ -759,22 +774,27 @@ partial class Game
             return new Target { Type = "sail", Id = "saltmere", Label = Has("boat") > 0 ? "Sail somewhere" : "Asinan landing (you need a boat to sail)", AltType = "launch", AltLabel = "Take the helm" };
         if (Dist(x, y, 160, 72) < 10) return new Target { Type = "door", Id = "house:tomas", Label = "Go inside Tomas's hut" };
         if (Dist(x, y, MouthDoorX, MouthDoorY) < 14) return new Target { Type = "cave", Label = "Enter Frostfang Caverns" };
+        // Facing your own crab pot or bubo beats a campfire, a smoker or a rack close by, and a chicken wandering past.
+        if (BuildAt(fx, fy) is Build pot && Data.BuildById[pot.id].Water)
+        {
+            string trap = pot.id == "bubo" ? "bubo" : "crab pot";
+            return PotReady(pot) ? new Target { Type = "pot", Ref = pot, Label = pot.id == "bubo" ? "Lift the bubo" : "Haul up the crab pot" }
+                : new Target { Type = "info", Label = $"The {trap} is soaking. {(pot.id == "bubo" ? "Lift" : "Haul")} it up tomorrow morning" };
+        }
         if (Dist(x, y, FireX, FireY) < 16) return new Target { Type = "rest", Label = restLabel, AltType = "cook", AltLabel = "Cook" };
         foreach (var b in state.builds)
         {
             var d = Data.BuildById[b.id];
             if (d.Door && Dist(x, y, b.x * T + 10, b.y * T + 12) < 10)
-                return new Target { Type = "door", Id = ShackKey(b), Tx = b.x, Ty = b.y, Label = "Go inside your shack" };
+                return new Target { Type = "door", Id = ShackKey(b), Tx = b.x, Ty = b.y, Label = b.id == "kubo" ? "Go inside your bahay kubo" : "Go inside your shack" };
             if (d.Rest != null && Dist(x, y, b.x * T + d.Rest[0], b.y * T + d.Rest[1]) < 14)
                 return new Target { Type = "rest", Label = restLabel, AltType = d.Station == "fire" ? "cook" : null, AltLabel = d.Station == "fire" ? "Cook" : null };
             if (d.Station == "smoker" && Dist(x, y, b.x * T + 5, b.y * T + 10) < 13)
                 return new Target { Type = "craft", Id = "smoker", Label = "Use the smoking rack" };
             if (b.id == "dryrack" && Dist(x, y, b.x * T + 5, b.y * T + 10) < 13) return RackTarget(b);
         }
-        // Facing your own crab pot beats a chicken wandering past.
-        if (BuildAt(fx, fy) is Build pot && pot.id == "crabpot")
-            return PotReady(pot) ? new Target { Type = "pot", Ref = pot, Label = "Haul up the crab pot" }
-                : new Target { Type = "info", Label = "The crab pot is soaking. Haul it up tomorrow morning" };
+        // Bakawan's firefly trees: after dark, watch the alitaptap (Bakawan.cs).
+        if (FireflyTarget() is Target fireflies) return fireflies;
         if (MountNear()) return new Target { Type = "ride", Label = $"Ride {Data.MountName}" };
         if (Dist(x, y, CarvingX, CarvingY + 4) < 13) return new Target { Type = "carving", Label = "Read the carving" };
         if (NearestAnimal() is Animal a) return new Target { Type = "animal", Ref = a, Label = AnimalLabel(a) };
@@ -805,6 +825,7 @@ partial class Game
     void Rest(bool shelter = false)
     {
         Sfx.Play("ui");
+        Learned("rest");
         int day0 = state.day;
         float to = shelter && Stormy ? StormEnds() : Night ? DawnMin + 30 : 21 * 60;
         FadeThrough(() =>
@@ -816,21 +837,24 @@ partial class Game
             Save();
         }, () =>
         {
-            string msg = state.day != day0 ? $"Morning of day {state.day}." + WeatherNews()
+            string msg = state.day != day0 ? $"Morning of day {state.day}." + SeasonTurn() + WeatherNews() + FestivalNews()
                 : shelter ? $"You wait out the storm. It's {ClockText(state.clock, 10)}." + WeatherNews()
                 : FullMoon ? "Night falls. The moon is full tonight." : "Night falls.";
-            Toast(msg + (state.food < 25 ? " You wake up hungry." : ""), 4);
+            Toast(msg + (state.food < 25 ? " You wake up hungry." : ""), state.day != day0 && SeasonTurn() != "" ? 7 : 4);
         });
     }
 
     void OnAlt()
     {
         if (mode != "play") return;
-        if (target?.AltType == "cook") OpenCraft("fire");
+        if (target?.AltType == "release") ReleaseCatch();
+        else if (target?.AltType == "riddle") AskRiddle();
+        else if (target?.AltType == "cook") OpenCraft("fire");
         else if (target?.AltType == "chum") ThrowChum(target.Id);
         else if (target?.AltType == "launch") LaunchBoat();
         else if (target?.AltType == "troll") ToggleTroll();
         else if (target?.AltType == "unrack") UnloadRack((Build)target.Ref);
+        else if (target?.AltType == "rackguso") LayGuso((Build)target.Ref);
     }
 
     void OnAlt2()
@@ -866,6 +890,9 @@ partial class Game
                     case "habagatfolk": TalkHabagat(target.Id); break;
                     case "saltbed": RakeSalt(); break;
                     case "rack": UseRack((Build)target.Ref); break;
+                    case "rackguso": LayGuso((Build)target.Ref); break;
+                    case "guso": UseGusoLine(int.Parse(target.Id)); break;
+                    case "fireflies": WatchFireflies(int.Parse(target.Id)); break;
                     case "watch": Watch((SeaCreature)target.Ref); break;
                     case "joy": TalkJoy(); break;
                     case "agong": BeatAgong(); break;
@@ -915,6 +942,8 @@ partial class Game
         if (toastTimer > 0) toastTimer -= dt;
         toastAlpha = Math.Clamp(toastAlpha + (toastTimer > 0 ? dt : -dt) / 0.25f, 0, 1);
         UpdateFloaters(dt);
+        UpdateGuide(dt);
+        TellBadgeNews();
         if (mode is not ("pause" or "panel" or "title" or "create"))
         {
             UpdateCritters(dt);
@@ -922,14 +951,19 @@ partial class Game
             UpdateBugs(dt);
             UpdateParticles(dt);
             UpdateBoat(dt);
+            UpdateGlow(dt);
             UpdateSchools(dt);
             UpdateStrollers(dt);
             UpdateSeaLife(dt);
             UpdateLeaves(dt);
             UpdateWeather(dt);
             heldT = Math.Max(0, heldT - dt);
+            UpdateRelease(dt);
         }
         if (mode == "panel" && panel == "sungka") UpdateSungka(dt);
+        if (mode == "panel" && panel == "quiz") UpdateQuiz(dt);
+        if (mode == "panel" && panel == "sort") UpdateSort();
+        if (mode == "panel" && panel == "album") UpdateAlbum();
         if (mode is not ("title" or "create" or "pause")) state.playSecs += dt;
         if (mode != "pause") idleT = mode == "play" && !player.Moving ? idleT + dt : 0;
         if (ActiveModes.Contains(mode))
@@ -994,10 +1028,13 @@ partial class Game
                 // On Tidemane you gallop on land and swim through any water; on foot, waders slow you in the shallows.
                 bool wet = InWater, ride = Riding;
                 float speed = Aboard ? BoatSpeed : ride ? (Swimming ? 74 : 92) : wet ? 52 * 0.7f : 52;
-                float len = MathF.Sqrt(dx * dx + dy * dy), sp = speed * push * dt * (Starving ? 0.6f : 1f);
+                float len = MathF.Sqrt(dx * dx + dy * dy);
+                // Under sail the monsoon helps or hinders (Seasons.cs); a trolling boat just putters along.
+                if (Aboard && !trolling) speed *= WindFactor(dx / len, dy / len);
+                float sp = speed * push * dt * (Starving ? 0.6f : 1f);
                 float mx = dx / len * sp, my = dy / len * sp;
-                if (Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, ride)) player.X += mx;
-                if (Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, ride)) player.Y += my;
+                if (Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, ride, !ride)) player.X += mx;
+                if (Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, ride, !ride)) player.Y += my;
                 player.Face = MathF.Abs(dx) > MathF.Abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
                 if (Aboard) boatFace = player.Face;
                 int frameBefore = (int)(player.WalkT * 9);
@@ -1016,6 +1053,8 @@ partial class Game
                 DiscoverArchipelago();
                 DiscoverHabagat();
                 ChartNearIslets();
+                UpdateReefWalk();
+                WarnRisingTide();
                 if (mode == "play") { UpdateTroll(dt); UpdateRegatta(dt); CheckEclipse(); }
                 CheckPin();
             }
@@ -1033,12 +1072,20 @@ partial class Game
             else
             {
                 target = FindTarget();
+                // Just after landing a fish, F lets it go (Release.cs), over whatever F would do here.
+                if (CanRelease)
+                {
+                    target ??= new Target { Type = "none", Label = "" };
+                    target.AltType = "release";
+                    target.AltLabel = ReleaseLabel;
+                }
                 string label = target?.Label ?? "";
                 if (target?.AltLabel != null) label += $"   [<alt>] {target.AltLabel}";
                 if (target?.Alt2Label != null) label += $"   [<spear>] {target.Alt2Label}";
                 if (target?.RideLabel != null) label += $"   [<ride>] {target.RideLabel}";
                 if (target?.Type != "boat" && !Stormy && BoatInReach()) label += "   [<ride>] Board your boat";
-                SetPrompt(label, target != null ? "<act>" : null);
+                if (target?.Type == "none") SetPrompt($"{target.AltLabel}", "<alt>");
+                else SetPrompt(label, target != null ? "<act>" : null);
             }
             saveTimer += dt;
             if (saveTimer > 5) { saveTimer = 0; Save(); }
@@ -1083,8 +1130,21 @@ partial class Game
         tomasX = TomasHomeX; tomasY = TomasHomeY;
         // Nothing carries over from a game played earlier in this session (quitting to the title and loading another slot).
         fish = null; reel = null; panel = null; boss = null; dlg = null; eclipse = null; race = null; raceArmed = false; sungka = null;
-        bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear(); seaLife.Clear();
+        bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear(); seaLife.Clear(); glowTrail.Clear();
         habagatWalk.Clear();
+        // The Sea school's moment-to-moment bits (1.17).
+        landed = null; releaseFx = null; sorting = null; quiz = null; riddle = null; warnedTide = int.MinValue;
+        badgeNews = null; lessonPrizes = null;
+        albumPages = null;
+        state.know ??= new(); state.letGo ??= new(); state.missed ??= new();
+        goals.Clear(); tracked = null; guideWay = null; lastTrackedId = lastTrackedTitle = goalDoneTitle = null; goalDoneT = 0;
+        requestsKnown = null; journalPage = 0; seaPointCache = ("", 0, 0, 0, 0);
+        state.track ??= "";
+        NoteGuideVersion(fresh);
+        // A story finished without ever meeting Tomas (the early-Glowgill bug): he's met, so he gives requests.
+        if (state.flags.ended) state.flags.metTomas = true;
+        // The tide goes out after the Tidecrawler's catch card, in a fade: a game closed before then would never reach the wreck.
+        if (state.Caught("tidecrawler")) state.flags.tideOut = true;
         trolling = towing = false;
         boatFace = "right"; sailFurl = 1; sprayT = 0; mountDir = 1;
         derbyT = 0; heldT = 0; iframes = 0; hurtFlash = 0; quake = 0; pointerHold = false; caveFloor = 1;
@@ -1106,7 +1166,7 @@ partial class Game
         // Cave floors aren't saved, so a game saved underground carries on at the cave mouth.
         if (state.scene == "cave") { player.X = MouthDoorX; player.Y = MouthDoorY + 2; }
         else if (state.scene != "world" && SceneExists(state.scene)) LoadScene(state.scene);
-        if (!(Aboard ? BoatCanStand(player.X, player.Y) : CanStand(player.X, player.Y, Wading, Riding)))
+        if (!(Aboard ? BoatCanStand(player.X, player.Y) : CanStand(player.X, player.Y, Wading, Riding, !Riding)))
         {
             // Somewhere that isn't there any more (the atoll used to be smaller): back to the boat, or to Saltmere.
             LoadScene("world");
@@ -1116,6 +1176,7 @@ partial class Game
             player.X = atoll ? AtollJettyX + 4 : 160; player.Y = atoll ? AtollJettyY + 1 : 115;
         }
         int rescued = RescueStranded();
+        ReconcileAlbum();
         if (state.tamed && !state.riding && state.mountX == 0 && state.mountY == 0) { state.mountX = player.X + 12; state.mountY = player.Y; }
         ReindexBuilds();
         if (scene == "world") FillLoose();
@@ -1180,12 +1241,6 @@ partial class Game
     {
         if (hasSave) TitleContinue();
         else TitleNew();
-    }
-
-    void RestartFromEnding()
-    {
-        Save();
-        TitleNew();
     }
 
     // Back to the title screen from the menu, to load another slot or start a new game.

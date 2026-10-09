@@ -11,7 +11,8 @@ partial class Game
 {
     string mapHover;   // the dot the mouse is over on the chart (its tooltip's title), for the autotest
 
-    sealed record MapMark(string Label, float X, float Y, Color Dot, Color Text, float Size, bool HasDot, List<string> Tip, int Prio);
+    // Region: an island's name label that opens its page in the island guide when clicked (Atlas.cs).
+    sealed record MapMark(string Label, float X, float Y, Color Dot, Color Text, float Size, bool HasDot, List<string> Tip, int Prio, string Region = null);
 
     /* ---------- Charting ---------- */
     // An island: one of the five original biomes, one of Amihan's four islands by name, or a Habagat island (Asinan,
@@ -42,6 +43,12 @@ partial class Game
         if (state.charted.Contains(r)) return;
         state.charted.Add(r);
         mapTexDirty = true;
+        // The first island you chart after Saltmere: a word about the island guide (Atlas.cs).
+        if (r != "saltmere" && !state.Hinted("atlasHint") && RegionById.ContainsKey(r))
+        {
+            state.hinted["atlasHint"] = true;
+            ToastLater($"New on your map: {RegionById[r].Name}. Click an island's name on the map (<map>) to read about its land, water and wildlife.");
+        }
         if (r.StartsWith("amihan:")) Toast($"You've charted {r[7..]}.", 2.5f);
         else if (r.StartsWith("habagat:") && !r.StartsWith("habagat:islet:")) Toast($"You've charted {r[8..]}.", 2.5f);
     }
@@ -128,11 +135,8 @@ partial class Game
         }
         float dx = sx - cx, dy = sy - cy, len = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));
         float ux = dx / len, uy = dy / len;
-        // Where the line from you to the pin leaves the view (inset from the edges and the HUD).
-        float t = float.MaxValue;
-        if (ux > 0) t = MathF.Min(t, (Gfx.LW - 46 - cx) / ux); else if (ux < 0) t = MathF.Min(t, (46 - cx) / ux);
-        if (uy > 0) t = MathF.Min(t, (Gfx.LH - 80 - cy) / uy); else if (uy < 0) t = MathF.Min(t, (100 - cy) / uy);
-        float ax = cx + ux * t, ay = cy + uy * t;
+        // Where the line from you to the pin leaves the view (inset from the edges and the HUD, and below the goal card).
+        var (ax, ay) = EdgePoint(cx, cy, ux, uy);
         float px = -uy, py = ux;
         Gfx.Circle(ax, ay, 20, Pal.WithAlpha(Pal.Ink, 0.75f));
         Gfx.Triangle(ax + ux * 15, ay + uy * 15, ax - ux * 6 + px * 9, ay - uy * 6 + py * 9, ax - ux * 6 - px * 9, ay - uy * 6 - py * 9, red);
@@ -149,6 +153,7 @@ partial class Game
 
     void DrawMap()
     {
+        islandHover = null;
         Backdrop();
         RefreshMapTexture();
         const float pad = 18, head = 54;
@@ -166,6 +171,9 @@ partial class Game
         Gfx.Text(news, bx + pad + Gfx.Measure(title, FontKind.Ui700, 28) + 24, by + pad + 8, FontKind.Ui600, 17, Muted);
         string other = chartEast ? "Saltmere" : "Amihan";
         if (SmallButton(other, bx + bw - pad - SmallW("Close") - SmallW(other) - 14, by + pad - 4)) { chartEast = !chartEast; return; }
+        // The island guide (Atlas.cs), opened on the island you're on.
+        float gx = bx + bw - pad - SmallW("Close") - SmallW(other) - 28 - SmallW("Island guide");
+        if (SmallButton("Island guide", gx, by + pad - 4)) { OpenAtlas(HereRegion()); return; }
         if (SmallButton("Close", bx + bw - pad - SmallW("Close"), by + pad - 4)) { ClosePanels(); return; }
         float mx = bx + pad, my = by + pad + head;
         Gfx.Rect(mx - 2, my - 2, mw + 4, mh + 4, Pal.Ink);
@@ -187,14 +195,15 @@ partial class Game
         {
             if (!OnChart(wx, wy)) continue;
             var p = M(wx, wy);
-            marks.Add(new(Charted(region) ? name : "Uncharted island", p.X, p.Y, white, Charted(region) ? white : Pal.C("#f1e6c8"), 22, false, null, 0));
+            marks.Add(new(Charted(region) ? name : "Uncharted island", p.X, p.Y, white, Charted(region) ? white : Pal.C("#f1e6c8"), 22, false, null, 0, Charted(region) ? region : null));
         }
         // Daang Pulo's islets share one name, with how many you've charted.
         if (OnChart(0, 0))
         {
             var p = M(68 * T, 74.5f * T);
             int n = IsletsCharted;
-            marks.Add(new(n == 0 ? "Uncharted islets" : $"Daang Pulo ({n} of {IsletCount} islets)", p.X, p.Y, white, n > 0 ? white : Pal.C("#f1e6c8"), n > 0 ? 20 : 22, false, null, 0));
+            marks.Add(new(n == 0 ? "Uncharted islets" : $"Daang Pulo ({n} of {IsletCount} islets)", p.X, p.Y, white, n > 0 ? white : Pal.C("#f1e6c8"), n > 0 ? 20 : 22, false, null, 0,
+                Charted("habagat:islet:0") ? "habagat:islet:0" : null));
         }
         // Fishing spots, where you've charted them.
         foreach (var s in Data.Spots.Where(s => s.Scene == "world" && SpotKnown(s) && Charted(SpotRegion(s))))
@@ -222,7 +231,19 @@ partial class Game
             // The sanctuary's name sits in its middle, and Bantay Joy on her platform.
             var sp = M(SanctCX * T, (SanctCY + SanctRY + 1.2f) * T);
             marks.Add(new("Marine sanctuary", sp.X, sp.Y, white, Pal.C("#bff4ff"), 20, false, null, 0));
-            Place("Bantay Joy", JoyX, JoyY, new() { "Bantay Joy, the sea warden", "No fishing or traps inside the buoys", $"Seen: {SeaKinds.Keys.Count(k => state.sightings.GetValueOrDefault(k) > 0)} of 3 animals" });
+            Place("Bantay Joy", JoyX, JoyY, new() { "Bantay Joy, the sea warden", "No fishing or traps inside the buoys", $"Seen: {SeaKinds.Keys.Count(k => state.sightings.GetValueOrDefault(k) > 0)} of {SeaKinds.Count} animals" });
+            // Maya's guso farm, and Bakawan's firefly trees once Tala has told you about them (or you've found them).
+            if (Charted("amihan:Luntian Karsts"))
+            {
+                bool ready = Enumerable.Range(0, GusoLines.Length).Any(i => GusoLineOpen(i) && GusoReady(GusoAt(i)));
+                Place(ready ? "Seaweed farm (ready)" : "Seaweed farm", GusoLines[0].x, GusoFarmY, GusoTip(), 2);
+            }
+            if (Charted("amihan:Bakawan Island") && (state.Hinted("fireflies") || state.sightings.GetValueOrDefault("alitaptap") > 0))
+                Place("Alitaptap trees", FireflyTrees[1].x, FireflyTrees[1].y - 6, new()
+                {
+                    "Pagatpat trees", "The alitaptap gather here after dark, but not in the rain",
+                    GlowNight ? "Tonight the water glows: the moon is small" : "The water glows on nights when the moon is small"
+                });
         }
         else if (state.Hinted("habagat"))
         {
@@ -237,7 +258,7 @@ partial class Game
                 }
         }
         foreach (var b in state.builds.Where(b => b.id == "dryrack" && Rack(b) is RackLoad r && r.fish.Count > 0))
-            Place(RackDone(Rack(b)) ? "Rack (dry!)" : "Drying rack", b.x * T + 5, b.y * T + 5, new() { "Your drying rack", RackDone(Rack(b)) ? "The daing is ready" : $"{(int)((DryGoal - Rack(b).dry) / DryRate)} minutes of sun to go" }, 2);
+            Place(RackDone(Rack(b)) ? "Rack (dry!)" : "Drying rack", b.x * T + 5, b.y * T + 5, new() { "Your drying rack", RackDone(Rack(b)) ? (RackIsGuso(Rack(b)) ? "The dried guso is ready" : "The dried fish are ready") : $"{(int)((DryGoal - Rack(b).dry) / DryRate)} minutes of sun to go" }, 2);
         if (Has("boat") > 0 && !Aboard) { var bp = BoatPosition(); Place("Your boat", bp.x, bp.y, new() { "Your boat", "Moored here. R beside it to board." }, 1); }
         if (state.tamed && !state.riding) Place(Data.MountName, state.mountX, state.mountY - 6, new() { Data.MountName, "Waiting here. R whistles it over from anywhere outdoors." }, 1);
         foreach (var b in state.builds.Where(b => b.id == "crabpot"))
@@ -245,9 +266,20 @@ partial class Game
             bool ready = PotReady(b);
             Place(ready ? "Crab pot (ready)" : "Crab pot", b.x * T + 5, b.y * T + 5, new() { "Your crab pot", ready ? "Ready to haul up" : "Soaking. Haul it up tomorrow morning." }, 2);
         }
+        foreach (var b in state.builds.Where(b => b.id == "bubo"))
+        {
+            bool ready = PotReady(b);
+            Place(ready ? "Bubo (ready)" : "Bubo", b.x * T + 5, b.y * T + 5, new() { "Your bubo", ready ? "Ready to lift" : "Soaking. Lift it tomorrow morning." }, 2);
+        }
         if (Wears("echo_sounder") && scene == "world")
             foreach (var sc in schools) Place("Feeding fish", sc.X, sc.Y, new() { "Feeding fish", "Your echo sounder hears a frenzy here" }, 4);
         if (HasPin) Place("Pin", state.pinX, state.pinY, new() { "Your pin", "Click it to take it away" }, 1);
+        // The goal you're following (Guide.cs), in green so it never reads as the pin or a person.
+        if (GoalOnChart() is { } goalAt && OnChart(goalAt.x, goalAt.y))
+        {
+            var gp = M(goalAt.x, goalAt.y);
+            marks.Add(new("Goal", gp.X, gp.Y, Pal.C("#5fd36b"), Pal.C("#bff2b0"), 16, true, new() { tracked.Title, Bind.Fix(tracked.Text) }, 1));
+        }
 
         // Where you are, or an arrow at the edge if you're off this chart.
         var (youX, youY, youLabel) = scene == "world" ? (player.X, player.Y - 6, "You")
@@ -294,6 +326,19 @@ partial class Game
                 Gfx.Line(m.X, m.Y, lx, ly, 1.5f, Pal.WithAlpha(m.Text, 0.7f));
             }
             Shadowed(m.Label, at.X, at.Y, font, m.Size, m.Text);
+            // A charted island's name opens its page in the island guide.
+            if (m.Region != null)
+            {
+#if DEBUG
+                Gfx.Seen["isle:" + m.Region] = at;
+#endif
+                if (Gfx.Hover(at.X, at.Y, at.Width, at.Height))
+                {
+                    Gfx.Rect(at.X, at.Y + at.Height - 2, at.Width, 2, m.Text);
+                    islandHover = m.Label;
+                }
+                if (Gfx.Click(at.X, at.Y, at.Width, at.Height)) { OpenAtlas(m.Region); return; }
+            }
         }
         if (youOn)
         {
@@ -342,7 +387,9 @@ partial class Game
             }
         }
         if (hovered != null) DrawMapTip(hovered.Tip, Gfx.Mouse.X + 16, Gfx.Mouse.Y + 12);
-        else if (Gfx.Hover(mx, my, mw, mh)) Gfx.Text("Click to drop a pin", mx + 10, my + mh - 26, FontKind.Ui600, 15, Pal.C("rgba(241,230,200,0.8)"));
+        else if (islandHover != null) Gfx.Text($"Click to read about {islandHover} in the island guide", mx + 10, my + mh - 26, FontKind.Ui600, 15, Pal.C("rgba(241,230,200,0.9)"));
+        else if (Gfx.Hover(mx, my, mw, mh)) Gfx.Text("Click to drop a pin, or an island's name to read about it", mx + 10, my + mh - 26, FontKind.Ui600, 15, Pal.C("rgba(241,230,200,0.8)"));
+        islandHover = null;
         if (Gfx.PressedOutside(bx, by, bw, bh)) ClosePanels();
     }
 
@@ -374,9 +421,10 @@ partial class Game
     static string IslanderNote(string id) => id switch
     {
         "lira" => "Cooks a meal for visiting fishers, once a day",
-        "niko" => "Tends the nets; has a job for you",
-        "maya" => "Studies the karst lagoon",
-        "tala" => "Watches the mangroves' wildlife",
+        "niko" => "Tends the nets; has a job for you",   // (bangus, then asohos)
+        "maya" => "Runs a guso farm in the karst lagoon",
+        "tala" => "Watches the mangroves' wildlife, and keeps a list",
+        "isay" => "Teaches the village children about fish: a lesson a day",
         _ => ""
     };
 

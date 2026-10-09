@@ -30,6 +30,7 @@ partial class Game
         && (f.Weather == null || (f.Weather == "storm" ? Stormy : f.Weather == "rain" ? state.weather != "clear" : state.weather == "clear"))
         && (!f.FullMoon || FullMoon)
         && (f.Need == null || state.Hinted(f.Need))
+        && (f.Season == null || f.Season == Season)
         && (!f.Legend || (state.commons.GetValueOrDefault(f.Id) == 0 && (f.Bait == null || f.Bait == bait)));
 
     static readonly HashSet<string> FreshSpots = new() { "lagoon", "oasis", "swamp", "icehole", "amihanpond", "bakawanpool" };
@@ -62,6 +63,7 @@ partial class Game
         // The sanctuary's fish spilling over into the water just outside it, and Bakunawa's scale under the moon.
         if (fish?.Spill == true) l++;
         if (Night && Wears("moon_charm")) l++;
+        if (Wears("gold_star_pin")) l++;
         return l;
     }
 
@@ -162,7 +164,7 @@ partial class Game
     TackleDef Gear(string slot) => GearId(slot) is string id ? Items.Tackle[id] : null;
     float ReelMul => Gear("reel")?.Reel ?? 1;
     float LineMul => (Gear("line")?.Line ?? 1) * (Perk(6) ? 1.2f : 1);
-    float SizeMul => (Gear("hook")?.Size ?? 1) * (Perk(7) ? 1.1f : 1) * (SetActive("atoll") ? 1.1f : 1);
+    float SizeMul => (Gear("hook")?.Size ?? 1) * (Perk(7) ? 1.1f : 1) * (SetActive("atoll") ? 1.1f : 1) * (Wears("steward_badge") ? 1.1f : 1);
     float BiteWindow => 1f + (Gear("bobber")?.Window ?? 0);
     float PerfectWindow => 0.25f + (Gear("bobber")?.Window ?? 0) * 0.3f + (Perk(4) ? 0.1f : 0);
 
@@ -196,7 +198,7 @@ partial class Game
         var (sx, sy) = SpotPos(Data.SpotById[spotId]);
         chumUntil[spotId] = time + 120;
         FaceToward(sx, sy);
-        swingT = 0.25f;
+        Swing("throw", 0.25f);
         Burst(sx, sy, "#8a6440", 10);
         Sfx.Play("splash");
         Toast("Fish crowd in around the chum. For the next two minutes they bite twice as fast, and rare ones a little more often.", 4);
@@ -366,7 +368,7 @@ partial class Game
     void DrillHit()
     {
         drill += PickTier > 0 ? 0.11f : 0.065f;
-        swingT = 0.2f;
+        Swing("pick", 0.2f);
         shakeT = 0.15f;
         Burst(605, 85, "#e8f6fb", 4);
         Sfx.Play("mine");
@@ -525,7 +527,7 @@ partial class Game
                 return;
             case "bite":
                 fish.BiteT -= dt;
-                SetPrompt(BiteWindow - fish.BiteT < PerfectWindow ? "Bite! Hook it NOW for a perfect hook!" : "Bite! Hook it!", "<act>", true);
+                SetPrompt((BiteWindow - fish.BiteT < PerfectWindow ? "Bite! Hook it NOW for a perfect hook!" : "Bite! Hook it!") + FieldGuideName(), "<act>", true);
                 if (fish.BiteT <= 0) GotAway("Too slow. It got away.");
                 return;
             case "reeling":
@@ -691,6 +693,7 @@ partial class Game
         if (reel.Roll.Boss) { BossBreach(); return; }
         var roll = reel.Roll;
         string spot = fish.Spot;
+        float waterX = fish.Bx, waterY = fish.By;
         float bonus = (reel.Perfect ? 1.1f : 1) * (fish.BigShadow ? 1.15f : 1);
         bool perfect = reel.Perfect;
         fish = null; reel = null; pointerHold = false;
@@ -714,7 +717,11 @@ partial class Game
             return;
         }
         var f = Data.FishById[roll.Id];
-        float kg = AddCatch(f, bonus, perfect);
+        // A fish you let go here before may be back, grown (Release.cs).
+        var back = f.Legend ? null : Returning(f.Id, spot);
+        // Back grown: big, and a fifth again on what it weighed when you let it go.
+        float kg = AddCatch(f, bonus, perfect, back != null ? MathF.Max(1.3f, back.kg / f.Kg * 1.2f) : 0);
+        float landedM = lastM;
         int n = state.commons[f.Id];
         if (f.Legend)
         {
@@ -728,15 +735,17 @@ partial class Game
         }
         heldItem = f.Id;
         heldT = 1.4f;
+        // A first catch points you at its Fish log card, which tells you about the real fish (FishFacts).
+        string firstNote = n == 1 ? " New in your Fesh-dex (<dex>): read about the real fish." : $" ({n} so far)";
         if (f.Rare)
         {
             Sfx.Play("rare");
-            Toast($"Rare catch! A {f.Name.ToLowerInvariant()}, {Kg(kg)}! ({n} so far)", 3.5f);
+            Toast($"Rare catch! A {f.Name.ToLowerInvariant()}, {Kg(kg)}!{firstNote}", n == 1 ? 4.5f : 3.5f);
         }
         else
         {
             Sfx.Play("catch");
-            Toast($"Caught a {f.Name.ToLowerInvariant()}, {Kg(kg)}! ({n} so far)");
+            Toast($"Caught a {f.Name.ToLowerInvariant()}, {Kg(kg)}!{firstNote}", n == 1 ? 4 : 2.6f);
         }
         if (Perk(10) && !f.Rare && rng.NextDouble() < 0.1)
         {
@@ -744,20 +753,33 @@ partial class Game
             Floater("Double catch!", player.X, player.Y - 34, "#7fd36b");
         }
         mode = "play";
-        if (!f.Rare && !state.Hinted("fishBag"))
+        bool bagHint = !f.Rare && !state.Hinted("fishBag");
+        if (bagHint)
         {
             state.hinted["fishBag"] = true;
             Toast($"Caught a {f.Name.ToLowerInvariant()}, {Kg(kg)}! It's in your bag (<bag>). Cook fish at a campfire with <alt>.", 4.5f);
         }
+        if (back != null)
+        {
+            state.grownBack++;
+            Floater("The one you let go!", player.X, player.Y - 40, "#9fe0b0");
+            Toast($"It's the {f.Name.ToLowerInvariant()} you let go on day {back.day}, back and grown: {Kg(kg)} (it was {Kg(back.kg)}).", 5);
+            CheckBadges();
+        }
+        // For a few seconds you can let it go (F). (A double catch rolled its own size: this is the first one's.)
+        lastM = landedM;
+        NoteLanded(f, spot, kg, waterX, waterY, bagHint || back != null);
         Save();
         MaybeHint(spot);
     }
 
     // Puts a fish in your bag and records it: its weight, your records and trophies, experience and the derby.
     // Big fish (a quarter over the usual size) sell for more; trophies are half again over.
-    float AddCatch(CommonFish f, float bonus = 1, bool perfect = false)
+    // MinM is a size it's at least (a fish you let go, back and grown: Release.cs).
+    float AddCatch(CommonFish f, float bonus = 1, bool perfect = false, float minM = 0)
     {
-        float m = (0.55f + MathF.Pow((float)rng.NextDouble(), 1.8f) * 1.15f) * SizeMul * bonus;
+        float m = MathF.Max(minM, (0.55f + MathF.Pow((float)rng.NextDouble(), 1.8f) * 1.15f) * SizeMul * bonus);
+        lastM = m;
         float kg = MathF.Max(0.01f, MathF.Round(f.Kg * m * 100) / 100);
         bool first = state.commons.GetValueOrDefault(f.Id) == 0;
         state.commons[f.Id] = state.commons.GetValueOrDefault(f.Id) + 1;
@@ -773,7 +795,14 @@ partial class Game
         else if (record && !first) Floater("New record!", fx, fy - 7, "#7fd36b");
         GainXp(4 + (int)MathF.Round(f.Difficulty * 4) + (f.Rare ? 8 : 0) + (f.Legend ? 60 : 0) + (perfect ? 3 : 0) + (trophy ? 5 : 0));
         DerbyCatch(f, kg);
-        if (first) CheckPageDone(f.Id);
+        FestivalCatch(f, kg);
+        if (first) { CheckPageDone(f.Id); CheckAlbum(f.Id); }
+        // The fish album, mentioned once you've a few pages in it.
+        if (first && !state.Hinted("albumHint") && AlbumChapters.Sum(ch => ch.Fish.Count(InAlbum)) >= 5)
+        {
+            state.hinted["albumHint"] = true;
+            ToastLater("Your fish album has five fish taped in: their families, the water they live in and what they eat. Open it from the Fesh-dex (<dex>).");
+        }
         return kg;
     }
 
@@ -797,6 +826,7 @@ partial class Game
 
     void SoldFish(string id, int n)
     {
+        Learned("sell");
         int big = Math.Min(n, BigCount(id));
         if (big > 0) state.big[id] = state.big.GetValueOrDefault(id) - big;
     }

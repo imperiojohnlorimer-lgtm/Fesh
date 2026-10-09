@@ -44,6 +44,7 @@ These are the defaults. Every one of them can be changed in the menu (Esc, then 
 | Click a nearby tile | Build there |
 | Tab | Map of the islands (click the chart to drop a pin) |
 | J / C | Fesh-dex (creatures and Fish log) / case board |
+| Q | Journal: the goals open right now, and the Getting started list |
 | M | Sound on or off |
 | R | Get on and off your boat: board it from beside it, land it beside a shore. Ride Tidemane, or hop off (once you have it); from anywhere outdoors it whistles Tidemane over |
 | F11 | Fullscreen |
@@ -54,6 +55,26 @@ A new game starts with character creation: name, skin, hair, hair colour, hat, s
 Saves from older versions ask you to make your fisher once. You can change your look any time from the menu.
 Your fisher walks with a proper stride (arms swinging against the legs), looks about and now and then stretches
 when you stand still, leans back to load a cast and into the throw, and pumps the rod as you reel.
+Tools are held in your hands and your arms do the work: the axe and pickaxe wind up over your head and come down on
+the tile in front (the pick bounces off the rock), a sword slashes, fists punch, the rake draws salt in, and you haul
+traps up with both hands. The rod goes back over your shoulder as you load a cast, whips forward as you throw, and
+your other hand turns the reel while you reel in.
+
+## Finding your way: the guide and the journal
+- **The goal card** under your health and food always shows the next step of whatever you're following, with how far
+  it is. It works the story out from what you've done, so you can wander off, do things in any order, and it simply
+  picks up from there. Story steps that need night or daylight say so ("Wait for night: rest by Tomas's campfire").
+- **A gold arrow** floats over the place, or sits at the edge of the view pointing there when it's off screen. Indoors
+  it points at the door first, underground at the ladder, and across the sea at the jetty you'd sail from (or your boat)
+  with a line saying what to do there.
+- **The journal** (Q, a click on the goal card, or Journal in the Esc menu) lists everything open: the story, what
+  people have asked you for (Tomas, Niko, Lira, Maya, Tala, Bantay Joy, Tatay Celso, Dado, Manang Rosa's daily order)
+  and somewhere new to explore. **Follow** any of them, or leave it on **Automatic** (the story, then a request you can
+  hand in, then the rest). When someone asks you for something new, a note says it's in the journal.
+- **Getting started** in the journal ticks off the basics as you do them: talk, fish, sell, buy bait, eat, cook,
+  make something, rest, build, and open the Fesh-dex and the map. Its other tab, **Sea school**, shows your three
+  badges (see below) and opens the tide table once Lola Pacing has given it to you.
+- Your goal shows on the map too. Don't want it? **Hide the arrow** in the journal, or Settings > Goal and arrow.
 
 ## Day, night and the menu
 An island clock runs while you play: the HUD shows the day and the time. A whole day and night takes 24 minutes of play
@@ -121,6 +142,9 @@ Everything you catch is tracked in the Fesh-dex's **Fish log**, island by island
 - **Every fish has its own picture**, in the log, in your bag and held up over your head when you land it.
 - **Click a fish** for its card: a big picture, a line about it, where and when it bites, how it fights, the baits it
   likes, your heaviest against trophy size, and what Pip pays. Back (or Esc) returns to the page.
+- **The real fish:** under the picture, every fish you've caught (or seen) has a note about the real animal: its
+  scientific name and a few true things about it (where it lives, how it feeds, how it's farmed or fished, and whether
+  it's in trouble). Fish made up for the game say which real animal they're based on.
 - A **green dot** marks fish whose time, weather and moon are right just now; the **Biting now** filter shows only
   those. The other filters are **Not caught** and **Rare**.
 - A fish that **gets away mid-fight** counts as seen: its silhouette and name appear before you've caught one.
@@ -221,12 +245,13 @@ Put all four fish of a set on show (in any of your aquariums) for a bonus while 
 Saltmere shore (bites 15% faster on Saltmere), Frozen north (rare luck on Frostfang), Desert springs (Pip pays 10% more
 for fish), Jungle waters (15% more XP), Coral reef (fish 10% heavier), Deep dark (reel bar +3), Salt and islets (fish dry
 twice as fast on drying racks). The aquarium panel shows
-each set's progress.
+each set's progress. Point at any of your fish to see its name; with more than 21 kinds in your bag, the arrows by
+"Your fish" turn the page.
 
 ## Pip, coins and Tomas's requests
 - **Pip** keeps a stall just east of Tomas's camp, open from 7 AM to 9 PM. Pip buys fish and materials (rare fish are worth far more, big fish
   more too) and sells bait (5), chum (8), cork bobbers (20), crab pots (40), spinner lures (45), berry saplings (15),
-  sailcloth (120), copper bars (30), iron bars (55) and crystal (90). Your coins show in the HUD.
+  sailcloth (120), copper bars (30), iron bars (55), crystal (90) and suka, vinegar for paksiw (4). Your coins show in the HUD.
 - **Tomas's requests:** once you've met him, Tomas asks for things (3 pond perch, 6 wood, 2 Arctic char, ...)
   and pays coins, sometimes with bait on top. The first twelve are a set list that sends you around the islands;
   after that he asks for random fish. When you have what he wants, his prompt says so. The bag shows the current request.
@@ -239,6 +264,14 @@ but closes the bridges (not the jetties) until it passes. You get half an hour's
 catches you halfway across a bridge you can still walk off it. You can always shelter wherever you are, which waits
 until the storm is over. The morning message and the clock's tooltip tell you what's coming. On Frostfang the rain
 falls as snow.
+
+**Seasons:** the islands take turns between the two monsoons, five days each, starting with the amihan. The **amihan**
+(the cool northeast wind) is mostly dry, with few storms. The **habagat** (the wet southwest monsoon) brings rainy days and
+more and longer storms; in the habagat a storm is a *bagyo*. Tomas and Pip warn you the day before the wind turns, the
+morning toast says so, and the clock's tooltip and the menu show the season and its day. Forecasts say whether a storm
+will be short or long. Under sail the wind helps you or holds you back by up to 15%: sailing southwest is quickest in
+the amihan, northeast in the habagat. (Trolling isn't affected.) Five-day seasons are the game's own short calendar; in
+the Philippines each monsoon lasts months.
 
 ## The boat
 Make a **sailboat** at a workbench from 20 wood, 4 iron bars and sailcloth from Pip. Then go to the end of
@@ -272,11 +305,21 @@ There are no bridges or wading routes: use the boat or swim there on the secret 
 
 | Island | People and wildlife | Fishing |
 |---|---|---|
-| Amihan Village | Lira offers a daily meal; Niko requests two bangus. Carabao graze nearby. | Bangus, banak, kitang |
-| Luntian Karsts | Maya studies the limestone lagoon; rufous hornbills wander the trees. | Lapu-lapu, maya-maya, talakitok |
-| Bakawan Island | Tala watches the mangroves, tarsiers and hornbills. | Hito, dalag, mangrove mudskipper |
+| Amihan Village | Lira offers a daily meal and needs a pot for the village supper; Niko requests two bangus, then three asohos. Carabao graze nearby. | Bangus, banak, kitang |
+| Luntian Karsts | Maya farms guso (seaweed) in the limestone lagoon; rufous hornbills wander the trees. | Lapu-lapu, maya-maya, talakitok, asohos (silver sillago) |
+| Bakawan Island | Tala watches the mangroves, tarsiers and hornbills; after dark, fireflies light its west shore. | Hito, dalag, mangrove mudskipper |
 | Baga Island | A volcanic island with a northern fishing jetty. | Tanigue, yellowfin tuna, great barracuda |
 | The open sea between them | From the boat or Tidemane, over deep water. | Galunggong, tulingan, pating, malasugi |
+
+**Rondalla evenings:** Lira is one pot short for the village supper. Cook her a **ginataang isda** or a **sinigang na
+isda** at a stove (60 coins). From then on, on any evening from 6 to 10 PM without a storm, three villagers sit out in
+the square with a bandurria, a guitar and a bass, and the village's music turns to plucked strings.
+
+**The Bangus Festival:** on the last day of every amihan (days 5, 15, 25...) the village celebrates, in the spirit of
+Dagupan's Bangus Festival. Bunting hangs across the square, a long street grill smokes beside the path from the
+landing (Lira's meal that day is a grilled bangus), and Niko judges a **bangus derby**: land the heaviest bangus you
+can that day and show it to him (150 coins from 2.6 kg, 80 from 2 kg, 40 for taking part, once a festival). Dado's
+regatta in Habagat pays double prizes on festival day. The morning message reminds you.
 
 Crab pots in the region catch **alimasag**. Catches use the existing records, size, selling, cooking and aquarium systems.
 The village has raised timber houses and woven hats; the region also has its own music.
@@ -303,33 +346,39 @@ you straight to the Asinan landing.
 | Asinan (west) | Manang Rosa, the salt maker | Salt beds, calamansi bushes, goats | Asinan flats: danggit, sapsap, *pagi* (stingray, rare, fights back) |
 | Daang Pulo (middle) | Dado (regatta), Lola Pacing (sungka) | A home islet and eleven limestone islets | Islet reef: labahita, bisugo, *pugita* (octopus, rare, night); spearfishing too |
 | Parola (east) | Tatay Celso, the lighthouse keeper | The Parola lighthouse, dark until you help mend it | Parola pier: tamban, pusit (night, once the lamp is lit), *buan-buan* (tarpon, rare, night, once lit), **Haring Buan-buan** (legend) |
-| The Habagat Sea | | From the boat or Tidemane, over deep water | Alumahan, matang-baka (night), *talang-talang* (rare, day) |
+| The Habagat Sea | | From the boat or Tidemane, over deep water | Alumahan, matang-baka (night), *talang-talang* (rare, day); dalagang-bukid (fusilier) in the amihan season, salay-salay (yellowstripe scad) in the habagat |
 
 Crab pots here bring up **alimango** (mud crab), **curacha** (spanner crab) or **sugpo** (tiger prawn).
 
 - **Salt and daing:** rake Manang Rosa's salt beds once a day for 3 salt, but only if it hasn't rained since the
   morning (Tomas or Pip can tell you tomorrow's weather). Build a **drying rack** (4 wood, 2 stone; key 0 in the build
   bar) and press E to lay out up to three raw fish with a salt each. They need six hours of clear daylight (between
-  6 AM and 6 PM) to become **daing**; rain stops them drying. F takes them back.
+  6 AM and 6 PM) to become **daing**; tamban and sapsap dry whole into **tuyo**. Rain stops them drying. F takes them back.
+- **Manang Rosa's provisions:** once you've met her, she wants two or three preserved fish a day for the boats, and pays
+  25 coins each (plus 10) and 2 salt. In the amihan it's dried fish (daing or tuyo); in the habagat, when drying is
+  chancy, it's tinapa or paksiw. When you have them, E hands them over.
 - **Food:** Habagat's bushes give **calamansi**. At a stove: **kinilaw** (fish, calamansi, salt), **sinigang na isda**
-  (2 fish, 2 calamansi) and **ginataang isda** (fish, coconut).
-- **Gleaning:** at low tide (4:30-8:30 AM and 4:30-8:30 PM; the clock's tooltip shows it here) walk the wet sand by the water
-  on Habagat's beaches for cowries, sea urchins and sea grapes. Each tide has only so much, and the water coming back
-  takes the rest.
+  (2 fish, 2 calamansi), **ginataang isda** (fish, coconut) and **paksiw na isda** (fish and suka, vinegar from Pip).
+  On a smoking rack, 2 galunggong, tamban, sapsap, matang-baka, alumahan, salay-salay, bangus or tilapia and a salt
+  make 2 **tinapa**.
+- **Gleaning:** at low tide walk the wet sand by the water on Habagat's beaches for cowries, sea urchins and sea
+  grapes. Each tide has only so much, and the water coming back takes the rest. The tide follows the moon (see
+  **The Sea school** below): the clock's tooltip here says when the next low tide is and how big.
 - **Sungka** with Lola Pacing: seven shells in each little house; sow them round, never into her head. End in your own
   head and go again; end where there are shells and pick them up and keep going; end in an empty house of yours and take
   hers across from it. A win pays 40 coins once a day.
 - **The regatta:** sail close by every islet to chart all twelve, then Dado races you round his buoys. The next gate
-  flashes gold. Beat his lolo's record for the old agong; there are medals and a daily prize too.
+  flashes gold. Beat his lolo's record for the old agong; there are medals and a daily prize too. Your first gold
+  wins Dado's **painted paraw sail** (red, gold, blue and green panels), which your boat wears from then on.
 - **The lighthouse:** bring Tatay Celso what he needs, three times, and Parola burns again: its beam sweeps the sea at
   night, and squid and tarpon come to the pier.
 - **The vanishing moon (spoilers):** the Case board gets a second case. Four clues on three islands lead to a full-moon
   night at Parola, when the old story of **Bakunawa**, the sea serpent that swallows moons, turns out to be true. Nobody
   fights it: you beat the agong on the beat while everyone bangs their pots, until it gives the moon back.
 - **The marine sanctuary** (on the Amihan chart, south of Bakawan and Baga): yellow buoys mark it. Nothing is fished or
-  trapped inside, but casts just outside bite quicker, with better luck, as fish spill out. Sea turtles, a dugong and,
-  by day, a whale shark live there. You can **watch** them (E, from the boat or the water) for the Fish log's
-  Sightings card; Bantay Joy, the sea warden, rewards you for seeing all three. They are protected in the Philippines,
+  trapped inside, but casts just outside bite quicker, with better luck, as fish spill out. Sea turtles, a dugong,
+  a banded sea krait (*walo-walo*), a giant clam (*taklobo*) in the east seagrass and, by day, a whale shark live there. You can **watch** them (E, from
+  the boat or the water) for the Fish log's Sightings card; Bantay Joy, the sea warden, rewards you for seeing all five. They are protected in the Philippines,
   so they're never catches.
 
 Knocked out anywhere in Habagat, you wake at Manang Rosa's, your boat at the Asinan landing. The region has its own
@@ -338,6 +387,110 @@ gong music.
 The people and places are fictional, inspired by Philippine traditions: Pangasinan's salt farms, the Hundred Islands,
 Iloilo's paraw regatta, the Visayan story of Bakunawa, and community-run marine sanctuaries with their *bantay dagat*.
 The Moonscale charm and Haring Buan-buan are inventions for the game.
+
+## The bubo
+Talk to **Tala** on Bakawan and she gives you a **bubo**, a long basket trap woven from split bamboo, and shows you how
+to weave more at a workbench (4 wood, Tools tab). Her kind is for fresh water: set it (B, then click **Bubo**, the last
+piece in the build bar, or step to it with the bumpers; it has no number key) at the edge of the Saltmere lagoon, the
+oasis, the Mirewood swamp, the Amihan village pond or Bakawan's mangrove pool. The karst lagoon, the atoll lagoon and
+the sea are salt; use a crab pot there. Face it the next morning and press E to lift it: one or two of that water's
+small, everyday fish (nothing rare, nothing over 3 kg). It's marked on your chart, and taking it down gives it back.
+
+## Maya's guso farm
+New in **1.15.0**. **Maya** on Luntian is starting a seaweed farm in the karst lagoon: a living for the village that
+takes no fish out of it. **Guso** is a seaweed farmed all over the Philippines. Talk to her and she gives you two
+cuttings and the two lines at the lagoon's west end (the stakes and ropes in the water).
+- **Plant:** stand on the sand beside a line, face it and press E to tie a cutting on.
+- **Harvest:** on the second morning the line is a row of fat, golden-green bunches. E cuts four and ties one straight
+  back on, so the line keeps growing. A **storm** while it grows tears half of it away (two instead of four), so watch
+  the forecast; the habagat is hard on the lines.
+- **Dry it:** guso needs no salt. At a drying rack, E (or F, if you've salted fish to lay out instead) spreads up to six
+  bunches. After six hours of clear daylight they come off as **dried guso**, which Pip buys for 14 coins (the traders
+  make carrageenan from it), and which rolls **sushi** and **maki** like any seaweed.
+- **Eat it:** fresh guso is a crunchy snack (5), or, with a splash of suka at a stove, **ensaladang guso** (30).
+- **The co-op:** bring Maya 4 dried guso for the village co-op's first sale. She pays 80 coins and opens the two east
+  lines for you as well. If you run out of cuttings with a line empty, she has more.
+
+The chart marks the farm (and when a line is ready). Lines and what's on them are saved.
+
+## Bakawan at night
+New in **1.15.0**. Once Tala has given you the bubo, ask her again: she keeps a list of what visitors see on Bakawan.
+- **Alitaptap:** on the island's west shore stand three **pagatpat** mangroves. After dark, unless it's raining,
+  thousands of fireflies gather in them and flash together, the whole tree at once. Press E nearby (on foot, or from
+  your boat just offshore) to watch.
+- **Glowing water:** on nights when the moon is small (not the nights around the full moon, and not in a storm), the
+  water around Bakawan glows blue-green wherever it's stirred: sail through it and your wake lights up. Tidemane's
+  wake and a wader's footsteps glow too, and so does the surf on its shore.
+- **Tala's list:** the alitaptap, the glowing water, the **tarsiers** and the **hornbills** (press E to observe them).
+  Each counts on the Fish log's Sightings card ("Legends & more"), next to the sanctuary's animals. Show her all four
+  for a reward. They're only ever watched.
+
+Firefly displays in mangroves, like those along the Iwahig, Donsol and Abatan rivers, and plankton that glow when
+disturbed are both real; the trees and the list are the game's own.
+
+## The Sea school
+New in **1.17.0**: three ways to learn about the sea that also make you a better fisher. Each has a badge in the
+journal's **Sea school** tab, bronze, silver and gold, with a prize at every step; gold in all three is a diploma.
+None of it is needed for anything else.
+
+**Ma'am Isay's class.** Ma'am Isay teaches the children at the little school on the north side of Amihan Village
+(07:00-16:00 they're on the bench out front). Once you've caught four kinds of fish she gives lessons about them:
+eight questions with three hearts, a quick-answer bonus, a streak, and one **Ask the class** where the children vote
+(they know the islands' own fish best). Name a fish from its picture or its shadow, say where it lives, when it bites,
+how it fights, which grows heavier, which bait it likes, whether it's a real animal, or which fish a true fact or a
+scientific name belongs to. Every answer, right or wrong, shows you the right one. Click an answer or press 1 to 4.
+The first lesson of the day pays from the school fund (6 coins a right answer, 30 more for all eight); practise as much
+as you like after. Fish you got wrong come up again first next time. Three right answers about a fish and you've **learned** it: a gold star in the Fish log. Learn 5
+for her **field guide** (a fish you've learned is named the moment it bites), 15 for 150 coins, 30 for a **gold star
+pin** (rare luck +1).
+
+**Let it go.** For a few seconds after you land a fish, F lets it go. Little ones (well under the usual size) say
+*Undersized*: they haven't spawned yet. **Galunggong and tamban** are in their closed season in the amihan, when Pip
+won't buy them. Letting those go counts for the badge and a little experience, and any fish you let go may be back
+at the same spot a day or more later, grown ("It's the one you let go!"). Crabs and lobsters from a pot go on a
+**sorting tray**: measure the shell against the keep line (for alimasag it's the real Philippine minimum, 10.2 cm),
+turn it over to check for eggs (a male has a narrow, pointed apron, a female a broad round one, and a female carrying
+eggs has a spongy orange or dark mass under it), then keep it or let it go (keys 1, 2, and 3 to turn it). Lobsters
+and crayfish are measured by the length of the carapace, the head shell. Eight right
+in a row and you sort by eye from then on. Prizes: a **dehooker** (fish you let go come back grown far more often),
+150 coins, and a **steward's badge** (the fish you catch run a tenth heavier).
+
+**The tides.** The tide now follows the moon: a low tide every 12 hours 25 minutes, so each day's comes about 50
+minutes later. Around the full and new moon the tides are big (**spring tides**): more to glean, for hours, and at the
+lowest the shallows beside Habagat's beaches dry right out, so you can walk out onto the **reef flat** (where an
+octopus sometimes turns up in a pool). At a half moon they're small (**neap tides**). Get back to the beach when
+the tide turns. Talk to **Lola Pacing** a second time and she explains it and gives you a **tide table** (the next three
+days as a graph, with the moon each day; hover to read it). Once a day she asks a riddle (F by her sungka board):
+when's the next low tide, the lowest, the next one in daylight, the smallest day. Click the answer on the graph.
+Find her the lowest tide still to come and she'll meet you on the flats below her board then, with two of her
+grandchildren, for a **reef walk** that lasts until the tide comes back. Prizes: 60 coins, a **gleaner's basket** (half as many finds again), and a **tide watch** (the tide in
+the clock's tooltip anywhere, and octopus more often).
+
+The real facts: closed seasons protect spawning fish in parts of the Philippines (galunggong off northern Palawan from
+November to January, sardines in the Visayan Sea and off Zamboanga from mid-November to mid-February, roughly the
+amihan). Philippine rules ban keeping egg-carrying blue swimming crabs or ones under 10.2 cm. Spring and neap tides
+come from the sun and moon pulling together or at right angles; on Earth that's about every two weeks, here every
+four days, as the game's moon goes round in eight. Pip's closed season and the other crabs' keep lines are the game's
+own.
+
+## The island guide and the fish album
+New in **1.18.0**, both for learning about the real places and animals behind the game.
+
+**The island guide** has a page for every island and sea you've found (the rest stay "Uncharted"): what kind of
+place it is (a coral atoll, limestone karst, a volcanic island, mangroves, salt flats...), what the land is like, its
+bodies of water marked fresh, brackish or salt, the climate, what lives there, the fish you can catch there, and an
+"In the real world" box on the real landforms and places behind it (how atolls form, what karst is, the Pacific Ring of
+Fire, mangroves, salt-making, the monsoons, marine sanctuaries). Each page has a cross-section drawing of the island
+(heights stretched to show the shape), the ocean's layers for the open seas, or a cut-away of the caverns. Open it with
+**Island guide** on the map, by clicking an island's name on the map, from the Fesh-dex, or from the journal.
+
+**The fish album** is a scrapbook like the ones made for school: a page for every fish you've caught, taped in with its
+local, English and scientific names, its family, the water it lives in (fresh, brackish or salt) and what it eats.
+The chapters follow how scientists group animals (sharks and rays, ancient lines, carp and catfish, tunas and billfish,
+reef fish...) and end with the crustaceans and the squid and octopus, which aren't fish at all. Its first page explains
+scientific names and families. Empty frames show only the water a missing fish lives in, and a full chapter pays five
+coins a fish. Open it from the Fesh-dex, a fish's card (**Album page**), the journal's Sea school tab or the island
+guide; turn the pages with the arrow keys.
 
 ## Tidemane (spoilers)
 Starfall Atoll hides a secret. A trail of hoofprints leads from the jetty into a ring of palms on the south-east side,
@@ -396,6 +549,12 @@ warning; at zero you walk slower and the reel's green bar shrinks. Eat from the 
 | Fried egg | 18 | Cook an egg (campfire or stove) |
 | Grilled fish | 25 | Cook any raw fish (campfire or stove) |
 | Fish stew | 55 | 2 raw fish and 1 berries (stove) |
+| Tuyo | 16 | Tamban or sapsap salted and dried on a rack |
+| Tinapa | 22 | Small fish, bangus or tilapia and salt (smoking rack) |
+| Daing | 28 | Any other fish salted and dried on a rack |
+| Paksiw na isda | 40 | 1 raw fish and 1 suka (stove) |
+| Guso | 5 | Maya's lines in the Luntian lagoon |
+| Ensaladang guso | 30 | 2 guso and 1 suka (stove) |
 
 ## Gathering
 - **Trees:** with an axe, face an oak, fir, palm or cactus and press E three times. Trees grow back after 3 days.
@@ -441,16 +600,16 @@ Your own shacks start empty: go inside and press B to place a workbench, furnace
 
 | Station | Makes |
 |---------|-------|
-| Workbench: Tools | Stone axe (3 wood, 2 stone), pickaxes: stone (3 wood, 3 stone), copper (2 wood, 2 copper bar), iron (2 wood, 3 iron bar), gold (2 wood, 3 gold bar), crystal (2 gold bar, 3 crystal, 1 shadow essence); sailboat (20 wood, 4 iron bar, 1 sailcloth); fishing spear (2 wood, 1 copper bar); crab pot (4 wood, 1 wool) |
+| Workbench: Tools | Stone axe (3 wood, 2 stone), pickaxes: stone (3 wood, 3 stone), copper (2 wood, 2 copper bar), iron (2 wood, 3 iron bar), gold (2 wood, 3 gold bar), crystal (2 gold bar, 3 crystal, 1 shadow essence); sailboat (20 wood, 4 iron bar, 1 sailcloth); fishing spear (2 wood, 1 copper bar); crab pot (4 wood, 1 wool); bubo (4 wood, once Tala has shown you) |
 | Workbench: Rods | Copper rod (2 wood, 3 copper bar), iron rod (copper rod, 3 iron bar), crystal rod (iron rod, 1 iron bar, 3 crystal), Ancient rod (crystal rod, 2 gold bar, 3 abyssite) |
 | Workbench: Tackle | Reels: copper (1 wood, 2 copper bar), iron (copper reel, 2 iron bar), gold (iron reel, 2 gold bar). Lines: silk (3 wool), crystal (silk line, 1 crystal, 1 slime gel). Hooks: barbed (1 copper bar), big-game (barbed hook, 2 iron bar). Bobbers: cork (2 wood), glow (cork bobber, 2 slime gel). Sinkers: stone (3 stone), iron (stone sinker, 1 iron bar). Lures: spinner (1 copper bar), fly (1 wool, 1 bat wing) |
 | Workbench: Gear | Big sail (2 sailcloth, 4 wood, 1 iron bar), echo sounder (2 copper bar, 1 gold bar, 1 crystal), sunglasses (1 copper bar, 1 crystal), fish finder (2 copper bar, 1 iron bar, 1 crystal), waders (3 slime gel, 2 wool), abyssite charm (2 abyssite, 1 gold bar), headlamp (2 copper bar, 1 crystal), cooler (6 wood, 1 iron bar, 1 wool) |
 | Workbench: Combat | Swords: copper (1 wood, 2 copper bar), iron (1 wood, 3 iron bar), gold (1 wood, 3 gold bar); crystal blade (2 gold bar, 3 crystal, 2 shadow essence); shell armour (4 crab shell, 2 iron bar) |
 | Workbench: Bait | Glow bait ×3 (2 bait, 1 slime gel), cut bait ×4 (1 raw fish), chum ×2 (1 raw fish, 1 berries) |
 | Furnace | Copper bar (2 copper ore, 1 wood), iron bar (2 iron ore, 1 wood), gold bar (2 gold ore, 1 wood) |
-| Smoking rack | Smoked fish (1 raw fish; fills 30, sells for 20), fish jerky ×2 (3 cut bait) |
+| Smoking rack | Smoked fish (1 raw fish; fills 30, sells for 20), fish jerky ×2 (3 cut bait), tinapa ×2 (2 galunggong, tamban, sapsap, matang-baka, alumahan, salay-salay, bangus or tilapia, and 1 salt; fills 22) |
 | Campfire (F) | Grilled fish, fried egg |
-| Cooking stove | Everything the campfire makes, plus fish stew, sushi rolls (1 raw fish, 1 seaweed) and maki platters (3 raw fish, 2 seaweed, 1 berries; fills 80) |
+| Cooking stove | Everything the campfire makes, plus fish stew, sushi rolls (1 raw fish, 1 seaweed or dried guso) and maki platters (3 raw fish, 2 seaweed or dried guso, 1 berries; fills 80), the Habagat dishes, paksiw and ensaladang guso (2 guso, 1 suka) |
 
 Legendary fish are never used up as a cooking ingredient.
 
@@ -472,6 +631,9 @@ taking down a shack also packs up everything inside it.
 | Berry bush | 1 berry sapling (from Pip) | Pick berries from it every day |
 | Smoking rack | 5 wood, 3 stone | Smoke fish (E) |
 | Crab pot | 1 crab pot (workbench or Pip) | Goes in shallow water; haul it up each morning |
+| Drying rack | 4 wood, 2 stone | Salt fish and dry them in the sun, or dry guso (key 0) |
+| Bubo | 1 bubo (workbench, once Tala has shown you) | Goes in fresh water; lift it each morning (no number key: click it or use the bumpers) |
+| Bahay kubo | 10 wood, 2 stone (once you've been to Amihan) | A nipa hut on stilts with woven bamboo walls; go inside and furnish it like a shack (no number key) |
 
 | Indoor piece | Cost | What it does |
 |--------------|------|--------------|
@@ -498,6 +660,8 @@ taking down a shack also packs up everything inside it.
 - `src/Clock.cs`: the island clock: day and night, dusk and dawn, a new day at 6 AM, regrowing trees
 - `src/Tidemane.cs`: the Starwell's secret, the fight with Tidemane, and riding it
 - `src/Archipelago.cs`: Amihan's four islands, village NPCs, landmarks and regional scenery
+- `src/Seaweed.cs`: Maya's guso farm in the Luntian lagoon
+- `src/Bakawan.cs`: Bakawan's firefly trees, the glowing water, sightings and Tala's list
 - `src/Boating.cs`: boat steering, boarding, safe landings, persistent moorings, and how the boat moves (sail, pennant, spray, wake)
 - `src/OpenSea.cs`: fishing the open sea from the boat or Tidemane, feeding frenzies, trolling, Ironbill's tow and the echo sounder
 - `src/Folk.cs`: Tomas, Pip and the villagers strolling about near home
@@ -521,6 +685,7 @@ taking down a shack also packs up everything inside it.
 - `src/State.cs`: the save file and the three save slots
 - `src/AutoTest.cs`: debug-only scripted play-through (see below)
 - `src/AmihanTests.cs`: navigation, village, wildlife, map and fish-attack checks
+- `src/GusoTests.cs`: the guso farm, drying and cooking guso, the co-op, the fireflies, the glowing water and Tala's list
 - `installer/Fesh.wxs`: the installer definition
 
 ## Automated check
@@ -542,7 +707,10 @@ $env:FESH_AUTOTEST = "$PWD\test-output"; $env:FESH_SAVE = "$PWD\test-output\save
 For pixel work, `FESH_SPRITES` set to a `.png` path draws every person pose and the boat in each state to zoomed
 sheets next to it (`-a`, `-b` and `-c`), touches no saves, and quits. The `-boat-directions` and `-mount-directions`
 sheets show all four headings while moving, fishing and holding a catch (plus the big sail and trolling).
-Set `FESH_DIRECTION_TEST=1` alongside `FESH_AUTOTEST` and `FESH_SAVE` to run only the direction checks; the full
-play-through includes them too.
+Set `FESH_DIRECTION_TEST=1` alongside `FESH_AUTOTEST` and `FESH_SAVE` to run only the direction checks, or
+`FESH_GUSO_TEST=1` for only the guso farm and Bakawan's night lights, `FESH_GUIDE_TEST=1` for only the guide, the
+journal, the aquarium's layout and the real-fish notes, `FESH_EDU_TEST=1` for only the Sea school (tides, letting
+fish go, sorting crabs and Ma'am Isay's class), or `FESH_ATLAS_TEST=1` for only the island guide and the fish album;
+the full play-through includes them too.
 
 Fonts: Pixelify Sans and Special Elite, both under the SIL Open Font License.

@@ -12,7 +12,8 @@ partial class Game
     float shakeT, swingT;
 
     /* ---------- Bag ---------- */
-    int Has(string id) => id == "fish" ? FishCount() : state.inv.GetValueOrDefault(id);
+    int Has(string id) => id == "fish" ? FishCount() : id == Items.TinapaFishId ? state.inv.Where(kv => Items.TinapaFish.Contains(kv.Key)).Sum(kv => kv.Value)
+        : id == Items.SeaweedId ? Items.Seaweeds.Sum(state.inv.GetValueOrDefault) : state.inv.GetValueOrDefault(id);
     void Give(string id, int n = 1) => state.inv[id] = state.inv.GetValueOrDefault(id) + n;
 
     bool Take(string id, int n = 1)
@@ -26,12 +27,13 @@ partial class Game
     // Raw fish you can cook or cut up. Legendary fish are never used up as an ingredient.
     int FishCount() => state.inv.Where(kv => Items.ById[kv.Key].Kind == "fish" && !Data.FishById[kv.Key].Legend).Sum(kv => kv.Value);
 
-    // Uses up raw fish for cooking, most plentiful ordinary fish first so rare catches are kept.
-    void TakeFish(int n)
+    // Uses up raw fish for cooking, most plentiful ordinary fish first so rare catches are kept. Tinapa only takes the
+    // fish that are smoked for tinapa (Items.TinapaFish).
+    void TakeFish(int n, bool tinapa = false)
     {
         for (int i = 0; i < n; i++)
         {
-            var pick = state.inv.Where(kv => Items.ById[kv.Key].Kind == "fish" && !Data.FishById[kv.Key].Legend)
+            var pick = state.inv.Where(kv => Items.ById[kv.Key].Kind == "fish" && !Data.FishById[kv.Key].Legend && (!tinapa || Items.TinapaFish.Contains(kv.Key)))
                 .OrderBy(kv => Data.FishById[kv.Key].Rare ? 1 : 0).ThenByDescending(kv => kv.Value).FirstOrDefault();
             if (pick.Key == null) return;
             Take(pick.Key);
@@ -67,6 +69,7 @@ partial class Game
         if (d.Food <= 0) return;
         if (state.food >= 99.5f && state.hp >= 99.5f) { Toast("You're full."); Sfx.Play("nope"); return; }
         if (!Take(id)) return;
+        Learned("eat");
         float gain = Math.Min(d.Food, 100 - state.food), heal = Math.Min(d.Food / 2f, 100 - state.hp);
         state.food = Math.Min(100, state.food + d.Food);
         state.hp = Math.Min(100, state.hp + d.Food / 2f);
@@ -85,9 +88,17 @@ partial class Game
         foreach (var (id, n) in r.Needs)
         {
             if (id == "fish") TakeFish(n);
+            else if (id == Items.TinapaFishId) TakeFish(n, tinapa: true);
+            else if (id == Items.SeaweedId)
+            {
+                // Seaweed from a crab pot goes first; dried guso is worth more at Pip's.
+                int left = n;
+                foreach (var w in Items.Seaweeds) { int k = Math.Min(left, Has(w)); if (k > 0) Take(w, k); left -= k; }
+            }
             else Take(id, n);
         }
         Give(r.Out, r.Count);
+        Learned(r.Station is "fire" or "stove" ? "cook" : "craft");
         var d = Items.ById[r.Out];
         Sfx.Play("craft");
         string tip = r.Out switch
@@ -103,6 +114,7 @@ partial class Game
             "glow_bait" => " It's used before plain bait when you cast.",
             "spear" => " At the coral shallows, the atoll lagoon or Daang Pulo's islet reef, press <spear> to spearfish.",
             "crab_pot" => " Press <build> outdoors to set it in shallow water.",
+            "bubo" => " Press <build> outdoors to set it in fresh water: the last piece in the build bar.",
             "cut_bait" or "fly_lure" or "spinner_lure" => " Pick it as your bait in the tackle box (<tackle>).",
             "chum" => " At a fishing spot, press <alt> to throw it.",
             "sunglasses" => " You wear them automatically. Look for fish shadows at fishing spots.",
@@ -159,7 +171,7 @@ partial class Game
         if (chopTile != (tx, ty)) { chopTile = (tx, ty); chopHits = 0; }
         chopHits++;
         shakeT = 0.25f;
-        swingT = 0.25f;
+        Swing(boulder ? "pick" : "axe", 0.25f);
         FaceToward(tx * T + 5, ty * T + 5);
         Sfx.Play(boulder ? "mine" : "chop");
         Burst(tx * T + 5, ty * T + 3, boulder ? "#9aa0a5" : k == 'c' ? "#6aa84f" : "#c9a06a", 5);
@@ -273,6 +285,8 @@ partial class Game
         a.Hearts = 1.5f;
         a.Flip = player.X < a.X;
         Sfx.Play("pet");
+        // The tarsier and the hornbill are only watched, and Tala keeps count of them (Bakawan.cs).
+        if (a.Kind is "tarsier" or "hornbill") { RecordSighting(a.Kind, a.X, a.Y - 8, k.Pet); return; }
         if (k.Gift != null && state.gifts.GetValueOrDefault(a.Key) != state.day)
         {
             state.gifts[a.Key] = state.day;

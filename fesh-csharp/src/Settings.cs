@@ -14,6 +14,7 @@ sealed class SettingsData
     public bool pauseUnfocused = true;         // pause when the game window loses focus
     public int dayLength = 24;                 // real minutes for a whole day and night; 0 stops the clock (only resting moves it)
     public bool clock24;                       // 14:30 instead of 2:30 PM
+    public bool guide = true;                  // the goal card and the arrow to it (Guide.cs); the journal works either way
     public Dictionary<string, int[]> keys = new(); // action -> its two keys (KeyboardKey values, 0 = none); missing actions use the defaults
 }
 
@@ -99,6 +100,7 @@ static class Bind
         new("dex", "Fesh-dex", KeyboardKey.J),
         new("case", "Case board", KeyboardKey.C),
         new("map", "Map", KeyboardKey.Tab),
+        new("journal", "Journal (goals)", KeyboardKey.Q),
         new("mute", "Sound on or off", KeyboardKey.M),
         new("fullscreen", "Fullscreen", KeyboardKey.F11)
     };

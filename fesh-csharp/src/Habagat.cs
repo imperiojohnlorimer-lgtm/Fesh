@@ -209,29 +209,38 @@ partial class Game
     }
 
     /* ---------- Gleaning at low tide ---------- */
-    // Twice a day the tide drops (around dawn and dusk) and the reef flats of Habagat's beaches are worth walking:
-    // cowries, sea urchins and sea grapes turn up on the wet sand by the water ("glean" loose finds, picked up by walking
-    // over them). The tide coming back in takes whatever's left.
-    bool LowTide => state.clock is >= 4.5f * 60 and < 8.5f * 60 or >= 16.5f * 60 and < 20.5f * 60;
-    const int GleanQuota = 10;   // finds per low tide
-
-    // Which low tide it is: the evening one belongs to its day, and the morning one to the day it ends in (it starts
-    // before the 06:00 day change).
-    string GleanTide => state.clock >= 16.5f * 60 ? $"{state.day}:pm" : $"{(state.clock < DawnMin ? state.day + 1 : state.day)}:am";
+    // Twice a lunar day the tide drops (Tides.cs) and the reef flats of Habagat's beaches are worth walking: cowries, sea
+    // urchins and sea grapes turn up on the wet sand by the water ("glean" loose finds, picked up by walking over them).
+    // The tide coming back in takes whatever's left. At a big spring low the shallows beside the beaches dry right out,
+    // and finds turn up out there too: the outer flat, where an octopus can be caught in a pool.
     bool GleanLeft => state.gleanTide != GleanTide || state.gleaned < GleanQuota;
 
-    bool GleanGround(int x, int y) => map[y, x] == 's' && BiomeAt(x, y) == 6 && x < EastStart
-        && new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }.Any(o => TileAt(x + o.Item1, y + o.Item2) is 'w' or '~');
+    bool GleanGround(int x, int y) => BiomeAt(x, y) == 6 && x < EastStart && (FlatOpen(x, y) || map[y, x] == 's'
+        && new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }.Any(o => TileAt(x + o.Item1, y + o.Item2) is 'w' or '~'));
 
     void PickGlean(Loose l)
     {
         if (state.gleanTide != GleanTide) { state.gleanTide = GleanTide; state.gleaned = 0; }
         state.gleaned++;
-        double r = rng.NextDouble();
-        string what = r < 0.45 ? "cowrie" : r < 0.75 ? "sea_urchin" : "sea_grapes";
-        Give(what);
-        Sfx.Play("pickup");
-        Floater($"+1 {Items.ById[what].Name.Split(' ')[0].ToLowerInvariant()}", l.x, l.y - 6, "#f2e6c8");
+        // Out on the dry reef flat there's a chance of an octopus caught in a pool; on Lola's reef walk, the first find is one.
+        bool outer = IsFlat(l.tx, l.ty);
+        if (ReefOctopusDue || outer && rng.NextDouble() < (Wears("tide_watch") ? 0.2 : 0.12))
+        {
+            if (ReefOctopusDue) state.reefOctopus = state.reefLow;
+            float kg = AddCatch(Data.FishById["pugita"]);
+            Sfx.Play("rare");
+            heldItem = "pugita"; heldT = 1.4f;
+            Toast(outer ? $"An octopus, caught in a pool on the outer flat! {Kg(kg)}. The biggest low tides uncover places you can't usually reach."
+                : $"An octopus in a rock pool! {Kg(kg)}. Lola's apo squeal and point.", 5);
+        }
+        else
+        {
+            double r = rng.NextDouble();
+            string what = r < 0.45 ? "cowrie" : r < 0.75 ? "sea_urchin" : "sea_grapes";
+            Give(what);
+            Sfx.Play("pickup");
+            Floater($"+1 {Items.ById[what].Name.Split(' ')[0].ToLowerInvariant()}", l.x, l.y - 6, "#f2e6c8");
+        }
         if (!state.Hinted("glean"))
         {
             state.hinted["glean"] = true;
@@ -272,10 +281,14 @@ partial class Game
             if (Dist(player.X, player.Y, s.X, s.Y + 6) < 15)
                 return new Target { Type = "habagatfolk", Id = n.id, Label = n.id switch
                 {
+                    "pacing" when ReefWalkOn && !ReefThanked => "Walk the reef with Lola Pacing",
+                    "pacing" when ReefWalkOn => "Talk to Lola Pacing",
+                    "pacing" when state.Hinted("metPacing") && !TidesLearned => "Talk to Lola Pacing",
                     "pacing" => "Play sungka with Lola Pacing",
+                    "rosa" when RosaCanFill => $"Give Manang Rosa {RosaOrder.count} {RosaOrder.what}",
                     "celso" when ParolaReady => $"Give Tatay Celso the {ParolaNeeds}",
                     _ => $"Talk to {n.name}"
-                } };
+                }, AltType = n.id == "pacing" && RiddleToday && !ReefWalkOn ? "riddle" : null, AltLabel = n.id == "pacing" && RiddleToday && !ReefWalkOn ? "Lola's tide riddle" : null };
         }
         if (SaltBedsInReach()) return new Target { Type = "saltbed", Label = "Rake the salt beds" };
         return null;
@@ -293,6 +306,18 @@ partial class Game
         }
     }
 
+    // Manang Rosa's provisions for the boats: two or three a day, and what kind follows the season. In the amihan the
+    // racks dry well, so she wants dried fish (daing or tuyo, any mix); in the habagat drying is chancy, so it's tinapa
+    // from the smoker or paksiw. Cheapest first in each list, which is the order they're handed over. She pays the same
+    // for any of them, in coins and salt (hard to come by when it rains).
+    (string[] items, int count, string what) RosaOrder => Season == "amihan"
+        ? (new[] { "tuyo", "daing" }, 2 + state.day % 2, "dried fish")
+        : (new[] { "tinapa", "paksiw" }, 2 + state.day % 2, "tinapa or paksiw");
+    bool RosaOrderDone => state.gifts.GetValueOrDefault("rosa_order") == state.day;
+    bool RosaCanFill => state.Hinted("metRosa") && !RosaOrderDone && RosaOrder.items.Sum(Has) >= RosaOrder.count;
+    int RosaPay => 25 * RosaOrder.count + 10;
+    const int RosaSalt = 2;
+
     void TalkRosa()
     {
         Say R(string t) => new("Manang Rosa", t);
@@ -308,9 +333,35 @@ partial class Game
             });
             return;
         }
+        var (items, count, what) = RosaOrder;
+        string order = $"{count} {what}";
+        if (RosaCanFill)
+        {
+            int left = count;
+            foreach (var id in items) { int n = Math.Min(left, Has(id)); Take(id, n); left -= n; }
+            state.coins += RosaPay;
+            Give("salt", RosaSalt);
+            state.gifts["rosa_order"] = state.day;
+            Sfx.Play("coin");
+            Talk(new()
+            {
+                R($"{order}! Salamat. The boats leave with full baskets."),
+                R($"Here's {RosaPay} coins, and {RosaSalt} salt from the beds. Come back tomorrow: there's always another boat.")
+            });
+            Save();
+            return;
+        }
+        string why = Season == "amihan"
+            ? "It's the amihan, so the wind is dry and the racks work. "
+            : "It's the habagat: drying is chancy in this rain, so we smoke our fish or cook it in vinegar. ";
+        string how = Season == "amihan"
+            ? "Daing or tuyo, either will do: salt your fish and dry them on a rack. Tamban and sapsap dry whole, as tuyo."
+            : "Tinapa or paksiw, either will do. Smoke small fish or bangus with a little salt, or simmer a fish in suka at a stove.";
         Talk(new()
         {
             R(Stormy || state.weather == "rain" ? "Rain on the beds again. We wait, and we hope tomorrow is dry." : RakedToday ? "You've raked today. The beds need another day of sun." : "The beds look dry. Go on, rake them!"),
+            RosaOrderDone ? R("Salamat again for today's provisions. Come back tomorrow.")
+                : R($"{why}The boats need provisions: bring me {order} today and I'll pay {RosaPay} coins and {RosaSalt} salt. {how}"),
             R("Calamansi grows wild here. A squeeze of it on fresh fish with a pinch of salt, and you have kinilaw.")
         });
     }
@@ -359,6 +410,17 @@ partial class Game
             if (!live || eclipse != null) continue;
             var s = HabagatWalk(n.id);
             list.Add((s.Y, () => DrawHabagatPerson(who.id, s)));
+            // On her reef walk Lola has two of her apo with her, one with a bucket (Tides.cs).
+            if (n.id == "pacing" && ReefWalkOn)
+                foreach (var (ox, oy, k) in new[] { (-9, 3, 1), (9, 1, 2) })
+                {
+                    int kx = (int)MathF.Round(s.X) + ox, ky = (int)MathF.Round(s.Y) + oy, kid = k;
+                    list.Add((ky, () =>
+                    {
+                        DrawKid((px, py, pw, ph, c) => pix.Rect(px, py, pw, ph, c), kx, ky, kid, (int)(time * 2 + kid) % 5 == 0 ? 1 : 0, time, stand: true);
+                        if (kid == 2) { pix.Rect(kx + 2, ky - 4, 3, 3, "#c8d0d8"); pix.Rect(kx + 2, ky - 5, 3, 1, "#8a98a2"); }
+                    }));
+                }
         }
         AddSanctuaryObjects(list, live);
     }

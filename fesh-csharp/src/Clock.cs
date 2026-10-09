@@ -69,6 +69,8 @@ partial class Game
     // Resting itself still costs food and heals you; a morning that just arrives doesn't.
     void NewDay(bool quiet)
     {
+        // A storm in the day that's ending tears at Maya's guso lines (Seaweed.cs); the forecast is still that day's here.
+        TearGuso();
         state.day++;
         RollWeather();
         Regrow();
@@ -78,7 +80,8 @@ partial class Game
         mapTexDirty = true;
         if (quiet) return;
         Save();
-        Toast($"Morning of day {state.day}." + WeatherNews() + (state.food < 25 ? " You're getting hungry." : ""), 4.5f);
+        string turn = SeasonTurn();
+        Toast($"Morning of day {state.day}." + turn + WeatherNews() + FestivalNews() + (state.food < 25 ? " You're getting hungry." : ""), turn != "" ? 7 : 4.5f);
     }
 
     // Chopped trees and broken boulders whose time is up grow back, one tile at a time (rebuilding the whole map would

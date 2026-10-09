@@ -13,6 +13,12 @@ sealed class Req { public string item, bonus; public int count, coins, bonusCoun
 sealed class WeatherSpell { public int at; public string w; }
 // Salted fish on a drying rack, and how many minutes of clear daylight they've had.
 sealed class RackLoad { public List<string> fish = new(); public float dry; }
+// A guso line in Maya's lagoon: the day a cutting was tied on, the time that day (minutes after 06:00), and whether a
+// storm has torn at it since.
+sealed class GusoLine { public int day; public float at; public bool torn; }
+
+// A fish you let go (1.17, Release.cs): what, where, the day, and how heavy it was. It may come back, grown.
+sealed class LetGo { public string id, spot; public int day; public float kg; }
 
 // The player's appearance. Each number is an index into the option lists in Look.cs.
 sealed class Look
@@ -100,6 +106,26 @@ sealed class State
     public int sungkaDay, sungkaWins;                // the day Lola Pacing last paid out for a win, and how many you've won
     public string gleanTide = "";                    // the low tide you last gleaned in ("day:am" or "day:pm")...
     public int gleaned;                              // ...and how many finds you picked up in it
+
+    // Maya's guso farm and Bakawan's night lights (1.15; flags in hinted: "guso", "gusoHarvest", "gusoCoop", "fireflies", "talaReward")
+    public Dictionary<string, GusoLine> guso = new(); // farm line "0".."3" -> the cutting growing on it (no key: an empty line)
+    public int festDay;                              // the Bangus Festival day your best bangus below was caught on...
+    public float festKg;                             // ...and how heavy it was (Festival.cs)
+
+    // The guide (1.16, Guide.cs): the goal you chose to follow ("" follows the story, then requests, by itself).
+    // The "Getting started" checklist is in hinted ("tut:sell", "tut:eat"...).
+    public string track = "";
+
+    // The Sea school (1.17): Ma'am Isay's class (School.cs), letting fish go (Release.cs) and the tides (Tides.cs).
+    public Dictionary<string, int> know = new();     // fish -> right answers about it in class (3 and it's learned)
+    public List<string> missed = new();              // fish you last got wrong in class: they come up again first
+    public int lessonDay, lessons, bestLesson;       // the day the paid lesson was last done, lessons finished, best score
+    public int released, releasedAll, grownBack;     // good releases (juveniles, closed season, crabs to go), all of them, ones back grown
+    public List<LetGo> letGo = new();                // fish let go that may turn up again at the same spot
+    public int sortRight, sortStreak;                // crabs sorted right, and in a row (8 and you sort by eye: hinted "quickSort")
+    public int riddleDay, riddlesAsked, riddles;     // Lola Pacing's tide riddle: the day last asked, how many asked, how many right
+    public int reefLow = -1, reefWalks;              // the low tide (Game.LowIndex) she'll meet you on the flats at (-1: none), and walks done
+    public int reefThanked = -1, reefOctopus = -1;   // the booked low she's thanked you on, and the one whose octopus has turned up
 
     // New games and saves from before the clock: day or night becomes a time, and the weather lasts the rest of the day.
     public void FixClock()
@@ -217,6 +243,7 @@ static class SaveFile
             s.tanks ??= new(); s.weather ??= "clear"; s.boatAt ??= "saltmere";
             s.tackle ??= new(); s.records ??= new(); s.trophies ??= new(); s.big ??= new(); s.pots ??= new();
             s.racks ??= new(); s.sightings ??= new(); s.gleanTide ??= "";
+            s.guso = (s.guso ?? new()).Where(kv => kv.Value != null && kv.Key is "0" or "1" or "2" or "3").ToDictionary(kv => kv.Key, kv => kv.Value);
             foreach (var key in s.racks.Keys.ToList())
                 if (s.racks[key] == null) s.racks.Remove(key);
                 else s.racks[key].fish = (s.racks[key].fish ?? new()).Where(f => f != null && Items.ById.ContainsKey(f)).ToList();

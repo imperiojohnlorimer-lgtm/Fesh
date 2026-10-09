@@ -39,17 +39,26 @@ partial class Game
     // Shallow water you can wade into with waders: the sea's shallows, the lagoons, the oasis and the swamp pools.
     static bool Wadeable(char t) => t is 'w' or 'l' or 'o' or 'm';
     bool Wading => scene == "world" && Has("waders") > 0;
-    bool InWater => scene == "world" && Wadeable(TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T)));
+    // On a reef flat the tide has dried out (Tides.cs) you're on wet sand, not in the water.
+    bool InWater
+    {
+        get
+        {
+            int tx = (int)MathF.Floor(player.X / T), ty = (int)MathF.Floor((player.Y - 1.5f) / T);
+            return scene == "world" && Wadeable(TileAt(tx, ty)) && !FlatOpen(tx, ty);
+        }
+    }
 
     // Wade lets you into shallow water (waders); swim into any water at all (riding Tidemane, see SwimOk and StormHoldsBack).
-    bool CanStand(float x, float y, bool wade = false, bool swim = false)
+    // Flats: you on foot, who can walk out onto Habagat's reef flats while a spring low has dried them (Tides.cs).
+    bool CanStand(float x, float y, bool wade = false, bool swim = false, bool flats = false)
     {
         if (swim && StormHoldsBack(x, y)) return false;
         foreach (var (ax, ay) in new[] { (x - 3, y - 3), (x + 2.9f, y - 3), (x - 3, y), (x + 2.9f, y) })
         {
             int tx = (int)MathF.Floor(ax / T), ty = (int)MathF.Floor(ay / T);
             char t = TileAt(tx, ty);
-            if (!(Walkable(t) || wade && Wadeable(t) || swim && SwimOk(tx, ty, t)) || BridgeClosed(tx, ty)) return false;
+            if (!(Walkable(t) || wade && Wadeable(t) || swim && SwimOk(tx, ty, t) || flats && FlatOk(tx, ty)) || BridgeClosed(tx, ty)) return false;
         }
         foreach (var r in Solids())
             if (x + 3 > r.X && x - 3 < r.X + r.W && y > r.Y && y - 3 < r.Y + r.H) return false;
@@ -58,7 +67,9 @@ partial class Game
 
     /* ---------- Building ---------- */
     // Outdoors you build outdoor pieces; inside your own shack you place furniture and crafting stations.
-    string[] BuildTools() => InOwnHouse ? Data.IndoorTools : Data.OutdoorTools;
+    // The bahay kubo joins the outdoor pieces once you've seen the islands' own houses, in Amihan.
+    string[] BuildTools() => InOwnHouse ? Data.IndoorTools : state.Hinted("amihan") ? Data.OutdoorTools : OutdoorToolsBeforeAmihan;
+    static readonly string[] OutdoorToolsBeforeAmihan = Data.OutdoorTools.Where(t => t != "kubo").ToArray();
 
     void ReindexBuilds()
     {
@@ -86,13 +97,16 @@ partial class Game
 
     bool InReach(int tx, int ty, int w) => Dist(player.X, player.Y - 2, (tx + w / 2f) * T, ty * T + 5) <= Reach;
 
+    const string BuboWater = "A bubo goes in fresh water: a pond, lake or mangrove pool";
+
     string PlaceProblem(BuildDef d, int tx, int ty)
     {
         if (!InReach(tx, ty, d.W)) return "Too far away";
         for (int i = 0; i < d.W; i++)
         {
             char t = TileAt(tx + i, ty);
-            if (InHouse ? t != '.' : d.Water ? !Wadeable(t) : !Buildable.Contains(t)) return d.Water ? "Crab pots go in shallow water" : "Can't build here";
+            if (InHouse ? t != '.' : d.Water ? !Wadeable(t) : !Buildable.Contains(t)) return d.Id == "bubo" ? BuboWater : d.Water ? "Crab pots go in shallow water" : "Can't build here";
+            if (d.Id == "bubo" && BuboSpot(tx + i, ty) == null) return BuboWater;
             if (InHouse && tx + i == RoomDoorX && ty >= SRows - 3) return "Keep the doorway clear";
             if (BuildAt(tx + i, ty) != null) return "Something is already here";
         }
@@ -178,7 +192,7 @@ partial class Game
         if (b.id == "dryrack" && state.racks.Remove(RackKey(b), out var load) && load.fish.Count > 0)
         {
             foreach (var f in load.fish) Give(f);
-            extra = $" The {load.fish.Count} fish on it went back in your bag.";
+            extra = $" The {load.fish.Count} {RackWhat(load)} on it went back in your bag.";
         }
         // Taking down a shack also packs up everything inside it, aquarium fish included.
         if (d.Door && state.rooms.Remove(ShackKey(b), out var room) && room.Count > 0)
@@ -286,13 +300,15 @@ partial class Game
         if (kind == "glean" && (!LowTide || !InHabagat || !GleanLeft)) return false;
         var cands = new List<(int x, int y)>();
         int px = (int)(player.X / T), py = (int)(player.Y / T);
-        foreach (var (x, y) in Reachable())
+        // Gleaning finds also turn up out on the reef flats while a spring low has dried them.
+        var where = kind == "glean" && FlatsDry ? Reachable().Concat(Flats().Where(f => Math.Abs(f.Item1 - px) <= 15 && Math.Abs(f.Item2 - py) <= 9)) : Reachable();
+        foreach (var (x, y) in where)
         {
             if (Math.Abs(x - px) > 15 || Math.Abs(y - py) > 9) continue;
             char t = map[y, x];
             if (kind == "glean" ? !GleanGround(x, y) : kind == "wood" ? !WoodGround.Contains(t) : kind == "worm" ? t is not ('g' or 'j') : !Buildable.Contains(t)) continue;
             if (BuildAt(x, y) != null || state.loose.Any(l => l.tx == x && l.ty == y)) continue;
-            if (Dist(x * T + 5, y * T + 6, player.X, player.Y) < 24 || !CanStand(x * T + 5, y * T + 7)) continue;
+            if (Dist(x * T + 5, y * T + 6, player.X, player.Y) < 24 || !CanStand(x * T + 5, y * T + 7, flats: kind == "glean")) continue;
             cands.Add((x, y));
         }
         if (cands.Count == 0) return false;
@@ -316,6 +332,8 @@ partial class Game
         looseTimer += dt;
         // The tide coming in (or a tide gleaned clean) takes what's left on the flats straight away.
         if (!LowTide || !GleanLeft) state.loose.RemoveAll(l => l.kind == "glean");
+        // ...and the water coming back over the outer flats takes what was out there.
+        else if (scene == "world" && !FlatsDry) state.loose.RemoveAll(l => l.kind == "glean" && IsFlat(l.tx, l.ty));
         if (looseTimer > 9)
         {
             looseTimer = 0;

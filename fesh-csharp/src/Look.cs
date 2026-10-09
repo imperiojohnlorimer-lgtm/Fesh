@@ -28,16 +28,31 @@ static class LookData
     // against the legs), and on 2 and 4 the legs pass under the body, which rides a pixel higher.
     // Bob lifts the upper body (breathing), lean tips it a pixel forward (+) or back (-) in a side view, blink closes the
     // eyes, and head turns only the head (a glance about while standing). Arms: 0 at the sides, 1 one arm waving (swing is
-    // the wave frame), 2 both raised overhead, 3 holding a rod out in front (swing pumps it a pixel).
+    // the wave frame), 2 both raised overhead, 3 holding a rod out in front (swing pumps it a pixel), 4 reaching for
+    // whatever's in hand: the near (or right) arm goes from its shoulder to hand, the other to hand2 (world pixels; see
+    // Game.HandsPose). ArmsBehind tucks them behind the body, for a back view with the hands out in front.
     public static void DrawPerson(Pix p, Look look, int x, int y, string face, int step, bool shadow = true, int bob = 0,
-        bool blink = false, int arms = 0, int swing = 0, int lean = 0, string head = null) =>
+        bool blink = false, int arms = 0, int swing = 0, int lean = 0, string head = null,
+        (int x, int y)? hand = null, (int x, int y)? hand2 = null, bool armsBehind = false) =>
         DrawFigure(p, Skins[look.skin % Skins.Length], HairColors[look.hairColor % HairColors.Length], Shirts[look.shirt % Shirts.Length],
-            Pants[look.pants % Pants.Length], look.hair == 1, look.hat % Hats.Length, null, x, y, face, step, shadow, bob, blink, arms, swing, lean, head);
+            Pants[look.pants % Pants.Length], look.hair == 1, look.hat % Hats.Length, null, x, y, face, step, shadow, bob, blink, arms, swing, lean, head,
+            hand, hand2, armsBehind);
+
+    // Where the shoulders are for an upper body at (ux, uy): the near and far one in a side view, the right and left
+    // one from the front or back. Arms hang from here, so a hand placed relative to them stays on the arm.
+    public static (int x, int y) NearShoulder(int ux, int uy, string face) => face switch
+    {
+        "right" => (ux - 1, uy - 7), "left" => (ux, uy - 7), _ => (ux + 3, uy - 7)
+    };
+    public static (int x, int y) FarShoulder(int ux, int uy, string face) => face switch
+    {
+        "right" => (ux + 1, uy - 7), "left" => (ux - 2, uy - 7), _ => (ux - 4, uy - 7)
+    };
 
     // The same, in any colours (Tomas isn't in the creator's palettes). Cap is the cap's colour (hat 3), else the shirt's.
     public static void DrawFigure(Pix p, string skin, string hair, string shirt, string pants, bool longHair, int hat, string cap,
         int x, int y, string face, int step, bool shadow = true, int bob = 0, bool blink = false, int arms = 0, int swing = 0,
-        int lean = 0, string head = null)
+        int lean = 0, string head = null, (int x, int y)? hand = null, (int x, int y)? hand2 = null, bool armsBehind = false)
     {
         string farPants = Shade(pants, 0.72f), shirtShade = Shade(shirt, 0.82f), hem = Shade(shirt, 0.9f);
         const string shoe = "#2e2420", farShoe = "#1f1815";
@@ -96,6 +111,7 @@ static class LookData
         {
             // Profile: a narrower body with a shaded back, the far arm behind it and the near arm over it.
             string farSkin = Shade(skin, 0.8f);
+            if (arms == 4 && hand2 is { } h2) ArmTo(p, FarShoulder(ux, uy, face), h2, Shade(shirt, 0.66f), farSkin);
             if (arms == 3) U(1, -6 + swing, 1, 1, farSkin);
             else if (arms == 0 && armSwing < 0) U(2, -5, 1, 1, farSkin);
             else if (arms == 0 && armSwing > 0) U(-4, -5, 1, 1, farSkin);
@@ -104,17 +120,27 @@ static class LookData
             U(-3, -7, 5, 3, shirt);
             U(-3, -7, 1, 3, shirtShade);
             U(-3, -5, 5, 1, hem);
-            SideArm(U, arms, armSwing, swing, shirtShade, skin);
+            if (arms == 4) { if (hand is { } h) ArmTo(p, NearShoulder(ux, uy, face), h, shirtShade, skin); }
+            else SideArm(U, arms, armSwing, swing, shirtShade, skin);
         }
         else
         {
+            if (arms == 4 && armsBehind) ReachArms();
             U(-3, -4, 6, 1, pants);
             U(-2, -8, 4, 1, shirt);
             U(-3, -7, 6, 3, shirt);
             U(2, -7, 1, 3, shirtShade);
             U(-3, -5, 6, 1, hem);
             if (face == "down") U(-1, -8, 2, 1, skin);   // the neckline
-            FrontArms(p, ux, uy, arms, armSwing, swing, shirtShade, skin);
+            if (arms != 4) FrontArms(p, ux, uy, arms, armSwing, swing, shirtShade, skin);
+            else if (!armsBehind) ReachArms();
+        }
+        // Front and back: the right arm to the hand, the left to the other hand (or hanging).
+        void ReachArms()
+        {
+            if (hand is { } h) ArmTo(p, NearShoulder(ux, uy, face), h, shirtShade, skin);
+            if (hand2 is { } h2) ArmTo(p, FarShoulder(ux, uy, face), h2, shirtShade, skin);
+            else { p.Rect(ux - 4, uy - 7, 1, 2, shirtShade); p.Rect(ux - 4, uy - 5, 1, 1, skin); }
         }
         if (longHair && hf != "up")
         {
@@ -152,6 +178,13 @@ static class LookData
         if (hf == "down") { p.Rect(ux - 1, uy - 10, 1, 1, "#1b1b1b"); p.Rect(ux + 1, uy - 10, 1, 1, "#1b1b1b"); }
         else if (hf == "left") p.Rect(ux - 2, uy - 10, 1, 1, "#1b1b1b");
         else if (hf == "right") p.Rect(ux + 1, uy - 10, 1, 1, "#1b1b1b");
+    }
+
+    // An arm from its shoulder to the hand: a sleeve, then the hand itself.
+    static void ArmTo(Pix p, (int x, int y) s, (int x, int y) h, string sleeve, string skin)
+    {
+        if (s != h) p.Line(s.x, s.y, h.x, h.y, sleeve);
+        p.Rect(h.x, h.y, 1, 1, skin);
     }
 
     // The near arm in a side view (U mirrors it for facing left): hanging, swinging forward (+1) or back (-1),

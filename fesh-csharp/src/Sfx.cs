@@ -48,6 +48,11 @@ static class Sfx
         Add("bolt", 0.25f, b => { Noise(b, 0.12f, 0.1f); Tone(b, 760, 0.14f, "triangle", 0.035f, -380); });
         // The agong (a deep, ringing bong) and the villagers' pots and pans (a bright clank).
         Add("gong", 1.2f, b => { Tone(b, 196, 1.1f, "sine", 0.12f, -6); Tone(b, 472, 0.6f, "sine", 0.05f, -10); Tone(b, 770, 0.3f, "triangle", 0.025f); Noise(b, 0.04f, 0.12f); });
+        // The quiz and the sorting tray (1.17): a bright rising pair for right, a soft falling one for wrong, and a
+        // little splash with a twinkle for a fish let go.
+        Add("right", 0.3f, b => { Tone(b, 784, 0.09f, "triangle", 0.05f); Tone(b, 1175, 0.16f, "triangle", 0.05f, 0, 0.09f); });
+        Add("wrong", 0.3f, b => { Tone(b, 392, 0.12f, "triangle", 0.045f); Tone(b, 294, 0.18f, "triangle", 0.045f, -40, 0.11f); });
+        Add("release", 0.5f, b => { Noise(b, 0.16f, 0.09f); Tone(b, 1319, 0.08f, "sine", 0.035f, 0, 0.2f); Tone(b, 1760, 0.14f, "sine", 0.03f, 0, 0.28f); });
         Add("clang", 0.25f, b => { Tone(b, 1250, 0.18f, "square", 0.02f, -80); Tone(b, 1900, 0.1f, "triangle", 0.025f); Noise(b, 0.05f, 0.1f); });
     }
 

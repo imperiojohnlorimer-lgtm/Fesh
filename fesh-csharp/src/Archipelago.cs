@@ -7,6 +7,7 @@ namespace Fesh;
 partial class Game
 {
     const int EastStart = 140;
+    const int NikoAsohos = 3;
     bool chartEast;
     bool InAmihan => scene == "world" && player.X >= EastStart * T;
     static readonly (string name, float cx, float cy, float rx, float ry)[] AmihanIslands =
@@ -21,7 +22,8 @@ partial class Game
         ("lira", "Lira", 1595, 185, "#e6a843"),
         ("niko", "Niko", 1715, 187, "#367caa"),
         ("maya", "Maya", 2045, 127, "#b45b66"),
-        ("tala", "Tala", 1895, 597, "#72a752")
+        ("tala", "Tala", 1895, 597, "#72a752"),
+        ("isay", "Ma'am Isay", SchoolX, SchoolY, "#d9a43a")
     };
 
     void GenerateArchipelago()
@@ -92,9 +94,18 @@ partial class Game
         {
             var s = IslanderWalk(n.id);
             if (Dist(player.X, player.Y, s.X, s.Y + 6) < 15)
-                return new Target { Type = "islander", Id = n.id, Label = $"Talk to {n.name}" };
+                return new Target
+                {
+                    Type = "islander", Id = n.id,
+                    Label = n.id == "maya" && CanGiveMayaGuso ? $"Give Maya {GusoHandIn} dried guso"
+                        : n.id == "niko" && DerbyToJudge ? "Show Niko your best bangus"
+                        : n.id == "lira" && SupperDish() is string dish ? $"Give Lira the {Items.ById[dish].Name.ToLowerInvariant()}"
+                        : n.id == "niko" && state.Hinted("niko_request") && !state.Hinted("niko_asohos") && Has("asohos") >= NikoAsohos ? $"Give Niko {NikoAsohos} asohos" : n.id == "tala" && TalaListDone && !state.Hinted("talaReward") ? "Tell Tala what you've seen"
+                        : n.id == "isay" && state.Hinted("metIsay") ? (LessonToday ? "Today's lesson with Ma'am Isay" : "Practise with Ma'am Isay") : $"Talk to {n.name}"
+                };
         }
-        return null;
+        // Maya's guso lines in the lagoon, when you face one (Seaweed.cs).
+        return GusoTarget();
     }
 
     void TalkIslander(string id)
@@ -102,6 +113,8 @@ partial class Game
         switch (id)
         {
             case "lira":
+                // Her supper request comes first (Rondalla.cs).
+                if (LiraSupper()) break;
                 Talk(new()
                 {
                     new("Lira", "Mabuhay! Welcome to Amihan. You've crossed a long stretch of sea to find our village. There are limestone lagoons, mangrove islands and volcanic shores beyond it."),
@@ -110,49 +123,76 @@ partial class Game
                 }, () =>
                 {
                     if (state.gifts.GetValueOrDefault("lira_meal") == state.day) { Toast("Lira: Come back tomorrow for another meal."); return; }
-                    state.gifts["lira_meal"] = state.day; Give("fish_stew"); Save();
-                    Toast("Lira packed you a bowl of fish stew. (+1 fish stew)");
+                    LiraMeal();
                 });
                 break;
             case "niko":
+                // On the Bangus Festival's day he judges the derby, and says so the first time you talk (Festival.cs).
+                if (DerbyToJudge) { JudgeBangus(); break; }
+                if (FestivalToday && FestivalBest == 0 && state.gifts.GetValueOrDefault("fest_announce") != state.day)
+                {
+                    state.gifts["fest_announce"] = state.day;
+                    Talk(new() { new("Niko", FestivalNikoLine()) });
+                    break;
+                }
+                // After the bangus, a second job (1.15): asohos for the village's breakfast, fried whole.
+                if (state.Hinted("niko_request") && !state.Hinted("niko_asohos") && Has("asohos") >= NikoAsohos)
+                {
+                    Take("asohos", NikoAsohos); state.coins += 70; Give("cricket", 4); state.hinted["niko_asohos"] = true; Save();
+                    Sfx.Play("coin");
+                    Talk(new() { new("Niko", $"{NikoAsohos} asohos! The kids will fight over these at breakfast. Salamat. Here: 70 coins, and four crickets. Asohos snap them up in the shallows.") });
+                    break;
+                }
+                if (state.Hinted("niko_request") && !state.Hinted("niko_asohos"))
+                {
+                    state.hinted["nikoAsohosAsked"] = true;   // for the guide's journal
+                    Talk(new()
+                    {
+                        new("Niko", "The village loved your bangus. Now the kids want asohos for breakfast: the little silver whiting, fried whole, crunchy bones and all."),
+                        new("Niko", $"They feed over the sandy bottom of Maya's lagoon on Luntian. Bring me {NikoAsohos} and I'll pay 70 coins.")
+                    });
+                    break;
+                }
                 if (!state.Hinted("niko_request") && Has("bangus") >= 2)
                 {
                     Take("bangus", 2); state.coins += 90; Give("cut_bait", 5); state.hinted["niko_request"] = true; Save();
                     Talk(new() { new("Niko", "Two bangus for the village supper! Salamat. Here are 90 coins and five pieces of cut bait for the reef fish.") });
                 }
-                else Talk(new()
+                else
                 {
-                    new("Niko", state.Hinted("niko_request") ? "The village loved your catch. The sea always has another story for you." : "Could you bring me two bangus from the village pond? I'll pay 90 coins and give you cut bait."),
-                    new("Niko", "A boat follows <move>. Come alongside dry shore and press <act> to land; press <act> beside your boat to board again. Your chart shows where you left it."),
-                    new("Niko", "The sharp-toothed reef fish fight back! When the red warning appears, release the reel and duck until it passes. Keeping the line tight means taking a hit.")
-                });
+                    // The guide's journal lists his bangus once he's asked for them.
+                    if (!state.Hinted("niko_request")) state.hinted["nikoAsked"] = true;
+                    Talk(new()
+                    {
+                        new("Niko", state.Hinted("niko_request") ? "The village loved your catch. The sea always has another story for you." : "Could you bring me two bangus from the village pond? I'll pay 90 coins and give you cut bait."),
+                        new("Niko", "A boat follows <move>. Beside dry shore, press <ride> to land; press <ride> beside your boat to board again. Your chart shows where you left it."),
+                        new("Niko", "The sharp-toothed reef fish fight back! When the red warning appears, release the reel and duck until it passes. Keeping the line tight means taking a hit.")
+                    });
+                }
                 break;
-            case "maya":
-                Talk(new()
-                {
-                    new("Maya", "These sheltered waters hold lapu-lapu and maya-maya. Local fish names can change from island to island."),
-                    new("Maya", "Out by Baga, talakitok and tanigue put up a fierce fight. Keep food in your bag, and watch their warning before an attack."),
-                    new("Maya", "A storm slows a boat already at sea, but you can still steer it home. Wait ashore before setting out again.")
-                });
-                break;
-            case "tala":
-                Talk(new()
-                {
-                    new("Tala", "Bakawan means mangrove. Its roots shelter young fish; the pools here hold hito, dalag and mudskippers."),
-                    new("Tala", "Watch the tiny tarsiers and the hornbills quietly. The carabao near the village is used to people, but the wild animals need their space.")
-                });
-                break;
+            // Maya's guso farm (Seaweed.cs), and Tala's bubo and night-time list (Bakawan.cs).
+            case "maya": TalkMaya(); break;
+            case "tala": TalkTala(); break;
+            // Ma'am Isay's class (School.cs).
+            case "isay": TalkIsay(); break;
         }
     }
 
-    IEnumerable<Box> IslandSolids() => Islanders.Select(n => new Box(n.x - 16, n.y - 22, 32, 19))
-        .Concat(new[] { new Box(2073, 97, 24, 10), new Box(1983, 131, 24, 10), new Box(2309, 455, 52, 25) });
+    IEnumerable<Box> IslandSolids() => Islanders.Select(n => n.id == "isay" ? new Box(n.x - 23, n.y - 24, 46, 21) : new Box(n.x - 16, n.y - 22, 32, 19))
+        .Append(SchoolBenchBox)
+        .Concat(new[] { new Box(2073, 97, 24, 10), new Box(1983, 131, 24, 10), new Box(2309, 455, 52, 25) })
+        .Concat(FireflyTreeSolids());
 
     void AddArchipelagoObjects(List<(float y, Action draw)> list)
     {
         list.Add((107, () => DrawKarst(2085, 107, 41)));
         list.Add((141, () => DrawKarst(1995, 141, 32)));
         list.Add((480, DrawBagaCone));
+        if (RondallaOut) AddRondalla(list);
+        if (FestivalHere) AddFestival(list);
+        // Bakawan's pagatpat, the firefly trees (Bakawan.cs).
+        foreach (var (fx, fy) in FireflyTrees)
+            if (MathF.Abs(fx - player.X) < W && MathF.Abs(fy - player.Y) < H + 30) list.Add((fy, () => DrawPagatpat(fx, fy)));
         // Root fans and small bamboo clumps make the mangrove island distinct from the palm village.
         foreach (var (x, y) in new[] { (1855, 525), (1945, 555), (1885, 575) })
         {
@@ -172,8 +212,16 @@ partial class Game
         foreach (var n in Islanders)
         {
             if (Math.Abs(n.x - player.X) > W && pix.W == W || Math.Abs(n.y - player.Y) > H && pix.H == H) continue;
-            list.Add((n.y - 3, () => DrawBahay(n.x, n.y - 5, n.shirt)));
             var s = IslanderWalk(n.id);
+            // Ma'am Isay's school, with its bench of children, and her (School.cs).
+            if (n.id == "isay")
+            {
+                list.Add((n.y - 3, () => DrawSchool(n.x, n.y - 5)));
+                list.Add((SchoolY + 18, () => DrawSchoolBench(time)));
+                list.Add((s.Y, () => DrawIsayFigure(pix, (int)MathF.Round(s.X), (int)MathF.Round(s.Y), s.Face, s.Step, s.Moving ? 0 : (int)(time % 3 / 2), (time + 3) % 4.3f < 0.12f)));
+                continue;
+            }
+            list.Add((n.y - 3, () => DrawBahay(n.x, n.y - 5, n.shirt)));
             list.Add((s.Y, () =>
             {
                 var look = new Look { skin = 2, shirt = n.id == "niko" ? 2 : n.id == "tala" ? 3 : 1, hat = 0, hair = 1 };

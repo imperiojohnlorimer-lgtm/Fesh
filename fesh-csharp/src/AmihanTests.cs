@@ -95,7 +95,7 @@ partial class Game
             var s = Data.SpotById[spot];
             Check($"{s.Label} is fishable from its island's reachable dry land", positions.Any(p => CanStand(p.x, p.y) && Dist(p.x, p.y, s.X, s.Y) < s.R - 4));
         }
-        Check("the region has seventeen catchable species registered in the bag", Data.Spots.Where(s => s.Biome == "amihan").Sum(s => Data.Common[s.Id].Length) + Data.PotCatch["amihan"].Length == 17
+        Check("the region has eighteen catchable species registered in the bag (asohos joined in 1.15)", Data.Spots.Where(s => s.Biome == "amihan").Sum(s => Data.Common[s.Id].Length) + Data.PotCatch["amihan"].Length == 18
             && Data.Common.Where(k => Data.SpotById[k.Key].Biome == "amihan").SelectMany(k => k.Value).All(f => Items.ById.ContainsKey(f.Id)));
         Check("carabao, tarsiers and hornbills spawn on safe ground", new[] { "carabao", "tarsier", "hornbill" }.All(k => animals.Any(a => a.Kind == k && CanStand(a.X, a.Y))));
         player.X = 1595; player.Y = 198; yield return 3;

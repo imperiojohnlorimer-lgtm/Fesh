@@ -363,7 +363,7 @@ partial class Game
         if (chopTile != (n.X, n.Y)) { chopTile = (n.X, n.Y); chopHits = 0; }
         chopHits++;
         shakeT = 0.25f;
-        swingT = 0.25f;
+        Swing("pick", 0.25f);
         FaceToward(n.X * T + 5, n.Y * T + 5);
         Sfx.Play("mine");
         Burst(n.X * T + 5, n.Y * T + 3, ore.Color, 5);
@@ -487,7 +487,7 @@ partial class Game
     {
         if (swingT > 0.12f) return;
         var (_, dmg) = Weapon();
-        swingT = 0.3f;
+        Swing(WeaponTool(), 0.3f);
         FaceToward(m.X, m.Y);
         m.Hp -= dmg;
         m.Hurt = 0.2f;

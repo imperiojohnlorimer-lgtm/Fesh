@@ -71,23 +71,34 @@ partial class Game
         if (record) state.regattaBest = t;
         string medal = t <= GoldTime ? "gold" : t <= SilverTime ? "silver" : t <= BronzeTime ? "bronze" : null;
         int prize = medal switch { "gold" => 120, "silver" => 60, "bronze" => 30, _ => 0 };
+        // On the Bangus Festival's day, Dado's prizes are doubled (Festival.cs).
+        if (FestivalToday) prize *= 2;
         bool paid = prize > 0 && state.regattaDay != state.day;
         if (paid) { state.regattaDay = state.day; state.coins += prize; }
         Sfx.Play(medal != null ? "rare" : "catch");
         string msg = $"Finished in {RaceTime(t)}{(record ? " (your best!)" : "")}. " + (medal == null ? "No medal this time." : $"A {medal} medal!")
-            + (paid ? $" Dado sends {prize} coins." : medal != null ? " (One prize a day.)" : "");
+            + (paid ? $" Dado sends {prize} coins{(FestivalToday ? " (double, for the festival!)" : "")}." : medal != null ? " (One prize a day.)" : "");
+        // Beating his lolo's record wins the agong (a clue); gold, the first time, Dado's family sail (1.15).
+        var lines = new List<Say>();
         if (t <= SilverTime && !state.Hinted("bk:agong"))
         {
             state.hinted["bk:agong"] = true;
             Give("agong");
+            lines.Add(new("Dado", "You beat my lolo's record! Nobody has since he set it. Then this is yours, by the old rules: his agong."));
+            lines.Add(new("Dado", "They say the keepers at Parola beat it on full-moon nights, to keep the moon safe. Tatay Celso would know."));
+            lines.Add(new("", "New clue on your Case board (Habagat): The regatta agong."));
+        }
+        if (t <= GoldTime && Has("painted_sail") == 0)
+        {
+            Give("painted_sail");
+            lines.Add(new("Dado", "And gold! Here, take our family's paraw sail: red, gold, blue and green panels. Everyone on the water will know who won."));
+            lines.Add(new("", "Your boat wears the painted sail now."));
+        }
+        if (lines.Count > 0)
+        {
             Save();
-            Talk(new()
-            {
-                new("", msg),
-                new("Dado", "You beat my lolo's record! Nobody has since he set it. Then this is yours, by the old rules: his agong."),
-                new("Dado", "They say the keepers at Parola beat it on full-moon nights, to keep the moon safe. Tatay Celso would know."),
-                new("", "New clue on your Case board (Habagat): The regatta agong.")
-            });
+            lines.Insert(0, new("", msg));
+            Talk(lines);
             return;
         }
         Toast(msg, 5);

@@ -44,7 +44,7 @@ partial class Game
     }
 
     bool SceneExists(string key) =>
-        key == "world" || key == "cave" || key == "house:tomas" || state.builds.Any(b => b.id == "shack" && ShackKey(b) == key);
+        key == "world" || key == "cave" || key == "house:tomas" || state.builds.Any(b => Data.BuildById[b.id].Door && ShackKey(b) == key);
 
     void LoadScene(string key)
     {
@@ -115,7 +115,9 @@ partial class Game
         roomBase = new Pix(w * T, h * T);
         basePix = roomBase;
         var g = roomBase;
-        string paper = tomas ? "#5d7d8a" : "#c9a77a", stripe = tomas ? "#6a8b98" : "#d6b78c";
+        // A bahay kubo's walls are woven bamboo (sawali); a shack's are planks.
+        bool kubo = state.builds.Any(b => b.id == "kubo" && ShackKey(b) == scene);
+        string paper = tomas ? "#5d7d8a" : kubo ? "#d8c08a" : "#c9a77a", stripe = tomas ? "#6a8b98" : kubo ? "#b89a62" : "#d6b78c";
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {

@@ -331,7 +331,7 @@ partial class Game
         var b = boss;
         if (b == null || swingT > 0.12f) return;
         var (_, dmg) = Weapon();
-        swingT = 0.3f;
+        Swing(WeaponTool(), 0.3f);
         FaceToward(b.X, b.Y);
         if (b.Hurt > 0) { Sfx.Play("nope"); return; }
         bool open = b.Phase == "winded";
@@ -679,13 +679,13 @@ partial class Game
     }
 
     // You in the saddle, sitting up over its back.
-    void DrawRider(int x, int y, bool moving, int step, int arms = 0, int pump = 0)
+    void DrawRider(int x, int y, bool moving, int step, int arms = 0, int pump = 0, HandPose hands = null)
     {
         if (player.Face is "left" or "right") mountDir = player.Face == "right" ? 1 : -1;
         bool swim = Swimming;
         var seat = RiderSeat(x, y);
         void Rider() => LookData.DrawPerson(pix, state.look, seat.x, seat.y, player.Face, 0, shadow: false,
-            blink: time % 3.7f < 0.12f, arms: arms, swing: pump);
+            blink: time % 3.7f < 0.12f, arms: arms, swing: pump, hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
         if (player.Face is "up" or "down")
         {
             DrawTidemaneEndOn(x, y, player.Face == "up", swim, moving, step, Rider);

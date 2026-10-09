@@ -12,6 +12,7 @@ partial class Game
 {
     const float SanctCX = 222, SanctCY = 69, SanctRX = 22, SanctRY = 5;     // the ellipse, in tiles
     const float JoyX = 2229, JoyY = 690;                                      // Bantay Joy, on the watch platform
+    const float TakloboX = 2345, TakloboY = 712;                              // the giant clam, in the east seagrass
     readonly List<SeaCreature> seaLife = new();
 
     static readonly Dictionary<string, (string name, string label, string about)> SeaKinds = new()
@@ -21,7 +22,12 @@ partial class Game
         ["dugong"] = ("Dugong", "Watch the dugong",
             "A dugong grazes the seagrass like a slow grey cow, leaving bare trails behind it. There are very few left, and they're protected."),
         ["butanding"] = ("Butanding (whale shark)", "Watch the whale shark",
-            "A whale shark glides past, longer than your boat, its back speckled with white. It only eats plankton. Catching one has been banned in the Philippines since 1998.")
+            "A whale shark glides past, longer than your boat, its back speckled with white. It only eats plankton. Catching one has been banned in the Philippines since 1998."),
+        ["walowalo"] = ("Walo-walo (banded sea krait)", "Watch the sea krait",
+            "A banded sea krait ripples past, striped black and silver-blue, and lifts its head for a breath. It's venomous but shy, and hunts eels in the reef. Leave it be."),
+        // 1.15: it never moves. Giant clams are protected in the Philippines, and sanctuaries are where they're grown back.
+        ["taklobo"] = ("Taklobo (giant clam)", "Watch the giant clam",
+            "A giant clam as wide as a basket sits in the seagrass, its mantle shimmering blue and green between the wavy shell. It's protected; sanctuaries like this one help them grow back.")
     };
 
     bool InSanctuary(float x, float y)
@@ -59,10 +65,11 @@ partial class Game
         bool near = scene == "world" && Dist(player.X, player.Y, SanctCX * T, SanctCY * T) < 520;
         if (!near) { seaLife.Clear(); return; }
         if (seaLife.Count == 0)
-            foreach (var (kind, x, y) in new[] { ("pawikan", 2080f, 690f), ("pawikan", 2330f, 705f), ("dugong", 2105f, 708f), ("butanding", 2270f, 670f) })
+            foreach (var (kind, x, y) in new[] { ("pawikan", 2080f, 690f), ("pawikan", 2330f, 705f), ("dugong", 2105f, 708f), ("butanding", 2270f, 670f), ("walowalo", 2180f, 700f), ("taklobo", TakloboX, TakloboY) })
                 seaLife.Add(new SeaCreature { Kind = kind, X = x, Y = y, ToX = x, ToY = y, Wait = FxRand(0, 3), Phase = FxRand(0, 6) });
         foreach (var c in seaLife)
         {
+            if (c.Kind == "taklobo") continue;   // it stays put
             if (c.Wait > 0) { c.Wait -= dt; continue; }
             float dx = c.ToX - c.X, dy = c.ToY - c.Y, d = MathF.Sqrt(dx * dx + dy * dy);
             if (d < 1.5f)
@@ -79,7 +86,7 @@ partial class Game
                 }
                 continue;
             }
-            float sp = c.Kind switch { "pawikan" => 9, "dugong" => 6, _ => 8 } * dt;
+            float sp = c.Kind switch { "pawikan" => 9, "dugong" => 6, "walowalo" => 12, _ => 8 } * dt;
             float nx = c.X + dx / d * Math.Min(sp, d), ny = c.Y + dy / d * Math.Min(sp, d);
             if (SeaLifeWater(c.Kind, nx, ny)) { c.X = nx; c.Y = ny; }
             else c.ToX = c.ToY = 0;
@@ -112,14 +119,9 @@ partial class Game
     void Watch(SeaCreature c)
     {
         FaceToward(c.X, c.Y);
-        bool first = state.sightings.GetValueOrDefault(c.Kind) == 0;
-        state.sightings[c.Kind] = state.sightings.GetValueOrDefault(c.Kind) + 1;
         c.Wait = Math.Max(c.Wait, 2);
         Sfx.Play("pet");
-        Floater(first ? "New sighting!" : "Sighting", c.X, c.Y - 12, "#bff4ff");
-        if (first) GainXp(10);
-        Toast(SeaKinds[c.Kind].about + (first && SeaKinds.Keys.All(k => state.sightings.GetValueOrDefault(k) > 0) ? " That's all three! Tell Bantay Joy." : ""), 5);
-        Save();
+        RecordSighting(c.Kind, c.X, c.Y - 12, SeaKinds[c.Kind].about);
     }
 
     void TalkJoy()
@@ -133,8 +135,8 @@ partial class Game
             Talk(new()
             {
                 J("Welcome to the sanctuary! I'm Joy, the bantay dagat: the sea warden. The buoys mark where it starts."),
-                J("Inside the buoys, nobody fishes and nobody sets traps. Sea turtles, a dugong and a butanding live here, and they're all protected."),
-                J("Watch them all you like, from a respectful distance. If you see all three, come and tell me."),
+                J("Inside the buoys, nobody fishes and nobody sets traps. Sea turtles, a dugong, a butanding, a sea krait and a giant clam live here, and they're all protected."),
+                J($"Watch them all you like, from a respectful distance. If you see all {CountWord(SeaKinds.Count)}, come and tell me."),
                 J("Here's the secret: fish grow up safe in here, then swim out. Cast just outside the buoys and you'll see.")
             });
             return;
@@ -146,13 +148,13 @@ partial class Game
             Sfx.Play("coin");
             Talk(new()
             {
-                J("You've seen the turtles, the dugong and the butanding! Most visitors never see all three."),
+                J($"You've seen the turtles, the dugong, the butanding, the walo-walo and the taklobo! Most visitors never see all {CountWord(SeaKinds.Count)}."),
                 J("Salamat for keeping your distance. Here, from the village fund: 150 coins and some glow bait for fishing outside the buoys.")
             });
             return;
         }
         int seen = SeaKinds.Keys.Count(k => state.sightings.GetValueOrDefault(k) > 0);
-        Talk(new() { J(all ? "The sanctuary's quiet today. The turtles are fat and happy." : $"You've seen {seen} of the three so far. The butanding comes up by day; the dugong stays on the seagrass.") });
+        Talk(new() { J(all ? "The sanctuary's quiet today. The turtles are fat and happy." : $"You've seen {seen} of the {CountWord(SeaKinds.Count)} so far. The butanding comes up by day; the dugong and the taklobo stay on the seagrass.") });
     }
 
     /* ---------- Drawing ---------- */
@@ -250,6 +252,29 @@ partial class Game
                     R(-8, -2, 14, 4, body); R(-6, -3, 10, 6, body);
                     R(-11, -1, 3, 2, body); R(-12, -2, 1, 4, body);
                     if (surfacing) { R(6, -2, 3, 3, Pal.C("#8a8a80")); R(8, -1, 1, 1, Pal.C("#2a2a2a")); pix.Ring(x + 7 * d, y, 2 + up * 6, Pal.Rgba(235, 248, 252, 0.6f * (1 - up / 0.6f))); }
+                    break;
+                }
+                case "walowalo":
+                {
+                    // A banded sea krait: a thin body rippling side to side in black and silver-blue bands, its head up to breathe.
+                    for (int k = 0; k < 14; k++)
+                    {
+                        int wy = (int)MathF.Round(MathF.Sin(t * 6 + c.Phase - k * 0.7f) * 1.2f);
+                        var band = k / 2 % 2 == 0 ? Pal.Rgba(30, 34, 44, 0.85f) : Pal.Rgba(170, 196, 214, 0.85f);
+                        R(5 - k, wy, 1, 1, band);
+                    }
+                    if (surfacing) { R(6, -1, 2, 2, Pal.C("#1e222c")); pix.Ring(x + 6 * d, y, 2 + up * 4, Pal.Rgba(235, 248, 252, 0.6f * (1 - up / 0.6f))); }
+                    break;
+                }
+                case "taklobo":
+                {
+                    // A giant clam: a wavy grey shell open at the top, its mantle shimmering between the lips.
+                    var shell = Pal.Rgba(196, 196, 178, 0.8f);
+                    pix.Rect(x - 5, y - 1, 11, 4, shell); pix.Rect(x - 4, y - 2, 9, 6, shell);
+                    for (int k = -4; k <= 4; k += 2) pix.Rect(x + k, y + 2 + (k / 2 % 2 == 0 ? 0 : 1), 1, 2, Pal.Rgba(150, 150, 136, 0.8f));
+                    float sh = (MathF.Sin(t * 1.7f + c.Phase) + 1) / 2;
+                    pix.Rect(x - 4, y - 1, 9, 2, Pal.Rgba((byte)(40 + 40 * sh), (byte)(150 + 50 * sh), (byte)(190 - 40 * sh), 0.9f));
+                    pix.Rect(x - 2, y - 1, 1, 1, Pal.Rgba(220, 250, 255, 0.8f)); pix.Rect(x + 2, y, 1, 1, Pal.Rgba(220, 250, 255, 0.6f));
                     break;
                 }
                 default:

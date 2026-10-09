@@ -341,15 +341,17 @@ partial class Game
     void DrawGameTab(float x, float y, float w, float bottom)
     {
         float bx = x, by = y + 4;
-        foreach (var label in new[] { "Resume", "Save game", "Change your look", "Quit to title", "Quit game" })
+        foreach (var label in new[] { "Resume", "Journal", "Save game", "Change your look", "Quit to title", "Quit game" })
         {
-            // Changing your look waits until you're not in the middle of fishing (the menu can open mid-cast).
-            bool live = label != "Change your look" || pausedFrom == "play";
+            // Changing your look, or the journal, waits until you're not in the middle of fishing (the menu can open mid-cast).
+            bool live = label is not ("Change your look" or "Journal") || pausedFrom == "play";
             if (Button(label, bx, by, 300, 52, FontKind.Ui700, 22, label == "Resume" ? Pal.Buoy : live ? Pal.Sand : Pal.C("#d8cbb0"), label == "Resume" ? White : live ? Pal.Ink : Muted, 4, 3, 6, live))
             {
                 switch (label)
                 {
                     case "Resume": ClosePause(); break;
+                    // The way into the journal on a gamepad (Guide.cs).
+                    case "Journal": ClosePause(); if (mode == "play") TogglePanel("journal"); break;
                     case "Save game":
                         Sfx.Play("ui");
                         Toast(Save() ? $"Saved to slot {SaveFile.Slot}." : "Couldn't save the game! Check there's space on the disk.");
@@ -377,7 +379,8 @@ partial class Game
         string dark = Night ? $"Night. Morning comes at {HourText(DawnMin)}." : $"Day. Night falls at {HourText(DuskMin)}.";
         string pace = Settings.Data.dayLength > 0 ? $"A whole day takes {Settings.Data.dayLength} minutes of play." : "The clock is stopped (Settings). Rest to move it on.";
         string tomorrow = KnowTomorrow ? $"Tomorrow: {DescribeDay(state.tomorrow)}." : "Ask Tomas or Pip what tomorrow's weather will do.";
-        foreach (var line in new[] { dark, moon, now + (Forecast() is string f ? " " + f : " No change expected today."), tomorrow, pace, $"Time played: {PlayTime(state.playSecs)}." })
+        string season = SeasonLine() + (SeasonDay == SeasonDays ? $". The {(Season == "amihan" ? "habagat" : "amihan")} comes tomorrow." : ".");
+        foreach (var line in new[] { dark, season, moon, now + (Forecast() is string f ? " " + f : " No change expected today."), tomorrow, pace, $"Time played: {PlayTime(state.playSecs)}." })
         {
             var wrapped = Gfx.Wrap(line, FontKind.Ui500, 20, iw);
             Lines(wrapped, ix, iy, 27, FontKind.Ui500, 20, Pal.PaperInk);
@@ -414,12 +417,23 @@ partial class Game
             if (c >= 0 && c != sel) { changed = true; Sfx.Play("ui"); return c; }
             return sel;
         }
-        d.musicOn = Pick("Music", new[] { "On", "Off" }, d.musicOn ? 0 : 1) == 0;
-        d.muted = Pick($"All sound ({Bind.Name("mute")})", new[] { "On", "Off" }, d.muted ? 1 : 0) == 1;
+        // On/off settings sit two to a row, so the guide fitted in.
+        int Pair(string label, bool on, bool right)
+        {
+            float px = right ? x + w / 2 + 10 : x;
+            Gfx.Text(label, px, y + 9, FontKind.Ui600, 21, Pal.PaperInk);
+            int c = Choices(new[] { "On", "Off" }, on ? 0 : 1, right ? px + 190 : cx, y);
+            if (right) y += rowH;
+            if (c >= 0 && c != (on ? 0 : 1)) { changed = true; Sfx.Play("ui"); return c; }
+            return on ? 0 : 1;
+        }
+        d.musicOn = Pair("Music", d.musicOn, false) == 0;
+        d.muted = Pair($"All sound ({Bind.Name("mute")})", !d.muted, true) == 1;
         bool full = IsWindowState(ConfigFlags.BorderlessWindowMode);
-        if ((Pick($"Fullscreen ({Bind.Name("fullscreen")})", new[] { "On", "Off" }, full ? 0 : 1) == 0) != full) ToggleFullscreen();
-        d.shake = Pick("Screen shake", new[] { "On", "Off" }, d.shake ? 0 : 1) == 0;
-        d.pauseUnfocused = Pick("Pause in the background", new[] { "On", "Off" }, d.pauseUnfocused ? 0 : 1) == 0;
+        if ((Pair($"Fullscreen ({Bind.Name("fullscreen")})", full, false) == 0) != full) ToggleFullscreen();
+        d.shake = Pair("Screen shake", d.shake, true) == 0;
+        d.pauseUnfocused = Pair("Pause in the background", d.pauseUnfocused, false) == 0;
+        d.guide = Pair("Goal and arrow", d.guide, true) == 0;
         var lengths = Settings.DayLengths;
         int li = Array.IndexOf(lengths, d.dayLength);
         d.dayLength = lengths[Pick("Length of a day", lengths.Select(m => m > 0 ? $"{m} min" : "Stopped").ToArray(), li < 0 ? 1 : li)];

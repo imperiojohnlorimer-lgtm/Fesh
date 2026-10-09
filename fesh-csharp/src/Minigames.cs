@@ -65,7 +65,7 @@ partial class Game
         if (mode != "spear" || thrown != null || spears <= 0) return;
         spears--;
         FaceToward(aimX, aimY);
-        swingT = 0.3f;
+        Swing("throw", 0.3f);
         thrown = (player.X, player.Y - 10, aimX, aimY, 0);
         Sfx.Play("cast");
     }
@@ -182,6 +182,7 @@ partial class Game
     {
         string key = $"{b.x},{b.y}";
         if (!PotReady(b)) return;
+        if (b.id == "bubo") { LiftBubo(b); return; }
         state.pots[key] = state.day;
         var biome = Data.Biomes[BiomeAt(b.x, b.y)].Id;
         var got = new List<string>();
@@ -191,18 +192,87 @@ partial class Game
         var crab = kinds[^1];
         foreach (var k in kinds) { if (roll < k.Weight) { crab = k; break; } roll -= k.Weight; }
         int crabs = 1 + (rng.NextDouble() < 0.45 ? 1 : 0);
-        for (int i = 0; i < crabs; i++) AddCatch(crab);
+        // Crabs and lobsters go on the sorting tray (Release.cs): measured, turned over, kept or let go.
+        var sorts = new List<CrabSort>();
+        for (int i = 0; i < crabs; i++) { AddCatch(crab); if (Sortable(crab.Id)) sorts.Add(NewCrab(crab.Id)); }
         got.Add(Items.Amount(crab.Id, crabs));
         if (rng.NextDouble() < 0.6) { int n = 1 + rng.Next(2); Give("seaweed", n); got.Add(Items.Amount("seaweed", n)); }
         if (rng.NextDouble() < 0.08) { Give("old_boot"); got.Add("an old boot"); }
         if (rng.NextDouble() < 0.04) { Give("pearl"); got.Add("a pearl!"); Sfx.Play("rare"); }
         FaceToward(b.x * T + 5, b.y * T + 5);
-        swingT = 0.3f;
+        Swing("haul", 0.3f);
         Burst(b.x * T + 5, b.y * T + 4, "#cfe8ee", 10);
         Sfx.Play("splash");
         heldItem = crab.Id;
         heldT = 1.2f;
-        Toast($"You haul up the pot: {string.Join(", ", got)}. It's set again for tomorrow.", 3.5f);
+        string sorted = StartSort(sorts);
+        Toast($"You haul up the pot: {string.Join(", ", got)}. It's set again for tomorrow.{sorted}", sorted != "" ? 4.5f : 3.5f);
+        Save();
+    }
+
+    /* ---------- Bubo ---------- */
+    // A bubo is a woven bamboo trap; Tala's kind is for fresh water. Each tile it can go in belongs to one fishing spot's
+    // water, flood-filled through the pond, lake and mangrove-pool tiles from the spot itself, so a trap always catches
+    // the fish of the water it's in (the atoll's lagoon and the karst lagoon are salt, though they're the same tiles).
+    Dictionary<(int, int), string> buboWaters;
+    const float BuboMaxKg = 3;
+
+    Dictionary<(int, int), string> BuboWaters()
+    {
+        if (buboWaters != null) return buboWaters;
+        buboWaters = new();
+        static bool Fresh(char t) => t is 'l' or 'o' or 'm';
+        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && FreshSpots.Contains(s.Id) && s.Id != "icehole"))
+        {
+            var queue = new Queue<(int x, int y)>();
+            int r = (int)MathF.Ceiling(s.R / T);
+            for (int ty = (int)(s.Y / T) - r; ty <= (int)(s.Y / T) + r; ty++)
+                for (int tx = (int)(s.X / T) - r; tx <= (int)(s.X / T) + r; tx++)
+                    if (tx >= 0 && ty >= 0 && tx < COLS && ty < ROWS && Fresh(worldMap[ty, tx]) && Dist(tx * T + 5, ty * T + 5, s.X, s.Y) <= s.R / 2
+                        && buboWaters.TryAdd((tx, ty), s.Id)) queue.Enqueue((tx, ty));
+            while (queue.Count > 0)
+            {
+                var (x, y) = queue.Dequeue();
+                foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                    if (nx >= 0 && ny >= 0 && nx < COLS && ny < ROWS && Fresh(worldMap[ny, nx]) && buboWaters.TryAdd((nx, ny), s.Id)) queue.Enqueue((nx, ny));
+            }
+        }
+        return buboWaters;
+    }
+
+    // The fishing spot whose water this tile is, or null if a bubo can't go here.
+    string BuboSpot(int tx, int ty) => scene == "world" ? BuboWaters().GetValueOrDefault((tx, ty)) : null;
+
+    // What swims into a bubo overnight: the small, ordinary fish of that water (nothing rare, nothing over 3 kg), the
+    // bottom-feeders most of all. Night or day and the weather don't matter (it was there all night).
+    List<(CommonFish f, double w)> BuboWeights(string spot) => Data.Common[spot]
+        .Where(f => !f.Rare && !f.Legend && !f.Troll && !f.FullMoon && f.Kg <= BuboMaxKg && (f.Need == null || state.Hinted(f.Need)) && (f.Season == null || f.Season == Season))
+        .Select(f => (f, f.Weight * (f.Style == "bottom" ? 2.0 : 1) * (f.Depth == "shallow" ? 1.5 : 1)))
+        .ToList();
+
+    void LiftBubo(Build b)
+    {
+        state.pots[$"{b.x},{b.y}"] = state.day;
+        FaceToward(b.x * T + 5, b.y * T + 5);
+        Swing("haul", 0.3f);
+        Burst(b.x * T + 5, b.y * T + 4, "#cfe8ee", 10);
+        Sfx.Play("splash");
+        var list = BuboSpot(b.x, b.y) is string spot ? BuboWeights(spot) : new();
+        if (list.Count == 0) { Toast("You lift the bubo. Nothing in it today. It's set again for tomorrow.", 3); Save(); return; }
+        var got = new List<CommonFish>();
+        int n = 1 + (rng.NextDouble() < 0.3 ? 1 : 0);
+        for (int i = 0; i < n; i++)
+        {
+            double roll = rng.NextDouble() * list.Sum(p => p.w);
+            var pick = list[^1].f;
+            foreach (var (f, w) in list) { if (roll < w) { pick = f; break; } roll -= w; }
+            AddCatch(pick);
+            got.Add(pick);
+        }
+        heldItem = got[0].Id;
+        heldT = 1.2f;
+        string what = string.Join(" and ", got.GroupBy(f => f.Id).Select(g => Items.Amount(g.Key, g.Count())));
+        Toast($"You lift the bubo: {what}. It's set again for tomorrow.", 3.5f);
         Save();
     }
 
@@ -214,7 +284,7 @@ partial class Game
         int n = 2 + rng.Next(2);
         Give("worm", n);
         FaceToward(l.x, l.y);
-        swingT = 0.25f;
+        Swing("dig", 0.25f);
         Burst(l.x, l.y, "#6b4a2b", 8);
         Sfx.Play("chop");
         Floater($"+{n} worms", l.x, l.y - 6, "#e8939a");
@@ -375,7 +445,8 @@ partial class Game
     // A little puff at your feet on sand, dunes and snow, and a splash when you're wading.
     void Footstep()
     {
-        char g = TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T));
+        int ftx = (int)MathF.Floor(player.X / T), fty = (int)MathF.Floor((player.Y - 1.5f) / T);
+        char g = FlatOpen(ftx, fty) ? 's' : TileAt(ftx, fty);
         string col = g switch { 's' or 'p' => "#d8bb7e", 'D' => "#d9a457", 'n' or 'i' => "#ffffff", 'e' => "#a19c90", _ => Wadeable(g) || Riding && Swimmable(g) ? "#cfe8ee" : null };
         if (col == null || scene != "world") return;
         // Hooves kick up a lot more than boots do.

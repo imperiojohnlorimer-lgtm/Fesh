@@ -9,15 +9,17 @@ partial class Game
 {
     string dexFish;               // the fish whose card is open in the Fish log, or null
     string dexFilter = "all";     // "all", "missing", "rare" or "now"
+    float lastDexBottom;          // where the Fish log panel last ended (the autotest checks it fits on the screen)
     const int PageReward = 200;   // coins for catching every fish on an island's page
 
-    // Whether its time, weather and moon are right just now (bait and legends aside). Crab-pot catches don't bite.
+    // Whether its time, weather, moon and season are right just now (bait and legends aside). Crab-pot catches don't bite.
     bool BitingNow(CommonFish f) =>
         Data.SpotOfFish.ContainsKey(f.Id)
         && (f.Time == "any" || (f.Time == "night") == Night)
         && (f.Weather == null || (f.Weather == "storm" ? Stormy : f.Weather == "rain" ? state.weather != "clear" : state.weather == "clear"))
         && (!f.FullMoon || FullMoon)
-        && (f.Need == null || state.Hinted(f.Need));
+        && (f.Need == null || state.Hinted(f.Need))
+        && (f.Season == null || f.Season == Season);
 
     bool Seen(string id) => state.seen.Contains(id) && state.commons.GetValueOrDefault(id) == 0;
 
@@ -80,6 +82,8 @@ partial class Game
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
         Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
         if (SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { dexFish = null; return; }
+        // Its page in the fish album, once you've caught one.
+        if (state.commons.GetValueOrDefault(dexFish) > 0 && SmallButton("Album page", x + w - pad - SmallW("Back") - 12 - SmallW("Album page"), y + pad - 6)) { OpenAlbum(dexFish); dexFish = null; return; }
 
         // The picture: its own (a silhouette if you've only seen it), or the legend's portrait.
         float px = x + pad, py = y + pad + 50;
@@ -95,6 +99,8 @@ partial class Game
             }
             else Gfx.TextCenter("?", px + picW / 2, py + picH / 2 - 30, FontKind.Ui700, 60, Pal.C("#9fc3d1"));
         }
+        // Under the picture: the real animal (FishFacts), once you've caught one or seen one get away.
+        DrawRealFish(f.Id, known || seen, px - 3, py + picH + 14, picW + 6, y + h - pad - (py + picH + 14));
 
         string name = known || seen ? f.Name : "???";
         Gfx.Text(name, x + pad, y + pad - 2, FontKind.Ui700, 34, f.Legend && known ? Pal.C("#9a6a1a") : Pal.PaperInk);
@@ -132,7 +138,13 @@ partial class Game
             string rec = state.records.TryGetValue(f.Id, out float kg) ? Kg(kg) : "-";
             int tr = state.trophies.GetValueOrDefault(f.Id);
             facts.Add(("Caught", $"{n} · heaviest {rec} · trophy from about {Kg(f.Kg * 1.5f)}{(tr > 0 ? $" ({tr} so far)" : "")}"));
-            facts.Add(("Pip pays", $"{PriceOf(f.Id)} coins"));
+            facts.Add(("Pip pays", ClosedFish.Contains(f.Id) ? $"{PriceOf(f.Id)} coins, but not in the amihan: Pip's closed season while they spawn" : $"{PriceOf(f.Id)} coins"));
+        }
+        // Ma'am Isay's class (School.cs).
+        if ((known || seen) && state.Hinted("metIsay") && !f.Legend)
+        {
+            int k = state.know.GetValueOrDefault(f.Id);
+            facts.Add(("Class", Learnt(f.Id) ? "Learned: you got three questions about it right" : $"{k} of {LearnedAt} right answers to learn it"));
         }
         foreach (var (k, v) in facts)
         {
@@ -150,11 +162,37 @@ partial class Game
         if (Gfx.PressedOutside(x, y, w, h)) dexFish = null;
     }
 
+    // The real fish behind a game fish: a scientific name and a few true things about it, or what an invented one is
+    // based on. FactLayout is shared with the autotest, which checks every one fits the box.
+    const float FactFs = 15, FactLh = 20, FactPad = 12;
+    (List<string> sci, List<string> body) FactLayout(FishFacts.Fact fact, float w) =>
+        (Gfx.Wrap((fact.Real ? "" : "Based on: ") + fact.Sci, FontKind.Note, 15, w - 2 * FactPad), Gfx.Wrap(fact.Text, FontKind.Ui500, FactFs, w - 2 * FactPad));
+    static float FactHeight(List<string> sci, List<string> body) => FactPad + 20 + sci.Count * 19 + 6 + body.Count * FactLh + FactPad - 4;
+
+    void DrawRealFish(string id, bool open, float x, float y, float w, float h)
+    {
+        Gfx.Box(x, y, w, h, Pal.C("#eef6f2"), Pal.C("#8fb8a8"), 2, 5);
+        if (!FishFacts.ById.TryGetValue(id, out var fact)) return;
+        if (!open)
+        {
+            Lines(Gfx.Wrap("Catch one to read about the real fish.", FontKind.Note, 16, w - 2 * FactPad), x + FactPad, y + FactPad, 22, FontKind.Note, 16, Muted);
+            return;
+        }
+        var (sci, body) = FactLayout(fact, w);
+        float ty = y + FactPad - 2;
+        Gfx.Text(fact.Real ? "The real fish" : "Made up for Fesh", x + FactPad, ty, FontKind.Ui700, 16, fact.Real ? Pal.C("#2a7d74") : Pal.C("#8a6a2a"));
+        ty += 20;
+        Lines(sci, x + FactPad, ty, 19, FontKind.Note, 15, Muted);
+        ty += sci.Count * 19 + 6;
+        Lines(body, x + FactPad, ty, FactLh, FontKind.Ui500, FactFs, Pal.PaperInk);
+    }
+
     string WhenText(CommonFish f)
     {
         var bits = new List<string> { f.Time == "any" ? "day or night" : f.Time == "night" ? "at night" : "by day" };
         if (f.Weather != null) bits.Add(f.Weather == "clear" ? "on clear days" : f.Weather == "rain" ? "in the rain" : "in storms");
         if (f.FullMoon) bits.Add("under a full moon");
+        if (f.Season != null) bits.Add($"in the {f.Season} season");
         if (f.Need == "parolaLit") bits.Add("once the Parola lamp is lit");
         if (f.Need == "moonReturned") bits.Add("once the moon is safe");
         if (f.Legend) bits.Add("only once");

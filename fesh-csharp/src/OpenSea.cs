@@ -63,6 +63,9 @@ partial class Game
         if (race != null) return new Target { Type = "info", Label = "Racing! Steer for the flashing gate", RideLabel = canLand ? "Land (ends the race)" : null };
         // A sea turtle, a dugong or the whale shark alongside comes first: you watch them from the boat.
         if (SeaLifeInReach() is SeaCreature sc) return new Target { Type = "watch", Ref = sc, Label = SeaKinds[sc.Kind].label, RideLabel = canLand ? "Land on shore" : null };
+        // So are Bakawan's alitaptap, from just offshore after dark.
+        if (FirefliesOut && FireflyTreeNear(32) is int ft and >= 0)
+            return new Target { Type = "fireflies", Id = ft.ToString(), Label = "Watch the alitaptap", RideLabel = canLand ? "Land on shore" : null };
         Target fishing = null;
         foreach (var s in Data.Spots)
             if (s.Scene == "world" && SpotOpen(s.Id) && SpotKnown(s) && s.Id != "icehole" && Dist(player.X, player.Y, s.X, s.Y) < s.R)

@@ -312,7 +312,7 @@ partial class Game
         var glint = Pal.Rgba(214, 228, 240, 0.3f * k);
         int x0 = camX - 1, x1 = camX + W + 1, y0 = camY - 1, y1 = camY + H + 1;
         foreach (var (sx, sy, _, _, w) in shore)
-            if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1 && w != 'm' && (Pix.Hash(sx / 3, sy / 3, 5) + t * 0.3) % 1 < 0.55)
+            if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1 && w != 'm' && (Pix.Hash(sx / 3, sy / 3, 5) + t * 0.3) % 1 < 0.55 && !TideDry(sx, sy))
                 pix.Rect(sx, sy, 1, 1, glint);
     }
 
