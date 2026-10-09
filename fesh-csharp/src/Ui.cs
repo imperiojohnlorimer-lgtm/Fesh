@@ -20,7 +20,7 @@ partial class Game
         if (!title) DrawGuideArrow();
         if (!title) DrawPinCompass();
         if (!title) DrawFishingUi();
-        if (!title && (BossFighting || BossOnLine)) DrawBossBar();
+        if (!title && (BossFighting || BossOnLine || GuardianFighting)) DrawBossBar();
         if (!title && eclipse != null) DrawEclipseBar();
         if (!title && race != null) DrawRaceChip();
         if (mode == "build") DrawBuildBar();
@@ -34,6 +34,8 @@ partial class Game
         if (mode == "odd") DrawOdd();
         if (mode == "legend") DrawLegend();
         if (mode == "tamed") DrawTamed();
+        if (mode == "platejaw") DrawGuardianCard();
+        if (mode == "seacard") DrawSeaCard();
         if (mode == "panel" && panel == "dex") DrawDex();
         if (mode == "panel" && panel == "case") DrawCase();
         if (mode == "panel" && panel == "map") DrawMap();
@@ -720,7 +722,7 @@ partial class Game
                 RowClick(key, cx + 4, cy - 4, colW - 8, rh - 2);
                 if (got) DrawIcon(icon, cx + 10, cy, 22); else Gfx.TextCenter("?", cx + 21, cy - 1, FontKind.Ui700, 19, Pal.C("#9a8a70"));
                 Gfx.Text(got ? name : "???", cx + 40, cy, FontKind.Ui700, 16, got ? col : Pal.C("#9a8a70"));
-                Lines(note, cx + 40, cy + 19, 16, FontKind.Note, 13, Muted);
+                Lines(note, cx + 40, cy + 18, 15, FontKind.Note, 13, Muted);
                 cy += rh;
             }
             cx = x + colW + gap; cy = y;
@@ -783,12 +785,16 @@ partial class Game
             Add(id, got, id, Data.FishById[id].Name, Pal.C("#9a6a1a"), got ? (state.records.TryGetValue(id, out float kg) ? $"{Kg(kg)} · {where}" : where) : info.Hint);
         }
         Add("tidemane", state.tamed, "tidemane", $"{Data.MountName}, your mount", Pal.C("#1d6f68"), state.tamed ? "Tamed on Starfall Atoll. It's yours to ride." : Data.Tidemane.Hint);
+        // Platejaw keeps its name once you've seen it (the toast names it as it rises); the rest of its card waits for the win.
+        Add("platejaw", GuardianMet, "platejaw_plate", $"{GuardianName}, the pool's guardian", Pal.C("#7a5a2a"),
+            GuardianBeaten ? "Driven off in the Ancient pool." : GuardianMet ? "Still hunting in the Ancient pool. Knock on the carved stone." : Data.Platejaw.Hint);
         Add("bakunawa", MoonReturned, "moon_charm", "Bakunawa, the moon-eater", Pal.C("#2f6a6a"),
             MoonReturned ? "It gave the moon back over Parola." : "Some full-moon nights, the moon goes out on the Habagat sea.");
         return rows;
     }
 
-    static float LegendRowH(List<string> note) => 21 + Math.Max(1, note.Count) * 16 + 4;
+    // Tight enough that Platejaw's row (1.19) still fits the page with every legend's hint on two lines.
+    static float LegendRowH(List<string> note) => 20 + Math.Max(1, note.Count) * 15 + 3;
 
     /* ---------- Odd catch card ---------- */
     void DrawOdd()
@@ -853,6 +859,8 @@ partial class Game
             Bind.Fix($"{t.Where} Press <ride> to ride. From anywhere outdoors, <ride> whistles it over."), "Ride on!")) CloseTamed();
     }
 
+    float lastGoldBottom;   // where the last gold card ended, checked against the screen
+
     // A glowing card for something extraordinary: portrait, name, a tag, a description, a boxed note and one button.
     // Returns true when the button is clicked.
     bool GoldCard(string art, string name, string tag, string about, string note, string button)
@@ -864,6 +872,7 @@ partial class Game
         float boxH = 12 + where.Count * 22 + 10;
         float h = pad + artH + 14 + 38 + 8 + 26 + 12 + desc.Count * 29 + 12 + boxH + 18 + 56 + pad + 8;
         float x = (Gfx.LW - cw) / 2, y = Math.Max(10, (Gfx.LH - h) / 2);
+        lastGoldBottom = y + h;
         Gfx.Rect(x - 7, y - 7, cw + 14, h + 14, Pal.WithAlpha(Pal.Lantern, 0.4f + 0.2f * MathF.Sin(time * 3)), 12);
         Gfx.Box(x, y, cw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
         float cy = y + pad;
@@ -925,6 +934,19 @@ partial class Game
     {
         const float w = 520, h = 56, y = 54;
         float x = Gfx.LW / 2 - w / 2;
+        if (guardian != null)
+        {
+            // Platejaw (Guardian.cs): bone and rust rather than Tidemane's sea green.
+            bool open = guardian.Phase is "beached" or "stunned";
+            Gfx.Box(x, y, w, h, Pal.C("rgba(30,26,22,0.92)"), Pal.C("#c9b48f"), 2, 6);
+            Gfx.Text(GuardianName, x + 16, y + 7, FontKind.Ui700, 20, Pal.C("#efe3c8"));
+            string gsub = open ? "Stranded! Strike now!" : "Armoured";
+            Gfx.Text(gsub, x + w - 16 - Gfx.Measure(gsub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16, open ? Pal.Lantern : Pal.C("#c9b48f"));
+            float gk = Math.Clamp(guardian.Spirit / GuardSpirit, 0, 1);
+            Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
+            if (gk > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * gk), 12, Pal.C("#d9823f"), 4);
+            return;
+        }
         bool line = BossOnLine;
         string name = line ? "Something enormous" : Data.MountName;
         Gfx.Box(x, y, w, h, Pal.C("rgba(16,36,58,0.92)"), Pal.C("#5fd6c9"), 2, 6);
@@ -1011,26 +1033,32 @@ partial class Game
     }
 
     /* ---------- Case board ---------- */
-    string caseTab = "saltmere";   // "saltmere" (the Halcyon) or "habagat" (the vanishing moon, once you've found Habagat)
+    float lastCaseBottom;          // where the Case board last ended, checked against the screen
+    string caseTab = "saltmere";   // "saltmere" (the Halcyon), "habagat" (the vanishing moon, once you've found Habagat) or "amihan" (the restless sea, once the ground has shaken)
 
     void DrawCase()
     {
         Backdrop();
-        if (!state.Hinted("habagat")) caseTab = "saltmere";
-        bool moon = caseTab == "habagat";
+        if (caseTab == "habagat" && !state.Hinted("habagat") || caseTab == "amihan" && !SeaStoryStarted) caseTab = "saltmere";
+        bool moon = caseTab == "habagat", sea = caseTab == "amihan";
+        var caseClues = moon ? Data.MoonClues : sea ? Data.SeaClues : null;
         const float bx = 50, bw = 1180, border = 13, padT = 21, padX = 24, padB = 29, colGap = 24;
         float ix = bx + border, iw = bw - border * 2, cw = iw - padX * 2;
         const float qw = 693;
-        var question = Gfx.Wrap(moon ? "Why does the moon go out over the Habagat sea?" : "How did these creatures end up around Saltmere Island?", FontKind.Note, 26, qw - 48);
+        var question = Gfx.Wrap(moon ? "Why does the moon go out over the Habagat sea?" : sea ? "When the ground shakes, what should Amihan Village do about the sea?"
+            : "How did these creatures end up around Saltmere Island?", FontKind.Note, 26, qw - 48);
         float qh = 19 + question.Count * 35 + 16;
-        int count = moon ? Data.MoonClues.Length : Data.Creatures.Length;
+        int count = caseClues?.Length ?? Data.Creatures.Length;
         float noteW = (cw - colGap * (count - 1)) / count;
-        var notes = moon
-            ? Data.MoonClues.Select(c =>
+        // The clues' writing shrinks a size if the board would otherwise run off the screen (the vanishing moon's full
+        // board did by a few pixels; the restless sea's by more).
+        float nfs = 19, nlh = 27;
+        List<(bool got, List<string> title, List<string> text, List<string> src)> MakeNotes() => caseClues != null
+            ? caseClues.Select(c =>
             {
                 bool got = state.Hinted(c.Key);
                 return (got, title: got ? Gfx.Wrap(c.Title, FontKind.Ui700, 21, noteW - 32) : new List<string>(),
-                    text: got ? Gfx.Wrap(c.Finding, FontKind.Note, 19, noteW - 32) : new List<string>(),
+                    text: got ? Gfx.Wrap(c.Finding, FontKind.Note, nfs, noteW - 32) : new List<string>(),
                     src: got ? Gfx.Wrap(c.Source, FontKind.Ui500, 16, noteW - 32) : new List<string>());
             }).ToList()
             : Data.Creatures.Select(cr =>
@@ -1038,16 +1066,27 @@ partial class Game
                 bool got = state.Caught(cr.Id);
                 var clue = Data.Clues[cr.Id];
                 return (got, title: got ? Gfx.Wrap(clue.Title, FontKind.Ui700, 21, noteW - 32) : new List<string>(),
-                    text: got ? Gfx.Wrap(clue.Finding, FontKind.Note, 19, noteW - 32) : new List<string>(),
+                    text: got ? Gfx.Wrap(clue.Finding, FontKind.Note, nfs, noteW - 32) : new List<string>(),
                     src: got ? Gfx.Wrap($"Found on the {cr.Name}", FontKind.Ui500, 16, noteW - 32) : new List<string>());
             }).ToList();
-        float noteH = Math.Max(181, notes.Max(n => 29 + n.title.Count * 24 + 8 + n.text.Count * 27 + 11 + n.src.Count * 20 + 16));
+        var notes = MakeNotes();
+        float NoteH() => Math.Max(181, notes.Max(n => 29 + n.title.Count * 24 + 8 + n.text.Count * nlh + 11 + n.src.Count * 20 + 16));
+        float noteH = NoteH();
         const float tw = 827;
-        string theoryText = moon ? Data.MoonTheories[MoonReturned ? Data.MoonTheories.Length - 1 : MoonClueCount] : Data.Theories[state.caught.Count];
+        string theoryText = moon ? Data.MoonTheories[MoonReturned ? Data.MoonTheories.Length - 1 : MoonClueCount]
+            : sea ? Data.SeaTheories[SeaCaseClosed ? Data.SeaTheories.Length - 1 : SeaClueCount] : Data.Theories[state.caught.Count];
         var theory = Gfx.Wrap(theoryText, FontKind.Note, 20, tw - 48);
         float th = 19 + 26 + theory.Count * 29 + 19;
         float innerH = padT + 46 + 8 + qh + 32 + noteH + 35 + th + padB;
-        float h = innerH + border * 2, by = Math.Max(10, (Gfx.LH - h) / 2);
+        if (innerH + border * 2 + 6 > Gfx.LH - 8)
+        {
+            nfs = 16; nlh = 22;
+            notes = MakeNotes();
+            noteH = NoteH();
+            innerH = padT + 46 + 8 + qh + 32 + noteH + 35 + th + padB;
+        }
+        float h = innerH + border * 2, by = Math.Max(4, (Gfx.LH - h - 6) / 2);
+        lastCaseBottom = by + h + 6;
 
         Gfx.Rect(bx, by + 6, bw, h, Pal.Ink, 6);
         Gfx.Rect(bx, by, bw, h, Pal.C("#6b4a2b"), 6);
@@ -1056,11 +1095,14 @@ partial class Game
         Gfx.Text("Case board", x, y + 5, FontKind.Ui700, 40, Pal.C("rgba(0,0,0,0.35)"));
         Gfx.Text("Case board", x, y + 2, FontKind.Ui700, 40, Pal.C("#fff7e6"));
         if (SmallButton("Close", ix + iw - padX - SmallW("Close"), y)) { ClosePanels(); return; }
-        // Once you've found Habagat, a second case: the vanishing moon.
-        if (state.Hinted("habagat"))
+        // Once you've found Habagat, a second case: the vanishing moon; once the ground shakes in Amihan, a third.
+        if (state.Hinted("habagat") || SeaStoryStarted)
         {
             float tabX = x + Gfx.Measure("Case board", FontKind.Ui700, 40) + 28;
-            foreach (var (id, label) in new[] { ("saltmere", "The Halcyon"), ("habagat", "The vanishing moon") })
+            var tabs = new List<(string, string)> { ("saltmere", "The Halcyon") };
+            if (state.Hinted("habagat")) tabs.Add(("habagat", "The vanishing moon"));
+            if (SeaStoryStarted) tabs.Add(("amihan", "The restless sea"));
+            foreach (var (id, label) in tabs)
             {
                 float w = SmallW(label);
                 if (Button(label, tabX, y, w, 44, FontKind.Ui700, 20, caseTab == id ? Pal.Lantern : Pal.Sand, Pal.Ink, 4) && caseTab != id) { caseTab = id; Sfx.Play("blip"); return; }
@@ -1093,8 +1135,8 @@ partial class Game
                 float ty = y + 29;
                 for (int k = 0; k < title.Count; k++) nt.Text(title[k], nx + 16, ty + k * 24, FontKind.Ui700, 21, Pal.PaperInk);
                 ty += title.Count * 24 + 8;
-                for (int k = 0; k < text.Count; k++) nt.Text(text[k], nx + 16, ty + k * 27, FontKind.Note, 19, Pal.PaperInk);
-                ty += text.Count * 27 + 11;
+                for (int k = 0; k < text.Count; k++) nt.Text(text[k], nx + 16, ty + k * nlh, FontKind.Note, nfs, Pal.PaperInk);
+                ty += text.Count * nlh + 11;
                 for (int k = 0; k < src.Count; k++) nt.Text(src[k], nx + 16, ty + k * 20, FontKind.Ui500, 16, Pal.C("#7a6a55"));
                 pins.Add(nt.Point(nx + noteW / 2, y + 8 + 6.5f));
             }

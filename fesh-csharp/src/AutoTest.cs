@@ -39,7 +39,9 @@ partial class Game
         Inp.ScriptFocused = true;
         // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
         standStill = true;
-        script = Environment.GetEnvironmentVariable("FESH_VIEW_TEST") == "1" ? ViewScript().GetEnumerator()
+        script = Environment.GetEnvironmentVariable("FESH_SEA_TEST") == "1" ? RestlessSeaScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_CAVEBOSS_TEST") == "1" ? GuardianScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_VIEW_TEST") == "1" ? ViewScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_ATLAS_TEST") == "1" ? AtlasScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_EDU_TEST") == "1" ? EduScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_GUIDE_TEST") == "1" ? GuideScript().GetEnumerator()
@@ -80,6 +82,8 @@ partial class Game
     // overhead, leaning, glancing and blinking poses), drawn 5x so single pixels can be judged.
     void ExportSprites(string path)
     {
+        ExportGuardianSprites(path);
+        ExportSeaSprites(path);
         ExportToolSprites(path);
         ExportDirectionSprites(path);
         var keep = pix;
@@ -864,7 +868,8 @@ partial class Game
         for (int i = 0; i < 3; i++) { Inp.Tap(KeyboardKey.E); yield return 6; }
         Check($"a crystal pickaxe mines abyssite ({Has("abyssite")})", Has("abyssite") == 1 && aby.Mined);
 
-        // The Ancient coelacanth gets its own card
+        // The Ancient coelacanth gets its own card. (Platejaw rising after it has its own checks in GuardianTests.cs.)
+        state.hinted["platejaw"] = true;
         fish = new FishCast { Spot = "ancientpool", Bx = AncientPoolX, By = AncientPoolY };
         reel = new ReelState { Roll = new Catchable { Id = "ancient_coelacanth", Name = "Ancient coelacanth", Difficulty = 4.6f, Rare = true } };
         mode = "reeling";
@@ -874,6 +879,7 @@ partial class Game
         pendingShot = "28-legend"; yield return 2;
         Inp.Tap(KeyboardKey.E); yield return 3;
         Check($"closing the card goes back to play (toast: {toastMsg})", mode == "play" && toastMsg.Contains("aquarium"));
+        state.hinted.Remove("platejaw");
 
         // The map works underground (it used to copy the cave's tiles)
         mapTexDirty = true;
@@ -1982,6 +1988,8 @@ partial class Game
         foreach (int frames in EduScript()) yield return frames;
         foreach (int frames in AtlasScript()) yield return frames;
         foreach (int frames in ViewScript()) yield return frames;
+        foreach (int frames in GuardianScript()) yield return frames;
+        foreach (int frames in RestlessSeaScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

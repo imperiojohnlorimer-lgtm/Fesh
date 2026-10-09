@@ -24,6 +24,7 @@ sealed record Waypoint(float X, float Y, string Place, string How);
 partial class Game
 {
     List<Goal> goals = new();         // this frame's goals (UpdateGuide), so the card, the arrow and the journal agree
+    string trackBeforeSea;            // what you were following when the evacuation began (RestlessSea.cs)
     Goal tracked;                     // the goal the card and the arrow follow
     Waypoint guideWay;
     string lastTrackedId, lastTrackedTitle;
@@ -38,7 +39,7 @@ partial class Game
 
     bool GuideOn => Settings.Data.guide;
     // The card and the arrow: in ordinary play only, never over a fight, the eclipse or a race (they have their own).
-    bool GuideShown => GuideOn && mode is "play" or "build" && boss == null && eclipse == null && race == null && !raceArmed;
+    bool GuideShown => GuideOn && mode is "play" or "build" && boss == null && guardian == null && tremor == null && evac?.Phase != "quake" && eclipse == null && race == null && !raceArmed;
 
     /* ---------- Working out the goals ---------- */
     List<Goal> Goals()
@@ -46,6 +47,7 @@ partial class Game
         var list = new List<Goal>();
         StoryGoal(list);
         RequestGoals(list);
+        SeaGoals(list);
         SchoolGoals(list);
         ExploreGoals(list);
         return list;
@@ -223,6 +225,38 @@ partial class Game
         }
     }
 
+    // The restless sea (RestlessSea.cs): one goal for the case, a step at a time, and the pond's bank as its own job.
+    // Nothing before the ground first shakes, and nothing ever says what's coming.
+    void SeaGoals(List<Goal> list)
+    {
+        if (!SeaStoryStarted) return;
+        if (PondDry && state.Hinted("rs:berberoka"))
+        {
+            var p = NewGoal("sea:pond", "request", "Mend the bangus pond's bank", "");
+            if (Has("stone") >= 6 && Has("wood") >= 2) { p.Text = "You have them. Niko will mend the bank with the others."; p.Ready = true; AtIslander(p, "niko"); }
+            else p.Text = $"Niko needs 6 stone and 2 wood. You have {Has("stone")} stone and {Has("wood")} wood.";
+            list.Add(p);
+        }
+        var g = NewGoal("sea:case", "request", $"The restless sea ({SeaClueCount} of 4 clues)", "");
+        if (!state.Hinted("rs:carpio")) { g.Text = "The ground shook. Ask Ma'am Isay about it."; AtIslander(g, "isay"); }
+        else if (!state.Hinted("rs:berberoka")) { g.Text = "The bangus pond has drained. Ask Niko about it."; AtIslander(g, "niko"); }
+        else if (!state.Hinted("rs:markTold")) { g.Text = "Ask Lira about the old post at the landing."; AtIslander(g, "lira"); }
+        else if (!state.Hinted("rs:mark")) { g.Text = "Look at the mark on the old post by the landing."; At(g, PostX, PostY + 8, "The old post"); }
+        else if (!state.Hinted("rs:signs")) { g.Text = "Tell Ma'am Isay what you've found."; AtIslander(g, "isay"); }
+        else if (SignsUp < SignSpots.Length)
+        {
+            g.Title = $"Put up the evacuation signs ({SignsUp} of {SignSpots.Length})";
+            g.Text = "At the green marks, from the landing up to School Rise.";
+            int i = Enumerable.Range(0, SignSpots.Length).First(k => !state.Hinted($"rs:sign{k}"));
+            At(g, SignSpots[i].x, SignSpots[i].y + 6, "A green mark");
+        }
+        else if (!state.Hinted("rs:drill")) { g.Title = "Run the drill"; g.Text = "Ask Ma'am Isay to ring the bell, then call Mia, Jun and Bea up to School Rise with you."; AtIslander(g, "isay"); }
+        else if (!SeaCaseClosed) { g.Title = "Know the way up"; g.Text = "If the ground ever shakes hard by the sea, go straight up to School Rise along the signs, calling to anyone you pass."; }
+        else if (!state.Hinted("rs:crabpot") && state.day > state.gifts.GetValueOrDefault("rs_done")) { g.Title = "Niko has something for you"; g.Text = "Visit Niko in Amihan Village."; g.Ready = true; AtIslander(g, "niko"); }
+        else return;
+        list.Add(g);
+    }
+
     // An animal's name inside a sentence: lower case, but not a place in it ("Philippine tarsier").
     static string LowerName(string n) => n.StartsWith("Philippine") ? n : char.ToLowerInvariant(n[0]) + n[1..];
 
@@ -344,6 +378,19 @@ partial class Game
     {
         if (mode is "title" or "create") return;
         if (mode == "play") goalDoneT = Math.Max(0, goalDoneT - dt);
+        // Heading up to School Rise (RestlessSea.cs): that's the only goal, and nothing you were following is lost.
+        if (SeaEmergency)
+        {
+            // What you were following comes back afterwards, even if you follow this one meanwhile (Codex).
+            trackBeforeSea ??= state.track ?? "";
+            var up = At(NewGoal("sea:up", "story", OnRise ? "Stay on School Rise" : "Up to School Rise!",
+                OnRise ? "Wait together for the all-clear." : "Follow the green signs uphill, and call to anyone you pass."), RiseX, RiseY, "School Rise");
+            goals = new() { up };
+            tracked = up;
+            guideWay = Route(up);
+            return;
+        }
+        if (trackBeforeSea != null) { state.track = trackBeforeSea; trackBeforeSea = null; }
         goals = Goals();
         if (state.track is { Length: > 0 } t && !goals.Any(g => g.Id == t)) state.track = "";
         var pick = PickTracked(goals);

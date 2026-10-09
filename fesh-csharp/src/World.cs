@@ -599,6 +599,8 @@ partial class Game
         int walk = moving ? 1 + (int)(player.WalkT * 9) % 4 : 0;   // your own four-frame walk
         string f = player.Face;
         if (iframes > 0 && (int)(time * 16) % 2 == 0) return; // blink while recovering from a hit
+        // Ducked down with your hands over your head while the ground shakes (RestlessSea.cs).
+        if (Ducking && !Riding) { DrawDucked(state.look, x, y, f); return; }
         bool holding = heldT > 0 && heldItem != null;
         // Breathing when still, and the odd blink. The walk adds its own bounce.
         int bob = moving || mode == "reeling" ? 0 : (time % 2.2f > 1.4f ? 1 : 0);
@@ -1113,6 +1115,7 @@ partial class Game
         if (Visible(MouthX * T, MouthY * T)) list.Add(((MouthY + 2) * T, DrawCaveMouth));
         if (Visible(PipX, PipY)) { if (PipOpen) list.Add((PipY, DrawPip)); list.Add((PipY + 9, () => DrawStall(t))); }
         AddArchipelagoObjects(list);
+        AddRestlessSeaObjects(list);
         if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
         if (Has("boat") > 0 && !Aboard)
         {
@@ -1389,6 +1392,8 @@ partial class Game
             DrawWater(t);
             DrawTufts(t);
             foreach (var b in state.builds) if (b.id == "path") DrawBuild(b, t);
+            DrawRestlessSea(t);
+            DrawRiseGround();
             DrawSaltBeds();
             DrawGusoFarm(t);
             DrawLoose(t);

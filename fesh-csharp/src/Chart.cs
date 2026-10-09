@@ -226,6 +226,8 @@ partial class Game
         if (chartEast)
         {
             Place("Village landing", 1495, 217, new() { "Village landing", "Moor here for Amihan Village" });
+            // Once Ma'am Isay has marked the route (RestlessSea.cs).
+            if (state.Hinted("rs:signs")) Place("School Rise", RiseX, RiseY + 12, new() { "School Rise", "Amihan Village's evacuation area", "Follow the green signs up from the landing" }, 2);
             foreach (var n in Islanders)
                 if (Charted(RegionOf(n.x, n.y + 10))) Place(n.name, n.x, n.y, new() { n.name, IslanderNote(n.id) });
             // The sanctuary's name sits in its middle, and Bantay Joy on her platform.

@@ -577,6 +577,34 @@ static class CreatureArt
                 g.StrokeStyle = Paint.Of("#1b2a1b"); g.LineWidth = 1.2f; Seg(g, 42, 3, 34, 4);
             }
         }
+        else if (id == "platejaw")
+        {
+            // Platejaw: an armoured fish like Dunkleosteus. A plated head and shoulders with bony blades for teeth, and a
+            // bare, shark-like body and tail behind.
+            g.FillStyle = C("#22302f");
+            Poly(g, -30, -2, -48, -20, -42, -2, -46, 12);
+            Poly(g, -16, -9, -9, -21, -3, -9);
+            Ell(g, -2, 12, 7, 2.6f, 0.5f);
+            Ell(g, -20, 9, 5, 2, 0.4f);
+            g.FillStyle = sil ? Sil : Paint.Linear(0, -12, 0, 12, (0, "#4d5d5b"), (0.65f, "#34403f"), (1, "#a7b0a6"));
+            g.BeginPath(); g.MoveTo(-34, -1); g.QuadTo(-16, -11, 4, -11); g.LineTo(4, 11); g.QuadTo(-16, 10, -34, 1); g.Fill();
+            g.FillStyle = sil ? Sil : Paint.Linear(0, -18, 0, 14, (0, "#9aa0aa"), (0.5f, "#6b707c"), (1, "#4a4e57"));
+            g.BeginPath(); g.MoveTo(-2, -12); g.QuadTo(14, -22, 30, -12); g.QuadTo(38, -6, 38, 1); g.LineTo(22, 4); g.LineTo(20, 10); g.QuadTo(8, 15, -2, 12); g.ClosePath(); g.Fill();
+            g.FillStyle = C("#3a0f12"); Poly(g, 22, 3, 37, 1, 34, 11, 20, 9);
+            g.FillStyle = sil ? Sil : Paint.Of("#55595f"); Poly(g, 16, 9, 34, 11, 33, 15, 14, 14);
+            if (!sil)
+            {
+                g.FillStyle = Paint.Of("#e8e0c8"); Poly(g, 30, 2, 38, 1, 36, 7); Poly(g, 28, 11, 35, 10, 34, 5);
+                g.StrokeStyle = Paint.Of("rgba(30,32,38,0.75)"); g.LineWidth = 1;
+                g.BeginPath(); g.MoveTo(4, -15); g.QuadTo(8, -2, 6, 12); g.Stroke();
+                g.BeginPath(); g.MoveTo(14, -19); g.QuadTo(16, -10, 14, -4); g.Stroke();
+                Seg(g, 6, 2, 20, 4);
+                g.FillStyle = Paint.Of("rgba(255,255,255,0.18)"); Ell(g, 16, -15, 9, 2.4f, -0.15f);
+                g.FillStyle = Paint.Of("#c9c2ae"); Circ(g, 27, -6, 4.2f);
+                g.Save(); g.ShadowColor = Paint.Of("#ffd76a"); g.ShadowBlur = 6 * s / 3.4f; g.FillStyle = Paint.Of("#ffd76a"); Circ(g, 27, -6, 2.6f); g.Restore();
+                g.FillStyle = Paint.Of("#10243a"); Circ(g, 27.6f, -6, 1.3f);
+            }
+        }
         else if (id == "starray")
         {
             // The Starfall ray: a huge manta, deep blue, its back glittering like the night sky.
@@ -742,10 +770,56 @@ static class CreatureArt
         g.Restore();
     }
 
+    // The restless sea's card (RestlessSea.cs): the sea drawn back off the reef, a wave coming in from the left, and the
+    // village up on School Rise to the right, together.
+    static void TsunamiScene(VCanvas g, float w, float h)
+    {
+        void Rect(float x, float y, float rw, float rh) { g.BeginPath(); g.RectPath(x, y, rw, rh); g.Fill(); }
+        g.FillStyle = Paint.Linear(0, 0, 0, h * 0.5f, (0, "#8fc4dc"), (1, "#e8f0e0"));
+        Rect(0, 0, w, h * 0.5f);
+        g.FillStyle = Paint.Linear(0, h * 0.42f, 0, h, (0, "#3f8fb0"), (1, "#1d4f78"));
+        Rect(0, h * 0.42f, w, h * 0.58f);
+        // The seabed left dry, with coral heads and a few stranded fish.
+        g.FillStyle = Paint.Linear(0, h * 0.55f, 0, h, (0, "#9a8662"), (1, "#7a6a4c"));
+        Poly(g, w * 0.34f, h * 0.6f, w * 0.64f, h * 0.52f, w * 0.7f, h, w * 0.3f, h);
+        g.FillStyle = Paint.Of("#c98478");
+        foreach (var (fx, fy, r) in new[] { (0.42f, 0.75f, 0.018f), (0.5f, 0.86f, 0.022f), (0.56f, 0.68f, 0.015f), (0.46f, 0.94f, 0.02f) }) Circ(g, w * fx, h * fy, w * r);
+        g.FillStyle = Paint.Of("#d8e2e8");
+        foreach (var (fx, fy) in new[] { (0.48f, 0.7f), (0.58f, 0.8f), (0.4f, 0.88f) }) Ell(g, w * fx, h * fy, w * 0.012f, h * 0.008f);
+        // The wave: a steep green wall with a white, curling crest.
+        g.FillStyle = Paint.Linear(0, h * 0.3f, 0, h, (0, "#2f8a8a"), (1, "#1d5a6a"));
+        Poly(g, 0, h * 0.34f, w * 0.1f, h * 0.27f, w * 0.2f, h * 0.31f, w * 0.29f, h * 0.48f, w * 0.33f, h, 0, h);
+        g.FillStyle = Paint.Of("#f4fbff");
+        Poly(g, w * 0.04f, h * 0.3f, w * 0.12f, h * 0.25f, w * 0.22f, h * 0.29f, w * 0.27f, h * 0.38f, w * 0.2f, h * 0.33f, w * 0.12f, h * 0.31f);
+        g.FillStyle = Paint.Of("rgba(244,251,255,0.7)");
+        foreach (var (fx, fy, r) in new[] { (0.29f, 0.5f, 0.015f), (0.31f, 0.62f, 0.012f), (0.3f, 0.76f, 0.014f), (0.25f, 0.4f, 0.012f) }) Circ(g, w * fx, h * fy, w * r);
+        // The island and School Rise, with the school, palms, and everyone up top.
+        g.FillStyle = Paint.Of("#e8d8a8");
+        Poly(g, w * 0.62f, h, w * 0.64f, h * 0.55f, w * 0.72f, h * 0.48f, w, h * 0.46f, w, h);
+        g.FillStyle = Paint.Linear(0, h * 0.25f, 0, h, (0, "#6fae5a"), (1, "#3f7a3a"));
+        Poly(g, w * 0.68f, h, w * 0.7f, h * 0.52f, w * 0.78f, h * 0.36f, w * 0.88f, h * 0.27f, w, h * 0.27f, w, h);
+        g.FillStyle = Paint.Of("#c39a5c"); Rect(w * 0.84f, h * 0.17f, w * 0.1f, h * 0.1f);
+        g.FillStyle = Paint.Of("#967342"); Poly(g, w * 0.82f, h * 0.18f, w * 0.89f, h * 0.1f, w * 0.96f, h * 0.18f);
+        g.FillStyle = Paint.Of("#2f8a4a"); Rect(w * 0.77f, h * 0.24f, w * 0.04f, h * 0.035f);
+        foreach (var (fx, col) in new[] { (0.8f, "#e6a843"), (0.835f, "#367caa"), (0.86f, "#e04b3a"), (0.885f, "#3f7fd0"), (0.91f, "#f2c94a"), (0.94f, "#f2ecf8") })
+        {
+            g.FillStyle = Paint.Of(col); Rect(w * fx, h * 0.24f, w * 0.014f, h * 0.035f);
+            g.FillStyle = Paint.Of("#b07a52"); Circ(g, w * (fx + 0.007f), h * 0.225f, w * 0.008f);
+        }
+        g.StrokeStyle = Paint.Of("#6b4a2b"); g.LineWidth = Math.Max(1, w / 160);
+        foreach (var px in new[] { 0.73f, 0.76f })
+        {
+            g.BeginPath(); g.MoveTo(w * px, h * 0.5f); g.QuadTo(w * (px + 0.01f), h * 0.38f, w * (px - 0.005f), h * 0.3f); g.Stroke();
+            g.FillStyle = Paint.Of("#4f8a3f");
+            Ell(g, w * (px - 0.005f), h * 0.3f, w * 0.03f, h * 0.02f, -0.3f); Ell(g, w * (px - 0.005f), h * 0.3f, w * 0.03f, h * 0.02f, 0.3f);
+        }
+    }
+
     // Draws the underwater portrait at logical size w x h onto a canvas that is already scaled to device pixels.
     public static void Scene(VCanvas g, float w, float h, string id, bool sil)
     {
-        bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan" or "tidemane" or "marlin" or "tarpon" or "bakunawa";
+        if (id == "tsunami") { TsunamiScene(g, w, h); return; }
+        bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan" or "tidemane" or "marlin" or "tarpon" or "bakunawa" or "platejaw";
         g.FillStyle = Paint.Linear(0, 0, 0, h, (0, deep ? "#1d3a5a" : "#3a8db0"), (1, deep ? "#050d18" : "#12304a"));
         g.BeginPath(); g.RectPath(0, 0, w, h); g.Fill();
         g.FillStyle = Paint.Of("rgba(255,255,255,0.06)");

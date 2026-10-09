@@ -57,6 +57,8 @@ partial class Game
         critters.Clear();
         particles.Clear();
         if (key != "cave") monsters.Clear();
+        // Platejaw only lives on the Ancient Floor, and goes back under if you leave it (Guardian.cs).
+        guardian = null; rocks.Clear();
         hover = null;
         ghost = null;
         fish = null;

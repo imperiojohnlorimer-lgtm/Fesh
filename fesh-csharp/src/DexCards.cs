@@ -14,6 +14,7 @@ partial class Game
     static readonly Dictionary<string, (string sci, string text)> ExtraFacts = new()
     {
         ["tidemane"] = ("Made up for Fesh", "In ancient Greek myths, hippocamps, half horse and half fish, pulled the sea god's chariot. Scientists borrowed the name: Hippocampus is the genus of the real seahorses."),
+        ["platejaw"] = ("Made up for Fesh, based on Dunkleosteus", "Dunkleosteus was an armoured fish, a placoderm, that lived about 380 to 360 million years ago. Bony plates covered its head and shoulders, and instead of teeth it had jaw plates with sharp edges that stayed sharp as they wore. Placoderms all died out, but coelacanths were already around back then, and still live today."),
         ["bakunawa"] = ("From Philippine stories", "In Visayan stories the Bakunawa, a sea serpent, swallows the moon, and people bang pots and gongs until it lets go. It's an old way of explaining eclipses. In a real lunar eclipse, the Earth passes between the Sun and a full moon, and the Earth's shadow falls on the moon."),
         ["dog"] = ("Canis familiaris", "Many dogs can swim, paddling with all four legs: that's where the name \"doggy paddle\" comes from."),
         ["sheep"] = ("Ovis aries", "The wool of most farm sheep keeps growing until it's sheared. A wet fleece is very heavy, so a sheep in the sea is in real trouble."),
@@ -46,6 +47,19 @@ partial class Game
             }
             return (got, got ? $"{Data.MountName}, your mount" : "???", "Legend", Pal.C("#10243a"),
                 got ? Data.Tidemane.Desc : "Not found yet. " + Data.Tidemane.Hint, facts);
+        }
+        if (key == "platejaw")
+        {
+            // Named once you've seen it rise; the story and the real fish behind it wait until you've driven it off.
+            bool won = GuardianBeaten;
+            if (won)
+            {
+                facts.Add(("How", Data.Platejaw.Where));
+                facts.Add(("After", "A broken piece of its armour, made into plate armour at a workbench, halves what monsters can do to you."));
+            }
+            else if (GuardianMet) facts.Add(("Where", "The Ancient pool, floor 12 of Frostfang Caverns. Knock on the carved stone to call it up."));
+            return (won, GuardianMet ? $"{GuardianName}, the pool's guardian" : "???", "Legend", Pal.C("#10243a"),
+                won ? Data.Platejaw.Desc : GuardianMet ? "Not beaten yet. It lunges out of the Ancient pool and strands itself on the stone: that's when to strike." : "Not found yet. " + Data.Platejaw.Hint, facts);
         }
         if (key == "bakunawa")
         {
@@ -97,7 +111,7 @@ partial class Game
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
         Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
         if (SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { dexExtra = null; return; }
-        Gfx.Text(name, x + pad, y + pad - 2, FontKind.Ui700, 34, dexExtra is "tidemane" or "bakunawa" && got ? Pal.C("#9a6a1a") : Pal.PaperInk);
+        Gfx.Text(name, x + pad, y + pad - 2, FontKind.Ui700, 34, dexExtra is "tidemane" or "bakunawa" or "platejaw" && got ? Pal.C("#9a6a1a") : Pal.PaperInk);
 
         // The picture, and under it the real animal (or story).
         float px = x + pad, py = y + pad + 50;
@@ -207,9 +221,9 @@ partial class Game
     void DrawExtraScene(string key, string id, float x, float y, float w, float h)
     {
         bool night = id is "alitaptap" or "plankton" || key == "bakunawa";
-        if (key is "tidemane" or "bakunawa")
+        if (key is "tidemane" or "bakunawa" or "platejaw")
         {
-            Gfx.Portrait(key == "tidemane" ? "tidemane" : "bakunawa", false, x, y, w, h);
+            Gfx.Portrait(key, false, x, y, w, h);
             return;
         }
         if (key.StartsWith("odd:") || id is "tarsier" or "hornbill")

@@ -566,7 +566,7 @@ partial class Game
     // A blow from something at (fromX, fromY) knocks you back a few steps of 3 pixels.
     void HurtPlayer(int dmg, float fromX, float fromY, int push = 4)
     {
-        float taken = dmg * (Has("shell_armor") > 0 ? 0.65f : 1f);
+        float taken = dmg * ArmourMul;
         state.hp = Math.Max(0, state.hp - taken);
         iframes = 0.9f;
         hurtFlash = 0.35f;
@@ -587,6 +587,9 @@ partial class Game
         if (state.hp <= 0) Faint();
     }
 
+    // Platejaw's plate armour beats the rock crabs' shells; you wear the better one.
+    float ArmourMul => Has("plate_armor") > 0 ? 0.5f : Has("shell_armor") > 0 ? 0.65f : 1f;
+
     // Blacking out in the caverns: you wake up outside, a bit poorer. Knocked flat at the Starwell, you come round on the
     // atoll's jetty, and Tidemane has gone back under.
     void Faint()
@@ -594,6 +597,10 @@ partial class Game
         fish = null; reel = null; pointerHold = false;
         panel = null;
         mode = "play";
+        // Knocked flat by Platejaw: it goes back down, and its rocks with it. The coelacanth was landed before the fight.
+        bool guarded = guardian != null;
+        guardian = null; guardianDue = false; rocks.Clear();
+        tremor = null; evac = null;
         if (InAmihan && boss == null)
         {
             LeaveMount();
@@ -654,7 +661,8 @@ partial class Game
             state.hp = 35;
             state.coins -= lost;
             Save();
-        }, () => Toast($"Everything went dark... You woke up outside the caverns{(lost > 0 ? $", {lost} coins lighter" : "")}. Eat and rest to recover.", 5));
+        }, () => Toast($"Everything went dark... You woke up outside the caverns{(lost > 0 ? $", {lost} coins lighter" : "")}. Eat and rest to recover."
+            + (guarded ? $" {GuardianName} went back under; knock on the carved stone by the Ancient pool to face it again." : ""), guarded ? 7 : 5));
     }
 
     // Health comes back slowly while you're fed and out of danger; starving wears it down (but never below 10).
@@ -668,13 +676,17 @@ partial class Game
     void RenderCave(float t)
     {
         var th = CaveTheme();
+        bool ancientFloor = caveFloor == AncientFloor;
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
         for (int y = vy0; y <= vy1; y++)
             for (int x = vx0; x <= vx1; x++)
                 if (map[y, x] == 'P' && (t * 0.3 + Pix.Hash(x, y, 7)) % 1 < 0.15) pix.Rect(x * T + 3, y * T + 5, 2, 1, "#4f8fb8");
         DrawSpots(t);
         var list = new List<(float y, Action draw)>();
+        DrawGuardianWater(t);
         foreach (var n in nodes) if (!n.Mined) list.Add((n.Y * T + 9, () => DrawNode(n, t)));
+        if (ancientFloor) list.Add((RuneStoneY, () => DrawRuneStone(t)));
+        if (guardian != null) list.Add((guardian.Y, () => DrawGuardianBody(t)));
         foreach (var m in monsters) list.Add((m.Y, () => DrawMonster(m, t)));
         for (int y = vy0; y <= vy1; y++)
             for (int x = vx0; x <= vx1; x++)
@@ -698,12 +710,15 @@ partial class Game
                 for (int x = vx0; x <= vx1; x++)
                     if (map[y, x] == 'G') LightHole(x * T + 5, y * T + 5, 12, 0.55f);
             LightHole(AncientPoolX, AncientPoolY, 40, 0.35f + 0.1f * MathF.Sin(t));
+            LightHole(RuneStoneX, RuneStoneY - 4, 14, 0.4f);
+            if (guardian != null) LightHole(guardian.X, guardian.Y - 6, 30, 0.6f);
         }
         ApplyDark(new Color(5, 4, 8, 255));
         foreach (var n in nodes)
             if (!n.Mined && n.Kind is "crystal" or "abyssite")
                 pix.Glow(n.X * T + 5, n.Y * T, 12, n.Kind == "crystal" ? Pal.Rgba(127, 232, 255, 0.25f) : Pal.Rgba(155, 107, 224, 0.28f));
         foreach (var m in monsters) if (m.Kind == "shade") pix.Glow(m.X, m.Y - 10, 10, Pal.Rgba(155, 107, 224, 0.2f));
+        DrawGuardianWarnings(t);
         if (ancient)
         {
             float a = 0.25f + 0.15f * MathF.Sin(t * 0.7f);

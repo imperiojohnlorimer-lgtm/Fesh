@@ -38,7 +38,8 @@ partial class Game
 
     // Shallow water you can wade into with waders: the sea's shallows, the lagoons, the oasis and the swamp pools.
     static bool Wadeable(char t) => t is 'w' or 'l' or 'o' or 'm';
-    bool Wading => scene == "world" && Has("waders") > 0;
+    // Not while the sea's going out and coming back (RestlessSea.cs): you never step off the shore then.
+    bool Wading => scene == "world" && Has("waders") > 0 && !SeaEmergency;
     // On a reef flat the tide has dried out (Tides.cs) you're on wet sand, not in the water.
     bool InWater
     {
@@ -225,8 +226,9 @@ partial class Game
     {
         if (Aboard) { Toast("Land your boat before building."); return; }
         if (mode == "panel") ClosePanels();
-        if (boss != null) { Sfx.Play("nope"); Toast("Not in the middle of a fight!"); return; }
+        if (boss != null || guardian != null) { Sfx.Play("nope"); Toast("Not in the middle of a fight!"); return; }
         if (eclipse != null) { Sfx.Play("nope"); Toast("Not now: Bakunawa has the moon!"); return; }
+        if (tremor != null || SeaEmergency) { Sfx.Play("nope"); Toast("Not now: up to School Rise!"); return; }
         if (mode != "play")
         {
             if (FishingModes.Contains(mode)) Toast("Finish fishing first.");

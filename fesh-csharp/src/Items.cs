@@ -43,6 +43,7 @@ static class Items
         new("gold_sword", "Gold sword", "weapon", "7 damage. Heavy and shiny.", Icon: "sword", Tint: "#f3c25b"),
         new("crystal_blade", "Crystal blade", "weapon", "10 damage. Hums faintly in the dark.", Icon: "sword", Tint: "#7fe8ff"),
         new("shell_armor", "Shell armour", "armor", "Rock crab shells strapped together. Monsters hurt you a third less.", Icon: "armor"),
+        new("plate_armor", "Plate armour", "armor", "Made from a piece of Platejaw's armour. Monsters hurt you half as much.", Icon: "platearmor"),
         new("rod_old", "Old rod", "rod", "The rod you arrived with. It does the job.", Icon: "rod", Tint: "#8a6440"),
         new("rod_copper", "Copper rod", "rod", "A wider green bar, quicker bites, a little more luck.", Icon: "rod", Tint: "#d9823f"),
         new("rod_iron", "Iron rod", "rod", "Wider still, faster bites, better luck with rare fish.", Icon: "rod", Tint: "#b9c4cc"),
@@ -97,6 +98,7 @@ static class Items
         new("bat_wing", "Bat wing", "material", "Leathery. Pip will take it.", Icon: "wing"),
         new("crab_shell", "Crab shell", "material", "Hard as rock. Good for armour.", Icon: "shell"),
         new("shadow_essence", "Shadow essence", "material", "What's left of a shade. It's cold to hold.", Icon: "essence"),
+        new("platejaw_plate", "Platejaw's plate", "material", "A piece of Platejaw's head armour, as big as a dinner plate and as hard as stone. A workbench can make armour of it.", Icon: "plate"),
         new("wool", "Wool", "material", "A gift from a friendly sheep. Beds and rugs need it.", Icon: "wool"),
         new("seaweed", "Seaweed", "material", "Comes up in crab pots. Sushi needs it.", Icon: "seaweed"),
         new("pearl", "Pearl", "material", "A lucky find in a crab pot or a sunken chest. Pip pays well for one.", Icon: "pearl"),
@@ -303,6 +305,7 @@ static class Items
         new("gold_sword", 1, "workbench", N(("wood", 1), ("gold_bar", 3))),
         new("crystal_blade", 1, "workbench", N(("gold_bar", 2), ("crystal", 3), ("shadow_essence", 2))),
         new("shell_armor", 1, "workbench", N(("crab_shell", 4), ("iron_bar", 2))),
+        new("plate_armor", 1, "workbench", N(("platejaw_plate", 1), ("iron_bar", 2))),
         new("spear", 1, "workbench", N(("wood", 2), ("copper_bar", 1))),
         new("crab_pot", 1, "workbench", N(("wood", 4), ("wool", 1))),
         new("bubo", 1, "workbench", N(("wood", 4))),
@@ -524,6 +527,17 @@ static class ItemArt
             case "sword":
                 p.Line(3, 9, 10, 2, tint); p.Line(4, 9, 10, 3, "#ffffff");
                 p.Rect(2, 8, 4, 1, "#8a6440"); p.Rect(3, 7, 1, 3, "#8a6440"); p.Line(1, 11, 3, 9, "#5b3a24");
+                break;
+            case "plate":
+                // A curved plate of bone, ridged and pitted, with a broken edge.
+                p.Rect(2, 3, 8, 7, "#9aa0aa"); p.Rect(3, 2, 6, 9, "#9aa0aa"); p.Rect(3, 3, 5, 2, "#c9cdd4");
+                p.Rect(4, 6, 1, 1, "#6b707c"); p.Rect(7, 5, 1, 1, "#6b707c"); p.Rect(5, 8, 1, 1, "#6b707c");
+                p.Rect(2, 9, 2, 1, "#6b707c"); p.Rect(9, 8, 1, 2, "#6b707c"); p.Rect(8, 10, 1, 1, "#4a4e57");
+                break;
+            case "platearmor":
+                p.Rect(2, 2, 8, 9, "#6b707c"); p.Rect(3, 3, 6, 7, "#9aa0aa"); p.Rect(5, 2, 2, 9, "#4a4e57");
+                p.Rect(1, 2, 2, 3, "#c9b48f"); p.Rect(9, 2, 2, 3, "#c9b48f"); p.Rect(3, 4, 2, 1, "#c9cdd4"); p.Rect(7, 4, 2, 1, "#c9cdd4");
+                p.Rect(3, 7, 6, 1, "#4a4e57");
                 break;
             case "armor":
                 p.Rect(2, 2, 8, 9, "#7d8288"); p.Rect(3, 3, 6, 7, "#9aa0a5"); p.Rect(5, 2, 2, 9, "#6e737a");

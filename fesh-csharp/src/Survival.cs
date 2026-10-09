@@ -111,6 +111,7 @@ partial class Game
             "crystal_pickaxe" => " Now you can mine abyssite on the Ancient Floor.",
             "copper_sword" or "iron_sword" or "gold_sword" or "crystal_blade" => " Your best weapon is used automatically in the caves.",
             "shell_armor" => " You wear it automatically. Cave monsters hurt less.",
+            "plate_armor" => " You wear it automatically. Cave monsters hurt half as much.",
             "glow_bait" => " It's used before plain bait when you cast.",
             "spear" => " At the coral shallows, the atoll lagoon or Daang Pulo's islet reef, press <spear> to spearfish.",
             "crab_pot" => " Press <build> outdoors to set it in shallow water.",

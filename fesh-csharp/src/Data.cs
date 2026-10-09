@@ -116,6 +116,13 @@ static class Data
         "Hooked in the Starwell at night on a coconut, then worn down on the sand until it chose you.",
         "Hoofprints on Starfall Atoll lead into the palms and stop at the water.");
 
+    // Platejaw, the guardian of the Ancient pool (Guardian.cs): made up for Fesh, based on Dunkleosteus (DexCards.cs has the real fish).
+    public static readonly LegendInfo Platejaw = new("platejaw",
+        "An armoured fish as long as two people, from long before the dinosaurs. Bone plates cover its head, and its jaws are blades of "
+        + "bone, not teeth. It has hunted the coelacanths here for longer than anyone remembers.",
+        "Called up out of the Ancient pool on floor 12 of Frostfang Caverns, and worn out with blows whenever it stranded itself on the stone.",
+        "Something armoured hunts at the very bottom of Frostfang Caverns.");
+
     public static readonly Dictionary<string, CommonFish[]> Common = new()
     {
         ["amihanpond"] = new CommonFish[]
@@ -335,6 +342,25 @@ static class Data
         ("bk:log", "The keeper's log", "\"The night the lamp failed, the moon's reflection went out on the strait. We beat the agong on the pier until it came back.\"", "Tatay Celso's old logbook"),
         ("bk:agong", "The regatta agong", "Dado's lolo's old bronze gong, beaten every full moon when the lighthouse was young, to keep the moon safe. Nobody has beaten it since.", "Won by beating the regatta record")
     };
+    // The restless sea over Amihan Village (RestlessSea.cs): four clues, then the drill and one day the real thing. The
+    // wording follows Codex's fact check: the stories are each teller's own version, and the science is PHIVOLCS's.
+    public static readonly (string Key, string Title, string Finding, string Source)[] SeaClues =
+    {
+        ("rs:carpio", "Bernardo Carpio's shrug", "Lira's lola's Tagalog story: Bernardo Carpio, trapped in the mountains of Montalban, shook the ground when he struggled. Really, rock slips along a fault.", "Ma'am Isay, after the tremor"),
+        ("rs:berberoka", "The berberoka's trick", "Niko's lola's northern Luzon story: the berberoka held back the water so the fish lay stranded, then let it go. The pond drained through a cracked bank.", "Niko, by the drained bangus pond"),
+        ("rs:mark", "The mark on the post", "A notch high on the old post. When Lira's lola was a girl, after a great shaking, the sea ran out past the reef, then came back up this far.", "The old post at the landing"),
+        ("rs:signs", "One sign is enough", "PHIVOLCS: Shake, Drop, Roar. Strong shaking by the sea, the sea suddenly dropping away or rising, or a roar. Any one: go uphill, and stay till it's declared safe.", "Ma'am Isay's lesson")
+    };
+    public static readonly string[] SeaTheories =
+    {
+        "No leads yet. The ground shook under Amihan Village, and the bangus pond drained.",
+        "The ground shakes when rock slips along a fault. But what does that have to do with the pond, or the sea?",
+        "The shaking cracked the pond's bank. Niko's lola had a story about water that runs away, and comes back.",
+        "After a great shaking long ago, the sea ran out past the reef and came back up to Lira's post. Those signs fit a tsunami.",
+        "One sign is enough: go up to School Rise along the signs, call to people as you go, and stay until it's declared safe.",
+        "Case closed. When the sea was restless, everyone went up to School Rise. We don't know how the berberoka story began, but its signs were worth remembering."
+    };
+
     // By how many clues you have (any of them), then the last once the moon is back.
     public static readonly string[] MoonTheories =
     {

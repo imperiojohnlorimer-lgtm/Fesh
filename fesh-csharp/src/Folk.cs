@@ -50,6 +50,8 @@ partial class Game
         else { pipWalk.X = PipX; pipWalk.Y = PipY; pipWalk.Moving = false; }
         foreach (var n in Islanders)
         {
+            // On their way up to School Rise, Lira and Niko are the evacuation's to move (RestlessSea.cs).
+            if (SeaEmergency && n.id is "lira" or "niko") continue;
             var s = IslanderWalk(n.id);
             if (Dist(s.X, s.Y, player.X, player.Y) < 400) Stroll(s, dt, (x, y) => FolkCanStand(x, y));
         }

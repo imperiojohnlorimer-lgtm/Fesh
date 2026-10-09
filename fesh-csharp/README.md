@@ -428,6 +428,33 @@ New in **1.15.0**. Once Tala has given you the bubo, ask her again: she keeps a 
 Firefly displays in mangroves, like those along the Iwahig, Donsol and Abatan rivers, and plankton that glow when
 disturbed are both real; the trees and the list are the game's own.
 
+## The restless sea (story 3, Amihan Village)
+Once you've met Ma'am Isay, a day later the ground shakes while you're on Amihan Village's island. It's a small one:
+get into the open, away from palms and houses, then **duck, cover your head and hold on** (hold E). Afterwards the
+bangus pond has drained, and a new case opens on the Case board (its third tab, *The restless sea*):
+
+1. **Ma'am Isay** explains earthquakes: rock slipping along a fault, the Pacific Ring of Fire, PHIVOLCS. Lira's lola
+   had a Tagalog story for them, about Bernardo Carpio, trapped in the mountains of Montalban.
+2. **Niko** tells his lola's version of a northern Luzon story: the **berberoka** held back the water so the fish
+   lay stranded, then let it go. The pond itself drained through a crack the shaking made in its bank: bring Niko
+   6 stone and 2 wood and he mends it; it refills on the tide by the next day.
+3. **Lira** sends you to the old post by the landing, with a notch cut high up: when her lola was a girl, after a
+   great shaking, the sea ran out past the reef and came back up that far.
+4. **Ma'am Isay** puts it together: those remembered signs fit a tsunami (nobody knows how the berberoka story began).
+   PHIVOLCS's signs are **Shake, Drop, Roar**, and any one of them means go uphill at once. Put up the three
+   evacuation-route signs from the landing to **School Rise**, then run a drill with Mia, Jun and Bea: walk the route
+   and call to them on your way (E near them; one call reaches everyone in earshot).
+
+On a later day the ground shakes hard. Duck, cover and hold in the open; then go straight up to School Rise along the
+signs, calling to anyone you pass. Lira and Niko head up straight away; the children go when you call, or when Ma'am
+Isay rings the school bell. From the rise you watch the sea run out past the reef, roar, and come back over the low
+ground, twice. Nobody gets hurt: anyone caught down on the beach is pulled up the slope. Once everyone's counted, an
+hour passes and the town's disaster office gives the all-clear on the radio. The case closes with a card, 150 coins
+and a short report on what you did; Niko has a crab pot for you the next day.
+
+While it's happening the clock, hunger and the derby clock wait, and you can't board a boat, ride, build or fish. A
+save made in the middle just starts it again the next time you're on the island by day.
+
 ## The Sea school
 New in **1.17.0**: three ways to learn about the sea that also make you a better fisher. Each has a badge in the
 journal's **Sea school** tab, bronze, silver and gold, with a prize at every step; gold in all three is a diploma.
@@ -522,13 +549,40 @@ map shows where.
 Tidemane turns to face all four directions, with front and back views while galloping or swimming. Its mane and
 tail move with it, and the rider, fishing rod and held catches share its bounce on land and on the water.
 
+## Platejaw (spoilers)
+The Ancient pool has a guardian. Land the **Ancient coelacanth** and, as you close its card, the black water heaves:
+**Platejaw**, an armoured fish as long as two people, rises out of the pool. The coelacanth is already in your bag,
+so it's yours however the fight goes. Platejaw never leaves the water for long:
+
+- It circles under the surface, following you round the pool. Linger right at the edge and it **snaps** at you
+  (12 damage).
+- It surfaces at the edge nearest you and **lines up a lunge**: red arrows mark its lane, and brighten once it has
+  picked its line. Step out of it. A lunge that catches you does 18 damage.
+- After a lunge it lies **stranded** on the stone for a moment. That's the only time a blow gets past its armour, so
+  strike it then; blows on its armoured head in the water just clang off.
+- Lunging into a pillar **dazes** it for longer, and blows land harder.
+- Once it's tired it **rams the side of the pool** and rocks fall from the roof. Orange rings show where (10 damage
+  each): step out of them.
+- Near the end it **throws a wave** out of the pool (14 damage). Get right behind a pillar, where green marks show
+  the shelter: the wave breaks on it.
+
+Wear it out and it sinks back, leaving a piece of its armour on the stone. A workbench makes that into **plate
+armour** (with 2 iron bars), which halves what monsters and fighting fish do to you.
+
+If you black out you wake at the cave mouth as usual, and walking off down the passage ends the fight too. Either
+way, the **carved stone** south of the pool calls it back: knock on it. A save from before 1.19 that already has the
+coelacanth meets Platejaw the same way.
+
+Platejaw is made up, but it's based on a real fish: **Dunkleosteus**, an armoured placoderm that lived about 380 to
+360 million years ago. Its card on the Fish log's last page tells you about it.
+
 ## Music
-Every island has its own looping tune, and so do Frostfang Caverns, the insides of houses and the fight with
-Tidemane. Rain adds its own patter. Like the sound effects, the music is composed by code at startup, so there are
+Every island has its own looping tune, and so do Frostfang Caverns, the insides of houses and the fights with
+Tidemane and Platejaw. Rain adds its own patter. Like the sound effects, the music is composed by code at startup, so there are
 no audio files. Turn it on or off from the pause menu.
 
 ## Health
-The heart bar (top left, under the clock) is your health. Cave monsters, Tidemane and some Amihan fish can hurt you. Health comes
+The heart bar (top left, under the clock) is your health. Cave monsters, Tidemane, Platejaw and some Amihan fish can hurt you. Health comes
 back slowly while your food meter is above 30 and nothing has hit you for a few seconds, food heals half of what it
 fills, and resting restores 50. Starving wears health down, but never below 10. If it reaches zero in the caves you
 black out and wake up at the cave mouth with 35 health and 10% fewer coins. At the Starwell you wake on the atoll's
@@ -588,11 +642,13 @@ straight down to that floor.
 | Shade (flies) | 9 | 16 | 16 | Shadow essence |
 
 Face a monster and press E to attack. Your best sword is used automatically (copper 3, iron 5, gold 7, crystal
-blade 10 damage); without one you swing your pickaxe (2) or your fists (1). Shell armour cuts damage by a third.
+blade 10 damage); without one you swing your pickaxe (2) or your fists (1). Shell armour cuts damage by a third, and
+plate armour (made from Platejaw's armour) by half.
 
 **The Ancient Floor** (floor 12) is always the same: a flooded ruin of pillars and glowing runes around the
 Ancient pool, where the legendary **Ancient coelacanth** lives. Shades and rock crabs guard it, and it's the only
-place with abyssite, which makes the Ancient rod.
+place with abyssite, which makes the Ancient rod. A carved stone south of the pool shows what else lives in it
+(see Platejaw above).
 
 ## Crafting
 Tomas's hut (walk to his door and press E) has a workbench, a stove and a bed you can use from the start.
@@ -604,7 +660,7 @@ Your own shacks start empty: go inside and press B to place a workbench, furnace
 | Workbench: Rods | Copper rod (2 wood, 3 copper bar), iron rod (copper rod, 3 iron bar), crystal rod (iron rod, 1 iron bar, 3 crystal), Ancient rod (crystal rod, 2 gold bar, 3 abyssite) |
 | Workbench: Tackle | Reels: copper (1 wood, 2 copper bar), iron (copper reel, 2 iron bar), gold (iron reel, 2 gold bar). Lines: silk (3 wool), crystal (silk line, 1 crystal, 1 slime gel). Hooks: barbed (1 copper bar), big-game (barbed hook, 2 iron bar). Bobbers: cork (2 wood), glow (cork bobber, 2 slime gel). Sinkers: stone (3 stone), iron (stone sinker, 1 iron bar). Lures: spinner (1 copper bar), fly (1 wool, 1 bat wing) |
 | Workbench: Gear | Big sail (2 sailcloth, 4 wood, 1 iron bar), echo sounder (2 copper bar, 1 gold bar, 1 crystal), sunglasses (1 copper bar, 1 crystal), fish finder (2 copper bar, 1 iron bar, 1 crystal), waders (3 slime gel, 2 wool), abyssite charm (2 abyssite, 1 gold bar), headlamp (2 copper bar, 1 crystal), cooler (6 wood, 1 iron bar, 1 wool) |
-| Workbench: Combat | Swords: copper (1 wood, 2 copper bar), iron (1 wood, 3 iron bar), gold (1 wood, 3 gold bar); crystal blade (2 gold bar, 3 crystal, 2 shadow essence); shell armour (4 crab shell, 2 iron bar) |
+| Workbench: Combat | Swords: copper (1 wood, 2 copper bar), iron (1 wood, 3 iron bar), gold (1 wood, 3 gold bar); crystal blade (2 gold bar, 3 crystal, 2 shadow essence); shell armour (4 crab shell, 2 iron bar); plate armour (Platejaw's plate, 2 iron bar), once you've beaten Platejaw |
 | Workbench: Bait | Glow bait ×3 (2 bait, 1 slime gel), cut bait ×4 (1 raw fish), chum ×2 (1 raw fish, 1 berries) |
 | Furnace | Copper bar (2 copper ore, 1 wood), iron bar (2 iron ore, 1 wood), gold bar (2 gold ore, 1 wood) |
 | Smoking rack | Smoked fish (1 raw fish; fills 30, sells for 20), fish jerky ×2 (3 cut bait), tinapa ×2 (2 galunggong, tamban, sapsap, matang-baka, alumahan, salay-salay, bangus or tilapia, and 1 salt; fills 22) |
@@ -659,6 +715,8 @@ taking down a shack also packs up everything inside it.
 - `src/Weather.cs`: the daily forecast, rain and storms coming and going, closed bridges
 - `src/Clock.cs`: the island clock: day and night, dusk and dawn, a new day at 6 AM, regrowing trees
 - `src/Tidemane.cs`: the Starwell's secret, the fight with Tidemane, and riding it
+- `src/Guardian.cs`: Platejaw, the Ancient pool's guardian: its fight, the carved stone, and its card
+- `src/RestlessSea.cs`: the restless sea (story 3): the tremor, the clues, the pond, the signs and the drill, the evacuation, and the sea going out and coming back
 - `src/Archipelago.cs`: Amihan's four islands, village NPCs, landmarks and regional scenery
 - `src/Seaweed.cs`: Maya's guso farm in the Luntian lagoon
 - `src/Bakawan.cs`: Bakawan's firefly trees, the glowing water, sightings and Tala's list
@@ -694,7 +752,7 @@ depth, bait, every fight style, perfect hooks, sizes, records, chests, the ice h
 worms and crickets, the tackle box, the derby, legends, the moon and storms), all five
 islands, odd catches, chopping, mining, crafting, cooking, eating, houses, the cave (ore tiers, monsters,
 health, fainting, the Ancient Floor and the lift), animals, the shop, requests, bait, weather, planters, the
-aquarium, the boat, the Starwell and the whole fight with Tidemane, riding and swimming, music, save slots, settings,
+aquarium, the boat, the Starwell and the whole fight with Tidemane, the fight with Platejaw, the restless sea from the tremor to the all-clear, riding and swimming, music, save slots, settings,
 rebinding keys, the clock (dusk, dawn, resting, regrowth), the forecast and tomorrow's, Pip's and Tomas's hours, birds and
 crickets, pausing in the background, copying and renaming slots, the gamepad (scripted), and every screen. It refuses to run without
 `FESH_SAVE`, because it wipes the slots and settings wherever that points.

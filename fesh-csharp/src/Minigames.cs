@@ -257,7 +257,7 @@ partial class Game
         Swing("haul", 0.3f);
         Burst(b.x * T + 5, b.y * T + 4, "#cfe8ee", 10);
         Sfx.Play("splash");
-        var list = BuboSpot(b.x, b.y) is string spot ? BuboWeights(spot) : new();
+        var list = BuboSpot(b.x, b.y) is string spot && !(spot == "amihanpond" && PondClosed) ? BuboWeights(spot) : new();
         if (list.Count == 0) { Toast("You lift the bubo. Nothing in it today. It's set again for tomorrow.", 3); Save(); return; }
         var got = new List<CommonFish>();
         int n = 1 + (rng.NextDouble() < 0.3 ? 1 : 0);

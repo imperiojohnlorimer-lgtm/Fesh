@@ -402,6 +402,8 @@ partial class Game
         // R gets you on and off the boat: from beside it (E may belong to a fishing spot there), and at the helm it lands
         // (E fishes over deep water). In a storm the boat stays tied up, so if you have Tidemane, R calls it instead.
         if (eclipse != null) return;   // you stand your ground with the agong
+        // The ground's shaking, or everyone's heading up to School Rise: no boats, no riding off (RestlessSea.cs).
+        if (tremor != null || SeaEmergency) { Toast("Not now: up to School Rise, on foot!"); return; }
         if (mode == "play" && Aboard) { LandBoat(); return; }
         if (mode == "play" && boss == null && BoatInReach() && !(Stormy && state.tamed)) { BoardBoat(); return; }
         if (!state.tamed || mode != "play" || boss != null) return;

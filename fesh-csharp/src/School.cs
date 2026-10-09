@@ -63,6 +63,8 @@ partial class Game
             }, OpenQuiz);
             return;
         }
+        // The restless sea (RestlessSea.cs) comes before the day's lesson.
+        if (IsaySeaTalk()) return;
         OpenQuiz();
     }
 
@@ -985,11 +987,13 @@ partial class Game
     {
         float bx = SchoolX - 18, by = SchoolY + 16;
         pix.Rect(bx, by + 1, 36, 2, "#8a5f36"); pix.Rect(bx + 1, by + 3, 1, 2, "#6b4a2b"); pix.Rect(bx + 34, by + 3, 1, 2, "#6b4a2b");
-        if (!SchoolHours) return;
         for (int k = 0; k < 4; k++)
         {
+            // Mia, Jun and Bea are out in the square during the drill and the evacuation, back on the bench once they're up.
+            bool here = evac?.People.FirstOrDefault(m => m.Kid == k) is Mover m ? m.Safe : SchoolHours;
+            if (!here) continue;
             int kx = (int)bx + 5 + k * 9, ky = (int)by + 1;
-            DrawKid((px, py, pw, ph, c) => pix.Rect(px, py, pw, ph, c), kx, ky, k, 0, t);
+            DrawKid((px, py, pw, ph, c) => pix.Rect(px, py, pw, ph, c), kx, ky, k, Shaking ? 2 : 0, t);
         }
     }
 

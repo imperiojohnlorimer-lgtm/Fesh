@@ -100,6 +100,9 @@ partial class Game
                     Label = n.id == "maya" && CanGiveMayaGuso ? $"Give Maya {GusoHandIn} dried guso"
                         : n.id == "niko" && DerbyToJudge ? "Show Niko your best bangus"
                         : n.id == "lira" && SupperDish() is string dish ? $"Give Lira the {Items.ById[dish].Name.ToLowerInvariant()}"
+                        : n.id == "lira" && LiraSeaLabel() is string liraSea ? liraSea
+                        : n.id == "niko" && NikoSeaLabel() is string nikoSea ? nikoSea
+                        : n.id == "isay" && IsaySeaLabel() is string isaySea ? isaySea
                         : n.id == "niko" && state.Hinted("niko_request") && !state.Hinted("niko_asohos") && Has("asohos") >= NikoAsohos ? $"Give Niko {NikoAsohos} asohos" : n.id == "tala" && TalaListDone && !state.Hinted("talaReward") ? "Tell Tala what you've seen"
                         : n.id == "isay" && state.Hinted("metIsay") ? (LessonToday ? "Today's lesson with Ma'am Isay" : "Practise with Ma'am Isay") : $"Talk to {n.name}"
                 };
@@ -113,8 +116,9 @@ partial class Game
         switch (id)
         {
             case "lira":
-                // Her supper request comes first (Rondalla.cs).
+                // Her supper request comes first (Rondalla.cs), then the restless sea's part (RestlessSea.cs).
                 if (LiraSupper()) break;
+                if (LiraSeaTalk()) break;
                 Talk(new()
                 {
                     new("Lira", "Mabuhay! Welcome to Amihan. You've crossed a long stretch of sea to find our village. There are limestone lagoons, mangrove islands and volcanic shores beyond it."),
@@ -135,6 +139,8 @@ partial class Game
                     Talk(new() { new("Niko", FestivalNikoLine()) });
                     break;
                 }
+                // The restless sea (RestlessSea.cs): the drained pond, its bank, and later a crab pot.
+                if (NikoSeaTalk()) break;
                 // After the bangus, a second job (1.15): asohos for the village's breakfast, fried whole.
                 if (state.Hinted("niko_request") && !state.Hinted("niko_asohos") && Has("asohos") >= NikoAsohos)
                 {
@@ -222,10 +228,14 @@ partial class Game
                 continue;
             }
             list.Add((n.y - 3, () => DrawBahay(n.x, n.y - 5, n.shirt)));
+            // On their way up to School Rise, Lira and Niko are drawn by the evacuation instead (RestlessSea.cs).
+            if (SeaEmergency && n.id is "lira" or "niko") continue;
             list.Add((s.Y, () =>
             {
                 var look = new Look { skin = 2, shirt = n.id == "niko" ? 2 : n.id == "tala" ? 3 : 1, hat = 0, hair = 1 };
                 int x = (int)MathF.Round(s.X), y = (int)MathF.Round(s.Y), bob = s.Moving ? 0 : (int)(time % 3 / 2);
+                // Ducked, hands over their heads, while the ground shakes (RestlessSea.cs).
+                if (Shaking) { DrawDucked(look, x, y, s.Face); return; }
                 LookData.DrawPerson(pix, look, x, y, s.Face, s.Step, bob: bob);
                 // A woven salakot and a sash distinguish the village fishers; both ride the walk's bounce.
                 int up = bob + (s.Step is 2 or 4 ? 1 : 0);

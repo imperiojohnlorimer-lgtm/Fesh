@@ -145,7 +145,7 @@ partial class Game
     }
 
     // Each island has its own tune; the cave and houses have theirs. Rain adds its own patter outdoors.
-    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine ? "boss" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
+    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine || GuardianFighting ? "boss" : SeaEmergency && evac.Phase != "quake" ? "alarm" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
         : RondallaPlaying ? "rondalla" : Data.Biomes[lastBiome < Data.Biomes.Length ? lastBiome : PlayerBiome()].Id;
 
     void PickMusic(float dt)
@@ -219,7 +219,12 @@ partial class Game
         state.py = player.Y;
         if (Aboard) { state.boatX = player.X; state.boatY = player.Y; }
         state.scene = scene;
-        return SaveFile.Write(state);
+        // During the evacuation the guide follows its own goal; the save keeps the one you chose (RestlessSea.cs, Codex).
+        string track = state.track;
+        if (trackBeforeSea != null) state.track = trackBeforeSea;
+        bool ok = SaveFile.Write(state);
+        state.track = track;
+        return ok;
     }
 
     /* ---------- Input ---------- */
@@ -273,6 +278,8 @@ partial class Game
             else if (mode == "legend") CloseLegend();
             else if (mode == "tamed") CloseTamed();
             else if (mode == "moon") CloseMoon();
+            else if (mode == "platejaw") CloseGuardianCard();
+            else if (mode == "seacard") CloseSeaCard();
             else if (mode == "build") ExitBuild();
             else if (mode is "waiting" or "charging") ReelIn("You reeled in.");
             else if (mode == "spear") EndSpear();
@@ -742,6 +749,8 @@ partial class Game
         }
         if (scene == "cave")
         {
+            // While Platejaw is up there's nothing to do but face it (Guardian.cs).
+            if (guardian != null) return GuardianTarget();
             if (MonsterInFront() is Monster m)
                 return new Target { Type = "monster", Ref = m, Label = $"Attack the {MonsterKinds[m.Kind].Name} ({Weapon().name})" };
             if (Dist(x, y, ropeTile.x * T + 5, ropeTile.y * T + 8) < 14) return new Target { Type = "exit", Label = "Climb the ladder back to the surface" };
@@ -749,6 +758,7 @@ partial class Game
                 return new Target { Type = "descend", Label = caveFloor + 1 == AncientFloor ? "Climb down. Something ancient waits below" : $"Climb down to floor {caveFloor + 1}" };
             if (NodeAt(fx, fy) is Node n)
                 return new Target { Type = "node", Ref = n, Label = $"Mine the {Items.ById[Ore(n.Kind).Item].Name.ToLowerInvariant()}" };
+            if (OnAncientFloor && Dist(x, y, RuneStoneX, RuneStoneY + 4) < 11) return RuneStoneTarget();
             foreach (var s in Data.Spots)
             {
                 if (!SpotHere(s)) continue;
@@ -761,6 +771,11 @@ partial class Game
         // In the middle of the fight at the Starwell there's nothing to do but fight; under Bakunawa, only beat the agong.
         if (boss != null) return BossTarget();
         if (eclipse != null) return EclipseTarget();
+        // The shaking and the evacuation (RestlessSea.cs): only what to do about them. In the drill, calling to the
+        // children comes first, and everything else still works.
+        if (tremor != null || SeaEmergency) return SeaEventTarget();
+        if (evac?.Drill == true && SeaEventTarget() is { Type: "shout" } drillCall) return drillCall;
+        if (RestlessSeaTarget() is Target seaTarget) return seaTarget;
         if (Aboard) return HelmTarget();
         if (ArchipelagoTarget() is Target islandTarget) return islandTarget;
         if (HabagatTarget() is Target habagatTarget) return habagatTarget;
@@ -876,6 +891,8 @@ partial class Game
             case "legend": CloseLegend(); return;
             case "tamed": CloseTamed(); return;
             case "moon": CloseMoon(); return;
+            case "platejaw": CloseGuardianCard(); return;
+            case "seacard": CloseSeaCard(); return;
             case "build": BuildAction(); return;
             case "play":
                 if (target == null) return;
@@ -915,6 +932,12 @@ partial class Game
                     case "descend": EnterCaveFloor(caveFloor + 1); break;
                     case "monster": Attack((Monster)target.Ref); break;
                     case "boss": StrikeBoss(); break;
+                    case "guardian": StrikeGuardian(); break;
+                    case "runestone": UseRuneStone(); break;
+                    case "shout": Shout(); break;
+                    case "seapost": LookAtPost(); break;
+                    case "seasign": PutUpSign(target.Tx); break;
+                    case "duck": break;
                     case "ride": Mount(); break;
                     case "carving": ReadCarving(); break;
                     case "craft": OpenCraft(target.Id); break;
@@ -973,12 +996,16 @@ partial class Game
         if (ActiveModes.Contains(mode))
         {
             TickClock(dt);
-            TickFood(dt);
-            TickHealth(dt);
+            // Only the shaking and the real evacuation hold these (Codex: the drill used to freeze them too, and hunger
+            // still hurt you during the evacuation).
+            if (tremor == null && !SeaEmergency) TickFood(dt);
+            if (tremor == null && !SeaEmergency) TickHealth(dt);
             UpdateMonsters(dt);
             UpdateBoss(dt);
+            UpdateGuardian(dt);
+            UpdateRestlessSea(dt);
             UpdateEclipse(dt);
-            TickDerby(dt);
+            if (tremor == null && !SeaEmergency) TickDerby(dt);
         }
         else { iframes = Math.Max(0, iframes - dt); hurtFlash = Math.Max(0, hurtFlash - dt); }
 
@@ -1025,7 +1052,7 @@ partial class Game
                 push = Math.Clamp(0.35f + 0.65f * (Inp.Stick.Length() - 0.35f) / 0.5f, 0.35f, 1);
             }
             // Under Bakunawa you stand your ground with the agong.
-            if (eclipse != null) dx = dy = 0;
+            if (eclipse != null || Ducking) dx = dy = 0;
             player.Moving = dx != 0 || dy != 0;
             if (player.Moving)
             {
@@ -1035,7 +1062,8 @@ partial class Game
                 float len = MathF.Sqrt(dx * dx + dy * dy);
                 // Under sail the monsoon helps or hinders (Seasons.cs); a trolling boat just putters along.
                 if (Aboard && !trolling) speed *= WindFactor(dx / len, dy / len);
-                float sp = speed * push * dt * (Starving ? 0.6f : 1f);
+                // Hard to walk while the ground shakes.
+                float sp = speed * push * dt * (Starving ? 0.6f : 1f) * (Shaking ? 0.45f : 1f);
                 float mx = dx / len * sp, my = dy / len * sp;
                 if (Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, ride, !ride)) player.X += mx;
                 if (Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, ride, !ride)) player.Y += my;
@@ -1134,6 +1162,8 @@ partial class Game
         tomasX = TomasHomeX; tomasY = TomasHomeY;
         // Nothing carries over from a game played earlier in this session (quitting to the title and loading another slot).
         fish = null; reel = null; panel = null; boss = null; dlg = null; eclipse = null; race = null; raceArmed = false; sungka = null;
+        guardian = null; guardianDue = false; rocks.Clear();
+        tremor = null; evac = null; cocos.Clear(); trackBeforeSea = null;
         bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear(); seaLife.Clear(); glowTrail.Clear();
         habagatWalk.Clear();
         // The Sea school's moment-to-moment bits (1.17).

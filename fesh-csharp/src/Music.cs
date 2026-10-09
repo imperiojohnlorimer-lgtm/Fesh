@@ -36,7 +36,9 @@ static class Music
         ["cave"] = new(45, Minor, 60, new[] { (0, Min), (0, Min), (8, Maj), (7, Min) }, "bell", "sine", "pad", false, 6, 0.25f, 0.08f),
         ["home"] = new(65, Major, 80, new[] { (0, Maj), (5, Maj), (9, Min), (7, Maj) }, "musicbox", "sine", null, false, 7, 0.55f, 0.08f),
         // The fight with Tidemane: fast, minor and driving.
-        ["boss"] = new(52, Minor, 150, new[] { (0, Min), (8, Maj), (10, Maj), (7, Maj) }, "pulse", "tri", null, true, 8, 0.9f, 0.07f)
+        ["boss"] = new(52, Minor, 150, new[] { (0, Min), (8, Maj), (10, Maj), (7, Maj) }, "pulse", "tri", null, true, 8, 0.9f, 0.07f),
+        // Up to School Rise (RestlessSea.cs): urgent and steady, Amihan's marimba over a walking beat, never frightening.
+        ["alarm"] = new(57, Minor, 126, new[] { (0, Min), (5, Min), (8, Maj), (7, Maj) }, "marimba", "tri", "pad", true, 41, 0.7f, 0.07f)
     };
 
     static readonly ConcurrentDictionary<string, float[]> pcm = new();

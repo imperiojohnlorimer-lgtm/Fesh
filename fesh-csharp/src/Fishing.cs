@@ -207,6 +207,9 @@ partial class Game
     /* ---------- Casting ---------- */
     Target SpotTarget(Spot s)
     {
+        // The bangus pond after the tremor: drained through its cracked bank, then refilling (RestlessSea.cs).
+        if (s.Id == "amihanpond" && PondClosed)
+            return new Target { Type = "info", Label = PondDry ? "The bangus pond is nearly dry. Its bank cracked in the shaking" : "The pond is filling on the tide. Fish it again tomorrow" };
         if (s.Id == "icehole" && IceFrozen)
             return new Target { Type = "drill", Id = s.Id, Label = PickTier > 0 ? "Break through the ice with your pickaxe" : "Chip a hole through the ice" };
         var t = new Target { Type = "spot", Id = s.Id, Label = s.Id == "icehole" ? s.Action : s.Action + " (hold to cast further)" };
@@ -683,6 +686,9 @@ partial class Game
         if (mode != "legend" || Raylib.GetTime() - catchOpenedAt < 0.6) return;
         mode = "play";
         Sfx.Play("ui");
+        // The coelacanth is landed, and the thing that hunts it rises (Guardian.cs), until you've driven it off.
+        // The target is still the pool from before the card, so a press next frame would cast instead (Codex): clear it.
+        if (legendId == "ancient_coelacanth" && OnAncientFloor && !GuardianBeaten) { guardianDue = true; target = null; return; }
         heldItem = legendId;
         heldT = 2f;
         Toast($"The {Data.FishById[legendId].Name} is in your bag. It would look magnificent in an aquarium.", 4);

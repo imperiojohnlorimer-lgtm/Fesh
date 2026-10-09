@@ -28,7 +28,7 @@ partial class Game
         else
         {
             // No knockback or monster-specific line cancellation. The fish remains hooked unless you faint.
-            float taken = damage * (Has("shell_armor") > 0 ? .65f : 1);
+            float taken = damage * ArmourMul;
             state.hp = Math.Max(0, state.hp - taken);
             lastHitT = time; hurtFlash = .35f; iframes = .9f;
             // The hit costs progress but never loses the fish by itself, and never adds any either.

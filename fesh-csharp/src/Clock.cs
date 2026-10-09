@@ -41,7 +41,7 @@ partial class Game
     void TickClock(float dt)
     {
         float rate = Settings.GameMinutesPerSecond;
-        if (rate > 0 && eclipse == null) Advance(dt * rate, quiet: false);
+        if (rate > 0 && eclipse == null && tremor == null && !SeaEmergency) Advance(dt * rate, quiet: false);
     }
 
     // Moves the clock forward, stopping at each dusk and dawn on the way so nothing is skipped (resting can cross both).
