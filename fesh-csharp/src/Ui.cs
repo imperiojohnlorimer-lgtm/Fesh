@@ -545,6 +545,7 @@ partial class Game
     {
         Backdrop();
         if (dexFish != null) { DrawFishCard(); return; }
+        if (dexExtra != null) { DrawExtraCard(); return; }
         const float nx = 50, nw = 1180, padT = 21, padR = 24, padB = 27, padL = 64, gap = 18;
         float innerW = nw - padL - padR;
         bool log = dexTab == "log";
@@ -570,10 +571,11 @@ partial class Game
         var heights = groups.Select(g => (int)(headH + g.fish.Count * rowH + 8)).ToList();
         var cols = TwoColumns(heights);
         // The last page: legends (with Tidemane and Bakunawa) on the left; odd catches, records and sightings on the right.
-        const float legendRow = 40;
+        // A legend's note takes a second line rather than being cut short (1.18.1); its card has the whole story.
+        var legendRows = LegendRows((innerW - gap) / 2 - 52);
         // Odd catches and sightings sit in two columns each, so the page fits on the screen.
         int oddRows = (Data.Odd.Length + 1) / 2, sightRows = Math.Max(SeaKinds.Count, BakawanKinds.Count);
-        float legendsH = 48 + (Data.Legends.Count + 2) * legendRow, oddH = 46 + oddRows * 26, sightH = 46 + 24 + sightRows * 26;
+        float legendsH = 48 + legendRows.Sum(r => LegendRowH(r.note)), oddH = 46 + oddRows * 26, sightH = 46 + 24 + sightRows * 26;
         float extrasH = oddH + 10 + 70 + 10 + sightH;
         float logH = logPage < Data.Biomes.Length ? Math.Max(60, cols.Max(c => c.Sum(i => heights[i] + cardGap))) : Math.Max(legendsH, extrasH);
 
@@ -599,7 +601,7 @@ partial class Game
         tx += SmallW("Fish album") + 10;
         if (Button("Island guide", tx, y, SmallW("Island guide"), 44, FontKind.Ui700, 20, Pal.C("#9fc3d1"), Pal.Ink, 4))
         { OpenAtlas(dexTab == "log" && logPage < Data.Biomes.Length ? RegionForBiome(Data.Biomes[logPage].Id) : HereRegion()); return; }
-        if (SmallButton("Close", nx + nw - padR - SmallW("Close"), y)) ClosePanels();
+        if (SmallButton("Close", nx + nw - padR - SmallW("Close"), y)) { ClosePanels(); return; }
         y += 46 + 10;
         Lines(lead, x, y, 28, FontKind.Note, 20, Pal.PaperInk);
         y += lead.Count * 28 + 16;
@@ -694,24 +696,33 @@ partial class Game
             float cx = x, cy = y;
             Gfx.Box(cx, cy, colW, legendsH, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text($"Legends: {Data.Legends.Keys.Count(id => state.commons.GetValueOrDefault(id) > 0)} of {Data.Legends.Count}", cx + 12, cy + 8, FontKind.Ui700, 18, Pal.PaperInk);
+            // Every row on this page opens a card (1.18.1), like a fish's row on the others.
+            const string clickHint = "Click any row for its card";
+            Gfx.Text(clickHint, cx + colW - 12 - Gfx.Measure(clickHint, FontKind.Ui500, 14), cy + 12, FontKind.Ui500, 14, Muted);
             cy += 38;
-            void Legend(bool got, string icon, string name, Color col, string note)
+            // A row's whole width is the button: a legend fish opens its fish card, the rest their own (DexCards.cs).
+            bool RowClick(string key, float rx, float ry, float rw, float rh)
             {
+                if (Gfx.Hover(rx, ry, rw, rh)) Gfx.Rect(rx, ry, rw, rh, Pal.C("rgba(29,79,120,0.07)"), 3);
+#if DEBUG
+                Gfx.Seen["row:" + key] = new Rectangle(rx, ry, rw, rh);
+#endif
+                if (!Gfx.Click(rx, ry, rw, rh)) return false;
+                if (Data.FishById.ContainsKey(key)) dexFish = key; else dexExtra = key;
+                Sfx.Play("blip");
+                return true;
+            }
+            foreach (var (key, got, icon, name, col, note) in legendRows)
+            {
+                // Not fish, but legends all the same: the atoll's hippocamp and the moon-eater of Habagat, under a rule.
+                if (key == "tidemane") Gfx.Rect(cx + 10, cy - 5, colW - 20, 1, Pal.C("#e0d0b0"));
+                float rh = LegendRowH(note);
+                RowClick(key, cx + 4, cy - 4, colW - 8, rh - 2);
                 if (got) DrawIcon(icon, cx + 10, cy, 22); else Gfx.TextCenter("?", cx + 21, cy - 1, FontKind.Ui700, 19, Pal.C("#9a8a70"));
                 Gfx.Text(got ? name : "???", cx + 40, cy, FontKind.Ui700, 16, got ? col : Pal.C("#9a8a70"));
-                Gfx.Text(Gfx.Ellipsize(note, FontKind.Note, 14, colW - 52), cx + 40, cy + 19, FontKind.Note, 14, Muted);
-                cy += legendRow;
+                Lines(note, cx + 40, cy + 19, 16, FontKind.Note, 13, Muted);
+                cy += rh;
             }
-            foreach (var (id, info) in Data.Legends)
-            {
-                bool got = state.commons.GetValueOrDefault(id) > 0;
-                Legend(got, id, Data.FishById[id].Name, Pal.C("#9a6a1a"), got && state.records.TryGetValue(id, out float kg) ? $"{Kg(kg)}. {info.Where}" : info.Hint);
-            }
-            // Not fish, but legends all the same: the atoll's hippocamp and the moon-eater of Habagat.
-            Gfx.Rect(cx + 10, cy - 5, colW - 20, 1, Pal.C("#e0d0b0"));
-            Legend(state.tamed, "tidemane", $"{Data.MountName}, your mount", Pal.C("#1d6f68"), state.tamed ? Data.Tidemane.Where : Data.Tidemane.Hint);
-            Legend(MoonReturned, "moon_charm", "Bakunawa, the moon-eater", Pal.C("#2f6a6a"),
-                MoonReturned ? "Rose with the moon in its jaws over Parola, and gave it back to the islands' noise." : "Some full-moon nights, the moon goes out on the Habagat sea.");
             cx = x + colW + gap; cy = y;
             Gfx.Box(cx, cy, colW, oddH, CardBg, Pal.C("#c9b48f"), 2, 5);
             Gfx.Text("Odd catches", cx + 12, cy + 8, FontKind.Ui700, 18, Pal.PaperInk);
@@ -727,6 +738,7 @@ partial class Game
             {
                 var o = Data.Odd[i];
                 int n = state.odd.GetValueOrDefault(o.Id);
+                RowClick("odd:" + o.Id, cx + (i % 2) * halfW + 6, cy + 38 + i / 2 * 26 - 3, halfW - 12, 24);
                 Pair(cx + (i % 2) * halfW, cy + 38 + i / 2 * 26, n > 0 ? $"{o.Name} ×{n}" : "???", n > 0 ? Pal.PaperInk : Pal.C("#9a8a70"),
                     n > 0 ? Data.SpotById[o.Spot].Label : "Not a fish");
             }
@@ -746,6 +758,7 @@ partial class Game
                 foreach (var (id, name) in kinds)
                 {
                     int n = state.sightings.GetValueOrDefault(id);
+                    RowClick("sight:" + id, hx + 6, ry - 3, halfW - 12, 24);
                     Gfx.Text(Gfx.Ellipsize(n > 0 ? $"{name} ×{n}" : "???", FontKind.Ui600, 16, halfW - 26), hx + 14, ry, FontKind.Ui600, 16, n > 0 ? Pal.C("#2f6a6a") : Pal.C("#9a8a70"));
                     ry += 26;
                 }
@@ -756,6 +769,26 @@ partial class Game
         lastDexBottom = ny + h;
         if (Gfx.PressedOutside(nx, ny, nw, h)) ClosePanels();
     }
+
+    // The legends page's rows: each legend fish, then Tidemane and Bakunawa. A caught legend's note is short (its weight
+    // and where), as its card tells the whole story; one still out there has its hint, wrapped to fit the width.
+    List<(string key, bool got, string icon, string name, Color col, List<string> note)> LegendRows(float noteW)
+    {
+        var rows = new List<(string, bool, string, string, Color, List<string>)>();
+        void Add(string key, bool got, string icon, string name, Color col, string note) => rows.Add((key, got, icon, name, col, Gfx.Wrap(note, FontKind.Note, 13, noteW)));
+        foreach (var (id, info) in Data.Legends)
+        {
+            bool got = state.commons.GetValueOrDefault(id) > 0;
+            string where = Data.SpotOfFish.TryGetValue(id, out var spot) ? Data.SpotById[spot].Label : "";
+            Add(id, got, id, Data.FishById[id].Name, Pal.C("#9a6a1a"), got ? (state.records.TryGetValue(id, out float kg) ? $"{Kg(kg)} · {where}" : where) : info.Hint);
+        }
+        Add("tidemane", state.tamed, "tidemane", $"{Data.MountName}, your mount", Pal.C("#1d6f68"), state.tamed ? "Tamed on Starfall Atoll. It's yours to ride." : Data.Tidemane.Hint);
+        Add("bakunawa", MoonReturned, "moon_charm", "Bakunawa, the moon-eater", Pal.C("#2f6a6a"),
+            MoonReturned ? "It gave the moon back over Parola." : "Some full-moon nights, the moon goes out on the Habagat sea.");
+        return rows;
+    }
+
+    static float LegendRowH(List<string> note) => 21 + Math.Max(1, note.Count) * 16 + 4;
 
     /* ---------- Odd catch card ---------- */
     void DrawOdd()

@@ -213,6 +213,7 @@ partial class Game
 
     void UpdateAlbum()
     {
+        if (dexFish != null) return;     // a fish's card is open over the album
         int spreads = AlbumPages().Count / 2;
         if (Bind.Pressed("left")) { albumSpread = Math.Max(0, albumSpread - 1); Sfx.Play("blip"); }
         else if (Bind.Pressed("right")) { albumSpread = Math.Min(spreads - 1, albumSpread + 1); Sfx.Play("blip"); }
@@ -223,17 +224,20 @@ partial class Game
     void DrawAlbum()
     {
         Backdrop();
+        // A fish's card, opened by clicking its photo: Back (or Esc) returns to the album.
+        if (dexFish != null) { DrawFishCard(); return; }
         var pages = AlbumPages();
         int spreads = pages.Count / 2;
         albumSpread = Math.Clamp(albumSpread, 0, spreads - 1);
-        const float w = 1220, h = 660;
+        const float w = 1220, h = AlbumH;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        // The cover, then two pages and the spine.
+        // The cover, then two pages and the spine; the page turning sits on the cover below them.
         Gfx.Rect(x, y, w, h, AlbumCover, 10);
-        float pw = (w - 190) / 2, ph = h - 64, px0 = x + 18, py = y + 46;
+        float pw = (w - 190) / 2, ph = AlbumPageH, px0 = x + 18, py = y + 46;
         Gfx.Text("Fish album", x + 22, y + 10, FontKind.Ui700, 26, Pal.C("#f2e2b0"));
         int caught = AlbumChapters.Sum(ch => ch.Fish.Count(InAlbum)), total = AlbumChapters.Sum(ch => ch.Fish.Length);
-        Gfx.Text($"{caught} of {total} pages filled", x + 22 + Gfx.Measure("Fish album", FontKind.Ui700, 26) + 18, y + 18, FontKind.Ui600, 16, Pal.C("#e2c88e"));
+        string filled = $"{caught} of {total} pages filled  ·  click a photo to look closer";
+        Gfx.Text(filled, x + 22 + Gfx.Measure("Fish album", FontKind.Ui700, 26) + 18, y + 18, FontKind.Ui600, 16, Pal.C("#e2c88e"));
         if (SmallButton("Close", x + w - 18 - SmallW("Close"), y + 4)) { ClosePanels(); return; }
         for (int side = 0; side < 2; side++)
         {
@@ -243,16 +247,18 @@ partial class Game
             var (chapter, fish) = pages[albumSpread * 2 + side];
             float bottom = DrawAlbumPage(chapter, fish, px + 16, py + 14, pw - 32, ph - 28, albumSpread * 2 + side);
             lastAlbumBottom = side == 0 ? bottom - py : Math.Max(lastAlbumBottom, bottom - py);
-            Gfx.TextCenter($"{albumSpread * 2 + side + 1}", px + pw / 2, py + ph - 20, FontKind.Note, 14, Muted);
+            Gfx.TextCenter($"{albumSpread * 2 + side + 1}", px + pw / 2, py + ph - 22, FontKind.Note, 14, Muted);
+            if (dexFish != null) return;    // a photo was clicked: its card opens next frame
         }
-        // Page turning.
-        float by = y + h - 34;
-        if (Button("< Previous", px0, by + 2, 120, 28, FontKind.Ui700, 15, Pal.Sand, Pal.Ink, 2, 2, 4, albumSpread > 0)) { albumSpread--; Sfx.Play("blip"); }
-        if (Button("Next >", px0 + 2 * pw + 6 - 120, by + 2, 120, 28, FontKind.Ui700, 15, Pal.Sand, Pal.Ink, 2, 2, 4, albumSpread < spreads - 1)) { albumSpread++; Sfx.Play("blip"); }
-        Gfx.TextCenter(Bind.Fix("Turn the pages with <left> and <right>"), px0 + pw + 3, by + 8, FontKind.Ui500, 14, Pal.C("#e2c88e"));
+        // Page turning, on the cover under the pages.
+        float by = py + ph + 8;
+        if (Button("< Previous", px0, by, 120, 28, FontKind.Ui700, 15, Pal.Sand, Pal.Ink, 2, 2, 4, albumSpread > 0)) { albumSpread--; Sfx.Play("blip"); }
+        if (Button("Next >", px0 + 2 * pw + 6 - 120, by, 120, 28, FontKind.Ui700, 15, Pal.Sand, Pal.Ink, 2, 2, 4, albumSpread < spreads - 1)) { albumSpread++; Sfx.Play("blip"); }
+        Gfx.TextCenter(Bind.Fix("Turn the pages with <left> and <right>"), px0 + pw + 3, by + 5, FontKind.Ui600, 15, Pal.C("#f2e2b0"));
 
-        // Chapter tabs down the right edge, starred when the chapter's full.
+        // Chapter tabs down the right edge, starred when the chapter's full. Long titles take three short lines.
         float tx = px0 + 2 * pw + 18, ty = py, tw = x + w - 12 - tx;
+        lastAlbumTabCut = false;
         for (int c = -1; c < AlbumChapters.Length; c++)
         {
             string label = c < 0 ? "How to read it" : AlbumChapters[c].Title.Split(':')[0];
@@ -260,22 +266,27 @@ partial class Game
             bool on = pages[albumSpread * 2].chapter == c || pages[albumSpread * 2 + 1].chapter == c;
             var fill = on ? Pal.Lantern : Pal.Sand;
 #if DEBUG
-            Gfx.Seen[$"album:{(c < 0 ? "intro" : AlbumChapters[c].Id)}"] = new Rectangle(tx, ty, tw, 40);
+            Gfx.Seen[$"album:{(c < 0 ? "intro" : AlbumChapters[c].Id)}"] = new Rectangle(tx, ty, tw, AlbumTabH);
 #endif
-            if (Button("", tx, ty, tw, 40, FontKind.Ui600, 13, fill, Pal.Ink, 2, 2, 4)) { albumSpread = first / 2; Sfx.Play("blip"); return; }
-            var lines = Gfx.Wrap(label, FontKind.Ui700, 13, tw - (c >= 0 ? 44 : 12));
-            if (lines.Count > 2) lines = new List<string> { lines[0], Gfx.Ellipsize(lines[1] + " " + lines[2], FontKind.Ui700, 13, tw - 44) };
-            Lines(lines, tx + 7, ty + 20 - lines.Count * 8, 16, FontKind.Ui700, 13, Pal.Ink);
+            if (Button("", tx, ty, tw, AlbumTabH, FontKind.Ui600, 13, fill, Pal.Ink, 2, 2, 4)) { albumSpread = first / 2; Sfx.Play("blip"); return; }
+            var lines = Gfx.Wrap(label, FontKind.Ui700, 12, tw - (c >= 0 ? 40 : 12));
+            lastAlbumTabCut |= lines.Count > 3;
+            Lines(lines, tx + 7, ty + AlbumTabH / 2 - lines.Count * 7 + 1, 14, FontKind.Ui700, 12, Pal.Ink);
             if (c >= 0)
             {
                 var ch = AlbumChapters[c];
-                if (state.Hinted("album:" + ch.Id)) DrawIcon("star", tx + tw - 24, ty + 10, 20);
-                else { string n = $"{ch.Fish.Count(InAlbum)}/{ch.Fish.Length}"; Gfx.Text(n, tx + tw - 8 - Gfx.Measure(n, FontKind.Ui600, 12), ty + 13, FontKind.Ui600, 12, Muted); }
+                if (state.Hinted("album:" + ch.Id)) DrawIcon("star", tx + tw - 24, ty + AlbumTabH / 2 - 10, 20);
+                else { string n = $"{ch.Fish.Count(InAlbum)}/{ch.Fish.Length}"; Gfx.Text(n, tx + tw - 8 - Gfx.Measure(n, FontKind.Ui600, 12), ty + AlbumTabH / 2 - 7, FontKind.Ui600, 12, Muted); }
             }
-            ty += 46;
+            ty += AlbumTabH + 4;
         }
+        lastAlbumTabsBottom = ty - 4 - py;
         if (Gfx.PressedOutside(x, y, w, h)) ClosePanels();
     }
+
+    const float AlbumH = 700, AlbumTabH = 44;
+    bool lastAlbumTabCut;           // a chapter tab's title needed more than three lines (the autotest checks none do)
+    float lastAlbumTabsBottom;      // where the tabs ended, below the top of the pages
 
     // One page: the intro, a chapter's opening (heading, blurb and two fish), or four fish. Returns where it ended.
     float DrawAlbumPage(int chapter, string[] fish, float x, float y, float w, float h, int page)
@@ -331,7 +342,8 @@ partial class Game
         return end;
     }
 
-    const float AlbumEntryH = 256, AlbumPageH = 660 - 64;
+    // The pages sit between the cover's header and the page-turning strip at the bottom.
+    const float AlbumEntryH = 274, AlbumPageH = AlbumH - 46 - 48;
 
     float DrawAlbumEntry(string id, float x, float y, float w, float h, int seed)
     {
@@ -339,10 +351,13 @@ partial class Game
         bool got = InAlbum(id);
         // The photo: a white border, the fish on a blue ground, and two bits of tape.
         float tilt = (seed * 37 % 7 - 3) * 0.6f;
-        float fx = x + 6, fy = y + 4 + tilt, fw = w - 12, fh = 92;
+        float fx = x + 6, fy = y + 4 + tilt, fw = w - 12, fh = 88;
 #if DEBUG
         Gfx.Seen["albumfish:" + id] = new Rectangle(x, y, w, h);
 #endif
+        // The whole entry opens the fish's card (as a row does in the Fish log), with its big picture and the real fish.
+        if (Gfx.Hover(x, y, w, h)) Gfx.Rect(x - 4, y - 2, w + 8, h + 4, Pal.C("rgba(138,90,42,0.10)"), 6);
+        if (Gfx.Click(x, y, w, h)) { dexFish = id; Sfx.Play("blip"); }
         if (got)
         {
             Gfx.Rect(fx, fy, fw, fh, Pal.C("#fffdf6"), 2);
@@ -362,24 +377,25 @@ partial class Game
         if (!got)
         {
             Gfx.Text("Not caught yet", x + 6, ty, FontKind.Note, 16, Muted);
-            var near = AlbumData.TryGetValue(id, out var hint) ? $"Lives in {WaterList(hint.Water)} water." : "";
-            Gfx.Text(Gfx.Ellipsize(near, FontKind.Note, 14, w - 12), x + 6, ty + 22, FontKind.Note, 14, Muted);
-            return ty + 40;
+            var near = Gfx.Wrap(AlbumData.TryGetValue(id, out var hint) ? $"Lives in {WaterList(hint.Water)} water." : "", FontKind.Note, 14, w - 12);
+            Lines(near, x + 6, ty + 22, 18, FontKind.Note, 14, Muted);
+            return ty + 22 + near.Count * 18;
         }
-        // Names: the fish's own (local, with the English in brackets), then the scientific one.
-        Gfx.Text(Gfx.Ellipsize(f.Name, FontKind.Ui700, 16, w - 12), x + 6, ty, FontKind.Ui700, 16, Pal.PaperInk);
-        ty += 20;
+        // Names: the fish's own (local, with the English in brackets), then the scientific one. Nothing is cut short:
+        // long ones take a second line (the autotest checks every entry still fits its slot).
+        var nameLines = Gfx.Wrap(f.Name, FontKind.Ui700, 16, w - 12);
+        Lines(nameLines, x + 6, ty, 19, FontKind.Ui700, 16, Pal.PaperInk);
+        ty += nameLines.Count * 19 + 1;
         if (FishFacts.ById.TryGetValue(id, out var fact))
         {
-            string sci = fact.Real ? fact.Sci : "Based on: " + fact.Sci;
-            Gfx.Text(Gfx.Ellipsize(sci, FontKind.Note, 14, w - 12), x + 6, ty, FontKind.Note, 14, Pal.C("#5a4a3a"));
-            ty += 19;
+            var sci = Gfx.Wrap(fact.Real ? fact.Sci : "Based on: " + fact.Sci, FontKind.Note, 14, w - 12);
+            Lines(sci, x + 6, ty, 17, FontKind.Note, 14, Pal.C("#5a4a3a"));
+            ty += sci.Count * 17 + 2;
         }
         if (AlbumData.TryGetValue(id, out var info))
         {
-            // The family (up to two lines), the water as coloured tags, and what it eats (up to two lines).
+            // The family, the water as coloured tags, and what it eats.
             var fam = Gfx.Wrap((info.Family.Contains("order ") ? "Group: " : "Family: ") + info.Family, FontKind.Ui500, 13, w - 12);
-            if (fam.Count > 2) fam = new List<string> { fam[0], Gfx.Ellipsize(fam[1] + " " + fam[2], FontKind.Ui500, 13, w - 12) };
             Lines(fam, x + 6, ty, 16, FontKind.Ui500, 13, Pal.PaperInk);
             ty += fam.Count * 16 + 3;
             float wx = x + 6;
@@ -393,14 +409,20 @@ partial class Game
             }
             ty += 20;
             var eats = Gfx.Wrap("Eats: " + info.Diet, FontKind.Ui500, 13, w - 12);
-            if (eats.Count > 2) eats = new List<string> { eats[0], Gfx.Ellipsize(eats[1] + " " + eats[2], FontKind.Ui500, 13, w - 12) };
             Lines(eats, x + 6, ty, 16, FontKind.Ui500, 13, Pal.PaperInk);
             ty += eats.Count * 16 + 2;
         }
         string rec = state.records.TryGetValue(id, out float kg) ? $"Caught {state.commons[id]} · biggest {Kg(kg)}" : $"Caught {state.commons[id]}";
-        Gfx.Text(Gfx.Ellipsize(rec, FontKind.Ui600, 13, w - 12), x + 6, ty + 2, FontKind.Ui600, 13, Pal.C("#2a7d74"));
-        return ty + 20;
+        var recLines = Gfx.Wrap(rec, FontKind.Ui600, 13, w - 12);
+        Lines(recLines, x + 6, ty + 2, 16, FontKind.Ui600, 13, Pal.C("#2a7d74"));
+        ty += 2 + recLines.Count * 16;
+        lastAlbumEntryH = Math.Max(lastAlbumEntryH, ty - y);
+        if (ty - y > h) albumTooTall = id;
+        return ty;
     }
+
+    float lastAlbumEntryH;          // the tallest entry drawn (the autotest checks every one fits its slot)
+    string albumTooTall;            // the last fish whose entry ran past its slot, or null
 
     static string WaterList(string water)
     {

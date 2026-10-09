@@ -64,13 +64,17 @@ partial class Game
     List<string> LikedBaits(CommonFish f)
     {
         if (!Data.SpotOfFish.TryGetValue(f.Id, out var spot)) return new();
-        var list = Items.Baits.Keys.Where(b => BaitLikes(b, f, spot)).Select(b => Items.ById[b].Name.ToLowerInvariant()).ToList();
-        if (f.Legend && f.Bait != null) list.Insert(0, Items.ById[f.Bait].Name.ToLowerInvariant() + " (only that)");
-        if (f.Troll) list.Insert(0, "a trolled lure (only that)");
-        return list.Distinct().ToList();
+        // A fish that takes only one thing says just that (it used to list other baits after "only that").
+        if (f.Troll) return new() { "a trolled lure (only that)" };
+        if (f.Legend && f.Bait != null) return new() { Items.ById[f.Bait].Name.ToLowerInvariant() + " (only that)" };
+        return Items.Baits.Keys.Where(b => BaitLikes(b, f, spot)).Select(b => Items.ById[b].Name.ToLowerInvariant()).Distinct().ToList();
     }
 
-    // A fish's own card, in place of the Fish log page (Back or Esc returns to it).
+    // A fish's own card, in place of the Fish log page, the album or the island guide (Back or Esc returns to it).
+    const float DexCardW = 1000, DexCardH = 600, DexCardPad = 28, DexPicW = 336, DexPicH = 196;
+    float lastCardBottom;       // where the card's right-hand column ended (the autotest checks it fits)
+    bool lastCardAcross;        // the card's name and its row of tags both fit across it (checked)
+
     void DrawFishCard()
     {
         var f = Data.FishById[dexFish];
@@ -78,12 +82,13 @@ partial class Game
         bool known = n > 0, seen = Seen(f.Id);
         Data.Legends.TryGetValue(f.Id, out var legend);
         FishArt.Looks.TryGetValue(f.Id, out var look);
-        const float w = 900, h = 520, pad = 28, picW = 336, picH = 196;
+        AlbumData.TryGetValue(f.Id, out var album);
+        const float w = DexCardW, h = DexCardH, pad = DexCardPad, picW = DexPicW, picH = DexPicH;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
         Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
         if (SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { dexFish = null; return; }
-        // Its page in the fish album, once you've caught one.
-        if (state.commons.GetValueOrDefault(dexFish) > 0 && SmallButton("Album page", x + w - pad - SmallW("Back") - 12 - SmallW("Album page"), y + pad - 6)) { OpenAlbum(dexFish); dexFish = null; return; }
+        // Its page in the fish album, once you've caught one (not from the album itself: Back goes there).
+        if (panel != "album" && n > 0 && SmallButton("Album page", x + w - pad - SmallW("Back") - 12 - SmallW("Album page"), y + pad - 6)) { OpenAlbum(dexFish); dexFish = null; return; }
 
         // The picture: its own (a silhouette if you've only seen it), or the legend's portrait.
         float px = x + pad, py = y + pad + 50;
@@ -103,7 +108,9 @@ partial class Game
         DrawRealFish(f.Id, known || seen, px - 3, py + picH + 14, picW + 6, y + h - pad - (py + picH + 14));
 
         string name = known || seen ? f.Name : "???";
-        Gfx.Text(name, x + pad, y + pad - 2, FontKind.Ui700, 34, f.Legend && known ? Pal.C("#9a6a1a") : Pal.PaperInk);
+        // A long name gets a smaller size rather than losing its end.
+        float nameRoom = w - 2 * pad - SmallW("Back") - SmallW("Album page") - 40, nameSize = Gfx.Measure(name, FontKind.Ui700, 34) <= nameRoom ? 34 : 27;
+        Gfx.Text(name, x + pad, y + pad - 2 + (34 - nameSize) / 2, FontKind.Ui700, nameSize, f.Legend && known ? Pal.C("#9a6a1a") : Pal.PaperInk);
         var tags = new List<string>();
         if (f.Legend) tags.Add("Legendary"); else if (f.Rare) tags.Add("Rare");
         if (f.Attack > 0) tags.Add("Fights back");
@@ -118,8 +125,20 @@ partial class Game
             Gfx.Text(t, chipX + 8, ty + 3, FontKind.Ui700, 15, t == "Legendary" ? Pal.Lantern : Pal.Paper);
             chipX += cw + 8;
         }
-        if (tags.Count > 0) ty += 34;
-        string about = known ? legend?.Desc ?? look?.About ?? "" : seen ? "You saw one get away in the middle of a fight. Catch one to learn more." : "Not caught yet.";
+        // The water it lives in (the album's tags), once you've caught one.
+        if (known && album != null)
+            foreach (var kind in album.Water.Split(',').Select(k => k.Trim()))
+            {
+                string word = WaterWord(kind);
+                float cw = Gfx.Measure(word, FontKind.Ui700, 15) + 16;
+                Gfx.Rect(chipX, ty, cw, 24, WaterColor(kind), 4);
+                Gfx.Text(word, chipX + 8, ty + 3, FontKind.Ui700, 15, Pal.Paper);
+                chipX += cw + 8;
+            }
+        lastCardAcross = Gfx.Measure(name, FontKind.Ui700, nameSize) <= nameRoom && chipX - 8 <= tx + tw;
+        if (chipX > tx) ty += 34;
+        string about = known ? legend?.Desc ?? look?.About ?? "" : seen ? "You saw one get away in the middle of a fight. Catch one to learn more."
+            : legend != null ? "Not caught yet. " + legend.Hint : "Not caught yet.";
         var aboutLines = Gfx.Wrap(about, FontKind.Note, 19, tw);
         Lines(aboutLines, tx, ty, 26, FontKind.Note, 19, Pal.PaperInk);
         ty += aboutLines.Count * 26 + 12;
@@ -129,8 +148,16 @@ partial class Game
             ? $"{(SpotKnown(Data.SpotById[spotId]) ? Data.SpotById[spotId].Label : "???")}, {Data.Biomes[PageOf(f.Id)].Name}"
             : $"Crab pots on {Data.Biomes[PageOf(f.Id)].Name}";
         var facts = new List<(string k, string v)> { ("Where", where), ("When", WhenText(f)) };
+        // A legend's own story of how you landed it (the legends page keeps only its weight and place).
+        if (known && legend != null) facts.Add(("How", legend.Where));
         if (known)
         {
+            // Its family and food, from the album.
+            if (album != null)
+            {
+                facts.Add(("Family", album.Family));
+                facts.Add(("Eats", album.Diet));
+            }
             facts.Add(("Fights", f.Style switch { "runner" => "makes runs: let go while it runs", "jumper" => "leaps: press as the marker crosses the gold", "bottom" => "hugs the bottom: pump it up with short taps", _ => "darts about" }
                 + (f.Depth != "any" ? $"; feeds in {f.Depth} water" : "")));
             var baits = LikedBaits(f);
@@ -158,7 +185,9 @@ partial class Game
         {
             Gfx.Circle(tx + 8, ty + 11, 6, now ? Pal.C("#3fae5a") : Pal.C("#a89a80"));
             Gfx.Text(now ? "Biting now" : "Not biting right now", tx + 22, ty + 2, FontKind.Ui700, 17, now ? Pal.C("#2f7d45") : Muted);
+            ty += 24;
         }
+        lastCardBottom = ty - y;
         if (Gfx.PressedOutside(x, y, w, h)) dexFish = null;
     }
 

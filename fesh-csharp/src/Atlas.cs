@@ -1,4 +1,5 @@
 using Raylib_cs;
+using static Raylib_cs.Raylib;
 
 namespace Fesh;
 
@@ -208,12 +209,15 @@ partial class Game
     /* ---------- The guide's panel ---------- */
     string atlasRegion = "saltmere";
     float lastAtlasBottom;      // where the page's text ended (the autotest checks it fits)
+    bool atlasZoom;             // the page's drawing is open big (click it; Back or Esc closes it)
 
     void OpenAtlas(string id = null)
     {
         if (id != null && id.StartsWith("habagat:islet")) id = "habagat:islet:0";
         if (id != null && RegionById.ContainsKey(id)) atlasRegion = id;
         if (!AtlasOpen(RegionById[atlasRegion])) atlasRegion = Regions.FirstOrDefault(AtlasOpen)?.Id ?? "saltmere";
+        atlasZoom = false;
+        dexFish = null;
         Learned("atlas");
         Sfx.Play("ui");
         panel = "atlas";
@@ -227,6 +231,9 @@ partial class Game
     void DrawAtlas()
     {
         Backdrop();
+        // A fish's card (click one under "Fish here") or the drawing made big, in place of the page.
+        if (dexFish != null) { DrawFishCard(); return; }
+        if (atlasZoom) { DrawAtlasZoom(); return; }
         const float w = 1200, h = 664, pad = 22;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
         Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
@@ -247,7 +254,7 @@ partial class Game
             Gfx.Seen["atlas:" + r.Id] = new Rectangle(lx, ly, lw, 26);
 #endif
             if (Button(label, lx, ly, lw, 26, FontKind.Ui600, 15, on ? Pal.Lantern : open ? Pal.Sand : Pal.C("#eadfc0"), open ? Pal.Ink : Muted, 2, 2, 4, open && !on))
-            { atlasRegion = r.Id; Sfx.Play("blip"); return; }
+            { atlasRegion = r.Id; atlasZoom = false; Sfx.Play("blip"); return; }
             ly += 29;
         }
 
@@ -260,11 +267,21 @@ partial class Game
         Gfx.Text(reg.Kind, px + Gfx.Measure(reg.Name, FontKind.Ui700, 26) + 23, py + 9, FontKind.Ui700, 14, Pal.Paper);
         py += 38;
 
-        // The cross-section, with the water bodies listed beside it.
-        float dw = 500, dh = 168;
+        // The cross-section, with the water bodies listed beside it. Click it to see it big.
+        float dw = 500, dh = 196;
         DrawRegionDiagram(reg, px, py, dw, dh);
-        Gfx.Text(reg.Diagram == "cave" ? "Cut-away, not to scale" : reg.Diagram == "ocean" ? "The ocean's layers, not to scale" : "Cross-section, not to scale: heights stretched to show the shape",
-            px, py + dh + 4, FontKind.Ui500, 12, Muted);
+#if DEBUG
+        Gfx.Seen["atlas:diagram"] = new Rectangle(px, py, dw, dh);
+#endif
+        if (Gfx.Hover(px, py, dw, dh))
+        {
+            const string big = "Click to see it bigger";
+            float bw = Gfx.Measure(big, FontKind.Ui700, 13) + 14;
+            Gfx.Rect(px + dw - bw - 6, py + dh - 26, bw, 20, Pal.Rgba(16, 36, 58, 0.8f), 4);
+            Gfx.Text(big, px + dw - bw + 1, py + dh - 23, FontKind.Ui700, 13, Pal.Paper);
+        }
+        if (Gfx.Click(px, py, dw, dh)) { atlasZoom = true; Sfx.Play("ui"); return; }
+        Gfx.Text(DiagramCaption(reg) + "  ·  click it to see it bigger", px, py + dh + 4, FontKind.Ui500, 12, Muted);
         float wx = px + dw + 20, ww = x + w - pad - wx, wy = py;
         Gfx.Text("Water", wx, wy, FontKind.Ui700, 17, Pal.PaperInk);
         wy += 24;
@@ -293,24 +310,34 @@ partial class Game
         }
         float a = Section("The land", reg.Land, px, py, colW);
         a = Section("Climate", reg.Climate, px, a, colW);
-        float b2 = Section("Life", reg.Life, px + colW + 20, py, colW);
-        // The fish here: caught ones in colour, the rest as shapes in the water.
+        // The right column starts under the water list if that runs long (the left one is clear of it).
+        float b2 = Section("Life", reg.Life, px + colW + 20, Math.Max(py, wy + 4 + key.Count * 17 + 10), colW);
+        // The fish here: caught ones in colour, the rest as question marks. Each opens its card, as in the Fish log.
         var fish = RegionFish(reg);
+        string fishTip = null;
         if (fish.Count > 0)
         {
             int caught = fish.Count(f => state.commons.GetValueOrDefault(f.Id) > 0);
             Gfx.Text($"Fish here: {caught} of {fish.Count} caught", px + colW + 20, b2, FontKind.Ui700, 16, Pal.PaperInk);
-            float fx = px + colW + 20, fy = b2 + 22;
+            const string tipText = "click one for its card";
+            Gfx.Text(tipText, px + pw - Gfx.Measure(tipText, FontKind.Ui500, 13), b2 + 3, FontKind.Ui500, 13, Muted);
+            const float tile = 38;
+            float fx = px + colW + 20, fy = b2 + 24;
             foreach (var f in fish)
             {
-                if (fx + 30 > px + pw) { fx = px + colW + 20; fy += 30; }
-                bool got = state.commons.GetValueOrDefault(f.Id) > 0;
-                Gfx.Rect(fx, fy, 28, 28, got ? Pal.C("#dcecf2") : Pal.C("#c9d6dc"), 4);
-                if (got) DrawIcon(f.Id, fx + 2, fy + 2, 24);
-                else Gfx.TextCenter("?", fx + 14, fy + 4, FontKind.Ui700, 16, Pal.C("#8a9aa4"));
-                fx += 32;
+                if (fx + tile > px + pw) { fx = px + colW + 20; fy += tile + 4; }
+                bool got = state.commons.GetValueOrDefault(f.Id) > 0, hover = Gfx.Hover(fx, fy, tile, tile);
+                Gfx.Rect(fx, fy, tile, tile, got ? (hover ? Pal.C("#c4e2ee") : Pal.C("#dcecf2")) : hover ? Pal.C("#b9c9d0") : Pal.C("#c9d6dc"), 4);
+                if (got) DrawIcon(f.Id, fx + 3, fy + 3, tile - 6);
+                else Gfx.TextCenter("?", fx + tile / 2, fy + 8, FontKind.Ui700, 20, Pal.C("#8a9aa4"));
+                if (hover) fishTip = got ? f.Name : Seen(f.Id) ? f.Name + " (seen)" : "Not caught yet";
+#if DEBUG
+                Gfx.Seen["atlasfish:" + f.Id] = new Rectangle(fx, fy, tile, tile);
+#endif
+                if (Gfx.Click(fx, fy, tile, tile)) { dexFish = f.Id; Sfx.Play("blip"); return; }
+                fx += tile + 4;
             }
-            b2 = fy + 36;
+            b2 = fy + tile + 8;
         }
         // In the real world, under both columns.
         float ry = Math.Max(a, b2) + 2;
@@ -320,8 +347,70 @@ partial class Game
         Gfx.Text("In the real world", px + 12, ry + 7, FontKind.Ui700, 15, Pal.C("#2a7d74"));
         Lines(real, px + 12, ry + 28, 18, FontKind.Ui500, 14, Pal.PaperInk);
         lastAtlasBottom = Math.Max(Math.Max(ry + rh, ly), wy + key.Count * 17 + 4);
+        // The pointed fish's name, beside the mouse, over everything.
+        if (fishTip != null)
+        {
+            var m = Gfx.Mouse;
+            float tw = Gfx.Measure(fishTip, FontKind.Ui600, 15) + 20, tx = Math.Clamp(m.X + 14, 4, Gfx.LW - tw - 4), ty = m.Y + 22 > Gfx.LH - 34 ? m.Y - 34 : m.Y + 22;
+            Gfx.Rect(tx, ty, tw, 28, NavyStrong, 4);
+            Gfx.Text(fishTip, tx + 10, ty + 5, FontKind.Ui600, 15, Pal.Paper);
+        }
         if (Gfx.PressedOutside(x, y, w, h)) ClosePanels();
     }
+
+    static string DiagramCaption(RegionInfo r) => r.Diagram == "cave" ? "Cut-away, not to scale" : r.Diagram == "ocean" ? "The ocean's layers, not to scale"
+        : "Cross-section, not to scale: heights stretched to show the shape";
+
+    // What each colour of ground in a cross-section is, for the key under the big drawing.
+    static readonly (char s, string name)[] GroundNames =
+    {
+        ('s', "Sand"), ('d', "Dunes"), ('g', "Grass"), ('f', "Woods"), ('j', "Rainforest"), ('p', "Palms"), ('n', "Snow and firs"), ('i', "Glacier ice"),
+        ('r', "Rock"), ('k', "Limestone"), ('m', "Mangrove mud"), ('l', "Volcanic rock"), ('c', "Coral"), ('b', "Salt beds"), ('q', "Seagrass"), ('u', "Sea floor")
+    };
+
+    // The page's drawing made big, with a key to its colours and the real-world note under it.
+    void DrawAtlasZoom()
+    {
+        var reg = RegionById[atlasRegion];
+        const float w = 1200, h = 664, pad = 22;
+        float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
+        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        Gfx.Text(reg.Name, x + pad, y + pad - 4, FontKind.Ui700, 30, Pal.PaperInk);
+        float kx = x + pad + Gfx.Measure(reg.Name, FontKind.Ui700, 30) + 14, kw = Gfx.Measure(reg.Kind, FontKind.Ui700, 14) + 18;
+        Gfx.Rect(kx, y + pad + 2, kw, 22, Pal.C("#3f6a8a"), 4);
+        Gfx.Text(reg.Kind, kx + 9, y + pad + 5, FontKind.Ui700, 14, Pal.Paper);
+        if (SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { atlasZoom = false; return; }
+        float dx = x + pad, dy = y + pad + 50, dw = w - 2 * pad, dh = 430;
+        DrawRegionDiagram(reg, dx, dy, dw, dh, 1.6f);
+        float ty = dy + dh + 10;
+        Gfx.Text(DiagramCaption(reg), dx, ty, FontKind.Ui500, 15, Muted);
+        ty += 26;
+        // The key: only the grounds this drawing uses, and the lakes' water.
+        if (reg.Diagram == "profile")
+        {
+            var used = reg.Profile.Select(p => p.H < 0 && p.S is not ('c' or 'q' or 'k' or 'r' or 'l') ? 'u' : p.S).Distinct().ToHashSet();
+            float cx = dx;
+            void Key(Color c, string name)
+            {
+                float nw = Gfx.Measure(name, FontKind.Ui600, 15);
+                if (cx + 26 + nw > dx + dw) { cx = dx; ty += 26; }
+                Gfx.Rect(cx, ty + 2, 18, 18, c, 3);
+                Gfx.Text(name, cx + 24, ty + 2, FontKind.Ui600, 15, Pal.PaperInk);
+                cx += 24 + nw + 22;
+            }
+            foreach (var (s, name) in GroundNames) if (used.Contains(s)) Key(GroundTop(s), name);
+            if (reg.Lakes.Any(l => l.ice)) Key(LakeColor(reg, true), "Frozen lake");
+            if (reg.Lakes.Any(l => !l.ice)) Key(LakeColor(reg, false), reg.Waters.Any(b => b.Kind == "brackish") && !reg.Waters.Any(b => b.Kind == "fresh") ? "Brackish pool" : "Fresh water");
+            Key(Pal.C("#2f7fa3"), "Sea");
+            ty += 30;
+        }
+        var real = Gfx.Wrap(reg.Real, FontKind.Ui500, 15, dw);
+        Lines(real, dx, ty, 20, FontKind.Ui500, 15, Pal.PaperInk);
+        lastAtlasZoomBottom = ty + real.Count * 20 - y;
+        if (Gfx.PressedOutside(x, y, w, h)) atlasZoom = false;
+    }
+
+    float lastAtlasZoomBottom;  // where the big drawing's page ended (checked against the panel)
 
     /* ---------- The cross-sections ---------- */
     static Color GroundTop(char s) => Pal.C(s switch
@@ -334,15 +423,36 @@ partial class Game
         'r' or 'n' => "#8a8f93", 'i' => "#bfe0ec", 'k' => "#b8b7a0", 'l' => "#4a4242", 'm' => "#6b5a3e", 'c' => "#d8a08a", 's' or 'd' or 'b' or 'u' or 'q' or 'p' => "#d8bf88", _ => "#9a7a52"
     });
 
-    void DrawRegionDiagram(RegionInfo r, float x, float y, float w, float h)
+    // z scales the labels, trees and buildings, for the big version of the drawing (1 on the page).
+    void DrawRegionDiagram(RegionInfo r, float x, float y, float w, float h, float z = 1)
     {
         Gfx.Rect(x - 2, y - 2, w + 4, h + 4, Pal.Ink, 4);
-        if (r.Diagram == "ocean") { DrawOceanDiagram(x, y, w, h); return; }
-        if (r.Diagram == "cave") { DrawCaveDiagram(x, y, w, h); return; }
+        // Kept inside its frame: a lighthouse on a high headland used to poke out of the top (Codex).
+        var clip = Gfx.S(x, y, w, h);
+        BeginScissorMode((int)clip.X, (int)clip.Y, (int)MathF.Ceiling(clip.Width), (int)MathF.Ceiling(clip.Height));
+        try
+        {
+            if (r.Diagram == "ocean") DrawOceanDiagram(x, y, w, h, z);
+            else if (r.Diagram == "cave") DrawCaveDiagram(x, y, w, h, z);
+            else DrawProfileDiagram(r, x, y, w, h, z);
+        }
+        finally { EndScissorMode(); }
+    }
+
+    // The colour a lake or pond is drawn: brackish where the place's still water is brackish (Codex: they were all fresh).
+    static Color LakeColor(RegionInfo r, bool ice) => ice ? Pal.C("#7fb8cc")
+        : r.Waters.Any(b => b.Kind == "brackish") && !r.Waters.Any(b => b.Kind == "fresh") ? Pal.C("#6f9a78") : Pal.C("#3fb5a5");
+
+    void DrawProfileDiagram(RegionInfo r, float x, float y, float w, float h, float z)
+    {
         var pts = r.Profile;
         // Heights and depths on a square-root scale, so a 3 m sand islet and a 60 m drop-off both show on one drawing.
         float maxH = Math.Max(4, pts.Max(p => p.H)), maxD = Math.Max(4, -pts.Min(p => p.H));
-        float k = (h - 40) / (MathF.Sqrt(maxH) + MathF.Sqrt(maxD)), sea = y + 34 + MathF.Sqrt(maxH) * k;
+        // Room at the top for the two rows of labels and whatever stands on the high ground (a lighthouse, trees), so
+        // a label never sits on top of what it names.
+        float above = r.Marks.Any(m => m.mark == "lighthouse") ? 40 : pts.Any(p => p.S is 'f' or 'j' or 'p' or 'n' or 'm' or 'd') ? 24 : 6;
+        float top = (40 + above) * z;
+        float k = (h - top - 6 * z) / (MathF.Sqrt(maxH) + MathF.Sqrt(maxD)), sea = y + top + MathF.Sqrt(maxH) * k;
         float Yh(float e) => sea - MathF.Sign(e) * MathF.Sqrt(MathF.Abs(e)) * k;
         // Sky, then the sea's surface.
         Gfx.Rect(x, y, w, sea - y, Pal.C("#cfe6f2"));
@@ -376,19 +486,19 @@ partial class Game
                 if (u >= x0 && u <= x1 && e < level)
                 {
                     float ly = Yh(level);
-                    Gfx.Rect(x + cx, ly, step, gy - ly, Pal.C(ice ? "#7fb8cc" : "#3fb5a5"));
-                    if (ice) Gfx.Rect(x + cx, ly, step, 3, Pal.C("#f2fbff"));
+                    Gfx.Rect(x + cx, ly, step, gy - ly, LakeColor(r, ice));
+                    if (ice) Gfx.Rect(x + cx, ly, step, 3 * z, Pal.C("#f2fbff"));
                 }
             char body = e < 0 && s is not ('c' or 'q' or 'k' or 'r' or 'l') ? 'u' : s;
             Gfx.Rect(x + cx, gy, step, y + h - gy, GroundBody(body));
             // Layers in the rock and soil, and the bedrock deep down.
-            for (float sy = y + h - 10; sy > gy + 8; sy -= 14) Gfx.Rect(x + cx, sy, step, 2, Pal.Rgba(60, 40, 20, 0.12f));
-            Gfx.Rect(x + cx, gy, step, 4, GroundTop(body));
-            if (e < 0 && s == 'q' && (int)(cx / step) % 3 == 0) Gfx.Rect(x + cx, gy - 6, 1.5f, 6, Pal.C("#5fa84a"));
-            if (e < 0 && s == 'c' && (int)(cx / step) % 4 == 0) Gfx.Circle(x + cx, gy - 2, 3, Pal.C("#f08a7a"));
+            for (float sy = y + h - 10 * z; sy > gy + 8 * z; sy -= 14 * z) Gfx.Rect(x + cx, sy, step, 2, Pal.Rgba(60, 40, 20, 0.12f));
+            Gfx.Rect(x + cx, gy, step, 4 * z, GroundTop(body));
+            if (e < 0 && s == 'q' && (int)(cx / step) % 3 == 0) Gfx.Rect(x + cx, gy - 6 * z, 1.5f * z, 6 * z, Pal.C("#5fa84a"));
+            if (e < 0 && s == 'c' && (int)(cx / step) % (int)(4 * z) == 0) Gfx.Circle(x + cx, gy - 2 * z, 3 * z, Pal.C("#f08a7a"));
         }
         // Trees, a few to each stretch of woods.
-        for (float cx = 6; cx < w - 6; cx += 15)
+        for (float cx = 6 * z; cx < w - 6 * z; cx += 15 * z)
         {
             float u = cx / w * 100;
             var (e, s) = At(u);
@@ -396,15 +506,15 @@ partial class Game
             float gy = Yh(e), tx = x + cx;
             switch (s)
             {
-                case 'f': Gfx.Rect(tx - 1, gy - 9, 2, 9, Pal.C("#6b4a2b")); Gfx.Circle(tx, gy - 12, 6, Pal.C("#3f7d3a")); break;
-                case 'j': Gfx.Rect(tx - 1, gy - 14, 2, 14, Pal.C("#5a4028")); Gfx.Circle(tx, gy - 16, 7, Pal.C("#2f6a2c")); Gfx.Circle(tx + 5, gy - 13, 5, Pal.C("#3f7d3a")); break;
+                case 'f': Gfx.Rect(tx - z, gy - 9 * z, 2 * z, 9 * z, Pal.C("#6b4a2b")); Gfx.Circle(tx, gy - 12 * z, 6 * z, Pal.C("#3f7d3a")); break;
+                case 'j': Gfx.Rect(tx - z, gy - 14 * z, 2 * z, 14 * z, Pal.C("#5a4028")); Gfx.Circle(tx, gy - 16 * z, 7 * z, Pal.C("#2f6a2c")); Gfx.Circle(tx + 5 * z, gy - 13 * z, 5 * z, Pal.C("#3f7d3a")); break;
                 case 'p':
-                    Gfx.Line(tx, gy, tx + 3, gy - 16, 2, Pal.C("#8a6440"));
-                    Gfx.Triangle(tx + 3, gy - 17, tx - 6, gy - 13, tx + 2, gy - 15, Pal.C("#4f9a45")); Gfx.Triangle(tx + 3, gy - 17, tx + 12, gy - 13, tx + 4, gy - 15, Pal.C("#4f9a45"));
+                    Gfx.Line(tx, gy, tx + 3 * z, gy - 16 * z, 2 * z, Pal.C("#8a6440"));
+                    Gfx.Triangle(tx + 3 * z, gy - 17 * z, tx - 6 * z, gy - 13 * z, tx + 2 * z, gy - 15 * z, Pal.C("#4f9a45")); Gfx.Triangle(tx + 3 * z, gy - 17 * z, tx + 12 * z, gy - 13 * z, tx + 4 * z, gy - 15 * z, Pal.C("#4f9a45"));
                     break;
-                case 'n': Gfx.Triangle(tx, gy - 16, tx - 6, gy, tx + 6, gy, Pal.C("#2f5a3a")); Gfx.Triangle(tx, gy - 16, tx - 3, gy - 9, tx + 3, gy - 9, Pal.C("#f2f6f8")); break;
-                case 'm': Gfx.Circle(tx, gy - 10, 6, Pal.C("#4f7a3a")); for (int i = -3; i <= 3; i += 3) Gfx.Line(tx, gy - 6, tx + i, gy + 1, 1, Pal.C("#6b5a3a")); break;
-                case 'd': if ((int)cx % 45 < 15) { Gfx.Rect(tx - 1, gy - 9, 3, 9, Pal.C("#5f9a4a")); Gfx.Rect(tx - 4, gy - 6, 2, 4, Pal.C("#5f9a4a")); } break;
+                case 'n': Gfx.Triangle(tx, gy - 16 * z, tx - 6 * z, gy, tx + 6 * z, gy, Pal.C("#2f5a3a")); Gfx.Triangle(tx, gy - 16 * z, tx - 3 * z, gy - 9 * z, tx + 3 * z, gy - 9 * z, Pal.C("#f2f6f8")); break;
+                case 'm': Gfx.Circle(tx, gy - 10 * z, 6 * z, Pal.C("#4f7a3a")); for (int i = -3; i <= 3; i += 3) Gfx.Line(tx, gy - 6 * z, tx + i * z, gy + z, z, Pal.C("#6b5a3a")); break;
+                case 'd': if ((int)(cx / z) % 45 < 15) { Gfx.Rect(tx - z, gy - 9 * z, 3 * z, 9 * z, Pal.C("#5f9a4a")); Gfx.Rect(tx - 4 * z, gy - 6 * z, 2 * z, 4 * z, Pal.C("#5f9a4a")); } break;
             }
         }
         // Things people have built.
@@ -415,33 +525,34 @@ partial class Game
             float gy = Yh(Math.Max(0, e));
             switch (mark)
             {
-                case "hut": Gfx.Rect(tx - 6, gy - 9, 12, 7, Pal.C("#b98b52")); Gfx.Triangle(tx - 9, gy - 8, tx + 9, gy - 8, tx, gy - 16, Pal.C("#ceb36b")); Gfx.Rect(tx - 5, gy - 2, 1, 2, Pal.C("#65452e")); Gfx.Rect(tx + 4, gy - 2, 1, 2, Pal.C("#65452e")); break;
-                case "post": Gfx.Rect(tx, sea - 7, 2, 12, Pal.C("#8a6440")); Gfx.Line(tx, sea - 2, tx + 18, sea - 2, 1, Pal.C("#dfe9ee")); Gfx.Circle(tx + 9, sea + 1, 2, Pal.C("#7a9a3a")); break;
-                case "buoy": Gfx.Circle(tx, sea - 2, 4, Pal.C("#f2c94a")); Gfx.Rect(tx - 1, sea - 10, 2, 7, Pal.C("#d8a83a")); break;
-                case "platform": Gfx.Rect(tx - 10, sea - 10, 20, 3, Pal.C("#8a6440")); Gfx.Rect(tx - 9, sea - 7, 2, 12, Pal.C("#6b4a2b")); Gfx.Rect(tx + 7, sea - 7, 2, 12, Pal.C("#6b4a2b")); break;
-                case "pier": Gfx.Rect(tx - 14, sea - 6, 28, 3, Pal.C("#8a6440")); Gfx.Rect(tx - 10, sea - 3, 2, 8, Pal.C("#6b4a2b")); Gfx.Rect(tx + 8, sea - 3, 2, 8, Pal.C("#6b4a2b")); break;
-                case "lighthouse": Gfx.Rect(tx - 4, gy - 30, 8, 30, Pal.C("#f2ecd8")); Gfx.Rect(tx - 4, gy - 22, 8, 4, Pal.C("#c0392b")); Gfx.Rect(tx - 5, gy - 34, 10, 4, Pal.C("#f2c94a")); Gfx.Triangle(tx - 5, gy - 34, tx + 5, gy - 34, tx, gy - 39, Pal.C("#3f4a5a")); break;
-                case "salt": Gfx.Rect(tx - 9, gy - 2, 18, 3, Pal.C("#f8f6f0")); Gfx.Rect(tx - 9, gy - 3, 1, 4, Pal.C("#8a6440")); Gfx.Rect(tx + 8, gy - 3, 1, 4, Pal.C("#8a6440")); break;
-                case "smoke": for (int i = 0; i < 4; i++) Gfx.Circle(tx + i * 3, gy - 8 - i * 7, 4 + i, Pal.Rgba(180, 180, 180, 0.6f - i * 0.12f)); break;
+                case "hut": Gfx.Rect(tx - 6 * z, gy - 9 * z, 12 * z, 7 * z, Pal.C("#b98b52")); Gfx.Triangle(tx - 9 * z, gy - 8 * z, tx + 9 * z, gy - 8 * z, tx, gy - 16 * z, Pal.C("#ceb36b")); Gfx.Rect(tx - 5 * z, gy - 2 * z, z, 2 * z, Pal.C("#65452e")); Gfx.Rect(tx + 4 * z, gy - 2 * z, z, 2 * z, Pal.C("#65452e")); break;
+                case "post": Gfx.Rect(tx, sea - 7 * z, 2 * z, 12 * z, Pal.C("#8a6440")); Gfx.Line(tx, sea - 2 * z, tx + 18 * z, sea - 2 * z, z, Pal.C("#dfe9ee")); Gfx.Circle(tx + 9 * z, sea + z, 2 * z, Pal.C("#7a9a3a")); break;
+                case "buoy": Gfx.Circle(tx, sea - 2 * z, 4 * z, Pal.C("#f2c94a")); Gfx.Rect(tx - z, sea - 10 * z, 2 * z, 7 * z, Pal.C("#d8a83a")); break;
+                case "platform": Gfx.Rect(tx - 10 * z, sea - 10 * z, 20 * z, 3 * z, Pal.C("#8a6440")); Gfx.Rect(tx - 9 * z, sea - 7 * z, 2 * z, 12 * z, Pal.C("#6b4a2b")); Gfx.Rect(tx + 7 * z, sea - 7 * z, 2 * z, 12 * z, Pal.C("#6b4a2b")); break;
+                case "pier": Gfx.Rect(tx - 14 * z, sea - 6 * z, 28 * z, 3 * z, Pal.C("#8a6440")); Gfx.Rect(tx - 10 * z, sea - 3 * z, 2 * z, 8 * z, Pal.C("#6b4a2b")); Gfx.Rect(tx + 8 * z, sea - 3 * z, 2 * z, 8 * z, Pal.C("#6b4a2b")); break;
+                case "lighthouse": Gfx.Rect(tx - 4 * z, gy - 30 * z, 8 * z, 30 * z, Pal.C("#f2ecd8")); Gfx.Rect(tx - 4 * z, gy - 22 * z, 8 * z, 4 * z, Pal.C("#c0392b")); Gfx.Rect(tx - 5 * z, gy - 34 * z, 10 * z, 4 * z, Pal.C("#f2c94a")); Gfx.Triangle(tx - 5 * z, gy - 34 * z, tx + 5 * z, gy - 34 * z, tx, gy - 39 * z, Pal.C("#3f4a5a")); break;
+                case "salt": Gfx.Rect(tx - 9 * z, gy - 2 * z, 18 * z, 3 * z, Pal.C("#f8f6f0")); Gfx.Rect(tx - 9 * z, gy - 3 * z, z, 4 * z, Pal.C("#8a6440")); Gfx.Rect(tx + 8 * z, gy - 3 * z, z, 4 * z, Pal.C("#8a6440")); break;
+                case "smoke": for (int i = 0; i < 4; i++) Gfx.Circle(tx + i * 3 * z, gy - (8 + i * 7) * z, (4 + i) * z, Pal.Rgba(180, 180, 180, 0.6f - i * 0.12f)); break;
             }
         }
         // The labels, alternating height so neighbours don't collide, each with a line down to its place.
         int n = 0;
+        float fs = 12 * z;
         foreach (var (lx, text) in r.Labels)
         {
             float tx = x + lx / 100 * w;
             var (e, _) = At(lx);
-            float gy = e < 0 ? Yh(e) : Yh(e) - 2, ty = y + 6 + (n++ % 2) * 18;
-            float tw = Gfx.Measure(text, FontKind.Ui700, 12) + 8;
+            float gy = e < 0 ? Yh(e) : Yh(e) - 2, ty = y + 6 * z + (n++ % 2) * 18 * z;
+            float tw = Gfx.Measure(text, FontKind.Ui700, fs) + 8 * z;
             float bx = Math.Clamp(tx - tw / 2, x + 2, x + w - tw - 2);
-            Gfx.Line(tx, ty + 14, tx, gy, 1, Pal.Rgba(16, 36, 58, 0.45f));
-            Gfx.Rect(bx, ty, tw, 15, Pal.Rgba(255, 250, 240, 0.9f), 3);
-            Gfx.Text(text, bx + 4, ty + 1, FontKind.Ui700, 12, Pal.PaperInk);
+            Gfx.Line(tx, ty + 14 * z, tx, gy, z, Pal.Rgba(16, 36, 58, 0.45f));
+            Gfx.Rect(bx, ty, tw, 15 * z, Pal.Rgba(255, 250, 240, 0.9f), 3);
+            Gfx.Text(text, bx + 4 * z, ty + z, FontKind.Ui700, fs, Pal.PaperInk);
         }
     }
 
     // The open ocean: the sunlit zone where plankton grows, the twilight below, the midnight dark, and who lives where.
-    void DrawOceanDiagram(float x, float y, float w, float h)
+    void DrawOceanDiagram(float x, float y, float w, float h, float z = 1)
     {
         var bands = new (float frac, string color, string name, string depth)[]
         {
@@ -449,49 +560,56 @@ partial class Game
             (0.30f, "#245a82", "Twilight zone", "200 to 1,000 m: faint light; many lanternfish rise from here at night"),
             (0.42f, "#10243a", "Midnight zone and deeper", "below 1,000 m: no sunlight at all")
         };
-        Gfx.Rect(x, y, w, 14, Pal.C("#cfe6f2"));
-        float by = y + 14;
+        float sky = 14 * z;
+        Gfx.Rect(x, y, w, sky, Pal.C("#cfe6f2"));
+        float by = y + sky;
+        // The words keep to the left; the animals that live in each zone are drawn on the right.
+        float textW = w - 140 * z;
         foreach (var (frac, color, name, depth) in bands)
         {
-            float bh = (h - 14) * frac;
+            float bh = (h - sky) * frac;
             Gfx.Rect(x, by, w, bh, Pal.C(color));
-            Gfx.Text(name, x + 10, by + 6, FontKind.Ui700, 14, Pal.Paper);
-            Gfx.Text(depth, x + 10, by + 24, FontKind.Ui500, 12, Pal.Rgba(240, 248, 252, 0.85f));
+            Gfx.Text(name, x + 10 * z, by + 6 * z, FontKind.Ui700, 14 * z, Pal.Paper);
+            var dl = Gfx.Wrap(depth, FontKind.Ui500, 12 * z, textW);
+            Lines(dl, x + 10 * z, by + 24 * z, 15 * z, FontKind.Ui500, 12 * z, Pal.Rgba(240, 248, 252, 0.85f));
             by += bh;
         }
         // A frenzy at the surface: birds above, small fish, and a hunter.
-        float fx = x + w - 120;
-        for (int i = 0; i < 9; i++) Gfx.Circle(fx + (i * 13) % 60, y + 24 + (i * 7) % 18, 2.2f, Pal.C("#e8f0f4"));
-        Gfx.Triangle(fx + 70, y + 30, fx + 92, y + 25, fx + 92, y + 35, Pal.C("#1d3550"));
-        Gfx.Circle(fx + 66, y + 30, 6, Pal.C("#1d3550"));
-        for (int i = 0; i < 3; i++) { float bx = fx + 10 + i * 20; Gfx.Line(bx - 5, y + 6, bx, y + 9, 1.5f, Pal.Ink); Gfx.Line(bx, y + 9, bx + 5, y + 6, 1.5f, Pal.Ink); }
-        Gfx.Text("feeding frenzy", fx - 4, y + 44, FontKind.Ui700, 11, Pal.Paper);
+        float fx = x + w - 120 * z;
+        for (int i = 0; i < 9; i++) Gfx.Circle(fx + (i * 13) % 60 * z, y + (24 + (i * 7) % 18) * z, 2.2f * z, Pal.C("#e8f0f4"));
+        Gfx.Triangle(fx + 70 * z, y + 30 * z, fx + 92 * z, y + 25 * z, fx + 92 * z, y + 35 * z, Pal.C("#1d3550"));
+        Gfx.Circle(fx + 66 * z, y + 30 * z, 6 * z, Pal.C("#1d3550"));
+        for (int i = 0; i < 3; i++) { float bx = fx + (10 + i * 20) * z; Gfx.Line(bx - 5 * z, y + 6 * z, bx, y + 9 * z, 1.5f * z, Pal.Ink); Gfx.Line(bx, y + 9 * z, bx + 5 * z, y + 6 * z, 1.5f * z, Pal.Ink); }
+        Gfx.Text("feeding frenzy", fx - 4 * z, y + 44 * z, FontKind.Ui700, 11 * z, Pal.Paper);
         // Lanternfish dots, low in the twilight, and a giant squid in the dark.
-        for (int i = 0; i < 7; i++) Gfx.Circle(x + w - 90 + i * 11, y + 14 + (h - 14) * 0.5f + (i % 2) * 6, 1.8f, Pal.C("#9fe8ff"));
-        Gfx.Text("lanternfish", x + w - 96, y + 14 + (h - 14) * 0.5f + 12, FontKind.Ui700, 11, Pal.C("#bff4ff"));
-        float sqx = x + w - 150, sqy = y + h - 34;
-        Gfx.Circle(sqx, sqy, 6, Pal.C("#8a4a5a")); Gfx.Rect(sqx - 14, sqy - 3, 12, 6, Pal.C("#8a4a5a"));
-        for (int i = 0; i < 4; i++) Gfx.Line(sqx + 4, sqy - 3 + i * 2, sqx + 22, sqy - 6 + i * 4, 1.5f, Pal.C("#8a4a5a"));
-        Gfx.Text("giant squid", sqx - 10, sqy + 9, FontKind.Ui700, 11, Pal.C("#d8a0b0"));
+        // Lanternfish in the middle of the twilight band, their label under them, still inside it (Codex: it spilled into the dark).
+        float twTop = y + sky + (h - sky) * 0.28f, twH = (h - sky) * 0.30f, twy = twTop + twH * 0.35f;
+        for (int i = 0; i < 7; i++) Gfx.Circle(x + w - (90 - i * 11) * z, twy + (i % 2) * 5 * z, 1.8f * z, Pal.C("#9fe8ff"));
+        Gfx.Text("lanternfish", x + w - 96 * z, MathF.Min(twy + 9 * z, twTop + twH - 14 * z), FontKind.Ui700, 11 * z, Pal.C("#bff4ff"));
+        float sqx = x + w - 150 * z, sqy = y + h - 34 * z;
+        Gfx.Circle(sqx, sqy, 6 * z, Pal.C("#8a4a5a")); Gfx.Rect(sqx - 14 * z, sqy - 3 * z, 12 * z, 6 * z, Pal.C("#8a4a5a"));
+        for (int i = 0; i < 4; i++) Gfx.Line(sqx + 4 * z, sqy + (-3 + i * 2) * z, sqx + 22 * z, sqy + (-6 + i * 4) * z, 1.5f * z, Pal.C("#8a4a5a"));
+        Gfx.Text("giant squid", sqx - 10 * z, sqy + 9 * z, FontKind.Ui700, 11 * z, Pal.C("#d8a0b0"));
     }
 
     // Under Frostfang: the snowy surface, then floors of cave stepping down, joined by ladders, with pools.
-    void DrawCaveDiagram(float x, float y, float w, float h)
+    void DrawCaveDiagram(float x, float y, float w, float h, float z = 1)
     {
         Gfx.Rect(x, y, w, h, Pal.C("#3a3430"));
-        Gfx.Rect(x, y, w, 22, Pal.C("#cfe6f2"));
-        Gfx.Rect(x, y + 22, w, 6, Pal.C("#f2f6f8"));
-        Gfx.Triangle(x + 60, y + 22, x + 50, y + 8, x + 70, y + 8, Pal.C("#2f5a3a"));
+        Gfx.Rect(x, y, w, 22 * z, Pal.C("#cfe6f2"));
+        Gfx.Rect(x, y + 22 * z, w, 6 * z, Pal.C("#f2f6f8"));
+        Gfx.Triangle(x + 60 * z, y + 22 * z, x + 50 * z, y + 8 * z, x + 70 * z, y + 8 * z, Pal.C("#2f5a3a"));
         var floors = new (float fx, float fy, string label, bool pool)[] { (0.08f, 0.24f, "Floor 1", true), (0.28f, 0.42f, "Floor 5", false), (0.48f, 0.6f, "Floor 10", true), (0.68f, 0.78f, "Ancient Floor", true) };
-        float px = x + w * 0.12f, py = y + 28;
+        float px = x + w * 0.12f, py = y + 28 * z;
         foreach (var (fx, fy, label, pool) in floors)
         {
-            float cx = x + w * fx, cy = y + h * fy, cw = w * 0.26f, ch = 22;
-            Gfx.Line(px, py, cx + 14, cy + 4, 2, Pal.C("#c9a46a"));
-            Gfx.Rect(cx, cy, cw, ch, Pal.C("#151210"), 8);
-            if (pool) Gfx.Rect(cx + cw * 0.45f, cy + ch - 8, cw * 0.4f, 7, Pal.C("#2a6a8a"), 3);
-            Gfx.Circle(cx + 10, cy + 6, 2, Pal.C("#7fe0ff"));
-            Gfx.Text(label, cx + 4, cy - 15, FontKind.Ui700, 12, Pal.C("#f2e6c8"));
+            float cx = x + w * fx, cy = y + h * fy, cw = w * 0.26f, ch = 26 * z;
+            Gfx.Line(px, py, cx + 14 * z, cy + 4 * z, 2 * z, Pal.C("#c9a46a"));
+            Gfx.Rect(cx, cy, cw, ch, Pal.C("#151210"), 8 * z);
+            if (pool) Gfx.Rect(cx + cw * 0.45f, cy + ch - 8 * z, cw * 0.4f, 7 * z, Pal.C("#2a6a8a"), 3 * z);
+            Gfx.Circle(cx + 10 * z, cy + 6 * z, 2 * z, Pal.C("#7fe0ff"));
+            // The label sits inside the floor's own room, clear of the room above it (Codex: they overlapped).
+            Gfx.Text(label, cx + 18 * z, cy + 4 * z, FontKind.Ui700, 12 * z, Pal.C("#f2e6c8"));
             px = cx + cw * 0.8f; py = cy + ch;
         }
     }

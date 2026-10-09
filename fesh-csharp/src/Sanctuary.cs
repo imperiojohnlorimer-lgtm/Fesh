@@ -22,7 +22,7 @@ partial class Game
         ["dugong"] = ("Dugong", "Watch the dugong",
             "A dugong grazes the seagrass like a slow grey cow, leaving bare trails behind it. There are very few left, and they're protected."),
         ["butanding"] = ("Butanding (whale shark)", "Watch the whale shark",
-            "A whale shark glides past, longer than your boat, its back speckled with white. It only eats plankton. Catching one has been banned in the Philippines since 1998."),
+            "A whale shark glides past, longer than your boat, its back speckled with white. It eats plankton and tiny fish, strained from the water. Catching one has been banned in the Philippines since 1998."),
         ["walowalo"] = ("Walo-walo (banded sea krait)", "Watch the sea krait",
             "A banded sea krait ripples past, striped black and silver-blue, and lifts its head for a breath. It's venomous but shy, and hunts eels in the reef. Leave it be."),
         // 1.15: it never moves. Giant clams are protected in the Philippines, and sanctuaries are where they're grown back.

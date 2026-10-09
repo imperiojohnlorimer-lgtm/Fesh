@@ -301,7 +301,7 @@ static class Data
     public static readonly Dictionary<string, LegendInfo> Legends = new()
     {
         ["old_whiskers"] = new("whiskers",
-            "The lagoon's oldest resident: a carp as long as a rowing boat, with whiskers like an old sea captain. Tomas's grandfather swore it once stole his lunch.",
+            "The lagoon's oldest resident: a catfish as long as a rowing boat, with whiskers like an old sea captain. Tomas's grandfather swore it once stole his lunch.",
             "Hooked in the lagoon in the rain, on a berry.", "The lagoon. Something huge stirs there when it rains, and it has a sweet tooth."),
         ["ancient_coelacanth"] = new("coelacanth",
             "A living fossil, older than the islands themselves. Its fins move like little legs, and its blue scales are flecked with silver like stars. Everyone said it died out millions of years ago, yet here it is, staring back at you.",

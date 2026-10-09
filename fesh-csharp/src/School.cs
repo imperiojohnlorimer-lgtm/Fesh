@@ -6,12 +6,15 @@ namespace Fesh;
 // Ma'am Isay's class (1.17): a little school on the north side of Amihan Village. She teaches the village children about
 // the fish their families bring home, and asks you to help with the fish you've caught. A lesson is eight questions on
 // fish you've caught or seen (their shapes and shadows, where and when they bite, how they fight, which grows bigger,
-// what's real about them), with three hearts, a streak, a quick-answer bonus and one "ask the class". Every answer
-// teaches the right one. Three right answers about a fish and you've learned it: a star in the Fish log, and the Sea
+// what's real about them, their families, their water and their food, and which ones aren't fish at all) and the places
+// you've charted (what kind of island, what kind of water), with three hearts, a streak, a quick-answer bonus and one
+// "ask the class". Every answer teaches the right one, with a further fact and the fish's album entry. Three right answers about a fish and you've learned it: a star in the Fish log, and the Sea
 // school's Fish ID badge (with Release.cs's "Let it go" and Tides.cs's tides) pays out as you go.
 sealed class QuizQ
 {
     public string Kind, Prompt, Subject, Teach, Quote, Big;     // Subject: the fish it's about; Big: a scientific name to show
+    public string Region;                                       // an island guide page, for a question about a place (no Subject)
+    public string More, Info;                                   // after answering: a further fact, and the fish's album line
     public bool Sil;                                            // the picture is the fish's shadow
     public string[] Options, Pics;                              // the answers (Pics: a fish picture per answer, or null)
     public int Answer;
@@ -22,7 +25,7 @@ sealed class Quiz
     public List<QuizQ> Qs = new();
     public int At, Right, Hearts = 3, Streak, BestStreak, Score, Coins, Picked = -1;
     public float T, Bounce;
-    public bool Paid, AskUsed;
+    public bool Paid, AskUsed, NewBest;
     public int[] Votes;
     public string View = "intro";
     public List<string> Learned = new();
@@ -55,7 +58,7 @@ partial class Game
             {
                 I("Magandang araw! I'm Ma'am Isay. I teach the village children, when I can keep them out of the water."),
                 I("They know the fish their families bring home. But you've been all over these islands! Half the fish in your bag, they've never seen."),
-                I("Help me teach them? I'll ask about the fish you've caught: shapes and shadows, where they bite, what's real about them. Three right answers about a fish and you've really learned it."),
+                I("Help me teach them? I'll ask about the fish you've caught: shapes and shadows, where they bite, their families, what they eat, what's real about them. And about the islands you've charted, too. Three right answers about a fish and you've really learned it."),
                 I("The first lesson each day earns you a little from the school fund. Practise as much as you like after that.")
             }, OpenQuiz);
             return;
@@ -76,9 +79,21 @@ partial class Game
     /* ---------- The questions ---------- */
     QuizQ MakeQuestion(string kind, List<CommonFish> known, HashSet<string> recent)
     {
+        // The islands (1.18.1): what kind of place, and what kind of water. Only places you've charted.
+        if (kind is "isle" or "waterbody") return MakeIslandQuestion(kind, recent);
+        if (kind == "notfish") return MakeNotFishQuestion(known);
         // Fish you know least come up most, and ones you got wrong last time most of all.
         var pool = known.Where(f => !recent.Contains(f.Id)).ToList();
         if (pool.Count == 0) pool = known;
+        // Some kinds only suit some fish: don't waste the slot on one that can't be asked.
+        pool = kind switch
+        {
+            "family" => pool.Where(f => FamilyAskable(f.Id)).ToList(),
+            "water" => pool.Where(f => AlbumData.ContainsKey(f.Id)).ToList(),
+            "diet" => pool.Where(f => FeedRole(f.Id) != null).ToList(),
+            _ => pool
+        };
+        if (pool.Count == 0) return null;
         double Weight(CommonFish f) => 1.0 + Math.Max(0, LearnedAt - state.know.GetValueOrDefault(f.Id)) + (state.missed.Contains(f.Id) ? 4 : 0);
         double roll = rng.NextDouble() * pool.Sum(Weight);
         var subject = pool[^1];
@@ -86,14 +101,15 @@ partial class Game
         string name = subject.Name;
         string lower = name.ToLowerInvariant();
         FishFacts.ById.TryGetValue(subject.Id, out var fact);
+        AlbumData.TryGetValue(subject.Id, out var album);
         bool pot = !Data.SpotOfFish.ContainsKey(subject.Id);
 
-        QuizQ Names(string prompt, string teach)
+        // Up to four names: the fish and others you've caught. "skip" leaves out any that would also fit the clue. Only
+        // fish you've caught, so no answer names one you haven't (Codex); with fewer than two to offer, it isn't asked.
+        QuizQ Names(string prompt, string teach, Func<CommonFish, bool> skip = null)
         {
-            var others = known.Where(f => f.Id != subject.Id).OrderBy(_ => rng.Next()).Select(f => f.Name).Distinct().Take(3).ToList();
-            if (others.Count < 3)
-                others.AddRange(Data.AllCommon.Where(f => !f.Legend && f.Id != subject.Id && !others.Contains(f.Name) && SpotKnownFor(f.Id))
-                    .OrderBy(_ => rng.Next()).Select(f => f.Name).Distinct().Take(3 - others.Count));
+            var others = known.Where(f => f.Id != subject.Id && (skip == null || !skip(f))).OrderBy(_ => rng.Next()).Select(f => f.Name).Distinct().Take(3).ToList();
+            if (others.Count < 2) return null;
             return Shuffle(new QuizQ { Prompt = prompt, Subject = subject.Id, Teach = teach }, name, others);
         }
 
@@ -117,9 +133,11 @@ partial class Game
             case "when":
             {
                 if (pot) return null;
-                string right = subject.Time switch { "day" => "By day", "night" => "At night", _ => "Day or night" };
-                var q = new QuizQ { Kind = kind, Prompt = $"When does the {lower} bite?", Subject = subject.Id, Teach = $"The {lower} bites {WhenText(subject)}.",
-                    Options = new[] { "By day", "At night", "Day or night" } };
+                // "Only" on the first two, so a fish that bites day and night has just the one right answer (Codex).
+                string right = subject.Time switch { "day" => "Only by day", "night" => "Only at night", _ => "Day and night" };
+                var q = new QuizQ { Kind = kind, Prompt = $"When does the {lower} bite?", Subject = subject.Id,
+                    Teach = $"The {lower} bites {WhenText(subject)}." + (subject.Time == "night" ? " Many fish feed at night, when it's harder for bigger hunters to see them." : ""),
+                    Options = new[] { "Only by day", "Only at night", "Day and night" } };
                 q.Answer = Array.IndexOf(q.Options, right);
                 return q;
             }
@@ -144,12 +162,13 @@ partial class Game
                 if (other == null) return null;
                 var (big, small) = subject.Kg > other.Kg ? (subject, other) : (other, subject);
                 bool first = rng.NextDouble() < 0.5;
+                // The weights are the game's (what you usually land here), so the words say so.
                 return new QuizQ
                 {
-                    Kind = kind, Prompt = "Which one grows heavier?", Subject = big.Id,
+                    Kind = kind, Prompt = "Which one is usually heavier when you land it?", Subject = big.Id,
                     Options = first ? new[] { big.Name, small.Name } : new[] { small.Name, big.Name },
                     Pics = first ? new[] { big.Id, small.Id } : new[] { small.Id, big.Id }, Answer = first ? 0 : 1,
-                    Teach = $"A grown {big.Name.ToLowerInvariant()} is usually about {Kg(big.Kg)}; a {small.Name.ToLowerInvariant()}, about {Kg(small.Kg)}."
+                    Teach = $"In these islands a {big.Name.ToLowerInvariant()} usually weighs about {Kg(big.Kg)} when you land it; a {small.Name.ToLowerInvariant()}, about {Kg(small.Kg)}."
                 };
             }
             case "fact":
@@ -157,7 +176,9 @@ partial class Game
                 if (fact == null) return null;
                 string quote = Redact(FirstSentences(fact.Text, 170), subject);
                 if (quote == null) return null;
-                return Names("Who am I?", $"That's the {lower}: {(fact.Real ? fact.Sci : "based on the " + fact.Sci)}.").With(q => { q.Kind = kind; q.Quote = quote; });
+                // Close relatives could fit the same clue (a tuna's fact describes every tuna), so none of them are offered.
+                return Names("Who am I?", $"That's the {lower}: {(fact.Real ? fact.Sci : "based on the " + fact.Sci)}.", f => SameFamily(f.Id, subject.Id))
+                    .With(q => { q.Kind = kind; q.Quote = quote; });
             }
             case "real":
             {
@@ -171,8 +192,9 @@ partial class Game
             }
             case "sci":
             {
-                if (fact is not { Real: true } || fact.Sci.Contains("spp") || fact.Sci.StartsWith("Family") || fact.Sci.Contains(',')) return null;
-                return Names("Which fish has this scientific name?", $"{fact.Sci} is the {lower}. Scientific names are agreed worldwide, so scientists everywhere know which fish you mean.")
+                // Only a real species' two- or three-word name (not a genus with "spp.", a family, or a group like an infraorder).
+                if (fact is not { Real: true } || !System.Text.RegularExpressions.Regex.IsMatch(fact.Sci, @"^[A-Z][a-z]+ [a-z]+( [a-z]+)?$")) return null;
+                return Names("Which fish has this scientific name?", $"{fact.Sci} is the {lower}. The first word is its genus (a group of close relatives), the second its species. Scientists everywhere use the same name, so they know which fish you mean.")
                     .With(q => { q.Kind = kind; q.Big = fact.Sci; });
             }
             case "bait":
@@ -185,11 +207,42 @@ partial class Game
                 return Shuffle(new QuizQ { Kind = kind, Prompt = $"Which bait does a {lower} go for?", Subject = subject.Id,
                     Teach = $"The {lower} goes for {string.Join(", ", LikedBaits(subject))}." }, pick, not);
             }
+            case "family":
+            {
+                // Families of other fish you've caught, never one the subject could also be filed under.
+                var others = known.Where(f => f.Id != subject.Id && FamilyAskable(f.Id) && !SameFamily(f.Id, subject.Id))
+                    .Select(f => FamilyShort(AlbumData[f.Id].Family)).Distinct().OrderBy(_ => rng.Next()).Take(3).ToList();
+                if (others.Count < 2) return null;
+                string fam = FamilyShort(album.Family);
+                string teach = fact is { Real: false }
+                    ? $"The {lower} is made up for Fesh, but it's based on the {fact.Sci}, one of the {album.Family}."
+                    : $"The {lower} is one of the {album.Family}.";
+                teach += " A family is a group of close relatives, like cats and tigers; scientific family names end in -idae.";
+                return Shuffle(new QuizQ { Kind = kind, Prompt = $"Which family does the {lower} belong to?", Subject = subject.Id, Teach = teach }, fam, others);
+            }
+            case "water":
+            {
+                // The whole recorded set, as one answer, so "salt" can't half-fit a fish that also lives in brackish water.
+                string right = WaterSetWord(album.Water);
+                var wrong = WaterSets.Select(WaterSetWord).Where(o => o != right).OrderBy(_ => rng.Next()).Take(3).ToList();
+                var set = WaterSet(album.Water);
+                string teach = $"The {lower} lives in {WaterList(album.Water)} water.";
+                teach += set.Count == 3 ? " Fish that move between fresh and salt water have to change how their bodies handle salt."
+                    : set.Contains("brackish") ? " Brackish water, in mangroves and river mouths, is a mix of fresh and salt."
+                    : set.Contains("fresh") ? " Fresh water, in rivers, lakes and ponds, has almost no salt in it." : " Most fish of the open sea can't survive long in fresh water.";
+                // "All", so a half-true answer ("fresh and brackish" for a fish that's also in the sea) is plainly wrong (Codex).
+                return Shuffle(new QuizQ { Kind = kind, Prompt = $"Which answer lists all the waters the {lower} lives in?", Subject = subject.Id, Teach = teach }, right, wrong);
+            }
+            case "diet":
+            {
+                string role = FeedRole(subject.Id);
+                var r = FeedRoles.First(f => f.id == role);
+                return Shuffle(new QuizQ { Kind = kind, Prompt = $"What does the {lower} eat?", Subject = subject.Id,
+                    Teach = $"The album says it eats: \"{album.Diet.TrimEnd('.')}.\" That makes the {lower} {r.word}. {r.means}" }, r.answer, FeedWrong[role].ToList());
+            }
         }
         return null;
     }
-
-    bool SpotKnownFor(string id) => !Data.SpotOfFish.TryGetValue(id, out var s) || SpotKnown(Data.SpotById[s]);
 
     QuizQ Shuffle(QuizQ q, string right, List<string> wrong)
     {
@@ -221,12 +274,166 @@ partial class Game
         return string.Join(' ', outWords);
     }
 
+    /* ---------- What the album and the island guide teach (1.18.1) ---------- */
+    // A family's short name for an answer: its common name and the first scientific name, "Groupers (Epinephelidae)".
+    static string FamilyShort(string family)
+    {
+        int open = family.IndexOf(" (");
+        if (open < 0) return family;
+        string sci = family[(open + 2)..].TrimEnd(')').Split(',')[0].Split(" or ")[0].Trim();
+        return $"{family[..open]} ({sci})";
+    }
+
+    // A family question needs one clear family: not an order or infraorder, and not "this or that".
+    static bool FamilyAskable(string id) => AlbumData.TryGetValue(id, out var a) && !a.Family.Contains("order ") && !a.Family.Contains(" or ")
+        && FishFacts.ById.ContainsKey(id);
+
+    // Two fish that are, or could be, filed in the same family: the same scientific family, or either's full entry
+    // naming the other's family (a parrotfish "or part of the wrasses, Labridae"; mudskippers "often put with the gobies").
+    static bool SameFamily(string a, string b)
+    {
+        if (!AlbumData.TryGetValue(a, out var fa) || !AlbumData.TryGetValue(b, out var fb)) return false;
+        string sa = FamilyShort(fa.Family), sb = FamilyShort(fb.Family);
+        string sciA = sa[(sa.IndexOf('(') + 1)..].TrimEnd(')'), sciB = sb[(sb.IndexOf('(') + 1)..].TrimEnd(')');
+        string comA = sa.Split(" (")[0].ToLowerInvariant(), comB = sb.Split(" (")[0].ToLowerInvariant();
+        string la = fa.Family.ToLowerInvariant(), lb = fb.Family.ToLowerInvariant();
+        return sciA == sciB || la.Contains(sciB.ToLowerInvariant()) || lb.Contains(sciA.ToLowerInvariant()) || la.Contains(comB) || lb.Contains(comA);
+    }
+
+    static HashSet<string> WaterSet(string water) => water.Split(',').Select(w => w.Trim()).ToHashSet();
+    static readonly string[] WaterSets = { "fresh", "salt", "fresh,brackish", "salt,brackish", "fresh,brackish,salt" };
+    static string WaterSetWord(string water)
+    {
+        var s = WaterSet(water);
+        return s.Count == 3 ? "Fresh, brackish and salt water" : s.SetEquals(new[] { "fresh" }) ? "Only fresh water" : s.SetEquals(new[] { "salt" }) ? "Only the sea (salt water)"
+            : s.Contains("fresh") ? "Fresh and brackish water" : "The sea and brackish water";
+    }
+
+    // How an animal feeds, from the album's diet: only the clear cases (scraps, bits and "anything" are left out).
+    static readonly (string id, string answer, string word, string means)[] FeedRoles =
+    {
+        ("carnivore", "Other animals: fish, shrimp, crabs, worms", "a carnivore", "Carnivores eat other animals."),
+        ("herbivore", "Algae and plants", "a herbivore", "Herbivores eat plants and algae; on a reef, grazers keep algae from smothering the coral."),
+        ("plankton", "Plankton: drifting life, mostly tiny", "a plankton feeder", "Plankton is life that drifts with the water: mostly tiny plants and animals, though some jellyfish are big. Plankton feeders sift or pick it out."),
+        ("omnivore", "Both plants and animals", "an omnivore", "Omnivores eat both plants and animals.")
+    };
+
+    // The wrong answers for each kind of feeder, each one plainly false for it (Codex: a lanternfish eats tiny animals,
+    // so "other animals" couldn't be wrong for it, and a plankton feeder of both plants and animals is an omnivore too).
+    static readonly Dictionary<string, string[]> FeedWrong = new()
+    {
+        ["carnivore"] = new[] { "Only algae and plants", "Only plankton, sifted from the water" },
+        ["herbivore"] = new[] { "Only other animals", "Only plankton, sifted from the water" },
+        ["plankton"] = new[] { "Only algae and plants, grazed off rocks", "Big prey: other fish and squid" },
+        ["omnivore"] = new[] { "Only algae and plants", "Only other animals" }
+    };
+
+    // Animals whose album line a teacher could argue with (a Moorish idol is an omnivore, a sunfish's jellyfish are
+    // plankton, a moonfish's "small animals" are vague) and the crabs and shrimp, which scavenge plants too: never asked.
+    static readonly HashSet<string> NoFeedQuestion = new() { "moorish_idol", "ocean_sunfish", "silver_moonfish" };
+
+    static string FeedRole(string id)
+    {
+        if (!AlbumData.TryGetValue(id, out var a) || NoFeedQuestion.Contains(id) || AlbumChapters.First(c => c.Id == "crustaceans").Fish.Contains(id)) return null;
+        string d = a.Diet.ToLowerInvariant();
+        bool Has(string pattern) => System.Text.RegularExpressions.Regex.IsMatch(d, pattern);
+        if (Has(@"\b(scraps|bits|anything|whatever|rotting|dead|carrion|drifting)\b")) return null;
+        bool plankton = Has(@"\bplankton\b|^filters"), plants = Has(@"\b(algae|seagrass|plants?|seeds|grazes)\b");
+        bool animals = Has(@"\b(fish|squid|shrimp|crabs?|worms|insects|snails|clams|frogs|birds|lobsters|sharks|sponges|mussels|urchins|brittle stars|jellyfish|crayfish|tunas|mackerels|sardines|anchovies|octopus|crustaceans|animals|parasites)\b|^hunts|^ambushes");
+        if (plankton) return plants || animals ? null : "plankton";
+        return plants && animals ? "omnivore" : plants ? "herbivore" : animals ? "carnivore" : null;
+    }
+
+    // "Which of these is not a fish?" A crab, shrimp, lobster, squid or octopus you've caught, among real fish.
+    QuizQ MakeNotFishQuestion(List<CommonFish> known)
+    {
+        var crust = AlbumChapters.First(c => c.Id == "crustaceans").Fish;
+        var ceph = AlbumChapters.First(c => c.Id == "cephalopods").Fish;
+        var odd = known.Where(f => crust.Contains(f.Id) || ceph.Contains(f.Id)).OrderBy(_ => rng.Next()).FirstOrDefault();
+        var fish = known.Where(f => !crust.Contains(f.Id) && !ceph.Contains(f.Id)).OrderBy(_ => rng.Next()).Select(f => f.Name).Distinct().Take(3).ToList();
+        if (odd == null || fish.Count < 2) return null;
+        bool isCrust = crust.Contains(odd.Id);
+        string lower = odd.Name.ToLowerInvariant();
+        return Shuffle(new QuizQ
+        {
+            Kind = "notfish", Prompt = "Which one of these is not a fish?", Subject = odd.Id,
+            Quote = "A fish has a backbone, breathes with gills, and swims with fins. One of these animals is something else, whatever the market calls it.",
+            Teach = isCrust
+                ? $"The {lower} is a crustacean: no backbone, a hard outer skeleton it sheds to grow, and jointed legs."
+                : $"The {lower} is a cephalopod, a mollusk like snails and clams: no backbone, a soft body, and arms around its mouth."
+        }, odd.Name, fish);
+    }
+
+    // The island guide's places: the kind of landform (shown its cross-section), or the kind of water in one of its
+    // bodies of water. Only charted places, so nothing names an island you haven't found.
+    QuizQ MakeIslandQuestion(string kind, HashSet<string> recent)
+    {
+        var open = Regions.Where(AtlasOpen).ToList();
+        if (kind == "isle")
+        {
+            var subjects = open.Where(r => r.Diagram != "ocean" && !recent.Contains(r.Id)).ToList();
+            if (subjects.Count == 0) return null;
+            var reg = subjects[rng.Next(subjects.Count)];
+            var wrong = open.Select(r => r.Kind).Where(k => k != reg.Kind).Distinct().OrderBy(_ => rng.Next()).Take(3).ToList();
+            if (wrong.Count < 2) return null;
+            return Shuffle(new QuizQ
+            {
+                Kind = kind, Region = reg.Id, Prompt = "This drawing shows a place you've charted. What kind of place is it?",
+                Teach = $"That's {reg.Name} ({reg.Kind.ToLowerInvariant()}). {FirstSentence(reg.Real)}"
+            }, reg.Kind, wrong);
+        }
+        // A body of water whose name doesn't give the answer away; fresh and brackish ones come up more often.
+        var bodies = open.Where(r => r.Diagram != "ocean").SelectMany(r => r.Waters.Select(b => (r, b)))
+            .Where(p => !System.Text.RegularExpressions.Regex.IsMatch(p.b.Name, @"\b(fresh|freshwater|salt|salty|brackish|sea|ocean)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                && !recent.Contains(p.r.Id)).ToList();
+        if (bodies.Count == 0) return null;
+        var pick = bodies.OrderByDescending(p => (p.b.Kind == "salt" ? 0 : 1) + rng.NextDouble() * 1.5).First();
+        var q = new QuizQ
+        {
+            Kind = kind, Region = pick.r.Id, Prompt = $"On {pick.r.Name}: what kind of water is this?", Big = pick.b.Name,
+            Options = new[] { "Fresh water", "Brackish water", "Salt water" },
+            Teach = $"{pick.b.Name}: {pick.b.Kind} water. " + pick.b.Kind switch
+            {
+                "fresh" => "Fresh water, from rain, rivers or springs, has almost no salt.",
+                "brackish" => "Brackish water is a mix: rain or river water meeting the sea's tide.",
+                _ => "Salt water is the sea's: about 35 grams of salt in every litre."
+            }
+        };
+        q.Answer = pick.b.Kind switch { "fresh" => 0, "brackish" => 1, _ => 2 };
+        return q;
+    }
+
+    static string FirstSentence(string text) { int i = text.IndexOf(". "); return i < 0 ? text : text[..(i + 1)]; }
+
+    // After an answer: a further fact ("Did you know?") and, for a fish, its family, water and food from the album.
+    void Enrich(QuizQ q)
+    {
+        if (q.Region != null)
+        {
+            var reg = RegionById[q.Region];
+            q.More = string.Join(" ", Sentences(reg.Real).Where(s => !q.Teach.Contains(s)));
+            return;
+        }
+        if (q.Subject == null) return;
+        if (FishFacts.ById.TryGetValue(q.Subject, out var fact))
+        {
+            string quoted = q.Kind == "fact" ? FirstSentences(fact.Text, 170) : "";
+            var rest = Sentences(fact.Text).Where(s => !quoted.Contains(s.TrimEnd('.')) && !q.Teach.Contains(s)).ToList();
+            q.More = rest.Count > 0 ? string.Join(" ", rest) : null;
+        }
+        if (AlbumData.TryGetValue(q.Subject, out var a))
+            q.Info = $"Family: {FamilyShort(a.Family)}  ·  Water: {WaterList(a.Water)}  ·  Food: {a.Diet}";
+    }
+
+    static List<string> Sentences(string text) =>
+        System.Text.RegularExpressions.Regex.Split(text, @"(?<=[.!?])\s+(?=[A-Z""])").Where(s => s.Length > 0).ToList();
+
     static readonly string[][] LessonPlan =
     {
-        new[] { "picture", "shadow" }, new[] { "shadow", "picture" },
-        new[] { "where", "when", "fight", "heavier", "bait" }, new[] { "where", "when", "fight", "heavier", "bait" },
-        new[] { "heavier", "where", "fight", "bait", "when" }, new[] { "real", "where", "when", "fight" },
-        new[] { "fact", "sci", "real" }, new[] { "fact", "sci", "real" }
+        new[] { "picture", "shadow" }, new[] { "shadow", "picture", "notfish" },
+        new[] { "where", "when", "fight", "heavier", "bait" }, new[] { "water", "diet", "where", "when" },
+        new[] { "isle", "waterbody", "diet", "water" }, new[] { "family", "notfish", "real", "fight" },
+        new[] { "fact", "sci", "family" }, new[] { "fact", "sci", "real", "diet" }
     };
 
     void StartLesson()
@@ -241,8 +448,9 @@ partial class Game
             foreach (var kind in slot.OrderBy(_ => rng.Next()))
                 if ((made = MakeQuestion(kind, known, recent)) != null) break;
             made ??= MakeQuestion("picture", known, recent);
+            Enrich(made);
             q.Qs.Add(made);
-            recent.Add(made.Subject);
+            recent.Add(made.Subject ?? made.Region);
             if (recent.Count > Math.Max(1, known.Count - 3)) recent.Clear();
         }
         q.At = 0; q.View = "question"; q.T = 0; q.Picked = -1; q.Votes = null;
@@ -262,17 +470,21 @@ partial class Game
         {
             q.Right++; q.Streak++; q.BestStreak = Math.Max(q.BestStreak, q.Streak);
             q.Score += 100 + (q.T < 6 ? 50 : 0) + q.Streak * 10;
-            int before = state.know.GetValueOrDefault(qq.Subject);
-            state.know[qq.Subject] = Math.Min(9, before + 1);
-            if (before + 1 == LearnedAt) q.Learned.Add(qq.Subject);
-            state.missed.Remove(qq.Subject);
+            // A question about a place (no fish) counts for the score, not toward learning a fish.
+            if (qq.Subject != null)
+            {
+                int before = state.know.GetValueOrDefault(qq.Subject);
+                state.know[qq.Subject] = Math.Min(9, before + 1);
+                if (before + 1 == LearnedAt) q.Learned.Add(qq.Subject);
+                state.missed.Remove(qq.Subject);
+            }
             Sfx.Play("right");
         }
         else
         {
             q.Hearts--; q.Streak = 0; Sfx.Play("wrong");
-            // It comes up again soon, in this lesson or the next.
-            if (!state.missed.Contains(qq.Subject)) state.missed.Add(qq.Subject);
+            // It comes up more often in the next lesson (this one's questions are already chosen).
+            if (qq.Subject != null && !state.missed.Contains(qq.Subject)) state.missed.Add(qq.Subject);
             if (state.missed.Count > 12) state.missed.RemoveAt(0);
         }
         CheckBadges();
@@ -298,6 +510,7 @@ partial class Game
             state.lessonDay = state.day;
         }
         state.lessons++;
+        q.NewBest = q.Score > state.bestLesson;
         state.bestLesson = Math.Max(state.bestLesson, q.Score);
         Sfx.Play(q.Right >= 7 ? "rare" : "craft");
         CheckBadges();
@@ -312,7 +525,8 @@ partial class Game
         q.AskUsed = true;
         var qq = q.Qs[q.At];
         int n = qq.Options.Length;
-        bool local = Data.Biomes[PageOf(qq.Subject)].Id is "amihan" or "habagat";
+        bool local = qq.Subject != null ? Data.Biomes[PageOf(qq.Subject)].Id is "amihan" or "habagat"
+            : RegionById[qq.Region].Biome is "amihan" or "habagat";
         var votes = new int[n];
         int right = local ? 55 + rng.Next(26) : 35 + rng.Next(26);
         votes[qq.Answer] = right;
@@ -376,19 +590,27 @@ partial class Game
         var q = quiz;
         int known = KnownFish().Count;
         float ty = y + pad + 52;
-        string lead = q.Paid ? "Today's lesson: eight questions about fish you've caught. Three hearts. Every answer teaches the right one."
+        string lead = q.Paid ? "Today's lesson: eight questions about the fish you've caught and the islands you've charted: their shapes, families, food and water. Three hearts. Every answer teaches the right one, and a little more."
             : "You've had today's lesson. Practise as much as you like: it still counts toward the fish you've learned, but the school fund pays once a day.";
         var l = Gfx.Wrap(lead, FontKind.Note, 20, w - 2 * pad);
         Lines(l, x + pad, ty, 27, FontKind.Note, 20, Muted);
         ty += l.Count * 27 + 16;
-        var again = state.missed.Where(Data.FishById.ContainsKey).Select(id => Data.FishById[id].Name).Take(4).ToList();
+        // The ones you missed, as many as fit, then how many more.
+        var missed = state.missed.Where(Data.FishById.ContainsKey).Select(id => Data.FishById[id].Name).ToList();
+        string againText = "nothing missed last time";
+        for (int n = missed.Count; n >= 1; n--)
+        {
+            string t = "the ones you missed: " + string.Join(", ", missed.Take(n)) + (n < missed.Count ? $" and {missed.Count - n} more" : "");
+            if (Gfx.Measure(t, FontKind.Ui500, 18) <= w - 2 * pad - 180) { againText = t; break; }
+            if (n == 1) againText = $"{missed.Count} fish you missed";
+        }
         var stats = new[]
         {
             ("Fish you know", $"{known} kinds caught"),
             ("Learned", $"{LearnedCount} (three right answers about a fish; a star in your Fish log)"),
             ("Best score", state.bestLesson > 0 ? $"{state.bestLesson}" : "no lessons yet"),
             ("How it scores", "100 a right answer, 50 more for a quick one, and a bonus for a streak"),
-            ("Again today", again.Count > 0 ? $"the ones you missed: {string.Join(", ", again)}" : "nothing missed last time")
+            ("Again today", againText)
         };
         foreach (var (k, v) in stats)
         {
@@ -428,8 +650,9 @@ partial class Game
         var prompt = Gfx.Wrap(qq.Prompt, FontKind.Ui700, 24, w - 2 * pad);
         Lines(prompt, x + pad, y + pad + 70, 30, FontKind.Ui700, 24, Pal.PaperInk);
 
-        // What the question shows: the fish, its shadow, a quote, or a scientific name.
-        float px = x + pad, py = y + pad + 110, pw = 400, ph = 232;
+        // What the question shows: the fish, its shadow, a quote, a scientific name, or a place's drawing. A prompt
+        // that takes two lines moves it all down (Codex: it used to run into the picture).
+        float px = x + pad, py = y + pad + 80 + prompt.Count * 30, pw = 400, ph = 232;
         bool pics = qq.Pics != null;
         if (!pics)
         {
@@ -444,8 +667,14 @@ partial class Game
             else if (qq.Big != null)
             {
                 Gfx.Rect(px, py, pw, ph, NoteBg, 3);
-                var lines = Gfx.Wrap(qq.Big, FontKind.Note, 34, pw - 30);
-                Lines(lines, px + 15, py + ph / 2 - lines.Count * 22, 44, FontKind.Note, 34, Pal.PaperInk);
+                float bs = Gfx.Wrap(qq.Big, FontKind.Note, 34, pw - 30).Count <= 2 ? 34 : 26, bl = bs + 10;
+                var lines = Gfx.Wrap(qq.Big, FontKind.Note, bs, pw - 30);
+                Lines(lines, px + 15, py + ph / 2 - lines.Count * bl / 2, bl, FontKind.Note, bs, Pal.PaperInk);
+            }
+            else if (qq.Region != null)
+            {
+                // The place's cross-section from the island guide (its name stays hidden: that's the question).
+                DrawRegionDiagram(RegionById[qq.Region], px, py, pw, ph);
             }
             else
             {
@@ -493,7 +722,7 @@ partial class Game
 
         // Under the answers: the quick bonus and "ask the class", or what the right answer teaches.
         float fx = x + pad + 330, fy = py + ph + 22, fw = x + w - pad - fx;
-        if (!answered)
+        if (answered) return DrawQuizLesson(x, y, w, pad, qq, fy);
         {
             float left = Math.Clamp(1 - q.T / 6, 0, 1);
             Gfx.Text(left > 0 ? "Quick answer bonus" : "Take your time", fx, fy + 4, FontKind.Ui600, 15, Muted);
@@ -506,23 +735,75 @@ partial class Game
             if (Button(ask, fx + fw - 180, fy - 4, 180, 40, FontKind.Ui700, 17, Pal.Sand, Pal.Ink, 3, 2, 5, !q.AskUsed)) AskClass();
             lastQuizBottom = fy + 36;
         }
-        else
-        {
-            bool right = q.Picked == qq.Answer;
-            var lines = Gfx.Wrap(qq.Teach, FontKind.Ui500, 16, fw - 150);
-            if (lines.Count > 4) lines = lines.Take(4).ToList();
-            float bh2 = Math.Max(76, lines.Count * 20 + 38);
-            Gfx.Box(fx, fy - 6, fw, bh2, right ? Pal.C("#e4f3e0") : Pal.C("#f8e6dc"), right ? Pal.C("#3f8a4a") : Rust, 2, 5);
-            Gfx.Text(right ? "Tama! (Right!)" : $"The answer: {Gfx.Ellipsize(qq.Options[qq.Answer], FontKind.Ui700, 16, fw - 300)}", fx + 12, fy, FontKind.Ui700, 16, right ? Pal.C("#2f6a3a") : Rust);
-            Lines(lines, fx + 12, fy + 22, 20, FontKind.Ui500, 16, Pal.PaperInk);
-            string next = q.At + 1 >= q.Qs.Count || q.Hearts <= 0 ? "Finish" : "Next";
-#if DEBUG
-            Gfx.Seen["quiz:next"] = new Rectangle(fx + fw - 128, fy + bh2 / 2 - 26, 116, 44);
-#endif
-            if (Button(next, fx + fw - 128, fy + bh2 / 2 - 26, 116, 44, FontKind.Ui700, 19, Pal.Buoy, White, 4, 2, 6)) { NextQuestion(); return false; }
-            lastQuizBottom = fy - 6 + bh2;
-        }
         return true;
+    }
+
+    // The answer's lesson, beside Ma'am Isay: right or wrong and why, then (as room allows) a further fact and the
+    // fish's album line. Nothing is cut short: if it can't all fit, the extras go, the why always stays (checked).
+    bool DrawQuizLesson(float x, float y, float w, float pad, QuizQ qq, float fy)
+    {
+        var q = quiz;
+        bool right = q.Picked == qq.Answer;
+        // Next sits on the left, above the class; the lesson takes the rest, right of Ma'am Isay.
+        string next = q.At + 1 >= q.Qs.Count || q.Hearts <= 0 ? "Finish" : "Next";
+#if DEBUG
+        Gfx.Seen["quiz:next"] = new Rectangle(x + pad, fy - 6, 300, 48);
+#endif
+        if (Button(next, x + pad, fy - 6, 300, 48, FontKind.Ui700, 20, Pal.Buoy, White, 4, 2, 6)) { NextQuestion(); return false; }
+        Gfx.TextCenter(Bind.Fix("or press <act>"), x + pad + 150, fy + 48, FontKind.Ui500, 14, Muted);
+        float bx = x + pad + QuizLessonX, by = fy - 6, bw = x + w - pad - bx, bh = y + 650 - pad - by, tw = bw - 24;
+        var (head, teach, info, more, fs) = QuizLessonLayout(qq, right, tw, bh);
+        Gfx.Box(bx, by, bw, bh, right ? Pal.C("#e4f3e0") : Pal.C("#f8e6dc"), right ? Pal.C("#3f8a4a") : Rust, 2, 5);
+        float ty = by + 8;
+        Lines(head, bx + 12, ty, 21, FontKind.Ui700, 17, right ? Pal.C("#2f6a3a") : Rust);
+        ty += head.Count * 21 + 2;
+        Lines(teach, bx + 12, ty, fs + 4, FontKind.Ui500, fs, Pal.PaperInk);
+        ty += teach.Count * (fs + 4);
+        if (info.Count > 0)
+        {
+            ty += 6;
+            Lines(info, bx + 12, ty, 18, FontKind.Ui600, 14, Pal.C("#2a5a6a"));
+            ty += info.Count * 18;
+        }
+        if (more.Count > 0)
+        {
+            ty += 6;
+            Gfx.Text("Did you know?", bx + 12, ty, FontKind.Ui700, 15, Pal.C("#8a5a2a"));
+            ty += 20;
+            Lines(more, bx + 12, ty, 19, FontKind.Ui500, 15, Pal.PaperInk);
+            ty += more.Count * 19;
+        }
+        lastQuizBottom = by + bh;
+        lastQuizLessonEnd = ty + 6 - (by + bh);
+        return true;
+    }
+
+    const float QuizLessonX = 424;     // the lesson box starts right of Ma'am Isay's portrait
+    float lastQuizLessonEnd;           // how far the lesson's text ran past its box (0 or less fits; checked)
+
+    // What the lesson box holds for a question, in a box tw wide and bh tall: the why always (a size smaller if it
+    // must), then the album line, then as many whole sentences of the further fact as fit.
+    (List<string> head, List<string> teach, List<string> info, List<string> more, float fs) QuizLessonLayout(QuizQ qq, bool right, float tw, float bh)
+    {
+        var head = Gfx.Wrap(right ? "Tama! (Right!)" : $"The answer: {qq.Options[qq.Answer]}", FontKind.Ui700, 17, tw);
+        float room = bh - 16 - head.Count * 21 - 2;
+        float fs = 16;
+        var teach = Gfx.Wrap(qq.Teach, FontKind.Ui500, fs, tw);
+        if (teach.Count * (fs + 4) > room) { fs = 14; teach = Gfx.Wrap(qq.Teach, FontKind.Ui500, fs, tw); }
+        room -= teach.Count * (fs + 4);
+        var info = qq.Info == null ? new List<string>() : Gfx.Wrap(qq.Info, FontKind.Ui600, 14, tw);
+        if (6 + info.Count * 18 > room) info = new(); else room -= 6 + info.Count * 18;
+        var more = new List<string>();
+        if (qq.More != null)
+        {
+            var sentences = Sentences(qq.More);
+            for (int n = sentences.Count; n >= 1; n--)
+            {
+                var l = Gfx.Wrap(string.Join(" ", sentences.Take(n)), FontKind.Ui500, 15, tw);
+                if (6 + 20 + l.Count * 19 <= room) { more = l; break; }
+            }
+        }
+        return (head, teach, info, more, fs);
     }
 
     void DrawQuizDone(float x, float y, float w, float pad)
@@ -543,7 +824,7 @@ partial class Game
         var rows = new List<string>
         {
             $"{q.Right} of {q.Qs.Count} right" + (q.Hearts <= 0 && q.At + 1 < q.Qs.Count ? " (out of hearts)" : ""),
-            $"Best streak {q.BestStreak} · score {q.Score}" + (q.Score >= state.bestLesson && q.Score > 0 ? " · a new best!" : $" (best {state.bestLesson})"),
+            $"Best streak {q.BestStreak} · score {q.Score}" + (q.NewBest && q.Score > 0 ? " · a new best!" : $" (best {state.bestLesson})"),
             q.Coins > 0 ? $"From the school fund: {q.Coins} coins" : q.Paid ? "No coins this time, but you've had your lesson" : "Practice: no coins, but it all counts toward learning",
             $"Fish learned: {LearnedCount}"
         };
@@ -555,11 +836,16 @@ partial class Game
             // Two rows of them, clear of the stamp.
             float lx0 = x + pad + 150, lx = lx0, right = x + w - pad - 320;
             int row = 0;
-            foreach (var id in q.Learned)
+            // Names in full; any that don't fit in two rows are counted at the end.
+            for (int i = 0; i < q.Learned.Count; i++)
             {
-                string nm = Gfx.Ellipsize(Data.FishById[id].Name, FontKind.Ui500, 15, 150);
+                string id = q.Learned[i], nm = Data.FishById[id].Name;
                 float iw = 32 + Gfx.Measure(nm, FontKind.Ui500, 15) + 18;
-                if (lx + iw > right && lx > lx0) { if (++row == 2) break; lx = lx0; ty += 32; }
+                if (lx + iw > right && lx > lx0)
+                {
+                    if (++row == 2) { Gfx.Text($"and {q.Learned.Count - i} more", lx0, ty + 34, FontKind.Ui600, 15, Muted); ty += 32; break; }
+                    lx = lx0; ty += 32;
+                }
                 DrawIcon(id, lx, ty - 4, 28);
                 Gfx.Text(nm, lx + 32, ty + 2, FontKind.Ui500, 15, Pal.PaperInk);
                 lx += iw;

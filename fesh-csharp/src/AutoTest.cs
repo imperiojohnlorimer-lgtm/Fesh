@@ -39,7 +39,8 @@ partial class Game
         Inp.ScriptFocused = true;
         // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
         standStill = true;
-        script = Environment.GetEnvironmentVariable("FESH_ATLAS_TEST") == "1" ? AtlasScript().GetEnumerator()
+        script = Environment.GetEnvironmentVariable("FESH_VIEW_TEST") == "1" ? ViewScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_ATLAS_TEST") == "1" ? AtlasScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_EDU_TEST") == "1" ? EduScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_GUIDE_TEST") == "1" ? GuideScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_GUSO_TEST") == "1" ? GusoScript().GetEnumerator()
@@ -1980,6 +1981,7 @@ partial class Game
         foreach (int frames in GuideScript()) yield return frames;
         foreach (int frames in EduScript()) yield return frames;
         foreach (int frames in AtlasScript()) yield return frames;
+        foreach (int frames in ViewScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

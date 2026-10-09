@@ -519,7 +519,9 @@ partial class Game
         }
         Check($"answering by clicks and by number keys, with one wrong ({quiz?.Right} right, {quiz?.Hearts} hearts)", named && quiz?.View == "done" && quiz.Right == LessonLength - 1 && quiz.Hearts == 2);
         Check($"today's lesson pays from the school fund ({state.coins - coinsQ} coins)", state.coins - coinsQ == 6 * (LessonLength - 1) && state.lessonDay == state.day && state.lessons == 1);
-        Check($"every right answer counts toward learning a fish, and three learns it ({quiz.Learned.Count} learned)", state.know.Values.Sum() == knowSum + LessonLength - 1 && quiz.Learned.Count >= 4 && quiz.Learned.All(Learnt));
+        // (A question about a place, 1.18.1, scores but isn't about a fish.)
+        int fishRight = quiz.Qs.Where((q, k) => k != 2 && q.Subject != null).Count();
+        Check($"every right answer about a fish counts toward learning it, and three learns it ({quiz.Learned.Count} learned)", state.know.Values.Sum() == knowSum + fishRight && quiz.Learned.Count >= 3 && quiz.Learned.All(Learnt));
         Check("the questions and answers fit the panel", fits);
         pendingShot = "334-quiz-done"; yield return 2;
         Check($"a prize won in the lesson is on its results card ({string.Join("; ", lessonPrizes ?? new())})", lessonPrizes?.Any(p => p.Contains("Fish ID")) == true);
@@ -543,13 +545,13 @@ partial class Game
         // Every kind of question is well formed, and the fact questions never name the fish.
         var known = KnownFish();
         bool ok = true, redacted = true, spots = true;
-        foreach (var kind in new[] { "picture", "shadow", "where", "when", "fight", "heavier", "fact", "real", "sci", "bait" })
+        foreach (var kind in new[] { "picture", "shadow", "where", "when", "fight", "heavier", "fact", "real", "sci", "bait", "family", "water", "diet", "notfish", "isle", "waterbody" })
             for (int i = 0; i < 30; i++)
             {
                 var q = MakeQuestion(kind, known, new());
                 if (q == null) continue;
                 ok &= q.Options.Length >= 2 && q.Options.Distinct().Count() == q.Options.Length && q.Answer >= 0 && q.Answer < q.Options.Length && q.Teach != null;
-                if (kind is "picture" or "shadow" or "fact" or "sci") ok &= q.Options[q.Answer] == Data.FishById[q.Subject].Name;
+                if (kind is "picture" or "shadow" or "fact" or "sci" or "notfish") ok &= q.Options[q.Answer] == Data.FishById[q.Subject].Name;
                 if (kind == "fact")
                     redacted &= !Data.FishById[q.Subject].Name.Split(' ', '(', ')').Where(w => w.Length >= 4).Any(w => q.Quote.Contains(w, StringComparison.OrdinalIgnoreCase));
                 if (kind == "where")

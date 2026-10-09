@@ -262,7 +262,9 @@ partial class Game
         else if (Bind.Pressed("ride")) ToggleRide();
         else if (BackPressed())
         {
-            if (mode == "panel" && panel == "dex" && dexFish != null) dexFish = null;
+            // A card open over the Fish log, the album or the island guide closes back to its page first.
+            if (mode == "panel" && panel is ("dex" or "album" or "atlas") && (dexFish != null || dexExtra != null)) { dexFish = null; dexExtra = null; }
+            else if (mode == "panel" && panel == "atlas" && atlasZoom) atlasZoom = false;
             else if (mode == "panel" && panel == "sungka") CloseSungka();
             else if (mode == "panel" && panel == "tides") CloseTides();
             else if (mode == "panel") ClosePanels();
@@ -648,6 +650,8 @@ partial class Game
         riddle = null;
         panel = null;
         dexFish = null;
+        dexExtra = null;
+        atlasZoom = false;
         if (mode == "panel") mode = "play";
     }
 
@@ -1134,6 +1138,7 @@ partial class Game
         habagatWalk.Clear();
         // The Sea school's moment-to-moment bits (1.17).
         landed = null; releaseFx = null; sorting = null; quiz = null; riddle = null; warnedTide = int.MinValue;
+        dexFish = null; dexExtra = null; atlasZoom = false;
         badgeNews = null; lessonPrizes = null;
         albumPages = null;
         state.know ??= new(); state.letGo ??= new(); state.missed ??= new();

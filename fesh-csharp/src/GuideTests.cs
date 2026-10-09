@@ -214,7 +214,7 @@ partial class Game
         /* ---------- The real fish ---------- */
         var noFact = Data.AllCommon.Where(f => !FishFacts.ById.ContainsKey(f.Id)).Select(f => f.Id).ToList();
         Check($"every fish has a real-world note ({noFact.Count} missing: {string.Join(", ", noFact.Take(4))})", noFact.Count == 0);
-        const float boxW = 336 + 6, boxH = 520 - 28 - (28 + 50 + 196 + 14);
+        const float boxW = DexPicW + 6, boxH = DexCardH - DexCardPad - (DexCardPad + 50 + DexPicH + 14);
         var tooLong = FishFacts.ById.Where(kv => FactLayout(kv.Value, boxW) is var (sci, body) && FactHeight(sci, body) > boxH).Select(kv => kv.Key).ToList();
         Check($"every note fits its box on the card ({tooLong.Count} don't: {string.Join(", ", tooLong.Take(4))})", tooLong.Count == 0);
         bool ascii = FishFacts.ById.Values.All(f => (f.Sci + f.Text).All(c => c < 128 || c == 'é'));

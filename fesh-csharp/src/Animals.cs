@@ -43,6 +43,20 @@ static class AnimalArt
             "WWWKKKK........",
             "WW...L.L......."
         }, new() { ['O'] = "#c7793f", ['R'] = "#a94e31", ['Y'] = "#e2b959", ['K'] = "#283c3e", ['k'] = "#405456", ['W'] = "#e6dfbf", ['e'] = "#faf1cb", ['L'] = "#6c634c" }),
+        // The atoll's odd catch (1.18.1: it had no sprite, so landing one crashed the catch card).
+        ["parrot"] = new(new[]
+        {
+            "......GGG...",
+            ".....GGGGY..",
+            ".....GGeGYY.",
+            ".....GGGG.y.",
+            "....RRGGG...",
+            "...RRRggG...",
+            "...RRRggG...",
+            "..BBRRgG....",
+            ".BBB.K.K....",
+            "BB.........."
+        }, new() { ['G'] = "#3f9a45", ['g'] = "#7cc456", ['R'] = "#d8433a", ['B'] = "#3f6fc8", ['Y'] = "#f2d16a", ['y'] = "#3a3a3a", ['e'] = "#1b1b1b", ['K'] = "#6b5a4a" }),
         ["goat"] = new(new[]
         {
             "..........hh.",
