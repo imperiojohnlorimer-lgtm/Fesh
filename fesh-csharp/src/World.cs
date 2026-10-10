@@ -1126,6 +1126,7 @@ partial class Game
         if (Visible(PipX, PipY)) { if (PipOpen) list.Add((PipY, DrawPip)); list.Add((PipY + 9, () => DrawStall(t))); }
         AddArchipelagoObjects(list);
         AddRestlessSeaObjects(list);
+        AddMagayonObjects(list);
         if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
         if (Has("boat") > 0 && !Aboard)
         {
@@ -1137,7 +1138,8 @@ partial class Game
         if (state.tamed && !state.riding && (call != null || Visible(state.mountX, state.mountY))) list.Add((call is { Phase: not "whistle" } ? call.Y : state.mountY, DrawMountIdle));
         if (boss != null) list.Add((boss.Y, () => DrawBoss(t)));
         if (!TomasInBed) list.Add((tomasY, DrawTomas));
-        list.Add((player.Y, DrawPlayer));
+        // On the title the view tours the islands with nobody in it (UiMenu.cs), and behind the creator of a new fisher too.
+        if (!(mode == "title" || mode == "create" && creatorFor == "new")) list.Add((player.Y, DrawPlayer));
         if (Visible(26, 150)) list.Add((157, DrawWreck));
         foreach (var o in list.OrderBy(o => o.y)) o.draw();
     }
@@ -1324,6 +1326,7 @@ partial class Game
         LightParola(t);
         LightEclipse();
         LightFireflies(t);
+        LightBaga(t);
         ApplyDark(new Color(8, 16, 40, 255));
         // With the moon in Bakunawa's jaws, the surf doesn't catch any moonlight.
         if (eclipse == null || eclipse.Phase == "spit") DrawMoonlitShore(t, k);
@@ -1331,6 +1334,7 @@ partial class Game
         DrawGlowingSurf(t, k);
         DrawGlowTrail(t, k);
         DrawFireflies(t, k);
+        GlowBaga(t, k);
         GlowMount(k);
         GlowParola(t, k);
         GlowEclipse(k);
@@ -1405,6 +1409,7 @@ partial class Game
             foreach (var b in state.builds) if (b.id == "path") DrawBuild(b, t);
             DrawRestlessSea(t);
             DrawRiseGround();
+            DrawBagaGround(t);
             DrawSaltBeds();
             DrawGusoFarm(t);
             DrawLoose(t);
@@ -1437,12 +1442,15 @@ partial class Game
             if (Darkness > 0) DrawNight(t);
             DrawEclipseSky();
             DrawRain(t);
+            DrawAshfall(Raylib.GetFrameTime());
             DrawGhost(t);
         }
         else if (scene == "cave") RenderCave(t);
         else RenderRoom(t);
         if (mode == "bite") DrawBang();
         pix.CamX = pix.CamY = 0;
+        // The title's tour fades through dark between islands (UiMenu.cs).
+        if (mode == "title" && TitleTour().dark is float tourDark && tourDark > 0) pix.Fill(0, 0, W, H, Pal.Rgba(4, 9, 16, tourDark));
         if (mode == "reeling") DrawReel();
         if (fade > 0) pix.Fill(0, 0, W, H, Pal.Rgba(4, 9, 16, fade));
     }

@@ -72,7 +72,7 @@ partial class Game
 
     // Nothing else is going on: no fight, eclipse, race, festival, storm, and it's daytime.
     bool SeaQuiet => mode == "play" && boss == null && guardian == null && eclipse == null && race == null && !raceArmed
-        && !Stormy && !FestivalToday && state.clock is >= 7 * 60 and < 17 * 60 && fish == null && landed == null;
+        && !Stormy && !FestivalToday && state.clock is >= 7 * 60 and < 17 * 60 && fish == null && landed == null && !VolcanoControlled;
 
     /* ---------- Starting things ---------- */
     void CheckRestlessSea()

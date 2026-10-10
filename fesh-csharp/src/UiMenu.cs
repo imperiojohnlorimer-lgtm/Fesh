@@ -86,8 +86,61 @@ partial class Game
         newestSlot = SaveFile.Newest();
     }
 
-    // The title screen's words (1.20: the islands beyond Saltmere, and the hotbar's keys).
-    const string TitleTagline = "A fishing mystery on Saltmere Island and the seas beyond. Catch what shouldn't exist, and find out how it got here.";
+    // The title screen's words (1.21: the islands beyond the first four, and the hotbar's keys).
+    const string TitleTagline = "A fishing mystery from Saltmere to Starfall, Amihan and Habagat. Catch what shouldn't exist, and hear the islands' stories.";
+
+    // The world behind the title (1.21): a slow tour of the islands, drifting over each for a few seconds and fading
+    // through dark to the next, with the place's name; a few stops put their landmark to one side, clear of the menu.
+    // The title's own player stands at each stop, unseen (every outdoor drawing culls by distance to the player);
+    // StartGame puts the real one back from the save. Codex checked the stops: Starfall's drift stays well west of the
+    // Starwell's secret glade.
+    static readonly (float x, float y, string name, string where)[] TitleStops =
+    {
+        (160, 115, "Saltmere Island", "Where it all starts"),
+        (935, 262, "Starfall Atoll", "A ring of coral far to the east"),
+        (1625, 192, "Amihan Village", "The Amihan Archipelago"),
+        (2040, 138, "Luntian Karsts", "The Amihan Archipelago"),
+        (2235, 470, "Baga Island", "The Amihan Archipelago"),
+        (1890, 560, "Bakawan Island", "The Amihan Archipelago"),
+        (265, 643, "Asinan", "The Habagat islands"),
+        (645, 630, "Daang Pulo", "The Habagat islands"),
+        (LighthouseX - 90, LighthouseY + 14, "Parola", "The Habagat islands")
+    };
+    const float TitleStopSecs = 8, TitleFade = 0.8f, TitleDrift = 48;
+    float titleT;
+
+    // Which stop, how far through it (0 to 1), and how dark the fade between stops is now (0 to 1). The very first look
+    // at Saltmere doesn't fade in.
+    (int stop, float k, float dark) TitleTour()
+    {
+        float t = titleT % (TitleStops.Length * TitleStopSecs);
+        int stop = Math.Min(TitleStops.Length - 1, (int)(t / TitleStopSecs));
+        float into = t - stop * TitleStopSecs, left = TitleStopSecs - into;
+        float dark = titleT < TitleStopSecs ? 0 : Math.Clamp(1 - into / TitleFade, 0, 1);
+        return (stop, into / TitleStopSecs, Math.Max(dark, Math.Clamp(1 - left / TitleFade, 0, 1)));
+    }
+
+    void UpdateTitleTour(float dt)
+    {
+        if (mode != "title") return;
+        titleT += dt;
+        var (stop, k, _) = TitleTour();
+        var s = TitleStops[stop];
+        player.X = s.x - TitleDrift / 2 + TitleDrift * k;
+        player.Y = s.y;
+    }
+
+    void DrawTitleCaption()
+    {
+        var (stop, _, dark) = TitleTour();
+        var s = TitleStops[stop];
+        float a = 1 - dark;
+        if (a <= 0.01f) return;
+        Gfx.Text(s.name, 38, 34, FontKind.Ui700, 30, Pal.WithAlpha(Pal.C("rgba(0,0,0,0.5)"), a));
+        Gfx.Text(s.name, 36, 32, FontKind.Ui700, 30, Pal.WithAlpha(Pal.Sand, a));
+        Gfx.Text(s.where, 38, 70, FontKind.Note, 19, Pal.WithAlpha(Pal.C("rgba(0,0,0,0.5)"), a));
+        Gfx.Text(s.where, 36, 68, FontKind.Note, 19, Pal.WithAlpha(Pal.Paper, a));
+    }
     static readonly string[] TitleControls =
     {
         "<move> walk  ·  <act> talk, fish and use  ·  1-6 pick from your hotbar  ·  <use> use what you're holding",
@@ -98,6 +151,7 @@ partial class Game
     void DrawTitle()
     {
         DrawRectangleGradientV(0, 0, GetScreenWidth(), GetScreenHeight(), Pal.C("rgba(16,36,58,0.05)"), Pal.C("rgba(16,36,58,0.78)"));
+        if (titleView == "main") DrawTitleCaption();
         if (slotInfo == null) RefreshSlots();
         if (titleView == "slots") { DrawSlots(); return; }
         if (titleView == "settings") { DrawMenu(); return; }
@@ -192,7 +246,7 @@ partial class Game
             return;
         }
         Gfx.Text(SlotTitle(s), tx, ty + 24, FontKind.Ui700, 27, Pal.PaperInk);
-        string where = s.scene == "cave" ? "Frostfang Caverns" : s.scene.StartsWith("house:") ? (s.scene == "house:tomas" ? "Tomas's hut" : "Your shack")
+        string where = s.scene == "cave" ? "Frostfang Caverns" : s.scene.StartsWith("house:") ? (s.scene == "house:tomas" ? "Tomas's hut" : s.scene == "house:school" ? "The school, Amihan Village" : "Your shack")
             : Data.Biomes[BiomeAt((int)(s.px / T), (int)((s.py - 1.5f) / T))].Name;
         Gfx.Text($"Day {s.day}, {ClockText(s.clock, 10)}  ·  {where}", tx, ty + 60, FontKind.Ui500, 18, Pal.PaperInk);
         Gfx.Text($"Creatures {s.caught.Count}/5  ·  {s.commons.Values.Sum()} fish caught  ·  {s.coins} coins", tx, ty + 84, FontKind.Ui500, 18, Pal.PaperInk);

@@ -23,7 +23,10 @@ partial class Game
         ("niko", "Niko", 1715, 187, "#367caa"),
         ("maya", "Maya", 2045, 127, "#b45b66"),
         ("tala", "Tala", 1895, 597, "#72a752"),
-        ("isay", "Ma'am Isay", SchoolX, SchoolY, "#d9a43a")
+        ("isay", "Ma'am Isay", SchoolX, SchoolY, "#d9a43a"),
+        // Baga (Magayon.cs): Manay Mila in her abaca garden, and Ben at the volcano station.
+        ("mila", "Manay Mila", MilaX, MilaY, "#c0392b"),
+        ("ben", "Ben", BenX, BenY, "#2a8a8a")
     };
 
     void GenerateArchipelago()
@@ -58,6 +61,9 @@ partial class Game
                 if (map[y, x] != 'j') continue;
                 if (Data.Spots.Any(s => s.Scene == "world" && s.Biome == "amihan" && Dist(x * T + 5, y * T + 5, s.X, s.Y) < s.R + 12)) continue;
                 if (Islanders.Any(n => Dist(x * T + 5, y * T + 5, n.x, n.y) < 48)) continue;
+                // Baga's cone stands on bare ground (Magayon.cs), and the lahar channel is kept clear.
+                float cdx = (x * T + 5 - ConeX) / 74f, cdy = (y * T + 5 - (ConeBaseY - 22)) / 40f;
+                if (cdx * cdx + cdy * cdy < 1 || ChannelDist(x * T + 5, y * T + 5) < 10) continue;
                 double roll = Pix.Hash(x, y, 183);
                 char kind = roll < .12 ? 'h' : roll < .16 ? 'R' : '\0';
                 if (kind == '\0') continue;
@@ -92,6 +98,8 @@ partial class Game
         if (!InAmihan || Aboard) return null;
         foreach (var n in Islanders)
         {
+            // At the shelter, or Mila on her way to the jetty, the folk from Baga aren't at home (Magayon.cs).
+            if (n.id is "mila" or "ben" && (BagaFolkAtSchool || n.id == "mila" && mgMilaWalk != null)) continue;
             var s = IslanderWalk(n.id);
             if (Dist(player.X, player.Y, s.X, s.Y + 6) < 15)
                 return new Target
@@ -104,7 +112,8 @@ partial class Game
                         : n.id == "niko" && NikoSeaLabel() is string nikoSea ? nikoSea
                         : n.id == "isay" && IsaySeaLabel() is string isaySea ? isaySea
                         : n.id == "niko" && state.Hinted("niko_request") && !state.Hinted("niko_asohos") && Has("asohos") >= NikoAsohos ? $"Give Niko {NikoAsohos} asohos" : n.id == "tala" && TalaListDone && !state.Hinted("talaReward") ? "Tell Tala what you've seen"
-                        : n.id == "isay" && state.Hinted("metIsay") ? (LessonToday ? "Today's lesson with Ma'am Isay" : "Practise with Ma'am Isay") : $"Talk to {n.name}"
+                        : n.id == "isay" && state.Hinted("metIsay") ? (LessonToday ? "Today's lesson with Ma'am Isay" : "Practise with Ma'am Isay")
+                        : n.id == "mila" ? MilaLabel() : n.id == "ben" ? BenLabel() : $"Talk to {n.name}"
                 };
         }
         // Maya's guso lines in the lagoon, when you face one (Seaweed.cs).
@@ -181,19 +190,23 @@ partial class Game
             case "tala": TalkTala(); break;
             // Ma'am Isay's class (School.cs).
             case "isay": TalkIsay(); break;
+            // Beneath the clouds (Magayon.cs).
+            case "mila": TalkMila(); break;
+            case "ben": TalkBen(); break;
         }
     }
 
     IEnumerable<Box> IslandSolids() => Islanders.Select(n => n.id == "isay" ? new Box(n.x - 23, n.y - 24, 46, 21) : new Box(n.x - 16, n.y - 22, 32, 19))
         .Append(SchoolBenchBox)
-        .Concat(new[] { new Box(2073, 97, 24, 10), new Box(1983, 131, 24, 10), new Box(2309, 455, 52, 25) })
+        .Concat(new[] { new Box(2073, 97, 24, 10), new Box(1983, 131, 24, 10), new Box(ConeX - 52, ConeBaseY - 28, 104, 28),
+            new Box(AlertBoardX - 7, AlertBoardY - 2, 15, 3), new Box(EvacTableX - 7, EvacTableY - 3, 15, 3), new Box(CrateX - 6, CrateY - 3, 13, 3) })
         .Concat(FireflyTreeSolids());
 
     void AddArchipelagoObjects(List<(float y, Action draw)> list)
     {
         list.Add((107, () => DrawKarst(2085, 107, 41)));
         list.Add((141, () => DrawKarst(1995, 141, 32)));
-        list.Add((480, DrawBagaCone));
+        list.Add((ConeBaseY, DrawBagaCone));
         if (RondallaOut) AddRondalla(list);
         if (FestivalHere) AddFestival(list);
         // Bakawan's pagatpat, the firefly trees (Bakawan.cs).
@@ -224,7 +237,20 @@ partial class Game
             {
                 list.Add((n.y - 3, () => DrawSchool(n.x, n.y - 5)));
                 list.Add((SchoolY + 18, () => DrawSchoolBench(time)));
-                list.Add((s.Y, () => DrawIsayFigure(pix, (int)MathF.Round(s.X), (int)MathF.Round(s.Y), s.Face, s.Step, s.Moving ? 0 : (int)(time % 3 / 2), (time + 3) % 4.3f < 0.12f)));
+                // While the ash falls she's inside the shelter with her class (Magayon.cs).
+                if (!AshFalling) list.Add((s.Y, () => DrawIsayFigure(pix, (int)MathF.Round(s.X), (int)MathF.Round(s.Y), s.Face, s.Step, s.Moving ? 0 : (int)(time % 3 / 2), (time + 3) % 4.3f < 0.12f)));
+                continue;
+            }
+            // Baga's two (Magayon.cs): Ben's station and Manay Mila's house, and them unless they're at the shelter.
+            if (n.id is "mila" or "ben")
+            {
+                list.Add((n.y - 3, () => { if (n.id == "ben") DrawStation(n.x, n.y - 5); else DrawBahay(n.x, n.y - 5, n.shirt); }));
+                if (BagaFolkAtSchool || n.id == "mila" && mgMilaWalk != null) continue;
+                list.Add((s.Y, () =>
+                {
+                    int bx = (int)MathF.Round(s.X), by = (int)MathF.Round(s.Y), bob = s.Moving ? 0 : (int)(time % 3 / 2);
+                    if (n.id == "mila") DrawMila(pix, bx, by, s.Face, s.Step, bob); else DrawBen(pix, bx, by, s.Face, s.Step, bob);
+                }));
                 continue;
             }
             list.Add((n.y - 3, () => DrawBahay(n.x, n.y - 5, n.shirt)));
@@ -257,24 +283,6 @@ partial class Game
         pix.Rect(x - 5, y - height - 2, 10, 3, "#548b46");
         pix.Rect(x - 12, y - 5, 6, 4, "#769756");
         pix.Rect(x - 8, y - height + 12, 4, 1, "#e3dbc0");
-    }
-
-    void DrawBagaCone()
-    {
-        const int x = 2335, y = 480;
-        for (int row = 0; row < 45; row++)
-        {
-            int half = 9 + row * 28 / 45;
-            pix.Rect(x - half, y - 45 + row, half * 2, 1, row % 6 == 0 ? "#65736b" : "#59675f");
-            pix.Rect(x + 3, y - 45 + row, half - 3, 1, "#48565a");
-        }
-        pix.Rect(x - 8, y - 45, 16, 3, "#303f43");
-        pix.Rect(x - 4, y - 44, 8, 1, "#c98252");
-        for (int i = 0; i < 3; i++)
-        {
-            float rise = (time * 3 + i * 9) % 28;
-            pix.Rect(x - 3 + rise / 5, y - 49 - rise, 7 + (int)(rise / 4), 3, Pal.Rgba(201, 211, 197, .3f * (1 - rise / 28)));
-        }
     }
 
     void DrawBahay(float x, float y, string trim)

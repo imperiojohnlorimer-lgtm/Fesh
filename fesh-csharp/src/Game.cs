@@ -148,7 +148,7 @@ partial class Game
     }
 
     // Each island has its own tune; the cave and houses have theirs. Rain adds its own patter outdoors.
-    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine || GuardianFighting ? "boss" : SeaEmergency && evac.Phase != "quake" ? "alarm" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
+    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine || GuardianFighting ? "boss" : SeaEmergency && evac.Phase != "quake" || BagaEvacuating ? "alarm" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
         : RondallaPlaying ? "rondalla" : Data.Biomes[lastBiome < Data.Biomes.Length ? lastBiome : PlayerBiome()].Id;
 
     void PickMusic(float dt)
@@ -276,6 +276,8 @@ partial class Game
             else if (mode == "panel" && panel == "atlas" && atlasZoom) atlasZoom = false;
             else if (mode == "panel" && panel == "sungka") CloseSungka();
             else if (mode == "panel" && panel == "tides") CloseTides();
+            else if (mode == "panel" && panel == "lahar") CloseLaharWatch();
+            else if (mode == "panel" && panel is "readings" or "gobag") { readings = null; gobag = null; ClosePanels(); }
             else if (mode == "panel") ClosePanels();
             else if (mode == "catch") CloseCatch();
             else if (mode == "odd") CloseOdd();
@@ -284,6 +286,7 @@ partial class Game
             else if (mode == "moon") CloseMoon();
             else if (mode == "platejaw") CloseGuardianCard();
             else if (mode == "seacard") CloseSeaCard();
+            else if (mode == "magayoncard") CloseMagayonCard();
             else if (mode == "build") ExitBuild();
             else if (mode is "waiting" or "charging") ReelIn("You reeled in.");
             else if (mode == "spear") EndSpear();
@@ -351,6 +354,7 @@ partial class Game
     string AreaName()
     {
         if (scene == "house:tomas") return "Tomas's hut";
+        if (scene == "house:school") return "The school (evacuation centre)";
         if (InHouse) return "Your shack";
         if (scene == "cave") return caveFloor == AncientFloor ? "The Ancient Floor" : $"Caverns, floor {caveFloor}";
         float x = player.X, y = player.Y;
@@ -389,6 +393,7 @@ partial class Game
     {
         "wreck" => state.flags.tideOut,
         "deep" => state.flags.dockFixed,
+        "bagareef" => !BagaClosed,
         _ => true
     };
 
@@ -665,12 +670,16 @@ partial class Game
         // A crab still on the sorting tray goes the safe way (Release.cs); a lesson left halfway is just left.
         if (panel == "sort") FinishSort();
         if (panel == "quiz") { quiz = null; lessonPrizes = null; }
+        // Baga's panels (Magayon.cs): the lahar watch always ends with the warning out, by you or by Ben.
+        bool lahar = panel == "lahar";
+        if (panel is "readings" or "gobag") { readings = null; gobag = null; }
         riddle = null;
         panel = null;
         dexFish = null;
         dexExtra = null;
         atlasZoom = false;
         if (mode == "panel") mode = "play";
+        if (lahar) LaharWatchClosed();
     }
 
     string craftStation;
@@ -743,6 +752,8 @@ partial class Game
 
         if (InHouse)
         {
+            // The school as the evacuation centre (Magayon.cs).
+            if (scene == "house:school") return SchoolRoomTarget();
             if (Dist(x, y, RoomDoorWX, RoomDoorWY) < 14) return new Target { Type = "exit", Label = "Go outside" };
             if (scene == "house:tomas" && Dist(x, y, PhotoX, PhotoY) < 12) return new Target { Type = "photo", Label = "Look at the photo" };
             // Tomas's bed is taken at night. You can wake him, though.
@@ -787,6 +798,8 @@ partial class Game
         if (tremor != null || SeaEmergency) return SeaEventTarget();
         if (evac?.Drill == true && SeaEventTarget() is { Type: "shout" } drillCall) return drillCall;
         if (RestlessSeaTarget() is Target seaTarget) return seaTarget;
+        // Baga and the shelter (Magayon.cs): during the evacuation and the ash, only what to do next.
+        if (MagayonTarget() is Target volcanoTarget) return volcanoTarget;
         if (Aboard) return HelmTarget();
         if (ArchipelagoTarget() is Target islandTarget) return islandTarget;
         if (HabagatTarget() is Target habagatTarget) return habagatTarget;
@@ -904,6 +917,7 @@ partial class Game
             case "moon": CloseMoon(); return;
             case "platejaw": CloseGuardianCard(); return;
             case "seacard": CloseSeaCard(); return;
+            case "magayoncard": CloseMagayonCard(); return;
             case "build": BuildAction(); return;
             case "play":
                 // Nothing in front of you: use what you're holding (Hotbar.cs).
@@ -950,6 +964,23 @@ partial class Game
                     case "seapost": LookAtPost(); break;
                     case "seasign": PutUpSign(target.Tx); break;
                     case "duck": break;
+                    // Beneath the clouds (Magayon.cs).
+                    case "schooldoor": EnterHouse("house:school", SchoolDoorX, SchoolDoorY); break;
+                    case "alertboard": FaceToward(AlertBoardX, AlertBoardY); OpenAlertCard(); break;
+                    case "abaca": TieAbaca(); break;
+                    case "pili": PlantPili(); break;
+                    case "gobag": OpenGoBag(); break;
+                    case "callmila": CallMila(); break;
+                    case "register": SignEvacList(); break;
+                    case "boardevac": BoardEvacBoat(assisted: false); break;
+                    case "ben": TalkBen(); break;
+                    case "jar": CoverJar(target.Tx); break;
+                    case "barrel": UnhookBarrel(); break;
+                    case "shutter": CloseShutter(target.Tx); break;
+                    case "takewater": TakeWater(); break;
+                    case "givewater": GiveWater(target.Tx); break;
+                    case "desk": RegisterShelter(); break;
+                    case "display": OpenLaharWatch(); break;
                     case "ride": Mount(); break;
                     case "carving": ReadCarving(); break;
                     case "craft": OpenCraft(target.Id); break;
@@ -981,6 +1012,7 @@ partial class Game
         if (toastTimer > 0) toastTimer -= dt;
         toastAlpha = Math.Clamp(toastAlpha + (toastTimer > 0 ? dt : -dt) / 0.25f, 0, 1);
         UpdateFloaters(dt);
+        UpdateTitleTour(dt);
         UpdateGuide(dt);
         TellBadgeNews();
         HoldMount();
@@ -1006,6 +1038,8 @@ partial class Game
         if (mode == "panel" && panel == "quiz") UpdateQuiz(dt);
         if (mode == "panel" && panel == "sort") UpdateSort();
         if (mode == "panel" && panel == "album") UpdateAlbum();
+        if (mode == "panel" && panel == "readings") UpdateReadings(dt);
+        if (mode == "panel" && panel == "lahar") UpdateLaharWatch(dt);
         if (mode is not ("title" or "create" or "pause")) state.playSecs += dt;
         if (mode != "pause") idleT = mode == "play" && !player.Moving ? idleT + dt : 0;
         if (ActiveModes.Contains(mode))
@@ -1013,14 +1047,17 @@ partial class Game
             TickClock(dt);
             // Only the shaking and the real evacuation hold these (Codex: the drill used to freeze them too, and hunger
             // still hurt you during the evacuation).
-            if (tremor == null && !SeaEmergency) TickFood(dt);
-            if (tremor == null && !SeaEmergency) TickHealth(dt);
+            // Leaving Baga and getting the shelter ready hold them too (Magayon.cs).
+            bool held = tremor != null || SeaEmergency || VolcanoControlled;
+            if (!held) TickFood(dt);
+            if (!held) TickHealth(dt);
             UpdateMonsters(dt);
             UpdateBoss(dt);
             UpdateGuardian(dt);
             UpdateRestlessSea(dt);
+            UpdateMagayon(dt);
             UpdateEclipse(dt);
-            if (tremor == null && !SeaEmergency) TickDerby(dt);
+            if (!held) TickDerby(dt);
         }
         else { iframes = Math.Max(0, iframes - dt); hurtFlash = Math.Max(0, hurtFlash - dt); }
 
@@ -1082,8 +1119,9 @@ partial class Game
                 // Hard to walk while the ground shakes.
                 float sp = speed * push * dt * (Starving ? 0.6f : 1f) * (Shaking ? 0.45f : 1f);
                 float mx = dx / len * sp, my = dy / len * sp;
-                if (Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, flats: true)) player.X += mx;
-                if (Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, flats: true)) player.Y += my;
+                // Somewhere closed (Baga's danger zone, the lahar channel, Baga while it's evacuated) stops you first (Magayon.cs).
+                if ((Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, flats: true)) && StepAllowed(player.X + mx, player.Y)) player.X += mx;
+                if ((Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, flats: true)) && StepAllowed(player.X, player.Y + my)) player.Y += my;
                 player.Face = MathF.Abs(dx) > MathF.Abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
                 if (Aboard) boatFace = player.Face;
                 int frameBefore = (int)(player.WalkT * 9);
@@ -1183,6 +1221,7 @@ partial class Game
         fish = null; reel = null; panel = null; boss = null; dlg = null; eclipse = null; race = null; raceArmed = false; sungka = null;
         guardian = null; guardianDue = false; rocks.Clear();
         tremor = null; evac = null; cocos.Clear(); trackBeforeSea = null;
+        ResetMagayon();
         bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear(); seaLife.Clear(); glowTrail.Clear();
         habagatWalk.Clear();
         // The Sea school's moment-to-moment bits (1.17).
@@ -1223,6 +1262,10 @@ partial class Game
         // Cave floors aren't saved, so a game saved underground carries on at the cave mouth.
         if (state.scene == "cave") { player.X = MouthDoorX; player.Y = MouthDoorY + 2; }
         else if (state.scene != "world" && SceneExists(state.scene)) LoadScene(state.scene);
+        // A room that isn't there any more (the school once it's no longer the shelter): outside its door.
+        else if (state.scene != "world") { player.X = state.exitX; player.Y = state.exitY; }
+        // Somewhere closed now (Baga while it's evacuated, or inside its danger zone in an old save) (Magayon.cs).
+        PlaceAfterLoad();
         if (!(Aboard ? BoatCanStand(player.X, player.Y) : CanStand(player.X, player.Y, Wading, Riding, !Riding)))
         {
             // Somewhere that isn't there any more (the atoll used to be smaller): back to the boat, or to Saltmere.
@@ -1308,6 +1351,9 @@ partial class Game
         EndSliderDrag();
         mode = "title";
         titleView = "main";
+        // The title tours the islands outdoors (UiMenu.cs), from the start; the saved game keeps where you really were.
+        if (scene != "world") LoadScene("world");
+        titleT = 0;
         slotInfo = null;
         toastTimer = 0;
         SetPrompt("");

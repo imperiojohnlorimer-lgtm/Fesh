@@ -131,6 +131,10 @@ sealed class State
     public int reefLow = -1, reefWalks;              // the low tide (Game.LowIndex) she'll meet you on the flats at (-1: none), and walks done
     public int reefThanked = -1, reefOctopus = -1;   // the booked low she's thanked you on, and the one whose octopus has turned up
 
+    // Beneath the clouds (1.21, Magayon.cs): Baga's alert level on Ben's board (0 to 3 in the story, Mayon's scale).
+    // The story's steps are in hinted ("mg:*") and their days in gifts ("mg_*").
+    public int bagaAlert;
+
     // New games and saves from before the clock: day or night becomes a time, and the weather lasts the rest of the day.
     public void FixClock()
     {

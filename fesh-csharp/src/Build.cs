@@ -29,6 +29,7 @@ partial class Game
         var list = StaticSolids();
         if (scene == "world") { list.AddRange(IslandSolids()); list.AddRange(HabagatSolids()); }
         foreach (var b in SceneBuilds()) if (BuildBox(b) is Box r) list.Add(r);
+        list.AddRange(SchoolRoomSolids());
         if (scene == "cave")
             foreach (var n in nodes) if (!NodeMined(n)) list.Add(new Box(n.X * T + 1, n.Y * T + 2, 8, 7));
         return list;
@@ -117,6 +118,15 @@ partial class Game
         if (scene == "world" && HabagatFolk.Any(n => area.Overlaps(new Box(n.x - 26, n.y - 38, 52, 62)))) return "Keep the village paths clear";
         if (scene == "world" && area.Overlaps(new Box(JoyX - 12, JoyY - 14, 24, 20))) return "Keep the warden's platform clear";
         if (scene == "world" && d.Water && InSanctuary(tx * T + 5, ty * T + 5)) return "No traps inside the marine sanctuary";
+        // Baga's permanent danger zone, the lahar channel, and Baga while it's evacuated (Magayon.cs).
+        // Every tile of the piece, not just the first (Codex: a shack could stand half inside the zone).
+        for (int i = 0; i < d.W && scene == "world"; i++)
+        {
+            float cx = (tx + i) * T + 5, cy = ty * T + 5;
+            if (Restriction(cx, cy) != null) return InPdz(cx, cy) ? "Not inside the permanent danger zone" : "That's closed: nobody builds there";
+            if (ChannelDist(cx, cy) < 12 || Dist(cx, cy, LaharMouthX, LaharMouthY) < 20) return "Keep the lahar channel clear";
+            if (Dist(cx, cy, EvacTableX, EvacTableY) < 16 || Dist(cx, cy, AbacaX, AbacaY) < 18 || Dist(cx, cy, PiliX, PiliY) < 10) return "Keep Manay Mila's garden and the jetty path clear";
+        }
         if (StaticSolids().Any(r => area.Overlaps(new Box(r.X - 3, r.Y - 3, r.W + 6, r.H + 6)))) return "No room here";
         if (scene == "world" && Dist(tx * T + 5, ty * T + 5, MouthDoorX, MouthDoorY) < 24) return "Keep the cave entrance clear";
         if (scene == "world" && area.Overlaps(new Box(TomasHomeX - 6, TomasHomeY - 6, 13, 9))) return "Keep Tomas's spot clear";
@@ -229,15 +239,16 @@ partial class Game
         if (boss != null || guardian != null) { Sfx.Play("nope"); Toast("Not in the middle of a fight!"); return; }
         if (eclipse != null) { Sfx.Play("nope"); Toast("Not now: Bakunawa has the moon!"); return; }
         if (tremor != null || SeaEmergency) { Sfx.Play("nope"); Toast("Not now: up to School Rise!"); return; }
+        if (VolcanoControlled) { Sfx.Play("nope"); Toast(BagaEvacuating ? "Not now: to the jetty!" : "Not now: help get the shelter ready."); return; }
         if (mode != "play")
         {
             if (FishingModes.Contains(mode)) Toast("Finish fishing first.");
             return;
         }
-        if (scene == "cave" || scene == "house:tomas")
+        if (scene == "cave" || scene == "house:tomas" || scene == "house:school")
         {
             Sfx.Play("nope");
-            Toast(scene == "cave" ? "You can't build down here." : "This is Tomas's place. Build a shack of your own to furnish.", 3);
+            Toast(scene == "cave" ? "You can't build down here." : scene == "house:school" ? "This is the school, and today it's the shelter." : "This is Tomas's place. Build a shack of your own to furnish.", 3);
             return;
         }
         if (!BuildTools().Contains(buildTool)) buildTool = BuildTools()[0];

@@ -990,7 +990,7 @@ partial class Game
         for (int k = 0; k < 4; k++)
         {
             // Mia, Jun and Bea are out in the square during the drill and the evacuation, back on the bench once they're up.
-            bool here = evac?.People.FirstOrDefault(m => m.Kid == k) is Mover m ? m.Safe : SchoolHours;
+            bool here = evac?.People.FirstOrDefault(m => m.Kid == k) is Mover m ? m.Safe : SchoolHours && !AshFalling;
             if (!here) continue;
             int kx = (int)bx + 5 + k * 9, ky = (int)by + 1;
             DrawKid((px, py, pw, ph, c) => pix.Rect(px, py, pw, ph, c), kx, ky, k, Shaking ? 2 : 0, t);

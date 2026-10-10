@@ -54,6 +54,7 @@ static class Items
         new("copper_reel", "Copper reel", "tackle", "The catch meter fills 15% faster.", Icon: "reel", Tint: "#d9823f"),
         new("iron_reel", "Iron reel", "tackle", "The catch meter fills 30% faster.", Icon: "reel", Tint: "#c9d4dc"),
         new("gold_reel", "Gold reel", "tackle", "The catch meter fills 45% faster.", Icon: "reel", Tint: "#f3c25b"),
+        new("abaca_line", "Abaca line", "tackle", "Twisted by Manay Mila from her own abaca fibre. Takes 25% more tension before it snaps.", Icon: "line", Tint: "#d9c08a"),
         new("silk_line", "Silk line", "tackle", "Takes 40% more tension before a running fish snaps it.", Icon: "line", Tint: "#f2efe6"),
         new("crystal_line", "Crystal line", "tackle", "Takes 90% more tension before it snaps.", Icon: "line", Tint: "#9fe8ff"),
         new("barbed_hook", "Barbed hook", "tackle", "Fish come out 10% heavier.", Icon: "hook", Tint: "#d9823f"),
@@ -196,7 +197,7 @@ static class Items
     public static readonly Dictionary<string, TackleDef> Tackle = new()
     {
         ["copper_reel"] = new("reel", Reel: 1.15f), ["iron_reel"] = new("reel", Reel: 1.3f), ["gold_reel"] = new("reel", Reel: 1.45f),
-        ["silk_line"] = new("line", Line: 1.4f), ["crystal_line"] = new("line", Line: 1.9f),
+        ["abaca_line"] = new("line", Line: 1.25f), ["silk_line"] = new("line", Line: 1.4f), ["crystal_line"] = new("line", Line: 1.9f),
         ["barbed_hook"] = new("hook", Size: 1.1f), ["biggame_hook"] = new("hook", Size: 1.25f), ["golden_hook"] = new("hook", Size: 1.2f, Luck: 1),
         ["cork_bobber"] = new("bobber", Window: 0.3f), ["glow_bobber"] = new("bobber", Window: 0.5f),
         ["stone_sinker"] = new("sinker", Depth: 1), ["iron_sinker"] = new("sinker", Depth: 2)
@@ -205,7 +206,7 @@ static class Items
     public static readonly string[] TackleSlots = { "reel", "line", "hook", "bobber", "sinker" };
     public static readonly Dictionary<string, string[]> TackleOrder = new()
     {
-        ["reel"] = new[] { "copper_reel", "iron_reel", "gold_reel" }, ["line"] = new[] { "silk_line", "crystal_line" },
+        ["reel"] = new[] { "copper_reel", "iron_reel", "gold_reel" }, ["line"] = new[] { "abaca_line", "silk_line", "crystal_line" },
         ["hook"] = new[] { "barbed_hook", "biggame_hook", "golden_hook" }, ["bobber"] = new[] { "cork_bobber", "glow_bobber" },
         ["sinker"] = new[] { "stone_sinker", "iron_sinker" }
     };

@@ -598,7 +598,7 @@ partial class Game
         /* ---------- Guide and old saves ---------- */
         Note("The guide and old saves");
         state.hinted.Remove("metIsay"); state.hinted["amihan"] = true; yield return 2;
-        Check($"Ma'am Isay is one of the people of Amihan to meet ({goals.FirstOrDefault(g => g.Id == "meet:amihan")?.Title})", goals.FirstOrDefault(g => g.Id == "meet:amihan")?.Title.Contains("of 6") == true);
+        Check($"Ma'am Isay is one of the people of Amihan to meet ({goals.FirstOrDefault(g => g.Id == "meet:amihan")?.Title})", goals.FirstOrDefault(g => g.Id == "meet:amihan")?.Title.Contains("of 8") == true);
         Check("nothing to follow into a spoiler: the guide never names the Starwell", goals.All(g => !g.Text.Contains("Starwell") && !g.Title.Contains("Starwell")));
         SaveFile.Clear(3);
         File.WriteAllText(SaveFile.SlotPath(3), "{\"created\":true,\"inv\":{\"rod_old\":1}}");

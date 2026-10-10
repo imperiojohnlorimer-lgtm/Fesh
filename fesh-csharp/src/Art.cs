@@ -860,10 +860,57 @@ static class CreatureArt
         }
     }
 
+    // Beneath the clouds' card (Magayon.cs): a Mayon-like cone with clouds wrapped round its summit, as Manay Mila's lola
+    // said, a lahar channel down its flank, and the school on the right with its lights on and everyone safe inside.
+    static void MagayonScene(VCanvas g, float w, float h)
+    {
+        void Rect(float x, float y, float rw, float rh) { g.BeginPath(); g.RectPath(x, y, rw, rh); g.Fill(); }
+        g.FillStyle = Paint.Linear(0, 0, 0, h * 0.62f, (0, "#f0b98a"), (1, "#f6e4c8"));
+        Rect(0, 0, w, h * 0.62f);
+        g.FillStyle = Paint.Linear(0, h * 0.6f, 0, h, (0, "#3f8fb0"), (1, "#1d4f78"));
+        Rect(0, h * 0.6f, w, h * 0.4f);
+        // The cone: concave slopes rising to a small crater, grey rock above and green below.
+        float cx = w * 0.42f, top = h * 0.16f, bw = w * 0.36f;
+        g.FillStyle = Paint.Linear(0, top, 0, h * 0.64f, (0, "#6d6862"), (0.55f, "#857f78"), (0.75f, "#6f8a52"), (1, "#4f7a3e"));
+        g.BeginPath(); g.MoveTo(cx - w * 0.025f, top);
+        g.QuadTo(cx - w * 0.06f, h * 0.48f, cx - bw, h * 0.64f); g.LineTo(cx + bw, h * 0.64f);
+        g.QuadTo(cx + w * 0.06f, h * 0.48f, cx + w * 0.025f, top); g.ClosePath(); g.Fill();
+        // The shaded east side and the channel cut down it, with its fan of mud at the bottom.
+        g.FillStyle = Paint.Of("rgba(40,36,40,0.22)");
+        g.BeginPath(); g.MoveTo(cx + w * 0.005f, top); g.QuadTo(cx + w * 0.05f, h * 0.48f, cx + bw, h * 0.64f); g.LineTo(cx + bw * 0.25f, h * 0.64f);
+        g.QuadTo(cx + w * 0.02f, h * 0.45f, cx + w * 0.005f, top); g.ClosePath(); g.Fill();
+        g.StrokeStyle = Paint.Of("#8a7a62"); g.LineWidth = Math.Max(2, w / 120);
+        g.BeginPath(); g.MoveTo(cx + w * 0.03f, h * 0.3f); g.QuadTo(cx + w * 0.1f, h * 0.5f, cx + w * 0.22f, h * 0.62f); g.Stroke();
+        g.FillStyle = Paint.Of("#8a7a62"); Ell(g, cx + w * 0.23f, h * 0.635f, w * 0.05f, h * 0.018f);
+        // A thin plume, and the cloud wrapped round the summit: Panganoron and Magayon together.
+        g.FillStyle = Paint.Of("rgba(230,230,226,0.6)");
+        foreach (var (fx, fy, r) in new[] { (0.41f, 0.12f, 0.02f), (0.39f, 0.08f, 0.026f), (0.36f, 0.04f, 0.03f) }) Circ(g, w * fx, h * fy, w * r);
+        g.FillStyle = Paint.Of("rgba(255,255,255,0.92)");
+        foreach (var (fx, fy, rx) in new[] { (0.36f, 0.22f, 0.07f), (0.45f, 0.21f, 0.08f), (0.52f, 0.235f, 0.06f), (0.31f, 0.24f, 0.05f) }) Ell(g, w * fx, h * fy, w * rx, h * 0.035f);
+        // An abaca plant in front on the left.
+        g.StrokeStyle = Paint.Of("#6f8f3a"); g.LineWidth = Math.Max(2, w / 100);
+        g.BeginPath(); g.MoveTo(w * 0.08f, h); g.LineTo(w * 0.09f, h * 0.62f); g.Stroke();
+        g.FillStyle = Paint.Of("#4f8a3e");
+        Ell(g, w * 0.05f, h * 0.62f, w * 0.06f, h * 0.025f, -0.5f); Ell(g, w * 0.13f, h * 0.6f, w * 0.06f, h * 0.025f, 0.4f); Ell(g, w * 0.09f, h * 0.56f, w * 0.05f, h * 0.022f, -1.2f);
+        // The school on its rise, its windows lit, the shelter for this.
+        g.FillStyle = Paint.Of("#e8d8a8"); Poly(g, w * 0.66f, h, w * 0.7f, h * 0.7f, w, h * 0.66f, w, h);
+        g.FillStyle = Paint.Of("#6fae5a"); Poly(g, w * 0.7f, h, w * 0.74f, h * 0.74f, w, h * 0.7f, w, h);
+        g.FillStyle = Paint.Of("#c39a5c"); Rect(w * 0.76f, h * 0.6f, w * 0.18f, h * 0.12f);
+        g.FillStyle = Paint.Of("#967342"); Poly(g, w * 0.74f, h * 0.61f, w * 0.85f, h * 0.5f, w * 0.96f, h * 0.61f);
+        g.FillStyle = Paint.Of("#ffd27a");
+        foreach (var fx in new[] { 0.79f, 0.84f, 0.89f }) Rect(w * fx, h * 0.63f, w * 0.03f, h * 0.04f);
+        foreach (var (fx, col) in new[] { (0.76f, "#c0392b"), (0.79f, "#2a8a8a"), (0.82f, "#e6a843"), (0.85f, "#367caa") })
+        {
+            g.FillStyle = Paint.Of(col); Rect(w * fx, h * 0.75f, w * 0.014f, h * 0.035f);
+            g.FillStyle = Paint.Of("#b07a52"); Circ(g, w * (fx + 0.007f), h * 0.74f, w * 0.008f);
+        }
+    }
+
     // Draws the underwater portrait at logical size w x h onto a canvas that is already scaled to device pixels.
     public static void Scene(VCanvas g, float w, float h, string id, bool sil)
     {
         if (id == "tsunami") { TsunamiScene(g, w, h); return; }
+        if (id == "magayon") { MagayonScene(g, w, h); return; }
         bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan" or "tidemane" or "marlin" or "tarpon" or "bakunawa" or "platejaw";
         g.FillStyle = Paint.Linear(0, 0, 0, h, (0, deep ? "#1d3a5a" : "#3a8db0"), (1, deep ? "#050d18" : "#12304a"));
         g.BeginPath(); g.RectPath(0, 0, w, h); g.Fill();

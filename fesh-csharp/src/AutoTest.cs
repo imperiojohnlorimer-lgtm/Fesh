@@ -39,7 +39,10 @@ partial class Game
         Inp.ScriptFocused = true;
         // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
         standStill = true;
-        script = Environment.GetEnvironmentVariable("FESH_HOTBAR_TEST") == "1" ? HotbarScript().GetEnumerator()
+        script = Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "1" ? VolcanoScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "review" ? VolcanoReviewScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "title" ? TitleTourScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_HOTBAR_TEST") == "1" ? HotbarScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MOUNT_TEST") == "1" ? MountScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_SEA_TEST") == "1" ? RestlessSeaScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_CAVEBOSS_TEST") == "1" ? GuardianScript().GetEnumerator()
@@ -2000,6 +2003,7 @@ partial class Game
         foreach (int frames in RestlessSeaScript()) yield return frames;
         foreach (int frames in MountScript()) yield return frames;
         foreach (int frames in HotbarScript()) yield return frames;
+        foreach (int frames in VolcanoScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

@@ -41,7 +41,7 @@ partial class Game
     void TickClock(float dt)
     {
         float rate = Settings.GameMinutesPerSecond;
-        if (rate > 0 && eclipse == null && tremor == null && !SeaEmergency) Advance(dt * rate, quiet: false);
+        if (rate > 0 && eclipse == null && tremor == null && !SeaEmergency && !VolcanoControlled) Advance(dt * rate, quiet: false);
     }
 
     // Moves the clock forward, stopping at each dusk and dawn on the way so nothing is skipped (resting can cross both).
@@ -71,6 +71,8 @@ partial class Game
     {
         // A storm in the day that's ending tears at Maya's guso lines (Seaweed.cs); the forecast is still that day's here.
         TearGuso();
+        // Rain later in the ending day still counts for Baga's lahar watch (Magayon.cs).
+        NoteBagaRain();
         state.day++;
         RollWeather();
         Regrow();

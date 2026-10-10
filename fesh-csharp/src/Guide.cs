@@ -48,6 +48,7 @@ partial class Game
         StoryGoal(list);
         RequestGoals(list);
         SeaGoals(list);
+        MagayonGoals(list);
         SchoolGoals(list);
         ExploreGoals(list);
         return list;
@@ -342,8 +343,11 @@ partial class Game
             if (!state.Hinted("guso")) Add("maya", "studies the karst lagoon on Luntian");
             if (!state.Hinted("bubo")) Add("tala", "watches the wildlife on Bakawan");
             if (!state.Hinted("metIsay")) Add("isay", "teaches the children at the school in Amihan Village");
+            // Baga (Magayon.cs): Manay Mila in her abaca garden, Ben at the volcano station.
+            if (!MgMet) Add("mila", "grows abaca on Baga's north shore");
+            if (!state.Hinted("mg:metBen")) Add("ben", "runs the volcano station on Baga");
             if (!state.Hinted("metJoy")) unmet.Add(("Bantay Joy", JoyX, JoyY, "guards the marine sanctuary"));
-            Meet("amihan", "Amihan", unmet, 6);
+            Meet("amihan", "Amihan", unmet, 8);
             void Add(string id, string note) { var s = IslanderWalk(id); unmet.Add((Islanders.First(n => n.id == id).name, s.X, s.Y, note)); }
         }
         if (state.Hinted("habagat"))
@@ -388,6 +392,16 @@ partial class Game
             goals = new() { up };
             tracked = up;
             guideWay = Route(up);
+            return;
+        }
+        // Leaving Baga and the ash (Magayon.cs) work the same way: their own goal, and yours kept for afterwards.
+        if (VolcanoControlled)
+        {
+            trackBeforeSea ??= state.track ?? "";
+            var now = MagayonNowGoal();
+            goals = new() { now };
+            tracked = now;
+            guideWay = Route(now);
             return;
         }
         if (trackBeforeSea != null) { state.track = trackBeforeSea; trackBeforeSea = null; }
@@ -456,6 +470,7 @@ partial class Game
         float gx = g.X, gy = g.Y;
         string place = g.Place, how = null;
         if (g.Scene == "house:tomas") { gx = 160; gy = 72; how = "It's inside Tomas's hut."; }
+        else if (g.Scene == "house:school") { gx = SchoolDoorX; gy = SchoolDoorY + 4; how = "It's inside the school."; }
         else if (g.Scene == "cave") { gx = MouthDoorX; gy = MouthDoorY; place = "Frostfang Caverns"; how = "It's down in Frostfang Caverns."; }
         else if (g.Scene == "sea")
         {
@@ -542,6 +557,7 @@ partial class Game
         return g.Scene switch
         {
             "house:tomas" => (160, 72),
+            "house:school" => (SchoolDoorX, SchoolDoorY),
             "cave" => (MouthDoorX, MouthDoorY),
             "sea" => scene == "world" ? SeaPoint(g.Spot) : null,
             _ => (g.X, g.Y)

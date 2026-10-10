@@ -423,6 +423,8 @@ partial class Game
         if (eclipse != null) return;   // you stand your ground with the agong
         // The ground's shaking, or everyone's heading up to School Rise: no boats, no riding off (RestlessSea.cs).
         if (tremor != null || SeaEmergency) { Toast("Not now: up to School Rise, on foot!"); return; }
+        // Leaving Baga goes by Niko's banca, and the ash is waited out in the shelter (Magayon.cs).
+        if (VolcanoControlled) { Toast(BagaEvacuating ? "Not now: everyone leaves together on Niko's banca." : "Not now: help get the shelter ready."); return; }
         if (mode == "play" && Aboard) { LandBoat(); return; }
         if (mode == "play" && boss == null && BoatInReach() && !(Stormy && state.tamed)) { BoardBoat(); return; }
         if (!state.tamed || mode != "play" || boss != null) return;
@@ -518,8 +520,8 @@ partial class Game
         bool hitX = false, hitY = false;
         for (int i = 0; i < n; i++)
         {
-            if (!hitX && mx != 0) { if (CanStand(player.X + mx / n, player.Y, Wading, true)) player.X += mx / n; else hitX = true; }
-            if (!hitY && my != 0) { if (CanStand(player.X, player.Y + my / n, Wading, true)) player.Y += my / n; else hitY = true; }
+            if (!hitX && mx != 0) { if (CanStand(player.X + mx / n, player.Y, Wading, true) && StepAllowed(player.X + mx / n, player.Y)) player.X += mx / n; else hitX = true; }
+            if (!hitY && my != 0) { if (CanStand(player.X, player.Y + my / n, Wading, true) && StepAllowed(player.X, player.Y + my / n)) player.Y += my / n; else hitY = true; }
         }
         if (hitX) rideVel.x = 0;
         if (hitY) rideVel.y = 0;
@@ -854,7 +856,7 @@ partial class Game
         whistleT = MathF.Max(0, whistleT - dt);
         var c = call;
         if (c == null) return;
-        if (!state.tamed || state.riding || scene != "world" || boss != null || eclipse != null || tremor != null || SeaEmergency || Aboard) { call = null; return; }
+        if (!state.tamed || state.riding || scene != "world" || boss != null || eclipse != null || tremor != null || SeaEmergency || VolcanoControlled || Aboard) { call = null; return; }
         if (Array.IndexOf(ActiveModes, mode) < 0) return;
         c.T += dt; c.Total += dt;
         switch (c.Phase)

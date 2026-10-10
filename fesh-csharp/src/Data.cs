@@ -361,6 +361,25 @@ static class Data
         "Case closed. When the sea was restless, everyone went up to School Rise. We don't know how the berberoka story began, but its signs were worth remembering."
     };
 
+    // Beneath the clouds on Baga (Magayon.cs): Manay Mila's lola's story, Ben's readings, the shelter and the lahar watch.
+    // Wording fact-checked with Codex: the story is one teller's version, the alert names are Mayon's (PHIVOLCS).
+    public static readonly (string Key, string Title, string Finding, string Source)[] MagayonClues =
+    {
+        ("mg:story", "Magayon's story", "Manay Mila's lola's telling: Magayon and Panganoron (cloud) died in the fight Pagtuga (eruption) began. Their grave grew into Mayon; its summit clouds are the two together.", "Manay Mila, in her abaca garden"),
+        ("mg:signs", "The rising signs", "More quakes, the ground swelling, more sulfur dioxide; then fewer quakes, but a glow and rockfalls. Signs don't all rise together: read them all.", "Ben's readings at Baga's station"),
+        ("mg:ash", "Shelter from the ash", "Before ash: cover the water, unhook the downpipe, shut the windows, then stay inside. A well-fitting mask is for when you must go out.", "The school, as the evacuation centre"),
+        ("mg:channel", "Rain and the channel", "Rain can turn fresh ash into a lahar that rushes down a channel and spills past its banks. Stay out until officials say it's clear.", "The school's display, in the rain")
+    };
+    public static readonly string[] MagayonTheories =
+    {
+        "No leads yet. Baga smokes quietly over its reef.",
+        "Manay Mila's lola had a story about a mountain like Baga. But how would anyone know when one is waking up?",
+        "No single sign is enough, so Ben reads them all. At Level 3 the disaster office ordered everyone off Baga, early.",
+        "Everyone's safe in the shelter, and the ash has passed. But Ben says the danger isn't over when an eruption quiets.",
+        "The warning's out. Lahars can come with any heavy rain, long after an eruption.",
+        "Case closed. Everyone followed the plan: go-bags, the shelter, the warning. Baga is still a volcano: the danger zone and the channel stay closed."
+    };
+
     // By how many clues you have (any of them), then the last once the moon is back.
     public static readonly string[] MoonTheories =
     {

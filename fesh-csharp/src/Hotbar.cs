@@ -134,6 +134,8 @@ partial class Game
     void UseHeld(bool quick = false)
     {
         if (mode != "play" || HeldItem is not string id) return;
+        // Not while everyone's heading to safety (RestlessSea.cs, Magayon.cs): no casting from the jetty mid-evacuation.
+        if (tremor != null || SeaEmergency || VolcanoControlled) { Sfx.Play("nope"); return; }
         string t = target?.Type;
         switch (HeldKey)
         {

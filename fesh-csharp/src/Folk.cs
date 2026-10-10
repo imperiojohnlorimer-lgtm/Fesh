@@ -52,6 +52,8 @@ partial class Game
         {
             // On their way up to School Rise, Lira and Niko are the evacuation's to move (RestlessSea.cs).
             if (SeaEmergency && n.id is "lira" or "niko") continue;
+            // Away at the shelter, or Mila on her way to the jetty (Magayon.cs).
+            if (n.id is "mila" or "ben" && (BagaFolkAtSchool || mgMilaWalk != null)) continue;
             var s = IslanderWalk(n.id);
             if (Dist(s.X, s.Y, player.X, player.Y) < 400) Stroll(s, dt, (x, y) => FolkCanStand(x, y));
         }

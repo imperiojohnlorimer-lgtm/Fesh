@@ -27,7 +27,7 @@ partial class Game
     }
 
     bool InHouse => scene.StartsWith("house:");
-    bool InOwnHouse => InHouse && scene != "house:tomas";
+    bool InOwnHouse => InHouse && scene is not ("house:tomas" or "house:school");
     static string ShackKey(Build b) => $"house:{b.x},{b.y}";
 
     // The furniture or buildings that belong to the current scene.
@@ -35,6 +35,7 @@ partial class Game
     {
         if (scene == "world") return state.builds;
         if (scene == "house:tomas") return TomasRoom;
+        if (scene == "house:school") return SchoolRoom;
         if (InHouse)
         {
             if (!state.rooms.TryGetValue(scene, out var room)) state.rooms[scene] = room = new List<Build>();
@@ -44,7 +45,7 @@ partial class Game
     }
 
     bool SceneExists(string key) =>
-        key == "world" || key == "cave" || key == "house:tomas" || state.builds.Any(b => Data.BuildById[b.id].Door && ShackKey(b) == key);
+        key == "world" || key == "cave" || key == "house:tomas" || key == "house:school" && (AshPhase || BagaFolkAtSchool) || state.builds.Any(b => Data.BuildById[b.id].Door && ShackKey(b) == key);
 
     void LoadScene(string key)
     {
@@ -52,7 +53,7 @@ partial class Game
         scene = key;
         if (key == "world") { map = worldMap; basePix = worldBase; }
         else if (key == "cave") BuildCave();
-        else BuildRoom(key == "house:tomas");
+        else BuildRoom(key);
         ReindexBuilds();
         critters.Clear();
         particles.Clear();
@@ -72,6 +73,8 @@ partial class Game
         {
             LoadScene(key);
             player.X = x; player.Y = y; player.Face = face;
+            // A door that now opens somewhere closed (an old shack in Baga's danger zone) lets you out beside it (Magayon.cs).
+            if (key == "world") PlaceAfterLoad();
             Save();
         }, after);
     }
@@ -81,10 +84,11 @@ partial class Game
         state.exitX = doorX;
         state.exitY = doorY + 3;
         bool tomas = key == "house:tomas";
-        int w = tomas ? TomasW : ShackW, h = tomas ? TomasH : ShackH;
+        var (w, h) = RoomSize(key);
         GoTo(key, (w / 2) * T + 5, (h - 2) * T + 8, "up", () =>
         {
-            if (tomas && !state.Hinted("tomasHut"))
+            if (key == "house:school") { if (AshPhase && !AshFalling) Toast("Close the two shutters before the ash comes.", 4); }
+            else if (tomas && !state.Hinted("tomasHut"))
             {
                 state.hinted["tomasHut"] = true;
                 Toast("Tomas's workbench and stove are yours to use. Press <act> at the workbench to craft an axe.", 5);
@@ -105,9 +109,12 @@ partial class Game
     int RoomDoorX => SCols / 2;
 
     // Walls around the edge (the top two rows are the back wall), wooden floor inside and a door at the bottom.
-    void BuildRoom(bool tomas)
+    static (int w, int h) RoomSize(string key) => key == "house:tomas" ? (TomasW, TomasH) : key == "house:school" ? (SchoolW, SchoolH) : (ShackW, ShackH);
+
+    void BuildRoom(string key)
     {
-        int w = tomas ? TomasW : ShackW, h = tomas ? TomasH : ShackH;
+        bool tomas = key == "house:tomas", school = key == "house:school";
+        var (w, h) = RoomSize(key);
         roomMap = new char[h, w];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
@@ -119,7 +126,8 @@ partial class Game
         var g = roomBase;
         // A bahay kubo's walls are woven bamboo (sawali); a shack's are planks.
         bool kubo = state.builds.Any(b => b.id == "kubo" && ShackKey(b) == scene);
-        string paper = tomas ? "#5d7d8a" : kubo ? "#d8c08a" : "#c9a77a", stripe = tomas ? "#6a8b98" : kubo ? "#b89a62" : "#d6b78c";
+        // The school's classroom walls are painted a pale green (Magayon.cs: the evacuation centre).
+        string paper = tomas ? "#5d7d8a" : school ? "#c8d8b4" : kubo ? "#d8c08a" : "#c9a77a", stripe = tomas ? "#6a8b98" : school ? "#b6c8a0" : kubo ? "#b89a62" : "#d6b78c";
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
@@ -183,12 +191,14 @@ partial class Game
     void RenderRoom(float t)
     {
         DrawWindows();
+        if (scene == "house:school") DrawSchoolShutters();
         var list = new List<(float y, Action draw)>();
         foreach (var b in SceneBuilds())
         {
             if (b.id == "rug") DrawBuild(b, t);
             else list.Add((b.y * T + 9, () => DrawBuild(b, t)));
         }
+        if (scene == "house:school") AddSchoolRoomObjects(list);
         list.Add((player.Y, DrawPlayer));
         if (scene == "house:tomas" && TomasInBed) list.Add((TomasBedY - 3.5f, DrawTomasAsleep));
         foreach (var o in list.OrderBy(o => o.y)) o.draw();

@@ -149,7 +149,7 @@ partial class Game
 
     /* ---------- The chart ---------- */
     // Which chart to open: the one you're on (indoors and underground, the Saltmere one).
-    void ChooseChart() => chartEast = scene == "world" && player.X >= EastStart * T;
+    void ChooseChart() => chartEast = scene == "world" ? player.X >= EastStart * T : scene == "house:school";
 
     void DrawMap()
     {
@@ -230,6 +230,13 @@ partial class Game
             if (state.Hinted("rs:signs")) Place("School Rise", RiseX, RiseY + 12, new() { "School Rise", "Amihan Village's evacuation area", "Follow the green signs up from the landing" }, 2);
             foreach (var n in Islanders)
                 if (Charted(RegionOf(n.x, n.y + 10))) Place(n.name, n.x, n.y, new() { n.name, IslanderNote(n.id) });
+            // Baga's volcano (Magayon.cs): the permanent danger zone, the alert level, and the evacuation while it stands.
+            if (Charted("amihan:Baga Island"))
+            {
+                var tip = new List<string> { "Baga's permanent danger zone", "Closed at every alert level", $"Alert level {BagaLevel}: {AlertLevels[BagaLevel].Name}" };
+                if (BagaClosed) tip.Add("Baga is evacuated until the advisory reopens it");
+                Place("Danger zone", PdzX, PdzY + 4, tip, 1);
+            }
             // The sanctuary's name sits in its middle, and Bantay Joy on her platform.
             var sp = M(SanctCX * T, (SanctCY + SanctRY + 1.2f) * T);
             marks.Add(new("Marine sanctuary", sp.X, sp.Y, white, Pal.C("#bff4ff"), 20, false, null, 0));
@@ -399,7 +406,7 @@ partial class Game
     List<string> SpotTip(Spot s)
     {
         var tip = new List<string> { s.Label };
-        if (!SpotOpen(s.Id)) tip.Add(s.Id == "wreck" ? "Closed: the tide is in" : s.Id == "deep" ? "Closed: the old dock needs repairing" : "Closed");
+        if (!SpotOpen(s.Id)) tip.Add(s.Id == "wreck" ? "Closed: the tide is in" : s.Id == "deep" ? "Closed: the old dock needs repairing" : s.Id == "bagareef" ? "Closed: Baga's evacuation order" : "Closed");
         var fish = Data.Common[s.Id];
         int got = fish.Count(f => state.commons.GetValueOrDefault(f.Id) > 0);
         tip.Add($"Caught here: {got} of {fish.Length}");
@@ -427,6 +434,8 @@ partial class Game
         "maya" => "Runs a guso farm in the karst lagoon",
         "tala" => "Watches the mangroves' wildlife, and keeps a list",
         "isay" => "Teaches the village children about fish: a lesson a day",
+        "mila" => "Grows abaca and pili on Baga's north shore",
+        "ben" => "Runs Baga's volcano station and its alert board",
         _ => ""
     };
 

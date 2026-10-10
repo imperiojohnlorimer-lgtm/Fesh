@@ -37,6 +37,7 @@ partial class Game
         if (mode == "tamed") DrawTamed();
         if (mode == "platejaw") DrawGuardianCard();
         if (mode == "seacard") DrawSeaCard();
+        if (mode == "magayoncard") DrawMagayonCard();
         if (mode == "panel" && panel == "dex") DrawDex();
         if (mode == "panel" && panel == "case") DrawCase();
         if (mode == "panel" && panel == "map") DrawMap();
@@ -54,6 +55,10 @@ partial class Game
         if (mode == "panel" && panel == "sort") DrawSort();
         if (mode == "panel" && panel == "atlas") DrawAtlas();
         if (mode == "panel" && panel == "album") DrawAlbum();
+        if (mode == "panel" && panel == "alertcard") DrawAlertCard();
+        if (mode == "panel" && panel == "readings") DrawReadings();
+        if (mode == "panel" && panel == "gobag") DrawGoBag();
+        if (mode == "panel" && panel == "lahar") DrawLaharWatch();
         if (mode == "moon") DrawMoonCard();
         if (mode == "pause") DrawMenu();
     }
@@ -1011,7 +1016,7 @@ partial class Game
         DrawHut();
         DrawFire(0);
         DrawWreck();
-        foreach (var n in Islanders) if (n.id == "isay") DrawSchool(n.x, n.y - 5); else DrawBahay(n.x, n.y - 5, n.shirt);
+        foreach (var n in Islanders) if (n.id == "isay") DrawSchool(n.x, n.y - 5); else if (n.id == "ben") DrawStation(n.x, n.y - 5); else DrawBahay(n.x, n.y - 5, n.shirt);
         DrawKarst(2085, 107, 41); DrawKarst(1995, 141, 32); DrawBagaCone();
         DrawGusoFarm(0, live: false);
         foreach (var (fx, fy) in FireflyTrees) DrawPagatpat(fx, fy, live: false);
@@ -1036,18 +1041,107 @@ partial class Game
 
     /* ---------- Case board ---------- */
     float lastCaseBottom;          // where the Case board last ended, checked against the screen
-    string caseTab = "saltmere";   // "saltmere" (the Halcyon), "habagat" (the vanishing moon, once you've found Habagat) or "amihan" (the restless sea, once the ground has shaken)
+    float lastCaseTabRight;        // where the last case tab ended (checked against the Close button)
+    string caseTab = "saltmere";   // "saltmere" (the Halcyon), "habagat" (the vanishing moon, once you've found Habagat), "amihan" (the restless sea, once the ground has shaken) or "baga" (beneath the clouds, once you've met Manay Mila)
+
+    // A tab per story, two lines each ("Story N" small, its name), greyed with a padlock until it begins. They shrink to fit
+    // between the title and Close. True when a click has just changed the tab (the caller stops drawing this frame).
+    bool DrawCaseTabs(float x, float y, float right)
+    {
+        var stories = CaseStories();
+        float tabX = x + Gfx.Measure("Case board", FontKind.Ui700, 40) + 28, room = right - tabX, fs = 19, pad = 30;
+        float TabW((string id, int n, string name, bool open, string hint) s) =>
+            Math.Max(Gfx.Measure(s.name, FontKind.Ui700, fs), Gfx.Measure($"Story {s.n}", FontKind.Ui600, 13) + (s.open ? 0 : 16)) + pad;
+        while (fs > 13 && stories.Sum(s => TabW(s) + 8) > room) { fs -= 1; pad = Math.Max(16, pad - 3); }
+        foreach (var s in stories)
+        {
+            float w = TabW(s);
+            bool sel = caseTab == s.id;
+            var fill = sel ? Pal.Lantern : s.open ? Pal.Sand : Pal.C("#b9a98a");
+            if (!sel && Gfx.Hover(tabX, y, w, 48)) fill = Lighten(fill, 0.14f);
+            Gfx.Box(tabX, y, w, 48, fill, Pal.Ink, 3, 6, 4);
+            var ink = s.open ? Pal.Ink : Pal.C("#5a4e3e");
+            string tag = $"Story {s.n}";
+            float sx = tabX + w / 2 - Gfx.Measure(tag, FontKind.Ui600, 13) / 2 + (s.open ? 0 : 8);
+            if (!s.open) DrawPadlock(sx - 15, y + 5, 1, ink);
+            Gfx.Text(tag, sx, y + 4, FontKind.Ui600, 13, ink);
+            Gfx.TextCenter(s.name, tabX + w / 2, y + 20, FontKind.Ui700, fs, ink);
+#if DEBUG
+            Gfx.Seen[s.name] = new Rectangle(tabX, y, w, 48);   // the autotest clicks a tab by its story's name
+#endif
+            if (Gfx.Click(tabX, y, w, 48) && !sel) { caseTab = s.id; Sfx.Play(s.open ? "blip" : "nope"); return true; }
+            lastCaseTabRight = tabX + w;
+            tabX += w + 8;
+        }
+        return false;
+    }
+
+    // A small padlock (the fonts have no symbol for one): an arched shackle over a body with a keyhole.
+    static void DrawPadlock(float x, float y, float k, Color c)
+    {
+        float t = Math.Max(1.5f, 1.6f * k);
+        Gfx.Line(x + 2.5f * k, y + 6 * k, x + 2.5f * k, y + 2.5f * k, t, c);
+        Gfx.Line(x + 2.5f * k, y + 2.5f * k, x + 4 * k, y + 0.8f * k, t, c);
+        Gfx.Line(x + 4 * k, y + 0.8f * k, x + 6 * k, y + 0.8f * k, t, c);
+        Gfx.Line(x + 6 * k, y + 0.8f * k, x + 7.5f * k, y + 2.5f * k, t, c);
+        Gfx.Line(x + 7.5f * k, y + 2.5f * k, x + 7.5f * k, y + 6 * k, t, c);
+        Gfx.Rect(x, y + 5.5f * k, 10 * k, 7 * k, c, 1.5f * k);
+        Gfx.Rect(x + 4.2f * k, y + 7.5f * k, 1.6f * k, 3 * k, Pal.C("#e9dfc6"));
+    }
+
+    // A story not begun yet: its name, that it's locked, and where it starts.
+    void DrawLockedCase((string id, int n, string name, bool open, string hint) s)
+    {
+        const float bx = 50, bw = 1180, border = 13, padT = 21, padX = 24, nw = 660;
+        float ix = bx + border, iw = bw - border * 2;
+        var hint = Gfx.Wrap(s.hint, FontKind.Note, 22, nw - 80);
+        float noteH = 96 + 46 + 40 + hint.Count * 30 + 30;
+        float innerH = padT + 54 + 34 + noteH + 44;
+        float h = innerH + border * 2, by = Math.Max(4, (Gfx.LH - h - 6) / 2);
+        lastCaseBottom = by + h + 6;
+        Gfx.Rect(bx, by + 6, bw, h, Pal.Ink, 6);
+        Gfx.Rect(bx, by, bw, h, Pal.C("#6b4a2b"), 6);
+        Gfx.Cork(ix, by + border, iw, innerH);
+        float x = ix + padX, y = by + border + padT;
+        Gfx.Text("Case board", x, y + 5, FontKind.Ui700, 40, Pal.C("rgba(0,0,0,0.35)"));
+        Gfx.Text("Case board", x, y + 2, FontKind.Ui700, 40, Pal.C("#fff7e6"));
+        if (SmallButton("Close", ix + iw - padX - SmallW("Close"), y)) { ClosePanels(); return; }
+        if (DrawCaseTabs(x, y, ix + iw - padX - SmallW("Close") - 16)) return;
+        y += 54 + 34;
+        float nx = ix + iw / 2 - nw / 2, cx = nx + nw / 2;
+        Gfx.Rect(nx + 2, y + 4, nw, noteH, Pal.C("rgba(0,0,0,0.25)"));
+        Gfx.Rect(nx, y, nw, noteH, Pal.C("#e9dfc6"));
+        Pin(cx, y + 10);
+        DrawPadlock(cx - 22, y + 30, 4.4f, Muted);
+        Gfx.TextCenter($"Story {s.n}: {s.name}", cx, y + 96, FontKind.Ui700, 30, Pal.PaperInk);
+        Gfx.TextCenter("Not unlocked yet.", cx, y + 96 + 46, FontKind.Note, 24, Muted);
+        Lines(hint.Select(l => l).ToList(), cx - (hint.Count > 0 ? hint.Max(l => Gfx.Measure(l, FontKind.Note, 22)) : 0) / 2, y + 96 + 46 + 40, 30, FontKind.Note, 22, Pal.PaperInk);
+    }
+
+    // The four stories in order, all on the board from the start (1.21): one not begun yet shows locked, with a hint where
+    // it starts that gives nothing away (Codex's wording).
+    (string id, int n, string name, bool open, string hint)[] CaseStories() => new[]
+    {
+        ("saltmere", 1, "The Halcyon", true, ""),
+        ("habagat", 2, "The vanishing moon", state.Hinted("habagat"), "Sail south and find the Habagat islands."),
+        ("amihan", 3, "The restless sea", SeaStoryStarted, state.Hinted("metIsay") ? "Come back to Amihan Village on a later day, by daylight."
+            : "Visit Amihan Village and introduce yourself to Ma'am Isay."),
+        ("baga", 4, "Beneath the clouds", MgStarted, "Visit Baga Island and speak with Manay Mila.")
+    };
 
     void DrawCase()
     {
         Backdrop();
-        if (caseTab == "habagat" && !state.Hinted("habagat") || caseTab == "amihan" && !SeaStoryStarted) caseTab = "saltmere";
-        bool moon = caseTab == "habagat", sea = caseTab == "amihan";
-        var caseClues = moon ? Data.MoonClues : sea ? Data.SeaClues : null;
+        var story = CaseStories().FirstOrDefault(s => s.id == caseTab);
+        if (story.id == null) { caseTab = "saltmere"; story = CaseStories()[0]; }
+        if (!story.open) { DrawLockedCase(story); return; }
+        bool moon = caseTab == "habagat", sea = caseTab == "amihan", baga = caseTab == "baga";
+        var caseClues = moon ? Data.MoonClues : sea ? Data.SeaClues : baga ? Data.MagayonClues : null;
         const float bx = 50, bw = 1180, border = 13, padT = 21, padX = 24, padB = 29, colGap = 24;
         float ix = bx + border, iw = bw - border * 2, cw = iw - padX * 2;
         const float qw = 693;
         var question = Gfx.Wrap(moon ? "Why does the moon go out over the Habagat sea?" : sea ? "When the ground shakes, what should Amihan Village do about the sea?"
+            : baga ? "Baga is stirring. How do we read its signs, and keep everyone safe?"
             : "How did these creatures end up around Saltmere Island?", FontKind.Note, 26, qw - 48);
         float qh = 19 + question.Count * 35 + 16;
         int count = caseClues?.Length ?? Data.Creatures.Length;
@@ -1076,7 +1170,8 @@ partial class Game
         float noteH = NoteH();
         const float tw = 827;
         string theoryText = moon ? Data.MoonTheories[MoonReturned ? Data.MoonTheories.Length - 1 : MoonClueCount]
-            : sea ? Data.SeaTheories[SeaCaseClosed ? Data.SeaTheories.Length - 1 : SeaClueCount] : Data.Theories[state.caught.Count];
+            : sea ? Data.SeaTheories[SeaCaseClosed ? Data.SeaTheories.Length - 1 : SeaClueCount]
+            : baga ? Data.MagayonTheories[MgDone ? Data.MagayonTheories.Length - 1 : MgClueCount] : Data.Theories[state.caught.Count];
         var theory = Gfx.Wrap(theoryText, FontKind.Note, 20, tw - 48);
         float th = 19 + 26 + theory.Count * 29 + 19;
         float innerH = padT + 46 + 8 + qh + 32 + noteH + 35 + th + padB;
@@ -1097,20 +1192,7 @@ partial class Game
         Gfx.Text("Case board", x, y + 5, FontKind.Ui700, 40, Pal.C("rgba(0,0,0,0.35)"));
         Gfx.Text("Case board", x, y + 2, FontKind.Ui700, 40, Pal.C("#fff7e6"));
         if (SmallButton("Close", ix + iw - padX - SmallW("Close"), y)) { ClosePanels(); return; }
-        // Once you've found Habagat, a second case: the vanishing moon; once the ground shakes in Amihan, a third.
-        if (state.Hinted("habagat") || SeaStoryStarted)
-        {
-            float tabX = x + Gfx.Measure("Case board", FontKind.Ui700, 40) + 28;
-            var tabs = new List<(string, string)> { ("saltmere", "The Halcyon") };
-            if (state.Hinted("habagat")) tabs.Add(("habagat", "The vanishing moon"));
-            if (SeaStoryStarted) tabs.Add(("amihan", "The restless sea"));
-            foreach (var (id, label) in tabs)
-            {
-                float w = SmallW(label);
-                if (Button(label, tabX, y, w, 44, FontKind.Ui700, 20, caseTab == id ? Pal.Lantern : Pal.Sand, Pal.Ink, 4) && caseTab != id) { caseTab = id; Sfx.Play("blip"); return; }
-                tabX += w + 10;
-            }
-        }
+        if (DrawCaseTabs(x, y, ix + iw - padX - SmallW("Close") - 16)) return;
         y += 46 + 8;
 
         var pins = new List<Vector2>();

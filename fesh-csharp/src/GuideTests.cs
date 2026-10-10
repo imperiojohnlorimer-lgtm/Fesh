@@ -285,7 +285,7 @@ partial class Game
         state.req = null; state.hinted.Clear();
         foreach (var k in new[] { "habagat", "metRosa", "visitedAtoll", "amihan", "metJoy", "sanctuaryReward", "guso", "gusoCoop", "bubo", "liraSupperAsked", "rondalla",
             "niko_request", "niko_asohos", "nikoAsohosAsked", "metPacing", "metDado", "metCelso", "isletsCharted", "bk:agong", "talaReward", "fireflies",
-            "tides", "metIsay" }) state.hinted[k] = true;
+            "tides", "metIsay", "mg:metMila", "mg:metBen", "mg:done", "mg:gift" }) state.hinted[k] = true;
         state.parola = 3; state.hinted["parolaLit"] = true; state.hinted["moonReturned"] = true; yield return 2;
         Check($"when it's the only goal, Automatic follows Rosa's order ({string.Join(", ", goals.Select(g => g.Id))} -> {tracked?.Id})", tracked?.Id == "rosa:order");
 

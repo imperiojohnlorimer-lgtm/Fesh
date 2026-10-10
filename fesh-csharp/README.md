@@ -101,7 +101,11 @@ and sound volume, music and sound on or off, fullscreen, screen shake, pausing i
 and a 12- or 24-hour clock. **Controls:** two keys for every action (click one and press the new key), and the gamepad
 layout. The title screen has Continue (your most recent save), Load game, New game and Settings. Load game shows each
 slot with Play, Copy (into an empty slot), Rename (give the slot its own name, like "Robin, before the storm") and
-Delete.
+Delete. Behind the title the view tours the islands, from Saltmere and Starfall Atoll to Amihan and Habagat, a few
+seconds over each.
+
+The **Case board** has a tab for each of the four stories from the start. One you haven't begun yet is greyed with a
+padlock; clicking it says where it starts, without giving anything away.
 
 ### Gamepad
 Plug in any gamepad Raylib knows. The layout is fixed:
@@ -455,6 +459,32 @@ and a short report on what you did; Niko has a crab pot for you the next day.
 While it's happening the clock, hunger and the derby clock wait, and you can't board a boat, ride, build or fish. A
 save made in the middle just starts it again the next time you're on the island by day.
 
+## Beneath the clouds (story 4, Baga Island)
+Baga, the volcanic island in Amihan, now has two people on its north shore. **Manay Mila** grows abaca and pili in
+the rich volcanic soil; help her tie the abaca fibre to dry and plant a pili seedling, and she tells you her lola's
+version of the Bicol story of **Daragang Magayon**: Magayon and Panganoron (whose name means cloud) died in the fighting
+Pagtuga (eruption) began, their grave grew into Mayon, and the clouds round its summit are the two of them together.
+**Ben** runs Baga's volcano station. His board shows the alert level, using the levels PHIVOLCS gives Mayon (0 No
+Alert to 5 Hazardous Eruption; the alert card explains each). Baga and its station are made up for the game. Nobody
+goes past the marker stones round the crater, the permanent danger zone, at any level.
+
+On a later day Baga gets restless (Level 1), and Ben needs help with the readings, simplified examples of what a
+volcano station measures: click each volcanic earthquake on the seismograph (not the surf's wiggles), read the GPS
+marks (is the ground swelling?), sweep the gas scanner across the plume (sulfur dioxide, in tonnes a day), and check the
+summit camera. Each one has to be read right before the next; Ben explains anything you get wrong. The first round
+takes Baga to Level 2: pack a go-bag at his crate while it's calm. The next day's readings are the twist: fewer quakes,
+but a glow and rockfalls at the crater. Signs don't all rise together. Level 3, and the disaster office orders
+everyone off Baga, early, while the sea is calm.
+
+Call to Manay Mila, sign the evacuation list at the jetty and board Niko's banca to Amihan Village (nothing has to be
+finished first: if you dawdle, Ben and Niko see you aboard). The school is the shelter: before the ash comes, cover the
+water jars, take the downpipe off the rain barrel and close the shutters; when the ash falls, stay inside, hand out
+sealed water and register everyone. Then wait for rain: rain on fresh ash makes **lahars**. When it has rained, use the
+display in the school to close the channel and the river mouth on the map and radio the warning, and watch the lahar
+rush down the channel and spill past its banks. The case closes with a card, 150 coins and a report on what you did;
+Manay Mila has an **abaca line** for you the next day. Finishing doesn't make Baga safe: an advisory reopens its north
+shore and reef four days after the order, and the danger zone and the channel stay closed.
+
 ## The Sea school
 New in **1.17.0**: three ways to learn about the sea that also make you a better fisher. Each has a badge in the
 journal's **Sea school** tab, bronze, silver and gold, with a prize at every step; gold in all three is a diploma.
@@ -717,6 +747,7 @@ taking down a shack also packs up everything inside it.
 - `src/Tidemane.cs`: the Starwell's secret, the fight with Tidemane, and riding it
 - `src/Guardian.cs`: Platejaw, the Ancient pool's guardian: its fight, the carved stone, and its card
 - `src/RestlessSea.cs`: the restless sea (story 3): the tremor, the clues, the pond, the signs and the drill, the evacuation, and the sea going out and coming back
+- `src/Magayon.cs` and `src/MagayonUi.cs`: beneath the clouds (story 4): Baga's volcano, Manay Mila and Ben, the readings, the go-bag, leaving Baga, the school as the shelter, the lahar watch
 - `src/Archipelago.cs`: Amihan's four islands, village NPCs, landmarks and regional scenery
 - `src/Seaweed.cs`: Maya's guso farm in the Luntian lagoon
 - `src/Bakawan.cs`: Bakawan's firefly trees, the glowing water, sightings and Tala's list
@@ -752,7 +783,7 @@ depth, bait, every fight style, perfect hooks, sizes, records, chests, the ice h
 worms and crickets, the tackle box, the derby, legends, the moon and storms), all five
 islands, odd catches, chopping, mining, crafting, cooking, eating, houses, the cave (ore tiers, monsters,
 health, fainting, the Ancient Floor and the lift), animals, the shop, requests, bait, weather, planters, the
-aquarium, the boat, the Starwell and the whole fight with Tidemane, the fight with Platejaw, the restless sea from the tremor to the all-clear, riding and swimming, music, save slots, settings,
+aquarium, the boat, the Starwell and the whole fight with Tidemane, the fight with Platejaw, the restless sea from the tremor to the all-clear, Baga's volcano from the first reading to the lahar warning, riding and swimming, music, save slots, settings,
 rebinding keys, the clock (dusk, dawn, resting, regrowth), the forecast and tomorrow's, Pip's and Tomas's hours, birds and
 crickets, pausing in the background, copying and renaming slots, the gamepad (scripted), and every screen. It refuses to run without
 `FESH_SAVE`, because it wipes the slots and settings wherever that points.
