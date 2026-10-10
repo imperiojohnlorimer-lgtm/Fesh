@@ -47,6 +47,11 @@ static class Inp
     // In menus (CursorUi) the left stick or D-pad steers a pointer and A clicks, so every mouse-driven screen works.
     static readonly HashSet<GamepadButton> padTapped = new(), padQueued = new(), padHeld = new();
     public static Vector2? ScriptStick { get; set; }
+    // The right stick, flicked left (-1) or right (+1) this frame: steps through the hotbar (Hotbar.cs). It has to come
+    // back to the middle before it flicks again.
+    public static float? ScriptRightX { get; set; }
+    public static int RightFlick { get; private set; }
+    static bool rightOut;
     public static bool UsingPad;          // the last input came from the gamepad: prompts name its buttons
     public static Vector2? PadCursor;     // the pointer the pad steers in menus (null: the mouse has it)
     public static bool CursorUi, PadClick, PadHold;
@@ -83,6 +88,10 @@ static class Inp
         padQueued.Clear();
         lastStick = stick;
         stick = ScriptStick ?? (Pad ? new Vector2(GetGamepadAxisMovement(PadIndex, GamepadAxis.LeftX), GetGamepadAxisMovement(PadIndex, GamepadAxis.LeftY)) : Vector2.Zero);
+        float rx = ScriptRightX ?? (Pad ? GetGamepadAxisMovement(PadIndex, GamepadAxis.RightX) : 0);
+        RightFlick = 0;
+        if (MathF.Abs(rx) < 0.3f) rightOut = false;
+        else if (MathF.Abs(rx) > 0.65f && !rightOut) { rightOut = true; RightFlick = rx > 0 ? 1 : -1; UsingPad = true; }
         if (stick.Length() < Dead) stick = Vector2.Zero;
         bool padUsed = stick != Vector2.Zero || padTapped.Count > 0;
         if (Pad) for (var b = GamepadButton.LeftFaceUp; b <= GamepadButton.RightThumb; b++) padUsed |= IsGamepadButtonPressed(PadIndex, b);

@@ -430,7 +430,7 @@ partial class Game
                     if (ShadowPos(s, k, t) is (float hx, float hy, bool big)) DrawShadowFish(hx, hy, big, t, k);
             if (Chummed(s.Id)) DrawChum(sx, sy, s.R, t);
             if (!frozen && s.Id != "icehole") DrawJump(s, i, sx, sy, t);
-            if (fish != null && fish.Spot == s.Id && mode != "casting") continue;
+            if (fish != null && fish.Spot == s.Id && !fish.Wild && mode != "casting") continue;
             if (frozen) continue;
             for (int k = 0; k < 2; k++)
             {
@@ -595,8 +595,15 @@ partial class Game
         if (Aboard) { DrawHelmsman(); return; }
         int x = (int)Math.Floor(player.X + 0.5), y = (int)Math.Floor(player.Y + 0.5);
         bool moving = player.Moving && mode is "play" or "build";
-        int step = moving ? (int)(player.WalkT * 8) % 2 : 0;       // Tidemane's gallop
         int walk = moving ? 1 + (int)(player.WalkT * 9) % 4 : 0;   // your own four-frame walk
+        // Stepping down off Tidemane: from the saddle to the ground in a little hop (Tidemane.cs).
+        if (!Riding && hopDown && hopT > 0)
+        {
+            float k = 1 - hopT / HopDownTime;
+            x = (int)MathF.Round(hopFromX + (x - hopFromX) * k);
+            y = (int)MathF.Round(hopFromY + (y - hopFromY) * k - MathF.Sin(k * MathF.PI) * 3);
+            walk = 0;
+        }
         string f = player.Face;
         if (iframes > 0 && (int)(time * 16) % 2 == 0) return; // blink while recovering from a hit
         // Ducked down with your hands over your head while the ground shakes (RestlessSea.cs).
@@ -607,18 +614,21 @@ partial class Game
         bool blink = time % 3.7f < 0.12f;
         bool rod = fish != null || mode == "charging";
         var (arms, pump, lean, glance) = PlayerPose(rod, holding);
+        // Whistling for Tidemane, a hand goes up.
+        if (whistleT > 0.2f && !Riding && arms == 0) { arms = 1; pump = (int)(time * 8) % 2; }
         int side = f == "left" ? -1 : 1;
         // Where the upper body is (in the saddle, everything you hold or swing is up where you sit), and what's in
         // your hands there: a tool mid-swing, the rod or the spear (Tools.cs). The arms reach for it.
         var (bx, by) = Riding ? RiderSeat(x, y) : (x, y);
-        if (Riding) lean = 0;
+        // In the saddle you lean into a gallop (not while you're holding or swinging anything).
+        if (Riding) lean = !rod && !holding && swingT <= 0 && RidePose().Kind == "gallop" ? 1 : 0;
         int rise = Riding ? 0 : bob + (walk is 2 or 4 ? 1 : 0);
         var hands = holding ? null : HandsPose(f, bx + (f is "left" or "right" ? lean * side : 0), by - rise, rod, pump);
         if (hands != null) arms = 4;
         if (hands?.ToolBehind == true) DrawToolPose(hands);
         if (Riding)
         {
-            DrawRider(x, y, moving, step, arms, pump, hands);
+            DrawRider(x, y, arms, pump, hands, lean);
             (x, y) = (bx, by);
         }
         else LookData.DrawPerson(pix, state.look, x, y, f, walk, bob: bob, blink: blink, arms: arms, swing: pump, lean: lean, head: glance,
@@ -1124,7 +1134,7 @@ partial class Game
         }
         if (Visible(160, 60)) { list.Add((69, DrawHut)); list.Add((FireY + 2, () => DrawFire(t))); }
         if (Visible(CarvingX, CarvingY)) list.Add((CarvingY, DrawCarving));
-        if (state.tamed && !state.riding && Visible(state.mountX, state.mountY)) list.Add((state.mountY, DrawMountIdle));
+        if (state.tamed && !state.riding && (call != null || Visible(state.mountX, state.mountY))) list.Add((call is { Phase: not "whistle" } ? call.Y : state.mountY, DrawMountIdle));
         if (boss != null) list.Add((boss.Y, () => DrawBoss(t)));
         if (!TomasInBed) list.Add((tomasY, DrawTomas));
         list.Add((player.Y, DrawPlayer));
@@ -1321,6 +1331,7 @@ partial class Game
         DrawGlowingSurf(t, k);
         DrawGlowTrail(t, k);
         DrawFireflies(t, k);
+        GlowMount(k);
         GlowParola(t, k);
         GlowEclipse(k);
         pix.Glow(StarwellX, StarwellY, 30, Pal.Rgba(120, 220, 255, (0.22f + 0.06f * MathF.Sin(t * 1.3f)) * k));
@@ -1397,6 +1408,7 @@ partial class Game
             DrawSaltBeds();
             DrawGusoFarm(t);
             DrawLoose(t);
+            DrawMountGround();
             DrawBugs(t);
             DrawSpots(t);
             DrawSchools(t);
@@ -1409,6 +1421,8 @@ partial class Game
             DrawSpearing(t);
             DrawEclipse(t);
             DrawObjects(t);
+            CullMountGlints();
+            DrawWhistle();
             DrawBossEffects(t);
             DrawFishing(t);
             DrawRelease(t);

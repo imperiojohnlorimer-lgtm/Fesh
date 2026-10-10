@@ -596,6 +596,8 @@ partial class Game
     {
         fish = null; reel = null; pointerHold = false;
         panel = null;
+        // A whistle for Tidemane still on its way is called off: you wake somewhere else (Codex).
+        call = null;
         mode = "play";
         // Knocked flat by Platejaw: it goes back down, and its rocks with it. The coelacanth was landed before the fight.
         bool guarded = guardian != null;

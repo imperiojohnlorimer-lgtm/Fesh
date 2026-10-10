@@ -44,7 +44,7 @@ partial class Game
         if (StarwellFound || scene != "world" || Dist(player.X, player.Y, StarwellX, StarwellY) > GladeR * T - 6) return;
         state.hinted["starwell"] = true;
         Sfx.Play("odd");
-        Toast("A hidden pool ringed by palms: the Starwell. The hoofprints run right up to the water, and stop.", 5);
+        Toast("A hidden pool ringed by palms: the Starwell. The trackPrints run right up to the water, and stop.", 5);
         Save();
     }
 
@@ -397,6 +397,25 @@ partial class Game
     // deep, its back end stays over it for a few steps, and if a storm catches you out there it must still swim you home.
     bool StormHoldsBack(float x, float y) => Stormy && TileUnder(x, y) == '~' && TileUnder(player.X, player.Y) != '~';
 
+    // How it moves under you (1.20): it picks up speed over a moment and pulls up short when you let go, rather than
+    // going from standing to full gallop in a frame. Top speeds are as before (92 on land, 74 swimming).
+    (float x, float y) rideVel;
+    float mountPhase;      // through the stride, from the distance it has really covered (so pushing at a wall doesn't gallop)
+    float mountSpeed;      // how fast it has really been going, smoothed
+    int mountGaitFrame = -1, hoofSide;
+    const float RideAccel = 700, SwimAccel = 450, RideBrake = 900;
+    // Climbing on and off: the rider swings up into the saddle (or steps down) over a moment. Only looks: you're in the
+    // saddle (or off) at once, and moving finishes it.
+    float hopT, hopFromX, hopFromY;
+    bool hopDown;
+    const float HopUp = 0.22f, HopDownTime = 0.2f;
+    // Over the shoreline at speed it bounds in (or out) with a splash. Only looks: where you can go is unchanged.
+    float shoreHopT, shoreHopCool;
+    bool wasSwimming;
+    const float ShoreHop = 0.3f;
+    // Hoofprints in sand and snow, fading (looks only).
+    readonly List<(float x, float y, float life, int dir)> trackPrints = new();
+
     void ToggleRide()
     {
         // R gets you on and off the boat: from beside it (E may belong to a fishing spot there), and at the helm it lands
@@ -412,27 +431,41 @@ partial class Game
         else Mount();
     }
 
-    // Close by, you hop on. From further away, a whistle brings it galloping (or swimming) over.
+    // Close by, you climb on. From further away, a whistle calls it over (StartCall): it comes and waits beside you.
     void Mount()
     {
         if (Aboard) { Toast("Land the boat before calling Tidemane."); return; }
-        bool near = Dist(player.X, player.Y, state.mountX, state.mountY) < 26;
-        if (!near)
+        if (call != null)
         {
-            Sfx.Play("whistle");
-            Burst(player.X - 8, player.Y, Swimmable(TileUnder(player.X, player.Y)) ? "#cfe8ee" : "#e8cf96", 10);
+            // Already coming: once it's close, R climbs on wherever it has got to.
+            if (call.Phase is "run" or "arrive" && Dist(player.X, player.Y, call.X, call.Y) < 26) CommitCall(quiet: true);
+            else { Toast($"{Data.MountName} is on its way."); return; }
         }
-        else FaceToward(state.mountX, state.mountY);
+        if (Dist(player.X, player.Y, state.mountX, state.mountY) >= 26) { StartCall(); return; }
+        FaceToward(state.mountX, state.mountY);
+        // You climb up where it stands, if there's a clear way to it; otherwise it steps over to you.
+        hopT = HopUp; hopDown = false; hopFromX = player.X; hopFromY = player.Y;
+        if (ClearWay(player.X, player.Y, state.mountX, state.mountY)) { player.X = state.mountX; player.Y = state.mountY; }
         state.riding = true;
         state.mountX = player.X; state.mountY = player.Y;
+        rideVel = (0, 0); mountSpeed = 0; mountPhase = 0; wasSwimming = Swimming; shoreHopT = 0;
         if (player.Face is "left" or "right") mountDir = player.Face == "right" ? 1 : -1;
         Sfx.Play("neigh");
         if (!state.Hinted("rideTip"))
         {
             state.hinted["rideTip"] = true;
-            Toast("In the saddle! Ride into the sea to swim. R hops off on dry land.", 4);
+            Toast("In the saddle! Ride into the sea to swim. <ride> hops off on dry land.", 4);
         }
         Save();
+    }
+
+    // Every step from one place to the other is somewhere you could ride (so you never climb on through a wall).
+    bool ClearWay(float x0, float y0, float x1, float y1)
+    {
+        int n = Math.Max(1, (int)MathF.Ceiling(Dist(x0, y0, x1, y1) / 2));
+        for (int i = 1; i <= n; i++)
+            if (!CanStand(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, Wading, true)) return false;
+        return true;
     }
 
     // You need dry ground (or shallows, in waders) to step down onto, right beside it.
@@ -443,106 +476,544 @@ partial class Game
         foreach (var (ox, oy) in new[] { (-9f * mountDir, 0f), (9f * mountDir, 0f), (0f, 6f), (0f, -6f), (-9f * mountDir, 6f), (9f * mountDir, 6f), (0f, 0f) })
             if (CanStand(mx + ox, my + oy, Wading)) { spot = (mx + ox, my + oy); break; }
         if (spot is not (float sx, float sy)) { Sfx.Play("nope"); Toast("Nowhere dry to hop off here. Ride up onto the shore first."); return; }
+        var seat = RiderSeat((int)MathF.Round(mx), (int)MathF.Round(my));
         state.riding = false;
         state.mountX = mx; state.mountY = my;
         player.X = sx; player.Y = sy;
+        hopT = HopDownTime; hopDown = true; hopFromX = seat.x; hopFromY = seat.y;
+        rideVel = (0, 0); mountSpeed = 0; shoreHopT = 0;
         Sfx.Play("pickup");
         Save();
     }
 
-    // Going indoors, underground or out to sea by boat, you leave it waiting where you got off.
+    // Going indoors, underground or out to sea by boat, you leave it waiting where you got off. A whistle still on its way
+    // is called off first (it's not riding then, so this mustn't return before it).
     void LeaveMount()
     {
+        call = null;
+        rideVel = (0, 0); mountSpeed = 0; shoreHopT = 0; hopT = 0;
         if (!state.riding) return;
         state.riding = false;
         state.mountX = player.X; state.mountY = player.Y;
     }
 
-    bool MountNear() => state.tamed && !state.riding && scene == "world" && boss == null
+    // In reach to climb on with <act> (kept short so it doesn't take E from a fishing spot; <ride> reaches 26 px).
+    bool MountNear() => state.tamed && !state.riding && scene == "world" && boss == null && call == null
         && Dist(player.X, player.Y, state.mountX, state.mountY) < 16;
 
-    /* ---------- Drawing ---------- */
-    // Tidemane with its feet at (x, y). Pose is "stand", "run", "rear", "lie" or "swim"; frame alternates the gallop.
-    // Drawn facing right and mirrored for dir -1.
-    void DrawTidemane(float fx, float fy, int dir, string pose, int frame, bool flash = false, float lift = 0, bool moving = false)
+    // Riding: the move keys or the stick ask for a speed and a heading, and it gets there quickly but not at once. Moves
+    // in steps of at most 2 px, each axis on its own, so it slides along a shore rather than sticking.
+    void RideMove(float dx, float dy, float push, float dt)
     {
-        int x = (int)MathF.Round(fx), y = (int)MathF.Round(fy - lift);
-        bool lie = pose == "lie", rear = pose == "rear", run = pose == "run", swim = pose == "swim";
-        int bob = swim ? FloatBob(fx) : run && frame == 1 ? -1 : 0, low = lie ? 4 : 0, up = rear ? -4 : 0;
-        void R(int ox, int oy, int w, int h, string c, int dy = 0)
+        bool swim = Swimming;
+        float top = (swim ? 74 : 92) * push * (Starving ? 0.6f : 1f) * (Shaking ? 0.45f : 1f);
+        float len = MathF.Sqrt(dx * dx + dy * dy);
+        float wx = len > 0 ? dx / len * top : 0, wy = len > 0 ? dy / len * top : 0;
+        float ax = wx - rideVel.x, ay = wy - rideVel.y, al = MathF.Sqrt(ax * ax + ay * ay);
+        bool braking = len == 0 || rideVel.x * wx + rideVel.y * wy < 0 || wx * wx + wy * wy < rideVel.x * rideVel.x + rideVel.y * rideVel.y;
+        float rate = (braking ? RideBrake : swim ? SwimAccel : RideAccel) * dt;
+        rideVel = al <= rate ? (wx, wy) : (rideVel.x + ax / al * rate, rideVel.y + ay / al * rate);
+        float mx = rideVel.x * dt, my = rideVel.y * dt, sx = player.X, sy = player.Y;
+        int n = Math.Max(1, (int)MathF.Ceiling(MathF.Max(MathF.Abs(mx), MathF.Abs(my)) / 2));
+        bool hitX = false, hitY = false;
+        for (int i = 0; i < n; i++)
         {
-            string col = flash ? "#ffffff" : c;
-            pix.Rect(dir > 0 ? x + ox : x - ox - w + 1, y + oy + dy + bob + low, w, h, col);
+            if (!hitX && mx != 0) { if (CanStand(player.X + mx / n, player.Y, Wading, true)) player.X += mx / n; else hitX = true; }
+            if (!hitY && my != 0) { if (CanStand(player.X, player.Y + my / n, Wading, true)) player.Y += my / n; else hitY = true; }
         }
-        const string body = "#2a9d8f", shade = "#1d6f68", belly = "#8fd3c4", mane = "#f2fbff", mane2 = "#bfe6f0", horn = "#ff8a7a",
-            fin = "#5fd6c9", finDark = "#3fb5a8", dark = "#10243a";
-        if (!swim) pix.Rect(x - 13, (int)MathF.Round(fy) + 1, 22, 1, "rgba(0,0,0,0.22)");
-
-        if (swim)
+        if (hitX) rideVel.x = 0;
+        if (hitY) rideVel.y = 0;
+        float moved = Dist(sx, sy, player.X, player.Y);
+        mountSpeed += (moved / MathF.Max(dt, 0.001f) - mountSpeed) * MathF.Min(1, dt * 14);
+        if (moved < 0.01f && len == 0) mountSpeed = MathF.Max(0, mountSpeed - dt * 300);
+        // A full stride covers more ground at a gallop than at a trot.
+        mountPhase += moved / (swim ? 36 : mountSpeed > 50 ? 46 : 24);
+        if (len > 0)
         {
-            // Swimming, the fish tail trails out behind along the surface and its fan flicks up out of the water.
-            int flick = (int)MathF.Round(MathF.Sin(time * 3.2f + fx * 0.1f) * 1.3f);
-            R(-12, -9, 3, 4, shade); R(-15, -8, 3, 3, body); R(-18, -7, 3, 2, shade);
-            R(-21, -9 + flick, 2, 3, fin); R(-23, -11 + flick, 2, 4, fin); R(-24, -12 + flick, 1, 3, finDark); R(-20, -7, 2, 1, finDark);
+            // Facing changes view (side or end on), so it waits until one direction clearly wins (no flicker on a diagonal).
+            bool sideNow = player.Face is "left" or "right";
+            bool wantSide = sideNow ? MathF.Abs(dx) * 1.25f >= MathF.Abs(dy) : MathF.Abs(dx) > MathF.Abs(dy) * 1.25f;
+            player.Face = wantSide ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+            heldT = 0;
+            hopT = 0;
+        }
+        RideEffects(dt);
+    }
+
+    // Hoofbeats, dust and prints on the stride, spray in the water, and the bound over the shoreline.
+    void RideEffects(float dt)
+    {
+        shoreHopT = MathF.Max(0, shoreHopT - dt);
+        shoreHopCool = MathF.Max(0, shoreHopCool - dt);
+        bool swim = Swimming;
+        // Only while it's moving: loading a game afloat, or being set down in the water, makes no splash.
+        if (swim != wasSwimming && mountSpeed < 10) wasSwimming = swim;
+        if (swim != wasSwimming)
+        {
+            if (mountSpeed > 40 && shoreHopCool <= 0) { shoreHopT = ShoreHop; shoreHopCool = 0.5f; }
+            if (swim)
+            {
+                Burst(player.X, player.Y - 2, "#cfe8ee", 10);
+                Sfx.Play("splash");
+            }
+            else for (int i = 0; i < 6; i++)
+                particles.Add(new Particle { X = player.X + (float)(fxRng.NextDouble() * 12 - 6), Y = player.Y - 6, Vx = (float)(fxRng.NextDouble() * 20 - 10), Vy = -(float)(fxRng.NextDouble() * 20 + 8), Life = 0.35f, Color = "#cfe8ee" });
+            wasSwimming = swim;
+        }
+        var p = RidePose();
+        int frames = p.Kind == "gallop" ? 8 : p.Kind is "trot" or "swim" ? 6 : 0;
+        int f = frames == 0 || mountSpeed < 4 ? -1 : p.Frame;
+        if (f == mountGaitFrame) return;
+        mountGaitFrame = f;
+        if (f < 0 || scene != "world") return;
+        int dir = player.Face == "left" ? -1 : player.Face == "right" ? 1 : 0;
+        if (p.Kind == "swim")
+        {
+            // A stroke throws up a little spray at its chest.
+            if (f % 3 == 0)
+                for (int i = 0; i < 3; i++)
+                    particles.Add(new Particle { X = player.X + dir * 8 + (float)(fxRng.NextDouble() * 6 - 3), Y = player.Y - 5, Vx = (float)(fxRng.NextDouble() * 16 - 8) + dir * 10, Vy = -(float)(fxRng.NextDouble() * 18 + 6), Life = 0.3f, Color = "#e8f6fa" });
+            return;
+        }
+        // A bound lands far hoof then near (da-dum), a trot one hoof at a time.
+        bool contact = p.Kind == "gallop" ? f is 1 or 2 : f is 0 or 3;
+        if (!contact) return;
+        hoofSide ^= 1;
+        Sfx.Play(hoofSide == 0 ? "hoof" : "hoof2");
+        int ftx = (int)MathF.Floor(player.X / T), fty = (int)MathF.Floor((player.Y - 1.5f) / T);
+        char g = FlatOpen(ftx, fty) ? 's' : TileAt(ftx, fty);
+        string col = g switch { 's' or 'p' => "#d8bb7e", 'D' => "#d9a457", 'n' or 'i' => "#ffffff", 'e' => "#a19c90", 'w' or 'l' or 'o' or 'm' or 'x' => "#cfe8ee", _ => null };
+        float hx = player.X + dir * 6, hy = player.Y;
+        if (col != null)
+            for (int i = 0; i < (p.Kind == "gallop" ? 3 : 2); i++)
+                particles.Add(new Particle { X = hx + (float)(fxRng.NextDouble() * 4 - 2), Y = hy, Vx = (float)(fxRng.NextDouble() * 16 - 8) - dir * 10, Vy = -(float)(fxRng.NextDouble() * 14 + 8), Life = (float)(fxRng.NextDouble() * 0.12 + 0.18), Color = col });
+        if (g is 's' or 'p' or 'D' or 'n' or 'i')
+        {
+            trackPrints.Add((hx, hy, 3f, dir));
+            if (trackPrints.Count > 64) trackPrints.RemoveAt(0);
+        }
+    }
+
+    // Every frame outside menus: the whistle's call, the climb on or off, the prints fading.
+    void UpdateMount(float dt)
+    {
+        UpdateCall(dt);
+        hopT = MathF.Max(0, hopT - dt);
+        TickHoofprints(dt);
+    }
+
+    // Every frame, menus too: out of play (fishing from the saddle, a panel, the pause menu) it stands still, so it
+    // doesn't set off again with the speed it had when you come back.
+    void HoldMount()
+    {
+        if (mode is "play" or "build" && Riding) return;
+        rideVel = (0, 0);
+        mountSpeed = 0;
+        mountGaitFrame = -1;
+        // A bound over the shoreline ends too: start fishing mid-bound and it would hang in the air (Codex).
+        shoreHopT = 0;
+    }
+
+    void TickHoofprints(float dt)
+    {
+        for (int i = trackPrints.Count - 1; i >= 0; i--)
+        {
+            var h = trackPrints[i];
+            if ((h.life -= dt) <= 0) trackPrints.RemoveAt(i);
+            else trackPrints[i] = h;
+        }
+    }
+
+    // What the mount under you is doing, for the sprite and the saddle.
+    MountPose RidePose()
+    {
+        var p = new MountPose { Saddle = true, Time = time, Seed = 0.37f, Ridden = true };
+        if (shoreHopT > 0) { p.Kind = "leap"; p.Leap = 1 - shoreHopT / ShoreHop; return p; }
+        if (Swimming)
+        {
+            p.Kind = "swim";
+            p.Speed = mountSpeed / 74;
+            p.Frame = mountSpeed > 4 ? (int)(mountPhase * 6) % 6 : (int)(time * 2.5f) % 6;
+        }
+        else if (mountSpeed > 50) { p.Kind = "gallop"; p.Frame = (int)(mountPhase * 8) % 8; }
+        else if (mountSpeed > 4) { p.Kind = "trot"; p.Frame = (int)(mountPhase * 6) % 6; }
+        else p.Toss = IdleToss(time, 0.37f);
+        return p;
+    }
+
+    // Now and then, standing about, it tosses its head (every ten seconds or so, for half a second).
+    static float IdleToss(float t, float seed)
+    {
+        float ph = (t + seed * 31) % 10.5f;
+        return ph < 0.5f ? ph / 0.5f : 0;
+    }
+
+    // Bounding over the shoreline lifts it a few pixels.
+    int RideLift() => shoreHopT > 0 ? (int)MathF.Round(MathF.Sin((1 - shoreHopT / ShoreHop) * MathF.PI) * 5) : 0;
+
+    /* ---------- Whistling it over ---------- */
+    // Called from afar it doesn't just appear under you any more: it comes. From where it's waiting if it can run or swim
+    // to you from there, else up out of water you can see (it's a sea creature), else galloping in from off the screen,
+    // and if it's shut out of everywhere, out of a swirl of sea foam beside you. It stops beside you and waits for
+    // <ride>. None of this is saved: state.mountX/Y stay where it was until it arrives (so a save mid-call loads with it
+    // where it was), and anything that takes you elsewhere calls it off (LeaveMount, StartGame, and UpdateCall itself).
+    sealed class MountCall
+    {
+        public string Phase = "whistle", Arrival = "run", Face = "right";
+        public float X, Y, T, Total, Stride, Lift, FromX, FromY, ToX, ToY, Replan, Speed;
+        public int Dir = 1;
+        public bool Storm;   // whether it was stormy when the way was worked out (a storm coming on means another way)
+        public readonly List<(float x, float y)> Path = new();
+    }
+    MountCall call;
+    float whistleT;
+    const float CallLimit = 3.4f, CallRun = 125, CallSwim = 95, CallWhistle = 0.35f;
+    const int CallReach = 26;   // tiles of travel it will cover
+
+    void StartCall()
+    {
+        call = new MountCall { X = state.mountX, Y = state.mountY };
+        whistleT = 0.7f;
+        Sfx.Play("whistle");
+        PlanCall(true);
+    }
+
+    // Where it may go on the way: ground it can gallop on or water it can swim, not a closed bridge or anything solid,
+    // and in a storm not the deep sea (it won't head out into that, as when you ride it).
+    bool CallTileOk(int tx, int ty, HashSet<(int, int)> blocked)
+    {
+        char t = TileAt(tx, ty);
+        if (!(Walkable(t) || SwimOk(tx, ty, t)) || BridgeClosed(tx, ty) || blocked.Contains((tx, ty))) return false;
+        return !(Stormy && t == '~');
+    }
+
+    // Where it can stand: the same footprint as yours, any water, and the storm rule judged by its own middle.
+    bool CallCanBe(float x, float y)
+    {
+        foreach (var (ax, ay) in new[] { (x - 3, y - 3), (x + 2.9f, y - 3), (x - 3, y), (x + 2.9f, y) })
+        {
+            int tx = (int)MathF.Floor(ax / T), ty = (int)MathF.Floor(ay / T);
+            char t = TileAt(tx, ty);
+            if (!(Walkable(t) || SwimOk(tx, ty, t)) || BridgeClosed(tx, ty)) return false;
+        }
+        if (Stormy && TileUnder(x, y) == '~') return false;
+        foreach (var r in Solids())
+            if (x + 3 > r.X && x - 3 < r.X + r.W && y > r.Y && y - 3 < r.Y + r.H) return false;
+        return true;
+    }
+
+    static int CallTX(float x) => (int)MathF.Floor(x / T);
+    static int CallTY(float y) => (int)MathF.Floor((y - 1.5f) / T);
+
+    // Steps from you to every tile within reach, eight ways (diagonals only round corners it could cut).
+    Dictionary<(int, int), int> CallField(int px, int py, HashSet<(int, int)> blocked)
+    {
+        var dist = new Dictionary<(int, int), int> { [(px, py)] = 0 };
+        var q = new Queue<(int, int)>();
+        q.Enqueue((px, py));
+        while (q.Count > 0)
+        {
+            var (x, y) = q.Dequeue();
+            int d = dist[(x, y)];
+            if (d >= CallReach) continue;
+            for (int oy = -1; oy <= 1; oy++)
+                for (int ox = -1; ox <= 1; ox++)
+                {
+                    if (ox == 0 && oy == 0) continue;
+                    int nx = x + ox, ny = y + oy;
+                    if (dist.ContainsKey((nx, ny)) || !CallTileOk(nx, ny, blocked)) continue;
+                    if (ox != 0 && oy != 0 && (!CallTileOk(x + ox, y, blocked) || !CallTileOk(x, y + oy, blocked))) continue;
+                    dist[(nx, ny)] = d + 1;
+                    q.Enqueue((nx, ny));
+                }
+        }
+        return dist;
+    }
+
+    // Tiles a solid thing stands on (houses, landmarks, people): it goes round them.
+    HashSet<(int, int)> CallBlocked()
+    {
+        var set = new HashSet<(int, int)>();
+        foreach (var r in Solids())
+            for (int ty = (int)MathF.Floor(r.Y / T); ty <= (int)MathF.Floor((r.Y + r.H) / T); ty++)
+                for (int tx = (int)MathF.Floor(r.X / T); tx <= (int)MathF.Floor((r.X + r.W) / T); tx++)
+                {
+                    // Only if the box covers the tile's middle, so a fence post doesn't wall off a whole tile row.
+                    float cx = tx * T + T / 2f, cy = ty * T + T / 2f;
+                    if (cx + 2 > r.X && cx - 2 < r.X + r.W && cy + 2 > r.Y && cy - 2 < r.Y + r.H) set.Add((tx, ty));
+                }
+        return set;
+    }
+
+    // Beside you, where it will stop: on the side it's coming from if there's room, else a little behind you (it's
+    // tall: stood just in front of you, it would hide you), and in front only with a good gap. Null when there's no room
+    // anywhere round you (Codex: it used to stop in the wall then); then it comes to where you stand, if that's open.
+    (float x, float y)? CallStop(float fromX)
+    {
+        float s = fromX < player.X ? -1 : 1;
+        foreach (var (ox, oy) in new[] { (13 * s, 0f), (-13 * s, 0f), (15 * s, -3f), (-15 * s, -3f), (12 * s, -7f), (-12 * s, -7f), (0f, -11f), (14 * s, 6f), (-14 * s, 6f), (0f, 18f) })
+            if (CallCanBe(player.X + ox, player.Y + oy)) return (player.X + ox, player.Y + oy);
+        return CallCanBe(player.X, player.Y) ? (player.X, player.Y) : null;
+    }
+
+    // Its footprint, at every point along a straight stretch, somewhere it can be (2 px steps; solids fetched once).
+    bool CallClear(float x0, float y0, float x1, float y1, HashSet<(int, int)> blocked, List<Box> solids)
+    {
+        int n = Math.Max(1, (int)MathF.Ceiling(Dist(x0, y0, x1, y1) / 2));
+        for (int i = 1; i <= n; i++)
+        {
+            float x = x0 + (x1 - x0) * i / n, y = y0 + (y1 - y0) * i / n;
+            foreach (var (ax, ay) in new[] { (x - 3, y - 3), (x + 2.9f, y - 3), (x - 3, y), (x + 2.9f, y) })
+                if (!CallTileOk((int)MathF.Floor(ax / T), (int)MathF.Floor(ay / T), blocked)) return false;
+            foreach (var r in solids)
+                if (x + 3 > r.X && x - 3 < r.X + r.W && y > r.Y && y - 3 < r.Y + r.H) return false;
+        }
+        return true;
+    }
+
+    // Works out the way to you. The first time, also where it comes from. The search runs out from where it will stop,
+    // so the way it takes ends there.
+    void PlanCall(bool first)
+    {
+        var c = call;
+        var blocked = CallBlocked();
+        var solids = Solids().ToList();
+        c.Storm = Stormy;
+        if (CallStop(first ? state.mountX : c.X) is not (float tx, float ty))
+        {
+            // Nowhere at all to stand beside you: it can't come here.
+            call = null;
+            Toast($"There's no room for {Data.MountName} here. Whistle again from somewhere more open.");
+            return;
+        }
+        (c.ToX, c.ToY) = (tx, ty);
+        int stx = CallTX(tx), sty = CallTY(ty);
+        var dist = CallField(stx, sty, blocked);
+        // In view: what the camera can see now, not just "near you" (Codex: near a map edge they differ).
+        bool OnScreen((int x, int y) k) => k.x * T + 5 > camX - 12 && k.x * T + 5 < camX + W + 12 && k.y * T + 5 > camY - 12 && k.y * T + 5 < camY + H + 24;
+        (int, int) start;
+        if (first)
+        {
+            var mt = (CallTX(state.mountX), CallTY(state.mountY));
+            (float x, float y) toward = (state.mountX - player.X, state.mountY - player.Y);
+            float tl = MathF.Max(1, MathF.Sqrt(toward.x * toward.x + toward.y * toward.y));
+            float Away((int x, int y) k) { float dx = k.x * T + 5 - player.X, dy = k.y * T + 5 - player.Y, l = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy)); return 1 - (dx * toward.x + dy * toward.y) / (l * tl); }
+            if (dist.ContainsKey(mt) && CallCanBe(state.mountX, state.mountY)) { c.Arrival = "run"; start = mt; }
+            else
+            {
+                // Water in view, a fair way off: it rises out of that.
+                var water = dist.Where(kv => kv.Value >= 3 && Swimmable(TileAt(kv.Key.Item1, kv.Key.Item2)) && OnScreen(kv.Key))
+                    .OrderBy(kv => MathF.Abs(kv.Value - 8) + Away(kv.Key) * 2).Select(kv => kv.Key).ToList();
+                // Otherwise across land from somewhere you can't see, from its side of the island if it can. If every
+                // tile it could come from is in view, it doesn't pop up on one: it forms out of sea foam beside you.
+                var far = water.Count > 0 ? water : dist.Where(kv => kv.Value >= 4 && !OnScreen(kv.Key))
+                    .OrderBy(kv => Away(kv.Key) * 6 - kv.Value * 0.2f).Select(kv => kv.Key).ToList();
+                if (far.Count > 0) { c.Arrival = water.Count > 0 ? "breach" : "run"; start = far[0]; }
+                else { c.Arrival = "foam"; start = (stx, sty); }
+                c.X = start.Item1 * T + T / 2f; c.Y = start.Item2 * T + T / 2f + 3;
+            }
         }
         else
         {
-            // The fish tail: down from the haunch to the sand, then up into a fan.
-            int sway = (int)MathF.Round(MathF.Sin(time * (run ? 14 : 4) + fx) * (lie ? 0 : 1));
-            R(-11, -9, 4, 4, shade); R(-13, -7, 3, 4, body); R(-15, -5, 3, 4, body); R(-17, -3, 3, 3, shade);
-            R(-20, -7 + sway, 2, 6, fin); R(-22, -9 + sway, 2, 5, fin); R(-23, -11 + sway, 1, 4, finDark); R(-20, -2, 3, 2, finDark);
-            R(-18, -4, 2, 2, fin);
+            start = (CallTX(c.X), CallTY(c.Y));
+            if (!dist.ContainsKey(start)) { c.Phase = "foam"; c.T = 0; c.Path.Clear(); return; }
         }
-        // Forelegs, with fin-edged hooves. Galloping, they reach and tuck in turn; rearing, they paw the air.
-        if (lie) { R(0, -3, 6, 2, shade); R(5, -2, 3, 1, fin); }
-        else if (!swim)
+        // Downhill through the field to where it stops, never cutting a corner the search wouldn't (Codex: it could
+        // take a diagonal past a tree), then pull the way tight wherever its whole footprint fits the straight line.
+        c.Path.Clear();
+        var at = start;
+        for (int guard = 0; guard < 80 && dist.TryGetValue(at, out int d) && d > 0; guard++)
         {
-            int a = run ? (frame == 0 ? 1 : -1) : 0;
-            R(1 + a, -5, 2, 4, shade, up); R(0 + a, -1, 4, 1, fin, up);
-            R(5 - a, -5, 2, 4, body, up); R(4 - a, -1, 4, 1, fin, up);
-            if (rear) { R(6, -10, 2, 2, body); R(2, -10, 2, 2, shade); }
+            (int, int) next = at;
+            int best = d;
+            for (int oy = -1; oy <= 1; oy++)
+                for (int ox = -1; ox <= 1; ox++)
+                {
+                    var n = (at.Item1 + ox, at.Item2 + oy);
+                    if (!dist.TryGetValue(n, out int nd) || nd >= best) continue;
+                    if (ox != 0 && oy != 0 && (!CallTileOk(at.Item1 + ox, at.Item2, blocked) || !CallTileOk(at.Item1, at.Item2 + oy, blocked))) continue;
+                    best = nd; next = n;
+                }
+            if (next == at) break;
+            at = next;
+            c.Path.Add((at.Item1 * T + T / 2f, at.Item2 * T + T / 2f + 3));
         }
-        // The body, with a pale belly, a little dorsal fin and starlight speckles.
-        // (Swimming, the pale belly is under the surface, so the flank just darkens into the water.)
-        R(-8, -11, 12, 1, body, up / 2); R(-10, -10, 16, 4, body, up / 2); R(-9, -6, 14, 1, swim ? shade : belly, up / 2); R(-7, -5, 10, 1, shade, up / 2);
-        R(-6, -13, 3, 2, fin, up / 2); R(-5, -14, 1, 1, finDark, up / 2);
-        float tw = (time * 1.3f + fx * 0.1f) % 1;
-        foreach (var (sx, sy, k) in new[] { (-6, -9, 0.0f), (-2, -10, 0.33f), (1, -8, 0.66f), (-8, -8, 0.5f) })
-            R(sx, sy, 1, 1, MathF.Abs(tw - k) < 0.12f ? "#ffffff" : "#fff6d0", up / 2);
-        // Neck and head, angled down toward the muzzle.
-        int hy = up + (lie ? 2 : 0);
-        R(3, -14, 4, 5, body, hy); R(5, -17, 4, 3, body, hy); R(4, -12, 2, 3, shade, hy);
-        R(6, -20, 4, 3, body, hy); R(7, -19, 5, 2, body, hy); R(9, -17, 4, 2, body, hy); R(10, -15, 3, 1, shade, hy);
-        R(12, -17, 1, 1, dark, hy); R(10, -15, 2, 1, "#16514b", hy);
-        R(8, -19, 1, 1, flash ? "#ffffff" : "#ffd76a", hy);
-        // Coral horns, and a mane of sea foam that streams back.
-        R(7, -22, 1, 2, horn, hy); R(6, -23, 1, 1, horn, hy); R(9, -22, 1, 2, horn, hy); R(10, -23, 1, 1, horn, hy);
-        int flow = (int)(time * (run ? 10 : 3)) % 2;
-        R(5, -21, 2, 1, mane, hy); R(4, -20, 2, 2, mane, hy); R(3, -18, 2, 2, flow == 0 ? mane : mane2, hy);
-        R(2, -16, 2, 2, mane, hy); R(1 - flow, -14, 2, 2, mane2, hy); R(0, -12, 2, 1, mane, hy); R(-1 - flow, -13, 1, 1, mane2, hy);
-        if (swim) DrawSwimWater(x, (int)MathF.Round(fy) - 5, dir, moving);
+        if (c.Path.Count > 0) c.Path.RemoveAt(c.Path.Count - 1);   // the stop's own tile: it goes to the stop itself
+        c.Path.Add((c.ToX, c.ToY));
+        for (int i = 0; i + 1 < c.Path.Count;)
+        {
+            var (ax0, ay0) = i == 0 ? (c.X, c.Y) : c.Path[i - 1];
+            var (bx1, by1) = c.Path[i + 1];
+            if (CallClear(ax0, ay0, bx1, by1, blocked, solids)) c.Path.RemoveAt(i); else i++;
+        }
+        c.Replan = 0.3f;
+    }
+
+    void UpdateCall(float dt)
+    {
+        whistleT = MathF.Max(0, whistleT - dt);
+        var c = call;
+        if (c == null) return;
+        if (!state.tamed || state.riding || scene != "world" || boss != null || eclipse != null || tremor != null || SeaEmergency || Aboard) { call = null; return; }
+        if (Array.IndexOf(ActiveModes, mode) < 0) return;
+        c.T += dt; c.Total += dt;
+        switch (c.Phase)
+        {
+            case "whistle":
+                if (c.T < CallWhistle) break;
+                c.Phase = c.Arrival; c.T = 0;
+                if (c.Phase == "breach")
+                {
+                    c.FromX = c.X; c.FromY = c.Y;
+                    Burst(c.X, c.Y - 2, "#cfe8ee", 14);
+                    Burst(c.X, c.Y - 6, "#ffffff", 6);
+                    Sfx.Play("splash");
+                    Sfx.Play("neigh");
+                }
+                else if (c.Phase == "run") Sfx.Play("neigh");
+                break;
+            case "breach":
+            {
+                // Up out of the water in an arc, and down again a little nearer you.
+                float k = MathF.Min(1, c.T / 0.6f);
+                c.Lift = MathF.Sin(k * MathF.PI) * 14;
+                if (c.Path.Count > 0 && k < 1)
+                {
+                    var (nx, ny) = c.Path[0];
+                    float dx = nx - c.FromX, dy = ny - c.FromY, l = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));
+                    float go = MathF.Min(l, 14) * k;
+                    c.X = c.FromX + dx / l * go; c.Y = c.FromY + dy / l * go;
+                    CallFace(dx, dy);
+                }
+                if (k < 1) break;
+                c.Lift = 0;
+                Burst(c.X, c.Y - 2, Swimmable(TileUnder(c.X, c.Y)) ? "#cfe8ee" : "#e8cf96", 10);
+                Sfx.Play("splash");
+                c.Phase = "run"; c.T = 0;
+                break;
+            }
+            case "run":
+            {
+                if (c.Total > CallLimit) { c.Phase = "foam"; c.T = 0; break; }
+                // You've moved off, or a storm has come on (or blown over) since it set out: another way.
+                if ((c.Replan -= dt) <= 0 && Dist(player.X, player.Y, c.ToX, c.ToY) > 16 || Stormy != c.Storm) { PlanCall(false); if (call == null || c.Phase != "run") break; }
+                bool swim = Swimmable(TileUnder(c.X, c.Y));
+                float left = Dist(c.X, c.Y, c.ToX, c.ToY);
+                float sp = (swim ? CallSwim : CallRun) * Math.Clamp(left / 18, 0.4f, 1) * dt;
+                float sx = c.X, sy = c.Y;
+                while (sp > 0 && c.Path.Count > 0)
+                {
+                    var (nx, ny) = c.Path[0];
+                    float dx = nx - c.X, dy = ny - c.Y, l = MathF.Sqrt(dx * dx + dy * dy);
+                    if (l <= sp) { c.X = nx; c.Y = ny; sp -= l; c.Path.RemoveAt(0); continue; }
+                    c.X += dx / l * sp; c.Y += dy / l * sp; sp = 0;
+                }
+                float mdx = c.X - sx, mdy = c.Y - sy, moved = MathF.Sqrt(mdx * mdx + mdy * mdy);
+                c.Speed = moved / MathF.Max(dt, 0.001f);
+                c.Stride += moved / (swim ? 36 : 46);
+                if (moved > 0.01f) CallFace(mdx, mdy);
+                if (c.Path.Count > 0) break;
+                // There: it pulls up beside you, rears and calls.
+                c.Phase = "arrive"; c.T = 0; c.Speed = 0;
+                CallFaceTo(player.X, player.Y);
+                if (!swim) { Burst(c.X + c.Dir * 4, c.Y, "#e8cf96", 6); Sfx.Play("neigh"); }
+                break;
+            }
+            case "foam":
+                // Shut out of everywhere (or too slow): sea foam swirls up beside you and it steps out of it.
+                if (c.T < 0.05f || c.T >= 0.7f && Dist(player.X, player.Y, c.ToX, c.ToY) > 16)
+                {
+                    // Where you are now (it was a moment ago if you've walked on while it formed).
+                    if (CallStop(player.X + 1) is not (float fx, float fy)) { call = null; break; }
+                    if (c.T < 0.05f) Sfx.Play("splash");
+                    (c.ToX, c.ToY) = (fx, fy);
+                }
+                if ((int)(c.T * 30) % 2 == 0)
+                {
+                    float a = c.T * 14, r = 9 - c.T * 9;
+                    particles.Add(new Particle { X = c.ToX + MathF.Cos(a) * r * 1.4f, Y = c.ToY - 4 + MathF.Sin(a) * r * 0.6f, Vx = 0, Vy = -14, Life = 0.4f, Color = "#e8f6fa" });
+                }
+                if (c.T < 0.7f) break;
+                c.X = c.ToX; c.Y = c.ToY; c.Path.Clear();
+                Burst(c.X, c.Y - 6, "#ffffff", 14);
+                Sfx.Play("neigh");
+                c.Phase = "arrive"; c.T = 0;
+                CallFaceTo(player.X, player.Y);
+                break;
+            case "arrive":
+                // Walked on while it reared: it comes after you again (Codex: it used to be left behind).
+                if (Dist(player.X, player.Y, c.ToX, c.ToY) > 16) { c.Phase = "run"; c.T = 0; PlanCall(false); break; }
+                if (c.T >= 0.6f) CommitCall();
+                break;
+        }
+    }
+
+    void CallFace(float dx, float dy)
+    {
+        var c = call;
+        if (MathF.Abs(dx) > 0.01f) c.Dir = dx > 0 ? 1 : -1;
+        bool side = c.Face is "left" or "right";
+        bool wantSide = side ? MathF.Abs(dx) * 1.25f >= MathF.Abs(dy) : MathF.Abs(dx) > MathF.Abs(dy) * 1.25f;
+        c.Face = wantSide ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+    }
+
+    void CallFaceTo(float x, float y)
+    {
+        var c = call;
+        c.Dir = x < c.X ? -1 : 1;
+        c.Face = MathF.Abs(x - c.X) >= MathF.Abs(y - c.Y) ? (c.Dir > 0 ? "right" : "left") : (y > c.Y ? "down" : "up");
+    }
+
+    // It's here: it waits where it stopped (and that's saved).
+    void CommitCall(bool quiet = false)
+    {
+        var c = call;
+        if (c == null) return;
+        state.mountX = c.X; state.mountY = c.Y;
+        call = null;
+        if (!quiet && !state.Hinted("callTip"))
+        {
+            state.hinted["callTip"] = true;
+            Toast($"{Data.MountName} came when you whistled. <ride> climbs on.", 4);
+        }
+        Save();
+    }
+
+    /* ---------- Drawing ---------- */
+    // Tidemane with its feet at (x, y), lifted off the ground by lift (a leap). Its shadow stays on the ground.
+    void DrawTidemane(float fx, float fy, int dir, MountPose p, float lift = 0)
+    {
+        int x = (int)MathF.Round(fx), y = (int)MathF.Round(fy), up = (int)MathF.Round(lift);
+        bool swim = p.Kind == "swim";
+        if (!swim) DrawMountShadow(x, y, up);
+        MountArt.BuildSide(mountCanvas, p);
+        BlitMount(mountCanvas, x, y - up, dir, p.Flash, swim ? y - 6 : int.MaxValue);
+        if (swim) DrawSwimWater(x, y - 6, dir, p.Speed > 0.15f);
+    }
+
+    void DrawMountShadow(int x, int y, int lift)
+    {
+        int w = Math.Max(8, 24 - lift);
+        pix.Rect(x - w / 2 - 2, y, w, 1, Pal.Rgba(16, 40, 44, 0.28f));
+        pix.Rect(x - w / 2, y + 1, w - 4, 1, Pal.Rgba(16, 40, 44, 0.14f));
     }
 
     // Floating, it rises and settles a pixel on the swell (the rider goes with it).
     int FloatBob(float fx) => MathF.Sin(time * 2.2f + fx * 0.07f) > 0.3f ? 1 : 0;
 
-    // The water around a swimming Tidemane, with the surface at row wl. The water itself (from the ground layer) is drawn
-    // back over everything below the surface, only where there really is water, so it matches the sea and stops at the
-    // shore. Broken foam where its body and tail cut the surface; moving, a bow wave and a wake fanning out behind;
-    // resting, little ripples spreading from either end. Every touch of foam is on water only.
+    // The surface around a swimming Tidemane, at row wl (what's under it was left to the sea by BlitMount). Broken foam
+    // where its body and tail cut the surface; moving, a bow wave and a wake fanning out behind; resting, little ripples
+    // spreading from either end. Every touch of foam is on water only.
     void DrawSwimWater(int x, int wl, int dir, bool moving)
     {
         void OnWater(int px, int py, Color c)
         {
             if (px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py))) pix.Rect(px, py, 1, 1, c);
         }
-        for (int py = wl; py <= wl + 6; py++)
-            for (int px = x - 16; px <= x + 16; px++)
-                if (px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py))) pix.Rect(px, py, 1, 1, worldBase.Buf[py * PW + px]);
         int lap = (int)(time * 5);
         var foam = Pal.Rgba(232, 246, 250, 0.65f);
         var foamDim = Pal.Rgba(232, 246, 250, 0.3f);
-        for (int ox = -20; ox <= 8; ox++)
+        for (int ox = -22; ox <= 11; ox++)
         {
             int px = x + dir * ox;
             double h = Pix.Hash((px >> 1) + lap, 7, 260);
@@ -551,13 +1022,13 @@ partial class Game
         }
         if (moving)
         {
-            for (int i = 0; i < 3; i++) OnWater(x + dir * (9 + i), wl - (lap + i) % 2, foam);
+            for (int i = 0; i < 3; i++) OnWater(x + dir * (11 + i), wl - (lap + i) % 2, foam);
             // The wake: two arms opening out behind it in a V.
             for (int k = 1; k <= 9; k++)
             {
                 if ((k + lap) % 4 == 0) continue;
                 var c = Pal.Rgba(232, 246, 250, 0.55f * (1 - k / 10f));
-                int px = x - dir * (21 + k * 2), spread = 1 + k * 3 / 4;
+                int px = x - dir * (24 + k * 2), spread = 1 + k * 3 / 4;
                 OnWater(px, wl - spread, c); OnWater(px - dir, wl - spread, c);
                 OnWater(px, wl + spread, c); OnWater(px - dir, wl + spread, c);
             }
@@ -567,82 +1038,38 @@ partial class Game
         var ring = Pal.Rgba(232, 246, 250, 0.45f * (1 - ph));
         foreach (int side in new[] { -1, 1 })
         {
-            int cx = x + side * (int)(13 + ph * 8);
+            int cx = x + side * (int)(15 + ph * 8);
             OnWater(cx - 1, wl, ring); OnWater(cx, wl + 1, ring); OnWater(cx + 1, wl, ring);
         }
     }
 
-    // Front and back views keep the same sea-green body, coral horns and foam mane as the side view. The rider
-    // sits behind the neck coming toward us, and in front of it going away; the tail trails along the water.
-    void DrawTidemaneEndOn(int x, int y, bool away, bool swim, bool moving, int frame, Action rider = null)
+    // Front and back: the tail and chest (or, going away, the head and croup) are drawn, then the rider, then whatever is
+    // nearer you than the rider (the head coming toward you, the tail going away).
+    void DrawTidemaneEndOn(int x, int y, bool away, MountPose p, Action rider = null, int lift = 0, bool legs = true)
     {
-        int bob = swim ? FloatBob(x) : moving && frame == 1 ? -1 : 0;
-        const string body = "#2a9d8f", shade = "#1d6f68", belly = "#8fd3c4", mane = "#f2fbff",
-            mane2 = "#bfe6f0", horn = "#ff8a7a", fin = "#5fd6c9", finDark = "#3fb5a8";
-        void R(int ox, int oy, int w, int h, string c) => pix.Rect(x + ox, y + oy + bob, w, h, c);
-        int sway = (int)MathF.Round(MathF.Sin(time * (moving ? 9 : 3.2f)) * (moving ? 2 : 1));
-        int flow = (int)(time * (moving ? 10 : 3)) % 2;
-        void Tail()
+        bool swim = p.Kind == "swim";
+        int wl = swim ? y - 6 : int.MaxValue;
+        if (!swim) DrawMountShadow(x, y, lift);
+        MountArt.BuildEnd(mountCanvas, p, away, false);
+        BlitMount(mountCanvas, x, y - lift, 1, p.Flash, wl);
+        if (rider != null)
         {
-            if (away)
+            rider();
+            // The rider's legs go down either side of it (not while they're still climbing up: Codex).
+            var (sx, sy) = MountArt.SeatEnd(p, away);
+            if (legs)
             {
-                R(-2, -7, 5, 5, shade); R(-1, -5, 3, 5, body);
-                R(sway - 1, -1, 3, 4, body); R(sway, 2, 2, 3, shade);
-                R(sway - 3, 3, 3, 3, fin); R(sway + 2, 3, 3, 3, fin);
-                R(sway - 4, 2, 1, 3, finDark); R(sway + 5, 2, 1, 3, finDark);
-                R(sway - 2, 6, 2, 1, finDark); R(sway + 2, 6, 2, 1, finDark);
-            }
-            else
-            {
-                R(-1, -16, 3, 5, shade); R(sway - 1, -20, 3, 5, body);
-                R(sway - 4, -23, 3, 3, fin); R(sway + 2, -23, 3, 3, fin);
-                R(sway - 5, -24, 1, 3, finDark); R(sway + 5, -24, 1, 3, finDark);
-                R(sway - 2, -21, 5, 2, finDark);
+                CoverLegs(x, y - lift, 1, wl, x + sx - 3, y - lift + sy - 3, x + sx + 3, y - lift + sy - 1);
+                RiderLegsEnd(x + sx, y - lift + sy);
             }
         }
-        if (!swim) pix.Rect(x - 6, y + 1, 13, 2, Pal.Rgba(0, 0, 0, .22f));
-        if (!away) Tail();
-        // Paired forelegs alternate their reach. There are no legs in the swimming silhouette.
-        if (!swim)
-            foreach (int side in new[] { -1, 1 })
-            {
-                int stride = moving ? (frame == 0 ? side : -side) : 0;
-                R(side < 0 ? -5 : 3, -6 + stride, 2, 5, side < 0 ? shade : body);
-                R(side < 0 ? -6 : 3, -1 + stride, 3, 1, fin);
-            }
-        R(-3, -15, 7, 2, body); R(-5, -13, 11, 6, body);
-        R(-4, -7, 9, 2, swim ? shade : belly); R(-3, -5, 7, 1, shade);
-        R(-5, -12, 2, 4, shade); R(4, -11, 1, 3, finDark);
-        foreach (var (sx, sy) in new[] { (-3, -11), (3, -10), (-2, -8), (2, -13) })
-            R(sx, sy, 1, 1, (int)(time * 3 + sx) % 3 == 0 ? "#ffffff" : "#fff6d0");
-        if (!away) rider?.Invoke();
-        if (away)
-        {
-            // Seen from behind, a white crest falls from the horns down the neck; no eyes on the back of the head.
-            R(-2, -21, 5, 9, body); R(-3, -24, 7, 4, body);
-            R(-4, -25, 2, 2, body); R(3, -25, 2, 2, shade);
-            R(-3, -27, 1, 3, horn); R(-4, -28, 1, 1, horn);
-            R(3, -27, 1, 3, horn); R(4, -28, 1, 1, horn);
-            R(-1, -25, 3, 4, mane); R(-2, -21, 4, 3, mane2);
-            R(-1 + flow, -18, 3, 3, mane); R(-1, -15, 2, 3, mane2);
-            rider?.Invoke();
-            Tail();
-        }
-        else
-        {
-            // Coming toward us, the broad muzzle, both gold eyes and the pale chest sit in front of the rider.
-            R(-3, -16, 7, 7, body); R(-2, -10, 5, 3, belly);
-            R(-4, -18, 2, 3, mane); R(3, -18, 2, 3, mane2);
-            R(-4 - flow, -15, 2, 4, mane2); R(4, -14, 1 + flow, 3, mane);
-            R(-3, -19, 1, 3, horn); R(-4, -20, 1, 1, horn);
-            R(3, -19, 1, 3, horn); R(4, -20, 1, 1, horn);
-            R(-1, -17, 3, 2, mane); R(0, -15, 1, 2, mane2);
-            R(-3, -14, 1, 1, "#ffd76a"); R(3, -14, 1, 1, "#ffd76a");
-            R(-3, -12, 7, 3, body); R(-2, -9, 5, 1, shade);
-            R(-2, -11, 1, 1, "#16514b"); R(2, -11, 1, 1, "#16514b");
-        }
-        if (swim) DrawEndOnSwimWater(x, y, away, moving);
+        MountArt.BuildEnd(mountCanvas, p, away, true);
+        BlitMount(mountCanvas, x, y - lift, 1, p.Flash, wl);
+        if (swim) DrawEndOnSwimWater(x, y, away, p.Speed > 0.15f);
     }
+
+    // Puts the mount's own pixels back over the rider's legs (the canvas still holds what was just drawn).
+    void CoverLegs(int x, int y, int dir, int wl, int x0, int y0, int x1, int y1) => BlitMount(mountCanvas, x, y, dir, false, wl, (x0, y0, x1, y1));
 
     void DrawEndOnSwimWater(int x, int y, bool away, bool moving)
     {
@@ -651,17 +1078,13 @@ partial class Game
         {
             if (IsWater(px, py)) pix.Rect(px, py, 1, 1, Pal.Rgba(232, 246, 250, alpha));
         }
-        // Only the bottom of the body is submerged. The up-facing tail and its fan are on the surface behind it.
-        for (int py = y - 5; py <= y + 1; py++)
-            for (int px = x - 6; px <= x + 6; px++)
-                if ((!away || Math.Abs(px - x) > 2) && IsWater(px, py)) pix.Rect(px, py, 1, 1, worldBase.Buf[py * PW + px]);
-        int lap = (int)(time * 5), ahead = away ? -1 : 1;
-        for (int k = -5; k <= 5; k++)
-            if ((k + lap) % 3 != 0) Foam(x + k, y - 5 + Math.Abs(k) / 3, .6f);
+        int lap = (int)(time * 5), ahead = away ? -1 : 1, wl = y - 6;
+        for (int k = -7; k <= 7; k++)
+            if ((k + lap) % 3 != 0) Foam(x + k, wl + Math.Abs(k) / 3, .6f);
         for (int k = 0; k < 8; k++)
         {
-            int spread = moving ? 6 + k : 6 + (int)(time * 3 % 4);
-            int wy = y - 5 - ahead * (9 + k * 2);
+            int spread = moving ? 7 + k : 7 + (int)(time * 3 % 4);
+            int wy = wl - ahead * (9 + k * 2);
             if ((k + lap) % 4 == 0) continue;
             Foam(x - spread, wy, .48f * (1 - k / 8f));
             Foam(x + spread, wy, .48f * (1 - k / 8f));
@@ -671,45 +1094,113 @@ partial class Game
     // The saddle is the common anchor for the rider, their rod and anything held overhead.
     (int x, int y) RiderSeat(int x, int y)
     {
-        bool moving = player.Moving && mode is "play" or "build";
-        int bob = Swimming ? FloatBob(x) : moving && (int)(player.WalkT * 8) % 2 == 1 ? -1 : 0;
-        return player.Face switch
-        {
-            "up" => (x, y - 7 + bob), "down" => (x, y - 10 + bob),
-            _ => (x + (player.Face == "left" ? 1 : -1), y - 8 + bob)
-        };
-    }
-
-    // You in the saddle, sitting up over its back.
-    void DrawRider(int x, int y, bool moving, int step, int arms = 0, int pump = 0, HandPose hands = null)
-    {
-        if (player.Face is "left" or "right") mountDir = player.Face == "right" ? 1 : -1;
-        bool swim = Swimming;
-        var seat = RiderSeat(x, y);
-        void Rider() => LookData.DrawPerson(pix, state.look, seat.x, seat.y, player.Face, 0, shadow: false,
-            blink: time % 3.7f < 0.12f, arms: arms, swing: pump, hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
+        var p = RidePose();
+        int lift = RideLift();
         if (player.Face is "up" or "down")
         {
-            DrawTidemaneEndOn(x, y, player.Face == "up", swim, moving, step, Rider);
-            return;
+            var (ex, ey) = MountArt.SeatEnd(p, player.Face == "up");
+            return (x + ex, y + ey - lift);
         }
-        string pose = swim ? "swim" : moving ? "run" : "stand";
-        DrawTidemane(x, y, mountDir, pose, step, moving: moving);
-        Rider();
+        var (sx, sy) = MountArt.Seat(p);
+        int dir = player.Face == "left" ? -1 : 1;
+        return (dir > 0 ? x + sx : x - sx, y + sy - lift);
     }
 
-    // Tidemane waiting for you: it shifts its weight, flicks its tail and now and then shakes out its mane.
+    // You in the saddle, sitting up over its back with a leg down its side.
+    void DrawRider(int x, int y, int arms = 0, int pump = 0, HandPose hands = null, int lean = 0)
+    {
+        if (player.Face is "left" or "right") mountDir = player.Face == "right" ? 1 : -1;
+        var p = RidePose();
+        int lift = RideLift();
+        var seat = RiderSeat(x, y);
+        // Swinging up into the saddle: from where you stood, in a little arc.
+        if (hopT > 0 && !hopDown)
+        {
+            float k = 1 - hopT / HopUp;
+            seat = ((int)MathF.Round(hopFromX + (seat.x - hopFromX) * k), (int)MathF.Round(hopFromY + (seat.y - hopFromY) * k - MathF.Sin(k * MathF.PI) * 5));
+        }
+        void Rider() => LookData.DrawPerson(pix, state.look, seat.x, seat.y, player.Face, 0, shadow: false,
+            blink: time % 3.7f < 0.12f, arms: arms, swing: pump, lean: lean, hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
+        if (player.Face is "up" or "down")
+        {
+            DrawTidemaneEndOn(x, y, player.Face == "up", p, Rider, lift, legs: hopT <= 0 || hopDown);
+            return;
+        }
+        bool swim = p.Kind == "swim";
+        int wl = swim ? y - 6 : int.MaxValue;
+        if (!swim) DrawMountShadow(x, y, lift);
+        MountArt.BuildSide(mountCanvas, p);
+        BlitMount(mountCanvas, x, y - lift, mountDir, false, wl);
+        Rider();
+        if (hopT <= 0 || hopDown)
+        {
+            CoverLegs(x, y - lift, mountDir, wl, seat.x - 3, seat.y - 3, seat.x + 3, seat.y - 1);
+            RiderLegSide(seat.x, seat.y, mountDir);
+        }
+        if (swim) DrawSwimWater(x, y - 6, mountDir, p.Speed > 0.15f);
+    }
+
+    // Side on, the near leg bends over its flank: thigh forward along the saddle, shin down, a boot against its side.
+    void RiderLegSide(int x, int y, int dir)
+    {
+        string pants = LookData.Pants[state.look.pants % LookData.Pants.Length];
+        void S(int dx, int dy, int w, int h, string c) => pix.Rect(dir > 0 ? x + dx : x - dx - w, y + dy, w, h, c);
+        S(-2, -3, 4, 1, pants);
+        S(1, -2, 1, 2, pants);
+        S(1, 0, 2, 1, "#2e2420");
+    }
+
+    // End on, both legs hang down either side.
+    void RiderLegsEnd(int x, int y)
+    {
+        string pants = LookData.Pants[state.look.pants % LookData.Pants.Length];
+        foreach (int s in new[] { -1, 1 })
+        {
+            int lx = s < 0 ? x - 4 : x + 3;
+            pix.Rect(lx, y - 3, 1, 3, pants);
+            pix.Rect(lx + (s < 0 ? -1 : 0), y, 2, 1, "#2e2420");
+        }
+    }
+
+    // Tidemane waiting for you, or on its way after a whistle: it shifts its weight, flicks its tail and now and then
+    // tosses its head.
     void DrawMountIdle()
     {
         if (!state.tamed || state.riding || boss != null) return;
-        bool swim = Swimmable(TileUnder(state.mountX, state.mountY));
-        if (Math.Abs(player.Y - state.mountY) > Math.Abs(player.X - state.mountX))
+        var c = call;
+        float mx = c != null && c.Phase != "whistle" ? c.X : state.mountX, my = c != null && c.Phase != "whistle" ? c.Y : state.mountY;
+        if (c != null && c.Phase == "foam") return;
+        var p = new MountPose { Saddle = true, Time = time, Seed = 0.37f };
+        bool swim = Swimmable(TileUnder(mx, my));
+        string face;
+        int dir;
+        if (c != null && c.Phase is "run" or "breach" or "arrive")
         {
-            DrawTidemaneEndOn((int)MathF.Round(state.mountX), (int)MathF.Round(state.mountY), player.Y < state.mountY, swim, false, 0);
-            return;
+            face = c.Face; dir = c.Dir;
+            if (c.Phase == "breach") { p.Kind = "leap"; p.Leap = MathF.Min(1, c.T / 0.6f); }
+            else if (c.Phase == "arrive") { if (swim) p.Kind = "swim"; else { p.Kind = "rear"; p.Frame = (int)(c.T * 6) % 2; } }
+            else if (swim) { p.Kind = "swim"; p.Speed = 1; p.Frame = (int)(c.Stride * 6) % 6; }
+            else { p.Kind = c.Speed > 50 ? "gallop" : "trot"; p.Frame = (int)(c.Stride * (p.Kind == "gallop" ? 8 : 6)) % (p.Kind == "gallop" ? 8 : 6); }
         }
-        int dir = player.X < state.mountX ? -1 : 1;
-        DrawTidemane(state.mountX, state.mountY, dir, swim ? "swim" : (time % 6 < 0.5f ? "rear" : "stand"), 0);
+        else
+        {
+            if (swim) { p.Kind = "swim"; p.Frame = (int)(time * 2.5f) % 6; }
+            else p.Toss = IdleToss(time, 0.37f) + (c != null ? 0.5f : 0);
+            bool vertical = Math.Abs(player.Y - my) > Math.Abs(player.X - mx);
+            dir = player.X < mx ? -1 : 1;
+            // It faces you: north of it, you see its back as it looks up at you.
+            face = vertical ? (player.Y < my ? "up" : "down") : (dir > 0 ? "right" : "left");
+        }
+        int lift = c?.Phase == "breach" ? (int)MathF.Round(c.Lift) : 0;
+        int ix = (int)MathF.Round(mx), iy = (int)MathF.Round(my);
+        if (c?.Phase == "breach")
+        {
+            // Rings where it broke the surface.
+            float ph = MathF.Min(1, c.T / 0.6f);
+            pix.Ring(c.FromX, c.FromY - 2, 3 + ph * 8, Pal.Rgba(232, 246, 250, 0.7f * (1 - ph)));
+        }
+        if (face is "up" or "down") DrawTidemaneEndOn(ix, iy, face == "up", p, null, lift);
+        else DrawTidemane(mx, my, dir, p, lift);
     }
 
     void DrawBoss(float t)
@@ -729,29 +1220,34 @@ partial class Game
             }
             return;
         }
-        string pose = b.Phase switch
+        // No flashing once it has calmed down (the last blow would otherwise keep it white through the dialogue).
+        var p = new MountPose { Time = t, Seed = 0.11f, Flash = b.Hurt > 0.25f && b.Phase != "calm" };
+        switch (b.Phase)
         {
-            "rear" or "stompRear" => "rear", "charge" or "stalk" => "run", "calm" => "lie", "winded" => "stand",
-            _ => "run"
-        };
-        int frame = (int)(t * (b.Phase == "charge" ? 14 : 8)) % 2;
-        if (b.Lift > 0) pix.Rect(b.X - 9, b.Y + 1, 18, 1, "rgba(0,0,0,0.25)");
+            case "emerge" or "surface": p.Kind = "leap"; p.Leap = MathF.Min(1, b.T / 0.6f); break;
+            case "dive": p.Kind = "leap"; p.Leap = MathF.Min(1, b.T / 0.5f); break;
+            case "rear" or "stompRear": p.Kind = "rear"; p.Frame = (int)(t * 7) % 2; break;
+            case "charge": p.Kind = "gallop"; p.Frame = (int)(t * 18) % 8; break;
+            case "stalk": p.Kind = "trot"; p.Frame = (int)(t * 10) % 6; break;
+            case "calm": p.Kind = "lie"; break;
+            default: p.Kind = "stand"; p.Toss = b.Phase == "winded" ? 0 : IdleToss(t, 0.11f); break;
+        }
         // Shaking while it rears, so you can see something's coming.
         float jx = b.Phase is "rear" or "stompRear" ? MathF.Sin(t * 60) : 0;
-        DrawTidemane(b.X + jx, b.Y, b.Dir, pose, frame, b.Hurt > 0.25f, b.Lift);
+        DrawTidemane(b.X + jx, b.Y, b.Dir, p, b.Lift);
         if (b.Phase == "winded")
         {
             // Little stars circling its head.
             for (int i = 0; i < 3; i++)
             {
                 float a = t * 5 + i * MathF.Tau / 3;
-                pix.Rect(b.X + b.Dir * 8 + MathF.Cos(a) * 6, b.Y - 25 + MathF.Sin(a) * 2, 1, 1, "#ffd76a");
+                pix.Rect(b.X + b.Dir * 11 + MathF.Cos(a) * 6, b.Y - 30 + MathF.Sin(a) * 2, 1, 1, "#ffd76a");
             }
         }
         if (b.Phase is "rear" or "stompRear")
         {
             // A "!" over its head.
-            int ex = (int)MathF.Round(b.X + b.Dir * 8), ey = (int)MathF.Round(b.Y) - 36;
+            int ex = (int)MathF.Round(b.X + b.Dir * 6), ey = (int)MathF.Round(b.Y) - 44;
             pix.Rect(ex - 2, ey - 1, 5, 10, "#10243a"); pix.Rect(ex - 1, ey, 3, 8, b.Phase == "rear" ? "#ff6a5a" : "#ffd76a");
             pix.Rect(ex, ey + 1, 1, 4, "#ffffff"); pix.Rect(ex, ey + 6, 1, 1, "#ffffff");
         }
@@ -761,6 +1257,59 @@ partial class Game
             pix.Ring(b.X, b.Y, StompMax / 1.6f, Pal.Rgba(255, 215, 106, 0.25f + 0.2f * MathF.Sin(t * 20)));
             pix.Ring(b.X, b.Y, StompMin / 1.6f, Pal.Rgba(127, 211, 107, 0.7f));
         }
+    }
+
+    // On the ground under everything: fading trackPrints, and the whistle's note over your head. Also clears last
+    // frame's glints (BlitMount collects them again as it draws).
+    void DrawMountGround()
+    {
+        mountGlints.Clear();
+        foreach (var (hx, hy, life, dir) in trackPrints)
+        {
+            var c = Pal.Rgba(60, 44, 24, 0.22f * Math.Min(1, life / 1.5f));
+            pix.Rect(hx - 1, hy, 2, 1, c);
+            pix.Rect(hx - 1 - dir * 3, hy + 1, 2, 1, c);
+        }
+    }
+
+    // A note rising from you as you whistle.
+    void DrawWhistle()
+    {
+        if (whistleT <= 0 || Riding) return;
+        float k = 1 - whistleT / 0.7f;
+        int x = (int)MathF.Round(player.X + 4 + k * 2), y = (int)MathF.Round(player.Y - 19 - k * 6);
+        var c = Pal.Rgba(255, 255, 255, 1 - k * k);
+        var o = Pal.Rgba(16, 36, 58, 0.8f * (1 - k * k));
+        pix.Rect(x - 1, y + 1, 4, 3, o); pix.Rect(x, y - 3, 3, 5, o);
+        pix.Rect(x + 1, y - 2, 1, 4, c); pix.Rect(x, y + 1, 2, 2, c); pix.Rect(x + 2, y - 2, 1, 1, c);
+    }
+
+    // Once everything on the ground is drawn: a speckle or eye that something has since covered (a palm, a hut, the
+    // player) no longer counts, so it can't glow through it after dark (Codex).
+    void CullMountGlints()
+    {
+        mountGlints.RemoveAll(g =>
+        {
+            int sx = g.x - pix.CamX, sy = g.y - pix.CamY;
+            if (sx < 0 || sy < 0 || sx >= W || sy >= H) return true;
+            var c = pix.Buf[sy * W + sx];
+            return c.R != g.col.R || c.G != g.col.G || c.B != g.col.B;
+        });
+    }
+
+    // After dark its speckles and eyes glow (DrawNight, after the dark is laid down), with a faint sea-green light
+    // round it.
+    void GlowMount(float k)
+    {
+        if (mountGlints.Count == 0) return;
+        float sx = 0, sy = 0;
+        foreach (var (x, y, eye, _) in mountGlints)
+        {
+            sx += x; sy += y;
+            pix.Glow(x + 0.5, y + 0.5, eye ? 3 : 2.5, eye ? Pal.Rgba(255, 215, 106, 0.55f * k) : Pal.Rgba(255, 242, 196, 0.4f * k));
+            pix.Rect(x, y, 1, 1, eye ? Pal.Rgba(255, 225, 130, k) : Pal.Rgba(255, 246, 214, 0.9f * k));
+        }
+        pix.Glow(sx / mountGlints.Count + 0.5, sy / mountGlints.Count + 0.5, 11, Pal.Rgba(120, 230, 220, 0.11f * k));
     }
 
     // The shockwave and the water bolts, drawn over everything on the ground.

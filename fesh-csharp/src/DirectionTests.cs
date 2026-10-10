@@ -35,6 +35,8 @@ partial class Game
                     boatFace = player.Face = face;
                     player.Moving = boat ? c is >= 2 and <= 5 : c is 1 or 2 or 4 or 5;
                     player.WalkT = c is 2 or 5 ? .15f : 0;
+                    // The mount's gait comes from how fast it's really going and how far through its stride (Tidemane.cs).
+                    mountSpeed = !boat && player.Moving ? 92 : 0; mountPhase = c is 2 or 5 ? 0.5f : 0; hopT = 0; shoreHopT = 0;
                     time = c is 3 or 5 ? .7f : 0;
                     mode = c == 6 ? "waiting" : "play"; sailFurl = c >= 6 ? 1 : 0;
                     heldItem = c == 7 ? "mahi_mahi" : null; heldT = c == 7 ? 2 : 0;
@@ -56,7 +58,7 @@ partial class Game
             UnloadImage(img);
         }
         pix = keep; state.aboard = state.riding = false; state.inv.Remove("big_sail");
-        fish = null; heldT = 0; heldItem = null; trolling = false; mode = "title";
+        fish = null; heldT = 0; heldItem = null; trolling = false; mode = "title"; mountSpeed = 0; mountPhase = 0;
     }
 
     // Tools in hand (Tools.cs): rows facing right, left, up and down; columns the axe's wind-up, strike, impact, hold

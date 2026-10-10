@@ -10,6 +10,9 @@ sealed class Critter { public string Id; public float X, Y, Vx, Vy, T; }
 sealed class FishCast
 {
     public string Spot, Bait; public float T, Sx, Sy, Tx, Ty, Bx, By, Timer, BiteT, WaitT, Power; public int Depth, Jigs; public bool BigShadow, Spill;
+    // A cast you aimed yourself (Hotbar.cs): Spot is the named spot whose water it fell in, and only its everyday fish bite
+    // (Wild); Dry, it fell on land; Empty, in water nothing lives in.
+    public bool Wild, Dry, Empty;
     public bool Baited => Bait != null; public Catchable Roll;
 }
 // The reel fight. Style is the fish's fighting style (see CommonFish). Runners build Tension while you hold during a run;
@@ -252,6 +255,7 @@ partial class Game
             if (mode == "reeling") reelTap = true;
             OnAction();
         }
+        else if (HotbarKeys()) { }
         else if (mode == "build" && Bind.Pressed("remove")) SelectTool("remove");
         else if (mode == "build" && DigitPressed() is int d && d < BuildTools().Length) SelectTool(BuildTools()[d]);
         else if (Bind.Pressed("alt")) OnAlt();
@@ -301,7 +305,7 @@ partial class Game
 
     bool ReelHeld()
     {
-        bool held = Bind.Down("act") || Inp.Down(KeyboardKey.Enter) || pointerHold;
+        bool held = Bind.Down("act") || Bind.Down("use") || Inp.Down(KeyboardKey.Enter) || pointerHold;
         if (waitRelease && !held) waitRelease = false;
         return held && !waitRelease;
     }
@@ -324,6 +328,13 @@ partial class Game
                 if (mode == "reeling") pointerHold = true;
                 return;
             case "play":
+                // Holding a tool, a click uses it (on what's in front, if that's what it's for); otherwise it acts as E.
+                if (HeldItem != null && (target == null || target.Type is "spot" or "tree" or "node" or "drill" or "monster" or "boss" or "guardian"))
+                {
+                    UseHeld();
+                    if (mode == "charging") pointerHold = true;
+                    return;
+                }
                 if (target == null) return;
                 OnAction();
                 if (mode == "charging") pointerHold = true;
@@ -895,7 +906,8 @@ partial class Game
             case "seacard": CloseSeaCard(); return;
             case "build": BuildAction(); return;
             case "play":
-                if (target == null) return;
+                // Nothing in front of you: use what you're holding (Hotbar.cs).
+                if (target == null) { UseHeld(); return; }
                 switch (target.Type)
                 {
                     case "npc":
@@ -971,6 +983,7 @@ partial class Game
         UpdateFloaters(dt);
         UpdateGuide(dt);
         TellBadgeNews();
+        HoldMount();
         if (mode is not ("pause" or "panel" or "title" or "create"))
         {
             UpdateCritters(dt);
@@ -979,6 +992,8 @@ partial class Game
             UpdateParticles(dt);
             UpdateBoat(dt);
             UpdateGlow(dt);
+            UpdateMount(dt);
+            hotbarTipT = MathF.Max(0, hotbarTipT - dt);
             UpdateSchools(dt);
             UpdateStrollers(dt);
             UpdateSeaLife(dt);
@@ -1054,23 +1069,25 @@ partial class Game
             // Under Bakunawa you stand your ground with the agong.
             if (eclipse != null || Ducking) dx = dy = 0;
             player.Moving = dx != 0 || dy != 0;
-            if (player.Moving)
+            // On Tidemane you gallop on land and swim through any water, picking up speed and pulling up (Tidemane.cs).
+            if (Riding) RideMove(dx, dy, push, dt);
+            else if (player.Moving)
             {
-                // On Tidemane you gallop on land and swim through any water; on foot, waders slow you in the shallows.
-                bool wet = InWater, ride = Riding;
-                float speed = Aboard ? BoatSpeed : ride ? (Swimming ? 74 : 92) : wet ? 52 * 0.7f : 52;
+                // On foot, waders slow you in the shallows.
+                bool wet = InWater;
+                float speed = Aboard ? BoatSpeed : wet ? 52 * 0.7f : 52;
                 float len = MathF.Sqrt(dx * dx + dy * dy);
                 // Under sail the monsoon helps or hinders (Seasons.cs); a trolling boat just putters along.
                 if (Aboard && !trolling) speed *= WindFactor(dx / len, dy / len);
                 // Hard to walk while the ground shakes.
                 float sp = speed * push * dt * (Starving ? 0.6f : 1f) * (Shaking ? 0.45f : 1f);
                 float mx = dx / len * sp, my = dy / len * sp;
-                if (Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, ride, !ride)) player.X += mx;
-                if (Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, ride, !ride)) player.Y += my;
+                if (Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, flats: true)) player.X += mx;
+                if (Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, flats: true)) player.Y += my;
                 player.Face = MathF.Abs(dx) > MathF.Abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
                 if (Aboard) boatFace = player.Face;
                 int frameBefore = (int)(player.WalkT * 9);
-                player.WalkT += dt * push * (wet && !ride ? 0.75f : 1);
+                player.WalkT += dt * push * (wet ? 0.75f : 1);
                 int frame = (int)(player.WalkT * 9);
                 if (!Aboard && frame != frameBefore && frame % 2 == 0) Footstep();
                 heldT = 0;
@@ -1117,6 +1134,8 @@ partial class Game
                 if (target?.RideLabel != null) label += $"   [<ride>] {target.RideLabel}";
                 if (target?.Type != "boat" && !Stormy && BoatInReach()) label += "   [<ride>] Board your boat";
                 if (target?.Type == "none") SetPrompt($"{target.AltLabel}", "<alt>");
+                // Nothing in front of you: what <act> does with what you're holding (Hotbar.cs).
+                else if (target == null && HeldUseHint() is string use) SetPrompt(use + label, "<act>");
                 else SetPrompt(label, target != null ? "<act>" : null);
             }
             saveTimer += dt;
@@ -1182,6 +1201,9 @@ partial class Game
         if (state.Caught("tidecrawler")) state.flags.tideOut = true;
         trolling = towing = false;
         boatFace = "right"; sailFurl = 1; sprayT = 0; mountDir = 1;
+        EnsureHotbar();
+        // Tidemane (Tidemane.cs): no whistle still on its way from another game, no momentum, no hop half done.
+        call = null; whistleT = 0; hopT = 0; rideVel = (0, 0); mountSpeed = 0; mountGaitFrame = -1; shoreHopT = 0; trackPrints.Clear();
         derbyT = 0; heldT = 0; iframes = 0; hurtFlash = 0; quake = 0; pointerHold = false; caveFloor = 1;
         mapTexDirty = true;
         titleView = "main";

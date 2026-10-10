@@ -162,7 +162,8 @@ partial class Game
 
     // The spot the fish finder reports on: the one you're fishing, or the one you're standing at.
     string FinderSpot() =>
-        fish != null && mode is "waiting" or "casting" or "charging" ? fish.Spot
+        fish?.Wild == true ? null
+        : fish != null && mode is "waiting" or "casting" or "charging" ? fish.Spot
         : mode == "charging" ? chargeSpot
         : mode == "play" && target?.Type == "spot" ? target.Id : null;
 

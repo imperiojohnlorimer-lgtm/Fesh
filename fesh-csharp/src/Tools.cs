@@ -117,7 +117,9 @@ partial class Game
             return new HandPose { Hand = h, Tool = "spear", Dx = sdir * 0.3f, Dy = -1, Length = 7 };
         }
         if (rod) return RodPose(face, ux, uy, pump);
-        if (swingT <= 0 || mode == "spear") return null;
+        if (mode == "spear") return null;
+        // Nothing being swung: whatever you're holding on the hotbar, carried (Hotbar.cs).
+        if (swingT <= 0) return HeldTool is string carried && mode is "play" or "build" or "dialogue" ? CarryPose(face, ux, uy, carried) : null;
         float p = 1 - swingT / Math.Max(0.01f, swingDur);
         var (elev, reach, bend, two) = SwingKey(swingTool, p);
         elev = Snap(elev);

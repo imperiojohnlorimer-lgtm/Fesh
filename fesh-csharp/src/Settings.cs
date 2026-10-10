@@ -93,6 +93,7 @@ static class Bind
         new("alt", "Cook, throw chum", KeyboardKey.F),
         new("spear", "Spearfish", KeyboardKey.G),
         new("ride", "Ride, board your boat", KeyboardKey.R),
+        new("use", "Use what you're holding", KeyboardKey.V),
         new("bag", "Bag", KeyboardKey.I),
         new("tackle", "Tackle box", KeyboardKey.T),
         new("build", "Build", KeyboardKey.B),

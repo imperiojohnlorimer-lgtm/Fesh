@@ -706,65 +706,110 @@ static class CreatureArt
         }
         else if (id == "tidemane")
         {
-            // Tidemane: a horse's head, neck and forelegs with fin-edged hooves, coral horns, a mane of sea foam,
-            // and a long fish tail curling up into a fan.
-            g.Translate(0, 4);
-            g.StrokeStyle = C("#1d6f68"); g.LineWidth = 12;
-            g.BeginPath(); g.MoveTo(-8, 2); g.QuadTo(-22, 16, -34, 4); g.Stroke();
-            g.LineWidth = 7;
-            g.BeginPath(); g.MoveTo(-31, 7); g.QuadTo(-38, 2, -40, -6); g.Stroke();
-            g.FillStyle = C("#5fd6c9");
-            Poly(g, -38, -6, -48, -22, -45, -11, -54, -11, -46, -5, -51, 5, -38, 0);
-            if (!sil)
+            // Tidemane, as the sprite draws it (1.20): a horse's head with ears and coral antlers sweeping back, foam lying
+            // along an arched crest, a deep chest on slim forelegs with a fan of fin at each fetlock and one at the elbow,
+            // and a short barrel whose haunch runs on into a scaled fish tail that dips to the sand and curls up into a fan.
+            g.Translate(10, 8);
+            g.Scale(0.8f);
+            // The tail: a tapering S from the haunch, sampled along a curve and filled between its two edges.
+            (float x, float y) TailAt(float k)
             {
-                g.StrokeStyle = Paint.Of("rgba(255,255,255,0.45)"); g.LineWidth = 0.8f;
-                Seg(g, -40, -4, -47, -18); Seg(g, -40, -4, -51, -10); Seg(g, -40, -3, -48, 3);
+                float u = 1 - k;
+                (float x, float y) p0 = (-10, -2), p1 = (-30, -4), p2 = (-30, 20), p3 = (-46, 4);
+                return (u * u * u * p0.x + 3 * u * u * k * p1.x + 3 * u * k * k * p2.x + k * k * k * p3.x,
+                        u * u * u * p0.y + 3 * u * u * k * p1.y + 3 * u * k * k * p2.y + k * k * k * p3.y);
             }
-            // Forelegs, one reaching forward, each ending in a little fan of fin instead of a hoof.
-            g.StrokeStyle = C("#1d6f68"); g.LineWidth = 4.5f;
-            g.BeginPath(); g.MoveTo(7, 5); g.QuadTo(10, 14, 6, 21); g.Stroke();
-            g.StrokeStyle = C("#2a9d8f");
-            g.BeginPath(); g.MoveTo(14, 4); g.QuadTo(20, 12, 21, 20); g.Stroke();
-            g.FillStyle = C("#5fd6c9");
-            Poly(g, 3, 21, 10, 21, 11, 25, 2, 25);
-            Poly(g, 18, 20, 25, 19, 27, 23, 18, 24);
-            // Body, belly and dorsal fin.
-            g.FillStyle = C("#3fb5a8"); Poly(g, -11, -8, -4, -19, 3, -9);
-            g.FillStyle = sil ? Sil : Paint.Linear(0, -11, 0, 11, (0, "#3cb9a9"), (0.6f, "#2a9d8f"), (1, "#1d6f68"));
-            Ell(g, 0, 0, 17, 11);
-            // Neck and head, angled down toward the muzzle.
-            g.BeginPath(); g.MoveTo(5, -6); g.QuadTo(9, -20, 16, -27); g.LineTo(26, -24); g.QuadTo(20, -12, 16, 3); g.ClosePath(); g.Fill();
-            Ell(g, 25, -25, 10, 5.5f, 0.45f);
-            Ell(g, 31, -20, 5.5f, 4.2f, 0.45f);
-            g.StrokeStyle = C("#ff8a7a"); g.LineWidth = 2.2f;
-            Seg(g, 19, -29, 17, -34); Seg(g, 17.8f, -31.6f, 14.5f, -33);
-            Seg(g, 23, -30, 24, -35); Seg(g, 23.6f, -32.5f, 26.5f, -33.8f);
+            var top = new List<(float x, float y)>(); var bot = new List<(float x, float y)>();
+            for (int i = 0; i <= 24; i++)
+            {
+                float k = i / 24f;
+                var (x, y) = TailAt(k);
+                var (nx, ny) = TailAt(MathF.Min(1, k + 0.01f));
+                var (px, py) = TailAt(MathF.Max(0, k - 0.01f));
+                float dx = nx - px, dy = ny - py, l = MathF.Max(0.001f, MathF.Sqrt(dx * dx + dy * dy)), w = 9 - 6.5f * k;
+                top.Add((x + dy / l * w, y - dx / l * w)); bot.Add((x - dy / l * w, y + dx / l * w));
+            }
+            g.FillStyle = sil ? Sil : Paint.Linear(0, -10, 0, 20, (0, "#5cc6b3"), (0.5f, "#2f9a8c"), (1, "#1c6462"));
+            g.BeginPath(); g.MoveTo(top[0].x, top[0].y);
+            foreach (var (x, y) in top.Skip(1)) g.LineTo(x, y);
+            for (int i = bot.Count - 1; i >= 0; i--) g.LineTo(bot[i].x, bot[i].y);
+            g.ClosePath(); g.Fill();
+            // The fan, forked, with rays and pale tips.
+            var tip = TailAt(1);
+            g.FillStyle = C("#79e6d6");
+            Poly(g, tip.x + 1, tip.y, tip.x - 9, tip.y - 15, tip.x - 7, tip.y - 4, tip.x - 13, tip.y + 9);
             if (!sil)
             {
-                g.FillStyle = Paint.Of("#8fd3c4"); Ell(g, 2, 6, 13, 4);
-                g.FillStyle = Paint.Of("rgba(255,255,255,0.18)"); Ell(g, -2, -6, 11, 3);
-                // Starlight speckles down its flanks.
-                foreach (var (x, y, r) in new[] { (-9f, -3f, 1.1f), (-4, -6, 0.9f), (1, -2, 1.2f), (6, -5, 0.8f), (-6, 2, 0.8f), (10, -1, 0.9f) })
+                g.StrokeStyle = Paint.Of("#41b3a6"); g.LineWidth = 0.9f;
+                Seg(g, tip.x, tip.y, tip.x - 9, tip.y - 14); Seg(g, tip.x, tip.y, tip.x - 12, tip.y + 8); Seg(g, tip.x, tip.y, tip.x - 8, tip.y - 6); Seg(g, tip.x, tip.y, tip.x - 9, tip.y + 3);
+                g.FillStyle = Paint.Of("#c9fbf2"); Circ(g, tip.x - 9, tip.y - 14.5f, 1.2f); Circ(g, tip.x - 12.6f, tip.y + 8.6f, 1.2f);
+                // Rows of scales down the tail.
+                g.StrokeStyle = Paint.Of("rgba(28,100,98,0.55)"); g.LineWidth = 0.8f;
+                for (int i = 2; i < 20; i += 2)
                 {
-                    g.Save(); g.ShadowColor = Paint.Of("#ffe8a0"); g.ShadowBlur = 5 * s / 3.4f; g.FillStyle = Paint.Of("#fff6d0"); Circ(g, x, y, r); g.Restore();
+                    var (x, y) = TailAt(i / 24f);
+                    float r = (9 - 6.5f * i / 24f) * 0.45f;
+                    for (int j = -1; j <= 1; j++) { g.BeginPath(); g.MoveTo(x - r, y + j * r * 1.2f); g.QuadTo(x, y + j * r * 1.2f + r * 0.8f, x + r, y + j * r * 1.2f); g.Stroke(); }
                 }
-                // The mane: a sheet of sea foam streaming back down the neck, scalloped at the edge, with spray coming off it.
-                g.Save(); g.ShadowColor = Paint.Of("#bff4ff"); g.ShadowBlur = 6 * s / 3.4f;
-                g.FillStyle = Paint.Linear(16, -30, 0, -6, (0, "#ffffff"), (1, "#cfe8ee"));
-                g.BeginPath();
-                g.MoveTo(17, -31); g.QuadTo(9, -31, 8, -26); g.QuadTo(3, -25, 4, -20); g.QuadTo(-1, -19, 1, -14);
-                g.QuadTo(-3, -12, 0, -8); g.QuadTo(-1, -4, 4, -4); g.QuadTo(8, -12, 10, -20); g.QuadTo(13, -26, 17, -31);
-                g.Fill();
-                g.Restore();
+            }
+            // A little fin on top of the tail, near the fan.
+            var fin = TailAt(0.72f);
+            g.FillStyle = C("#79e6d6"); Poly(g, fin.x + 3, fin.y - 3, fin.x - 2, fin.y - 9, fin.x - 4, fin.y - 2);
+            // The far foreleg, in shadow, behind the body.
+            g.StrokeStyle = C("#1c6462"); g.LineWidth = 4.2f;
+            g.BeginPath(); g.MoveTo(7, 4); g.QuadTo(5, 13, 4, 21); g.Stroke();
+            g.FillStyle = C("#1d4c55"); Ell(g, 4, 22.3f, 2.8f, 1.4f);
+            g.FillStyle = C("#41b3a6"); Poly(g, 2, 20, -3, 18, -1, 22);
+            // Body: a short barrel and a deep chest.
+            g.FillStyle = sil ? Sil : Paint.Linear(0, -12, 0, 11, (0, "#6fd6c0"), (0.35f, "#35a897"), (1, "#25837a"));
+            Ell(g, 0, 0, 15, 10);
+            Ell(g, 10, -1, 9, 11);
+            // The neck, arched along the crest, and the head angled down to the muzzle.
+            g.BeginPath(); g.MoveTo(1, -7); g.QuadTo(5, -25, 18, -31); g.LineTo(25, -24); g.QuadTo(19, -15, 19, 4); g.ClosePath(); g.Fill();
+            Ell(g, 23, -25, 9.5f, 5.6f, 0.62f);
+            Ell(g, 29.5f, -17.5f, 5.2f, 3.9f, 0.62f);
+            // Coral antlers sweeping back from behind the ears.
+            g.StrokeStyle = C("#ff8f7c"); g.LineWidth = 1.8f;
+            Seg(g, 17, -31, 12, -40); Seg(g, 14, -36.5f, 16.5f, -42); Seg(g, 13, -38.5f, 9.5f, -40);
+            g.StrokeStyle = C("#d4605a"); g.LineWidth = 1.5f;
+            Seg(g, 20, -31, 18.5f, -39); Seg(g, 19.2f, -36, 21.5f, -40.5f);
+            // The foam mane lying along the crest, with locks streaming back off it.
+            g.FillStyle = sil ? Sil : Paint.Linear(18, -32, 0, -6, (0, "#ffffff"), (1, "#bfe2ef"));
+            g.BeginPath();
+            g.MoveTo(18, -32); g.QuadTo(9, -30, 6, -24); g.QuadTo(1, -24, 2, -20); g.QuadTo(-3, -18, 0, -15);
+            g.QuadTo(-4, -12, -1, -9); g.QuadTo(-3, -5, 2, -6); g.QuadTo(4, -14, 7, -20); g.QuadTo(11, -27, 18, -29); g.ClosePath();
+            g.Fill();
+            // Ears, the far one in shadow, and the forelock falling between them.
+            g.FillStyle = C("#25837a"); Poly(g, 16, -30, 16.5f, -37, 19.5f, -31);
+            g.FillStyle = C("#35a897"); Poly(g, 19, -30, 21.5f, -37, 22.5f, -29);
+            g.FillStyle = C("#f6fdff"); Ell(g, 23.5f, -28.6f, 1.9f, 1.1f, 0.9f);
+            // The near foreleg reaching a little forward, with its hoof and its fin.
+            g.StrokeStyle = sil ? Sil : Paint.Of("#35a897"); g.LineWidth = 4.6f;
+            g.BeginPath(); g.MoveTo(14, 4); g.QuadTo(17, 13, 16, 21); g.Stroke();
+            g.FillStyle = C("#1d4c55"); Ell(g, 16.5f, 22.3f, 3, 1.5f);
+            g.FillStyle = C("#79e6d6"); Poly(g, 14.5f, 19.5f, 9, 17.5f, 11, 22);
+            // The fin flaring back from its elbow.
+            Poly(g, 9, 5, 0, 10, 4, 14);
+            if (!sil)
+            {
+                g.StrokeStyle = Paint.Of("#41b3a6"); g.LineWidth = 0.8f;
+                Seg(g, 8.5f, 5.5f, 1.5f, 10.5f); Seg(g, 8.5f, 5.5f, 4, 13);
+                // The pale belly and chest, a sheen on the back.
+                g.FillStyle = Paint.Of("rgba(196,240,222,0.6)"); Ell(g, 1, 7.2f, 11, 2.4f);
+                g.FillStyle = Paint.Of("rgba(255,255,255,0.16)"); Ell(g, -2, -6, 10, 2.6f);
+                // Starlight speckles on the haunch and the shoulder (five, as on the sprite).
+                foreach (var (x, y, r) in new[] { (-8f, -2f, 1.1f), (-5, 3, 0.9f), (9, -6, 1.1f), (13, -1, 0.9f), (4, 2, 0.8f) })
+                {
+                    g.Save(); g.ShadowColor = Paint.Of("#ffe8a0"); g.ShadowBlur = 3 * s / 3.4f; g.FillStyle = Paint.Of("#fff2c4"); Circ(g, x, y, r); g.Restore();
+                }
+                // The gold eye, the nostril and the line of the lips.
+                g.Save(); g.ShadowColor = Paint.Of("#ffd76a"); g.ShadowBlur = 3.5f * s / 3.4f; g.FillStyle = Paint.Of("#ffd76a"); Circ(g, 22.5f, -26.5f, 2.1f); g.Restore();
+                g.FillStyle = Paint.Of("#123f45"); Ell(g, 23.2f, -26.5f, 0.75f, 1.4f);
+                g.FillStyle = Paint.Of("#123f45"); Circ(g, 33.2f, -16.8f, 0.9f);
+                g.StrokeStyle = Paint.Of("#1c6462"); g.LineWidth = 1;
+                Seg(g, 27.5f, -14.3f, 32, -14);
                 g.StrokeStyle = Paint.Of("rgba(140,200,220,0.7)"); g.LineWidth = 0.8f;
-                g.BeginPath(); g.MoveTo(13, -28); g.QuadTo(7, -22, 5, -14); g.QuadTo(4, -9, 3, -6); g.Stroke();
-                g.FillStyle = Paint.Of("#e8f8ff");
-                foreach (var (x, y, r) in new[] { (2f, -27f, 1.3f), (-1.5f, -21, 1.1f), (-3, -15, 0.9f), (-3.5f, -9, 0.7f), (5, -31, 0.9f) }) Circ(g, x, y, r);
-                g.Save(); g.ShadowColor = Paint.Of("#ffd76a"); g.ShadowBlur = 7 * s / 3.4f; g.FillStyle = Paint.Of("#ffd76a"); Circ(g, 23, -27, 2.2f); g.Restore();
-                g.FillStyle = Paint.Of("#3a2a00"); Ell(g, 23.3f, -27, 0.7f, 1.5f);
-                g.FillStyle = Paint.Of("#10243a"); Circ(g, 34.6f, -18.5f, 0.9f);
-                g.StrokeStyle = Paint.Of("#16514b"); g.LineWidth = 1;
-                Seg(g, 29, -16.2f, 33.5f, -15.6f);
+                g.BeginPath(); g.MoveTo(15, -29); g.QuadTo(8, -24, 5, -16); g.QuadTo(3, -11, 2, -8); g.Stroke();
             }
         }
         g.Restore();

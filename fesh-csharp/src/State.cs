@@ -96,6 +96,10 @@ sealed class State
     public bool riding;                              // in the saddle right now
     public float mountX, mountY;                     // where Tidemane is waiting outdoors when you're not riding
 
+    // The hotbar (Hotbar.cs): six slots of what you carry in your hands, and which one you're holding (-1: hands free)
+    public string[] hotbar;                          // a tool family ("rod", "axe", "pick", "sword", "spear") or a food item; null in older saves
+    public int held = -1;
+
     // Habagat (the story flags are in hinted: "habagat", "isletsCharted", "parolaLit", "moonReturned", "bk:...")
     public Dictionary<string, RackLoad> racks = new(); // drying rack "x,y" -> what's drying on it
     public int saltDay;                              // the day you last raked Asinan's salt beds

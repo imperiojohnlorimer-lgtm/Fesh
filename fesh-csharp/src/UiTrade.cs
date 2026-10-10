@@ -5,6 +5,8 @@ namespace Fesh;
 partial class Game
 {
     int shopPage;
+    string shopTip;          // the item the mouse is over in the shop: its full description is drawn last, by the mouse
+    float lastShopBottom;    // the lowest row the buy list drew (the autotest checks it stays inside the stall)
 
     void DrawCoins(float x, float y, float size = 26)
     {
@@ -16,8 +18,9 @@ partial class Game
     void DrawShop()
     {
         Backdrop();
-        const float cw = 1080, ch = 620, pad = 24;
+        const float cw = 1080, ch = 680, pad = 24;
         float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
+        shopTip = null;
         Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
         Gfx.Text("Pip's stall", x + pad, y + pad, FontKind.Ui700, 36, Pal.PaperInk);
         float tx = x + pad + Gfx.Measure("Pip's stall", FontKind.Ui700, 36) + 28;
@@ -33,6 +36,7 @@ partial class Game
         if (shopTab == "sell") DrawSellList(x + pad, ly, cw - pad * 2, y + ch - pad - ly);
         else if (shopTab == "buy") DrawBuyList(x + pad, ly, cw - pad * 2);
         else DrawDerbyTab(x + pad, ly, cw - pad * 2);
+        if (shopTip != null) DrawItemTip(shopTip, Gfx.Mouse.X, Gfx.Mouse.Y);
         if (Gfx.PressedOutside(x, y, cw, ch)) ClosePanels();
     }
 
@@ -89,6 +93,8 @@ partial class Game
             Gfx.Box(rx, ry, colW, rowH, CardBg, Pal.C("#c9b48f"), 2, 5);
             DrawIcon(id, rx + 8, ry + 8, 36);
             var d = Items.ById[id];
+            // Pointing at the name or picture shows what it is (the buttons keep their own hover).
+            if (Gfx.Hover(rx, ry, colW - 200, rowH)) shopTip = id;
             bool rare = d.Kind == "fish" && Data.FishById[id].Rare;
             Gfx.Text(Gfx.Ellipsize($"{d.Name} ×{Has(id)}", FontKind.Ui700, 18, ClosedSeason(id) ? colW - 70 : colW - 300), rx + 54, ry + 8, FontKind.Ui700, 18, rare ? Rust : Pal.PaperInk);
             // In its closed season Pip won't buy it (Release.cs).
@@ -115,8 +121,9 @@ partial class Game
     {
         Gfx.Text("Pip's goods. Sailcloth and vinegar are the only things you can't make yourself.", x, y + 8, FontKind.Note, 19, Muted);
         y += 50;
-        // Six rows of two fit the stall's 620 px.
-        const float rowH = 70, gap = 8;
+        // Six rows of two fit the stall's 680 px, each with room for two lines of what the thing is. Anything longer
+        // is in full on the tooltip (shopTip).
+        const float rowH = 80, gap = 6;
         float colW = (w - 16) / 2;
         for (int i = 0; i < Items.Shop.Length; i++)
         {
@@ -125,11 +132,20 @@ partial class Game
             float rx = x + (i % 2) * (colW + 16), ry = y + (i / 2) * (rowH + gap);
             Gfx.Box(rx, ry, colW, rowH, CardBg, Pal.C("#c9b48f"), 2, 5);
             DrawIcon(id, rx + 10, ry + 9, 40);
-            Gfx.Text(d.Name, rx + 62, ry + 5, FontKind.Ui700, 19, Pal.PaperInk);
-            Gfx.Text($"(have {Has(id)})", rx + 70 + Gfx.Measure(d.Name, FontKind.Ui700, 19), ry + 8, FontKind.Ui500, 14, Muted);
-            Gfx.Text(Gfx.Ellipsize(Bind.Fix(d.Desc), FontKind.Note, 15, colW - 76), rx + 62, ry + 47, FontKind.Note, 15, Pal.PaperInk);
-            DrawIcon("coin", rx + 62, ry + 27, 18);
-            Gfx.Text(price.ToString(), rx + 84, ry + 26, FontKind.Ui700, 18, Pal.C("#9a6a1a"));
+            // The name and how many you have, kept clear of the buttons.
+            float btnL = id is "bait" or "chum" ? colW - 226 : colW - 114, nameW = btnL - 62 - 10;
+            string name = Gfx.Ellipsize(d.Name, FontKind.Ui700, 19, nameW);
+            Gfx.Text(name, rx + 62, ry + 5, FontKind.Ui700, 19, Pal.PaperInk);
+            string have = $"(have {Has(id)})";
+            if (Gfx.Measure(name, FontKind.Ui700, 19) + 8 + Gfx.Measure(have, FontKind.Ui500, 14) <= nameW)
+                Gfx.Text(have, rx + 70 + Gfx.Measure(name, FontKind.Ui700, 19), ry + 8, FontKind.Ui500, 14, Muted);
+            var desc = Gfx.Wrap(Bind.Fix(d.Desc), FontKind.Note, 15, colW - 76);
+            if (desc.Count > 2) desc = new() { desc[0], Gfx.Ellipsize(string.Join(" ", desc.Skip(1)), FontKind.Note, 15, colW - 76) };
+            Lines(desc, rx + 62, ry + 43, 16, FontKind.Note, 15, Pal.PaperInk);
+            if (Gfx.Hover(rx, ry, btnL, rowH)) shopTip = id;
+            lastShopBottom = ry + rowH;
+            DrawIcon("coin", rx + 62, ry + 25, 18);
+            Gfx.Text(price.ToString(), rx + 84, ry + 24, FontKind.Ui700, 18, Pal.C("#9a6a1a"));
             bool can1 = state.coins >= price;
             if (id is "bait" or "chum")
             {
@@ -138,6 +154,22 @@ partial class Game
             }
             if (Button("Buy 1", rx + colW - 114, ry + 6, 104, 34, FontKind.Ui700, 17, can1 ? Pal.Buoy : Pal.C("#d9ccb0"), can1 ? White : Muted, 3, 2, 5, can1)) Buy(id, price, 1);
         }
+    }
+
+    // An item's name and everything it says about itself, in a box by the mouse (kept on the screen), drawn after the
+    // rows so nothing covers it.
+    void DrawItemTip(string id, float mx, float my)
+    {
+        var d = Items.ById[id];
+        const float w = 380, fs = 17, lh = 22;
+        var lines = Gfx.Wrap(Bind.Fix(d.Desc), FontKind.Note, fs, w - 28);
+        if (Items.SellPrice(id) > 0 && d.Kind != "fish") lines.Add($"Pip pays {Items.SellPrice(id)} each.");
+        float h = 46 + lines.Count * lh + 10;
+        float x = Math.Clamp(mx + 18, 8, Gfx.LW - w - 8), y = Math.Clamp(my + 18, 8, Gfx.LH - h - 8);
+        if (my + 18 + h > Gfx.LH - 8) y = Math.Max(8, my - h - 12);
+        Gfx.Box(x, y, w, h, NavyStrong, Pal.Ink, 2, 6);
+        Gfx.Text(Gfx.Ellipsize(d.Name, FontKind.Ui700, 19, w - 28), x + 14, y + 10, FontKind.Ui700, 19, Pal.Lantern);
+        Lines(lines, x + 14, y + 40, lh, FontKind.Note, fs, Pal.Paper);
     }
 
     /* ---------- Aquarium ---------- */

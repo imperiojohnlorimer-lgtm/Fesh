@@ -86,6 +86,15 @@ partial class Game
         newestSlot = SaveFile.Newest();
     }
 
+    // The title screen's words (1.20: the islands beyond Saltmere, and the hotbar's keys).
+    const string TitleTagline = "A fishing mystery on Saltmere Island and the seas beyond. Catch what shouldn't exist, and find out how it got here.";
+    static readonly string[] TitleControls =
+    {
+        "<move> walk  ·  <act> talk, fish and use  ·  1-6 pick from your hotbar  ·  <use> use what you're holding",
+        "<ride> ride or board  ·  <bag> bag  ·  <build> build  ·  <map> map  ·  <journal> journal  ·  <dex> Fesh-dex  ·  Esc menu"
+    };
+    static readonly string TitleVersion = "Version " + (System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version is Version v ? $"{v.Major}.{v.Minor}.{v.Build}" : "?");
+
     void DrawTitle()
     {
         DrawRectangleGradientV(0, 0, GetScreenWidth(), GetScreenHeight(), Pal.C("rgba(16,36,58,0.05)"), Pal.C("rgba(16,36,58,0.78)"));
@@ -93,7 +102,7 @@ partial class Game
         if (titleView == "slots") { DrawSlots(); return; }
         if (titleView == "settings") { DrawMenu(); return; }
         const float logo = 176, tfs = 26, tlh = 35;
-        var tag = Gfx.Wrap("A fishing mystery on Saltmere Island. Catch what shouldn't exist, and find out how it got here.", FontKind.Note, tfs, 540);
+        var tag = Gfx.Wrap(TitleTagline, FontKind.Note, tfs, 600);
         int newest = newestSlot;
         float total = 160 + 22 + tag.Count * tlh + 26 + 56 + 14 + 44 + (newest > 0 ? 30 : 0);
         float y = (Gfx.LH - total) / 2 - 10;
@@ -129,8 +138,10 @@ partial class Game
         float sw = SmallW("Settings") + 10 + SmallW("Quit");
         if (SmallButton("Settings", cx - sw / 2, y)) OpenTitleSettings();
         if (SmallButton("Quit", cx - sw / 2 + SmallW("Settings") + 10, y)) quit = true;
-        Gfx.TextCenter(Bind.Fix("<move> to walk  ·  <act> to act  ·  <bag> bag  ·  <build> build  ·  <map> map  ·  <dex> Fesh-dex  ·  Esc menu"),
-            cx, Gfx.LH - 44, FontKind.Ui500, 18, Pal.WithAlpha(Pal.Paper, 0.85f));
+        // The controls, in two lines so they fit whatever the keys are bound to (and the pad's buttons on a gamepad).
+        for (int i = 0; i < TitleControls.Length; i++)
+            Gfx.TextCenter(Gfx.Ellipsize(Bind.Fix(TitleControls[i]), FontKind.Ui500, 18, Gfx.LW - 40), cx, Gfx.LH - 70 + i * 26, FontKind.Ui500, 18, Pal.WithAlpha(Pal.Paper, 0.85f));
+        Gfx.Text(TitleVersion, Gfx.LW - 16 - Gfx.Measure(TitleVersion, FontKind.Ui500, 15), 14, FontKind.Ui500, 15, Pal.WithAlpha(Pal.Paper, 0.6f));
     }
 
     /* ---------- Save slots ---------- */

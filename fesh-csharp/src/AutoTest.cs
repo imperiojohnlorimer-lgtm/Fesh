@@ -39,7 +39,9 @@ partial class Game
         Inp.ScriptFocused = true;
         // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
         standStill = true;
-        script = Environment.GetEnvironmentVariable("FESH_SEA_TEST") == "1" ? RestlessSeaScript().GetEnumerator()
+        script = Environment.GetEnvironmentVariable("FESH_HOTBAR_TEST") == "1" ? HotbarScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_MOUNT_TEST") == "1" ? MountScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_SEA_TEST") == "1" ? RestlessSeaScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_CAVEBOSS_TEST") == "1" ? GuardianScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VIEW_TEST") == "1" ? ViewScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_ATLAS_TEST") == "1" ? AtlasScript().GetEnumerator()
@@ -82,6 +84,8 @@ partial class Game
     // overhead, leaning, glancing and blinking poses), drawn 5x so single pixels can be judged.
     void ExportSprites(string path)
     {
+        ExportMountSprites(path);
+        if (Environment.GetEnvironmentVariable("FESH_SPRITES_ONLY") == "tidemane") return;
         ExportGuardianSprites(path);
         ExportSeaSprites(path);
         ExportToolSprites(path);
@@ -1732,7 +1736,11 @@ partial class Game
         pendingShot = "74-tidemane-waiting"; yield return 2;
         player.X = StarwellX; player.Y = StarwellY - 45; yield return 2;
         Inp.Tap(KeyboardKey.R); yield return 2;
-        Check("from far away, R whistles it over", Riding && Dist(state.mountX, state.mountY, player.X, player.Y) < 1);
+        // It comes when you whistle and waits beside you (MountScript has the rest).
+        for (int i = 0; i < 300 && call != null; i++) yield return 1;
+        Check("from far away, R whistles it over and it waits beside you", !Riding && call == null && Dist(state.mountX, state.mountY, player.X, player.Y) < 21);
+        Inp.Tap(KeyboardKey.R); yield return 3;
+        Check("then R climbs on", Riding);
         player.X = 160; player.Y = 74; player.Face = "up"; yield return 3;
         Inp.Tap(KeyboardKey.E); yield return 70;
         Check("going indoors leaves it waiting at the door", scene == "house:tomas" && !state.riding && Dist(state.mountX, state.mountY, 160, 74) < 1);
@@ -1990,6 +1998,8 @@ partial class Game
         foreach (int frames in ViewScript()) yield return frames;
         foreach (int frames in GuardianScript()) yield return frames;
         foreach (int frames in RestlessSeaScript()) yield return frames;
+        foreach (int frames in MountScript()) yield return frames;
+        foreach (int frames in HotbarScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

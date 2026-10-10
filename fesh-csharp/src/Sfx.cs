@@ -44,6 +44,11 @@ static class Sfx
         Add("hurt", 0.3f, b => { Tone(b, 300, 0.22f, "sawtooth", 0.05f, -160); Noise(b, 0.08f, 0.1f); });
         Add("neigh", 0.9f, Whinny);
         Add("stomp", 0.3f, b => { Tone(b, 95, 0.26f, "sine", 0.14f, -45); Noise(b, 0.14f, 0.12f); });
+        // Tidemane's hoofbeats (1.20): a soft knock, two pitches so the bound's da-dum doesn't cut itself off.
+        // A tool swung at nothing (Hotbar.cs): a quick rush of air.
+        Add("swish", 0.14f, b => { Noise(b, 0.1f, 0.05f); Tone(b, 900, 0.1f, "triangle", 0.012f, -600); });
+        Add("hoof", 0.09f, b => { Tone(b, 150, 0.06f, "triangle", 0.05f, -70); Noise(b, 0.03f, 0.035f); });
+        Add("hoof2", 0.09f, b => { Tone(b, 125, 0.06f, "triangle", 0.05f, -60); Noise(b, 0.03f, 0.035f); });
         Add("whistle", 0.4f, b => { Tone(b, 1500, 0.12f, "sine", 0.05f, 500); Tone(b, 2000, 0.2f, "sine", 0.05f, -350, 0.15f); });
         Add("bolt", 0.25f, b => { Noise(b, 0.12f, 0.1f); Tone(b, 760, 0.14f, "triangle", 0.035f, -380); });
         // The agong (a deep, ringing bong) and the villagers' pots and pans (a bright clank).

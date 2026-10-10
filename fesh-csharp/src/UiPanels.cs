@@ -6,7 +6,7 @@ namespace Fesh;
 
 partial class Game
 {
-    string bagSel;
+    string bagSel, bagTip;
 
     /* ---------- Bag ---------- */
     List<string> BagItems() => state.inv.Where(kv => kv.Value > 0).Select(kv => kv.Key)
@@ -52,6 +52,7 @@ partial class Game
             string n = state.inv[id].ToString();
             Gfx.Text(n, sx + slot - 8 - Gfx.Measure(n, FontKind.Ui700, 16), sy + slot - 20, FontKind.Ui700, 16, Pal.Ink);
             if (Gfx.Click(sx, sy, slot, slot)) { bagSel = id; Sfx.Play("blip"); }
+            if (Gfx.Hover(sx, sy, slot, slot) && id != bagSel) bagTip = id;
         }
 
         // Details for the selected item.
@@ -108,6 +109,11 @@ partial class Game
             cy += 34;
             if (BigButton(d.Kind == "fish" ? "Eat it raw" : "Eat", cx, cy, true)) Eat(bagSel);
         }
+        // Tools and food can go on the hotbar (Hotbar.cs), at the bottom of the card.
+        DrawHotbarAssign(cx, by + bh - pad - 76, bagSel);
+        // Pointing at another item in the bag: what it is, without picking it.
+        if (bagTip != null) DrawItemTip(bagTip, Gfx.Mouse.X, Gfx.Mouse.Y);
+        bagTip = null;
         if (Gfx.PressedOutside(bx, by, bw, bh)) ClosePanels();
     }
 
@@ -194,11 +200,13 @@ partial class Game
             }
             ry += tabH + 12;
         }
+        string craftTip = null;   // the recipe pointed at: what it makes, in full, by the mouse (drawn last)
         foreach (var r in recipes)
         {
             var d = Items.ById[r.Out];
             bool can = CanCraft(r);
             Gfx.Box(x + pad, ry, cw - pad * 2, rowH, CardBg, Pal.C("#c9b48f"), 2, 6);
+            if (Gfx.Hover(x + pad, ry, cw - pad * 2 - 180, rowH)) craftTip = r.Out;
             DrawIcon(r.Out, x + pad + 11, ry + 9, 48);
             float tx = x + pad + 72;
             string name = r.Count > 1 ? $"{d.Name} ×{r.Count}" : d.Name;
@@ -226,6 +234,7 @@ partial class Game
             if (Button("Previous", x + pad + 130, ry, 120, 38, FontKind.Ui700, 17, Pal.Sand, Pal.Ink, 3, 2, 5, craftPage > 0)) craftPage--;
             if (Button("Next", x + pad + 260, ry, 100, 38, FontKind.Ui700, 17, Pal.Sand, Pal.Ink, 3, 2, 5, craftPage < pages - 1)) craftPage++;
         }
+        if (craftTip != null) DrawItemTip(craftTip, Gfx.Mouse.X, Gfx.Mouse.Y);
         if (Gfx.PressedOutside(x, y, cw, h)) ClosePanels();
     }
 

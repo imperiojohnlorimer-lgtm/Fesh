@@ -14,7 +14,11 @@ partial class Game
     /* ---------- Bag ---------- */
     int Has(string id) => id == "fish" ? FishCount() : id == Items.TinapaFishId ? state.inv.Where(kv => Items.TinapaFish.Contains(kv.Key)).Sum(kv => kv.Value)
         : id == Items.SeaweedId ? Items.Seaweeds.Sum(state.inv.GetValueOrDefault) : state.inv.GetValueOrDefault(id);
-    void Give(string id, int n = 1) => state.inv[id] = state.inv.GetValueOrDefault(id) + n;
+    void Give(string id, int n = 1)
+    {
+        state.inv[id] = state.inv.GetValueOrDefault(id) + n;
+        HotbarGained(id);
+    }
 
     bool Take(string id, int n = 1)
     {

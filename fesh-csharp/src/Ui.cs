@@ -24,6 +24,7 @@ partial class Game
         if (!title && eclipse != null) DrawEclipseBar();
         if (!title && race != null) DrawRaceChip();
         if (mode == "build") DrawBuildBar();
+        if (!title && HotbarShown) DrawHotbar();
         if (!title) DrawPrompt();
         if (!title) DrawToast();
         if (!title) DrawFishAttackWarning();
@@ -275,7 +276,8 @@ partial class Game
         var segs = Segments(full);
         float SegW((string text, bool key) s) => s.key ? Gfx.Measure(s.text, FontKind.Ui700, fs) + 12 : Gfx.Measure(s.text, FontKind.Ui500, fs);
         float w = segs.Sum(SegW) + 36;
-        float y = Gfx.LH - (mode == "build" ? buildBarH + 13 + 46 : 19) - h;
+        // Above the build bar while building, and above the hotbar otherwise (Hotbar.cs).
+        float y = mode == "build" ? Gfx.LH - buildBarH - 13 - 46 - h : HotbarShown ? lastHotbarTop - 8 - h : Gfx.LH - 19 - h;
         float x = Gfx.LW / 2 - w / 2;
         Gfx.Rect(x, y, w, h, prompt.Urgent ? Pal.Buoy : NavyStrong, 5);
         x += 18;

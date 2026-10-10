@@ -262,7 +262,7 @@ partial class Game
         foreach (var b in state.builds.Where(b => b.id == "dryrack" && Rack(b) is RackLoad r && r.fish.Count > 0))
             Place(RackDone(Rack(b)) ? "Rack (dry!)" : "Drying rack", b.x * T + 5, b.y * T + 5, new() { "Your drying rack", RackDone(Rack(b)) ? (RackIsGuso(Rack(b)) ? "The dried guso is ready" : "The dried fish are ready") : $"{(int)((DryGoal - Rack(b).dry) / DryRate)} minutes of sun to go" }, 2);
         if (Has("boat") > 0 && !Aboard) { var bp = BoatPosition(); Place("Your boat", bp.x, bp.y, new() { "Your boat", "Moored here. R beside it to board." }, 1); }
-        if (state.tamed && !state.riding) Place(Data.MountName, state.mountX, state.mountY - 6, new() { Data.MountName, "Waiting here. R whistles it over from anywhere outdoors." }, 1);
+        if (state.tamed && !state.riding) Place(Data.MountName, state.mountX, state.mountY - 6, new() { Data.MountName, Bind.Fix("Waiting here. <ride> whistles it over from anywhere outdoors; it comes to you.") }, 1);
         foreach (var b in state.builds.Where(b => b.id == "crabpot"))
         {
             bool ready = PotReady(b);

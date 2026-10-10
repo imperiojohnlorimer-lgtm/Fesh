@@ -177,7 +177,10 @@ partial class Game
         Check("a moored boat cannot hide the storm shelter action", target?.Type == "rest" && target.Id == "shelter");
         state.tamed = true; state.mountX = player.X + 60; state.mountY = player.Y;
         Inp.Tap(KeyboardKey.R); yield return 3;
-        Check("in a storm, the ride key beside the tied-up boat still calls Tidemane", Riding && !Aboard);
+        Check("in a storm, the ride key beside the tied-up boat still calls Tidemane", call != null && !Aboard);
+        for (int i = 0; i < 300 && call != null; i++) yield return 1;
+        Inp.Tap(KeyboardKey.R); yield return 3;
+        Check("and once it's there, rides it rather than boarding", Riding && !Aboard);
         state.riding = state.tamed = false;
 
         ClearSkies(); state.hinted.Remove("visitedAtoll"); state.aboard = true;

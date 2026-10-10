@@ -90,6 +90,22 @@ partial class Game
 
     Catchable RollCatch(string spot)
     {
+        // A cast you aimed yourself into a spot's water only gets its everyday fish (and, now and then, a chest): the
+        // creatures, odd catches and legends are at the spots themselves (Hotbar.cs). Null if nothing will bite.
+        if (fish?.Wild == true)
+        {
+            if (rng.NextDouble() < ChestChance) return new Catchable { Id = "chest", Name = "Sunken chest", Difficulty = 2, Chest = true };
+            var wild = FishWeights(spot, fish.Bait, fish.Depth).Where(p => !p.f.Legend).ToList();
+            if (wild.Count == 0) return null;
+            double wr = rng.NextDouble() * wild.Sum(p => p.w);
+            var wp = wild[^1].f;
+            foreach (var (f, w) in wild)
+            {
+                if (wr < w) { wp = f; break; }
+                wr -= w;
+            }
+            return new Catchable { Id = wp.Id, Name = wp.Name, Difficulty = wp.Difficulty, Rare = wp.Rare };
+        }
         if (spot == "starwell" && TidemaneBites(fish?.Bait)) return new Catchable { Id = "tidemane", Name = "Something enormous", Difficulty = 4.8f, Boss = true };
         var ex = Data.Creatures.FirstOrDefault(c => c.Spot == spot && Eligible(c));
         if (ex != null)
@@ -492,6 +508,7 @@ partial class Game
                     if (charge <= 0) { charge = 0; chargeDir = 1; }
                     SetPrompt($"Let go to cast into {DepthName(CastDepth(charge))}");
                 }
+                else if (chargeSpot == null) CastFree(charge);
                 else Cast(chargeSpot, charge);
                 return;
             case "casting":
@@ -501,6 +518,13 @@ partial class Game
                 f.Bx = f.Sx + (f.Tx - f.Sx) * f.T;
                 f.By = f.Sy + (f.Ty - f.Sy) * f.T - MathF.Sin(MathF.PI * f.T) * (10 + f.Power * 14);
                 SetPrompt("");
+                if (f.T >= 1 && f.Dry)
+                {
+                    // A cast you aimed onto dry land (Hotbar.cs).
+                    Burst(f.Tx, f.Ty, "#d8bb7e", 4);
+                    ReelIn("Your line lands on dry ground. Face some water to fish.");
+                    return;
+                }
                 if (f.T >= 1)
                 {
                     f.Bx = f.Tx; f.By = f.Ty;
@@ -521,7 +545,8 @@ partial class Game
                         state.hinted["sniffed"] = true;
                         Toast("Something huge circles under your bobber, noses at the bait, and turns away. It wants something sweeter.", 5);
                     }
-                    fish.Roll = RollCatch(fish.Spot);
+                    fish.Roll = fish.Empty ? null : RollCatch(fish.Spot);
+                    if (fish.Roll == null) { ReelIn(fish.Empty ? "Nothing seems to live in this water." : "Nothing's biting here just now."); return; }
                     fish.BiteT = BiteWindow;
                     mode = "bite";
                     Sfx.Play("bite");
