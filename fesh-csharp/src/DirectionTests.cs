@@ -116,6 +116,46 @@ partial class Game
         }
         UnloadImage(img);
         pix = keep; fish = null; reel = null; swingT = 0; mode = "title";
+        ExportFoodSprites(path);
+    }
+
+    // Food held in your hand (1.22), 8x: rows facing right, left, up, down; columns a few foods held, a raw fish, then a
+    // bite of grilled fish rising, at your mouth and coming back down.
+    void ExportFoodSprites(string path)
+    {
+        var keep = pix;
+        const int cell = 30;
+        var cols = new (string food, float bite)[]
+        {
+            ("grilled_fish", -1), ("berries", -1), ("fish_stew", -1), ("sushi_roll", -1), ("coconut", -1), ("egg", -1), ("tamban", -1),
+            ("grilled_fish", .15f), ("grilled_fish", .45f), ("grilled_fish", .85f)
+        };
+        state.hotbar ??= new string[HotbarSlots];
+        var img = GenImageColor(cell * cols.Length, cell * 4, Color.Black);
+        int r = 0;
+        foreach (string face in new[] { "right", "left", "up", "down" })
+        {
+            for (int c = 0; c < cols.Length; c++)
+            {
+                player.X = 160; player.Y = 115; player.Face = face; player.Moving = false; time = 0.3f;
+                pix = new Pix(cell, cell) { CamX = (int)player.X - 15, CamY = (int)player.Y - 23 };
+                for (int sy = 0; sy < cell; sy++)
+                    for (int sx = 0; sx < cell; sx++)
+                        pix.Buf[sy * cell + sx] = worldBase.Buf[(pix.CamY + sy) * PW + pix.CamX + sx];
+                var (food, bite) = cols[c];
+                state.inv[food] = 1; state.hotbar[5] = food; state.held = 5;
+                mode = "play"; fish = null; swingT = 0;
+                if (bite >= 0) { eatItem = food; Swing("eat", 0.6f); swingT = 0.6f * (1 - bite); }
+                DrawPlayer();
+                for (int sy = 0; sy < cell; sy++)
+                    for (int sx = 0; sx < cell; sx++) ImageDrawPixel(ref img, c * cell + sx, r * cell + sy, pix.Buf[sy * cell + sx]);
+            }
+            r++;
+        }
+        ImageResizeNN(ref img, cell * cols.Length * 8, cell * 4 * 8);
+        ExportImage(img, path.Replace(".png", "-food.png"));
+        UnloadImage(img);
+        pix = keep; swingT = 0; state.held = -1; mode = "title";
     }
 
     IEnumerable<int> DirectionScript()

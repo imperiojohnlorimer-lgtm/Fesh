@@ -10,7 +10,7 @@ record struct Box(float X, float Y, float W, float H)
 partial class Game
 {
     /* ---------- Collision ---------- */
-    // Tomas's hut, his campfire, the wreck, Tomas himself, Pip's stall and the carving at the Starwell. Only outdoors.
+    // Tomas's hut, his campfire, the wreck, Tomas himself, Pip's stall, the carving at the Starwell and the fallen rocks. Only outdoors.
     List<Box> StaticSolids() => scene != "world" ? new() : new()
     {
         new(150, 56, 20, 13),
@@ -18,7 +18,9 @@ partial class Game
         new(12, 144, 28, 14),
         TomasSolid ? new(tomasX - 3, tomasY - 3, 7, 3) : new(-100, -100, 0, 0),
         new(PipX - 10, PipY + 1, 20, 9),
-        new(CarvingX - 4, CarvingY - 3, 8, 4)
+        new(CarvingX - 4, CarvingY - 3, 8, 4),
+        // The rocks fallen over the rocky shore's tide pools, until you break them up (Chapters.cs).
+        RocksCleared ? new(-100, -100, 0, 0) : new(RockfallX - 6, RockfallY - 2, 13, 6)
     };
 
     // Tomas blocks the way while he's standing at his camp, but not if he came back from bed while you stood on his spot.
@@ -365,6 +367,7 @@ partial class Game
             state.loose.RemoveAt(i);
             if (l.kind == "glean") { PickGlean(l); continue; }
             Give(l.kind);
+            Learned("gather");
             Sfx.Play("pickup");
             if (!state.Hinted("buildTip"))
             {

@@ -5,6 +5,28 @@ namespace Fesh;
 
 partial class Game
 {
+    // Renders the view with what you hold and with your hands free, and counts the pixels that change near your hand
+    // and elsewhere (food drawn in the wrong place, or not at all, shows up).
+    (int near, int elsewhere) HeldFoodPixels()
+    {
+        RenderWorld(time);
+        var with = (Color[])pix.Buf.Clone();
+        // The same pose, arms and all, with only the food left out (Codex: hands-free changed the arms too).
+        foodUndrawn = true;
+        RenderWorld(time);
+        foodUndrawn = false;
+        int near = 0, elsewhere = 0;
+        for (int i = 0; i < with.Length; i++)
+        {
+            var a = with[i]; var b = pix.Buf[i];
+            if (Math.Abs(a.R - b.R) + Math.Abs(a.G - b.G) + Math.Abs(a.B - b.B) < 12) continue;
+            float wx = i % W + camX, wy = i / W + camY;
+            if (Math.Abs(wx - player.X) <= 9 && wy >= player.Y - 20 && wy <= player.Y) near++; else elsewhere++;
+        }
+        RenderWorld(time);
+        return (near, elsewhere);
+    }
+
     // The hotbar, fishing anywhere, the shop's descriptions and the title (1.20). FESH_HOTBAR_TEST=1 runs only this.
     IEnumerable<int> HotbarScript()
     {
@@ -193,9 +215,44 @@ partial class Game
         Check("with a panel open, the number keys leave the hotbar alone", state.held == heldBefore);
         ClosePanels(); yield return 2;
         Inp.Tap(KeyboardKey.Six); yield return 2;
+        // You hold it: in your hand, drawn there (pixels), facing each way; from behind it's in front of you.
+        player.Face = "right"; yield return 2;
+        var foodPose = HandsPose("right", (int)player.X, (int)player.Y, false, 0);
+        Check($"food on the hotbar is held in your hand ({foodPose?.Tool}: {foodPose?.Item})", foodPose?.Tool == "food" && foodPose.Item == "grilled_fish");
+        Check("in every facing (behind you from the back)", new[] { "left", "down" }.All(f => HandsPose(f, 100, 100, false, 0) is { Tool: "food", ToolBehind: false })
+            && HandsPose("up", 100, 100, false, 0) is { Tool: "food", ToolBehind: true });
+        var (foodIn, foodOut) = HeldFoodPixels();
+        player.Face = "left"; yield return 2;
+        var (leftIn, leftOut) = HeldFoodPixels();
+        player.Face = "up"; yield return 2;
+        var (upIn, upOut) = HeldFoodPixels();
+        player.Face = "right"; yield return 2;
+        Check($"and it's really drawn by your hand ({foodIn} pixels there facing right, {leftIn} left, {upIn} peeking past your back; {foodOut + leftOut + upOut} elsewhere)",
+            foodIn >= 8 && leftIn >= 8 && upIn <= 8 && foodOut + leftOut + upOut == 0);
+        pendingShot = "hotbar-05b-holding-food"; yield return 2;
+        player.Face = "down"; yield return 2;
+        pendingShot = "hotbar-05c-holding-food-front"; yield return 2;
+        player.Face = "right"; yield return 2;
         float food0 = state.food;
         Inp.Tap(KeyboardKey.E); yield return 2;
         Check($"with food in hand, E eats one ({food0:0} -> {state.food:0}, {Has("grilled_fish")} left)", state.food > food0 && Has("grilled_fish") == 1);
+        // Partway through the bite (the hand is at your mouth from a third of the way in).
+        for (int i = 0; i < 60 && swingT > swingDur * 0.55f; i++) yield return 1;
+        var bite = HandsPose("right", (int)player.X, (int)player.Y, false, 0);
+        Check($"up to your mouth ({swingTool}, {bite?.Item}, hand at {bite?.Hand.y - (int)player.Y})", swingTool == "eat" && bite?.Item == "grilled_fish" && bite.Hand.y <= (int)player.Y - 9);
+        pendingShot = "hotbar-05d-eating"; yield return 2;
+        // Picking up the axe mid-bite and using it swings at once (eating mustn't hold the next swing back).
+        Inp.Tap(KeyboardKey.Two); yield return 2;
+        Inp.Tap(KeyboardKey.V); yield return 2;
+        Check($"a tool used straight after a bite swings ({swingTool})", swingTool == "axe" && swingT > 0);
+        for (int i = 0; i < 60 && swingT > 0; i++) yield return 1;
+        Inp.Tap(KeyboardKey.Six); yield return 2;
+        // A raw fish is held as its own little picture.
+        Give("tamban", 1); AssignHotbar(4, "tamban"); state.held = 4; yield return 2;
+        var (fishIn, fishOut) = HeldFoodPixels();
+        Check($"a raw fish is held as its picture ({HandsPose("right", (int)player.X, (int)player.Y, false, 0)?.Item}, {fishIn} pixels)", fishIn >= 8 && fishOut == 0);
+        pendingShot = "hotbar-05e-holding-fish"; yield return 2;
+        Take("tamban", 1); state.hotbar[4] = null; state.held = 5; yield return 2;
         Inp.Tap(KeyboardKey.E); yield return 2;
         Check($"the last one eaten, the slot is empty but remembered ({SlotItem(state.hotbar[5]) ?? "none"})", Has("grilled_fish") == 0 && SlotItem(state.hotbar[5]) == null && state.hotbar[5] == "grilled_fish");
         Inp.Tap(KeyboardKey.E); yield return 2;

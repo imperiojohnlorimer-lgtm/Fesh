@@ -15,6 +15,7 @@ sealed class SettingsData
     public int dayLength = 24;                 // real minutes for a whole day and night; 0 stops the clock (only resting moves it)
     public bool clock24;                       // 14:30 instead of 2:30 PM
     public bool guide = true;                  // the goal card and the arrow to it (Guide.cs); the journal works either way
+    public bool clearFont;                     // Atkinson Hyperlegible in place of the pixel and typewriter fonts (Gfx.Clear)
     public Dictionary<string, int[]> keys = new(); // action -> its two keys (KeyboardKey values, 0 = none); missing actions use the defaults
 }
 

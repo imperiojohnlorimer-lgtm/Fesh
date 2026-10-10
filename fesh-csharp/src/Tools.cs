@@ -14,15 +14,18 @@ sealed class HandPose
     public float Length;                   // how long it is from the hand, in pixels
     public bool ToolBehind, ArmsBehind;    // drawn before the body (pointing away from you), arms tucked behind it
     public string Tint;                    // the tool head's colour (a pickaxe's or sword's metal)
+    public string Item;                    // Tool "food": what's in your hand (null once it's eaten)
 }
 
 partial class Game
 {
     string swingTool = "axe";   // what the swing in progress is done with (Swing)
+    string eatItem;             // what an "eat" swing lifts to your mouth (it may have been your last one)
+    bool foodUndrawn;           // the autotest renders a frame with the food left out of your hand (same pose)
     float swingDur = 0.25f;     // how long that swing lasts, so swingT gives how far into it you are
 
     // Every action that swings something says what: "axe", "pick", "sword", "fist", "mallet", "rake", "haul", "hands",
-    // "dig" or "throw". The strike lands about a third of the way through.
+    // "dig", "throw" or "eat" (the food in your hand up to your mouth). The strike lands about a third of the way through.
     void Swing(string tool, float secs)
     {
         swingTool = tool;
@@ -69,6 +72,11 @@ partial class Game
                 return (Lerp(-20, -65, (p - 0.5f) / 0.5f), Lerp(5, 3, (p - 0.5f) / 0.5f), 0, true);
             case "dig":
                 return (-60 + 18 * MathF.Sin(p * MathF.PI * 4), 5, 0, true);
+            case "eat":
+                // Up to your mouth, a couple of bites, and back down.
+                if (p < 0.3f) return (Lerp(-20, 80, p / 0.3f), Lerp(4, 3, p / 0.3f), 0, false);
+                if (p < 0.75f) return (80, 3 - (int)((p - 0.3f) * 9) % 2, 0, false);
+                return (Lerp(80, -20, (p - 0.75f) / 0.25f), Lerp(3, 4, (p - 0.75f) / 0.25f), 0, false);
             default:
                 // An axe, a pickaxe or the agong's mallet: up and back, then down onto the tile in front. The axe
                 // bites and follows through; a pickaxe bounces back off the rock; the mallet springs off the gong.
@@ -119,7 +127,13 @@ partial class Game
         if (rod) return RodPose(face, ux, uy, pump);
         if (mode == "spear") return null;
         // Nothing being swung: whatever you're holding on the hotbar, carried (Hotbar.cs).
-        if (swingT <= 0) return HeldTool is string carried && mode is "play" or "build" or "dialogue" ? CarryPose(face, ux, uy, carried) : null;
+        if (swingT <= 0)
+        {
+            if (mode is not ("play" or "build" or "dialogue")) return null;
+            if (HeldTool is string carried) return CarryPose(face, ux, uy, carried);
+            // Food (Hotbar.cs) is held out in your hand, ready to eat.
+            return HeldFood is string food ? FoodPose(face, ux, uy, food) : null;
+        }
         float p = 1 - swingT / Math.Max(0.01f, swingDur);
         var (elev, reach, bend, two) = SwingKey(swingTool, p);
         elev = Snap(elev);
@@ -130,7 +144,7 @@ partial class Game
         var hand = (x: (int)MathF.Round(shoulder.Item1 + ax * reach), y: (int)MathF.Round(shoulder.Item2 + ay * reach));
         float toolElev = Snap(elev + bend);
         var (tx, ty) = Project(face, toolElev);
-        string tool = swingTool switch { "axe" or "pick" or "sword" or "mallet" or "rake" => swingTool, _ => null };
+        string tool = swingTool switch { "axe" or "pick" or "sword" or "mallet" or "rake" => swingTool, "eat" => "food", _ => null };
         float len = swingTool switch { "sword" => 7, "rake" => 8, "mallet" => 5, _ => 7 };
         // The other hand lower down the handle (or beside the first, on a rope or in the dirt).
         (int x, int y)? hand2 = !two ? null
@@ -138,6 +152,9 @@ partial class Game
             : side ? (hand.x - dir, hand.y + 1) : (hand.x - 2, hand.y);
         if (!side && !two) hand2 = null;
         float ahead = MathF.Cos(toolElev * MathF.PI / 180);
+        // Eating: the food goes up to your mouth, and is gone after the second bite. From behind, it's all in front of you.
+        if (tool == "food")
+            return new HandPose { Hand = hand, Tool = "food", Item = p < 0.6f && face != "up" ? eatItem : null, ToolBehind = face == "up", ArmsBehind = face == "up" };
         return new HandPose
         {
             Hand = hand, Hand2 = hand2, Tool = tool, Dx = tx, Dy = ty, Length = len,
@@ -186,6 +203,33 @@ partial class Game
         };
     }
 
+    // Food held out in front of you at chest height (the near hand from the side, the right hand from the front).
+    HandPose FoodPose(string face, int ux, int uy, string food)
+    {
+        var shoulder = face is "left" or "right" ? LookData.NearShoulder(ux, uy, face) : (x: ux + 1, y: uy - 7);
+        var (ax, ay) = Project(face, -20);
+        var hand = ((int)MathF.Round(shoulder.x + ax * 4), (int)MathF.Round(shoulder.y + ay * 4));
+        // From behind it's in front of you, low enough that your back hides it (not peeking over a shoulder).
+        if (face == "up") hand = (ux + 1, uy - 3);
+        return new HandPose { Hand = hand, Tool = "food", Item = food, ToolBehind = face == "up", ArmsBehind = face == "up" };
+    }
+
+    // A food item sitting on your hand: a raw fish as its own little picture, anything else as its bag icon at half
+    // size (ItemArt.Mini), facing the way you do. The hand is drawn over its bottom edge, holding it.
+    void DrawHeldFood(string id, int hx, int hy, int facing)
+    {
+        if (id == null || foodUndrawn) return;
+        if (FishArt.Looks.ContainsKey(id)) { FishArt.Draw(pix, id, hx - 3, hy - 3, 7, 4, facing < 0); return; }
+        var mini = ItemArt.Mini(id);
+        int x0 = hx - (facing < 0 ? 3 : 2), y0 = hy - 5;
+        for (int y = 0; y < ItemArt.MiniSize; y++)
+            for (int x = 0; x < ItemArt.MiniSize; x++)
+            {
+                var c = mini[y * ItemArt.MiniSize + (facing < 0 ? ItemArt.MiniSize - 1 - x : x)];
+                if (c.A > 0) pix.Rect(x0 + x, y0 + y, 1, 1, c);
+            }
+    }
+
     // The tool from the hand: a handle and its head (a blade, a pick, a mallet, a rake), a sword, the rod or a spear.
     void DrawToolPose(HandPose h)
     {
@@ -202,6 +246,9 @@ partial class Game
         void Dot(float x, float y, string c) => pix.Rect(MathF.Round(x), MathF.Round(y), 1, 1, c);
         switch (h.Tool)
         {
+            case "food":
+                DrawHeldFood(h.Item, h.Hand.x, h.Hand.y, facing);
+                break;
             case "rod":
             {
                 // A dark grip, the rod in its own colour, and the reel by the hand.

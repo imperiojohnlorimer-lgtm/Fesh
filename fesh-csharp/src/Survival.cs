@@ -103,13 +103,16 @@ partial class Game
         }
         Give(r.Out, r.Count);
         Learned(r.Station is "fire" or "stove" ? "cook" : "craft");
+        // Your first bar of a kind: Pip stocks them from now on (Chapters.cs).
+        bool firstBar = r.Station == "furnace" && !state.Hinted("tut:smelted:" + r.Out) && !state.Hinted("pipBars") && Items.Shop.Any(s => s.id == r.Out);
+        if (r.Station == "furnace") Learned("smelted:" + r.Out);
         var d = Items.ById[r.Out];
         Sfx.Play("craft");
         string tip = r.Out switch
         {
             "axe" => " Face a tree and press <act> to chop it.",
-            "pickaxe" => " It breaks boulders, and mines copper in Frostfang Caverns, up north.",
-            "copper_pickaxe" => " Now you can mine iron ore.",
+            "pickaxe" => " It breaks boulders, and mines copper in Frostfang Caverns, across the bridge east.",
+            "copper_pickaxe" => " Now you can mine iron ore, from the third floor of the caverns down.",
             "iron_pickaxe" => " Now you can mine gold ore.",
             "gold_pickaxe" => " Now you can mine crystal.",
             "crystal_pickaxe" => " Now you can mine abyssite on the Ancient Floor.",
@@ -129,6 +132,8 @@ partial class Game
             _ => ""
         };
         Toast($"Made a {d.Name.ToLowerInvariant()}.{tip}", tip == "" ? 2.2f : 4.5f);
+        // Queued, so making a second one straight away doesn't hide it.
+        if (firstBar) ToastLater($"Your first {d.Name.ToLowerInvariant()}! Pip will keep them on the stall now, for when you'd rather buy them.");
         Save();
     }
 
@@ -193,6 +198,7 @@ partial class Game
             _ => new[] { ("wood", 3) }
         };
         foreach (var (id, n) in drops) Give(id, n);
+        Learned(k == 'R' ? "boulder" : "chop");
         state.felled[$"{x},{y}"] = state.day;
         stumps[(x, y)] = k;
         worldMap[y, x] = Ground(k, x, y);

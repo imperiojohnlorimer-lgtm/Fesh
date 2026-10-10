@@ -441,6 +441,27 @@ static class ItemArt
         cache.Clear();
     }
 
+    // An item's icon at half size for the world (food held in your hand): each 2x2 block takes its commonest solid
+    // colour, so the picture keeps its own palette instead of blurring.
+    public const int MiniSize = S / 2;
+    static readonly Dictionary<string, Color[]> minis = new();
+    public static Color[] Mini(string itemId)
+    {
+        if (minis.TryGetValue(itemId, out var m)) return m;
+        var p = new Pix(S, S);
+        if (Items.ById.TryGetValue(itemId, out var d)) Draw(p, d.Icon ?? itemId, d.Tint);
+        else Draw(p, itemId, null);
+        m = new Color[MiniSize * MiniSize];
+        for (int y = 0; y < MiniSize; y++)
+            for (int x = 0; x < MiniSize; x++)
+            {
+                var block = new[] { p.Buf[2 * y * S + 2 * x], p.Buf[2 * y * S + 2 * x + 1], p.Buf[(2 * y + 1) * S + 2 * x], p.Buf[(2 * y + 1) * S + 2 * x + 1] }
+                    .Where(c => c.A > 128).ToList();
+                if (block.Count > 0) m[y * MiniSize + x] = block.GroupBy(c => (c.R, c.G, c.B)).OrderByDescending(g => g.Count()).First().First();
+            }
+        return minis[itemId] = m;
+    }
+
     static void Draw(Pix p, string icon, string tint)
     {
         switch (icon)

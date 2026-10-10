@@ -14,6 +14,7 @@ sealed class Goal
     public string Scene = "world";                        // where X, Y are: "world", "house:tomas", or "cave"/"sea" (Spot says which)
     public string Spot;                                   // a cave or sea fishing spot, which has no fixed place
     public string Region;                                 // the island it's on, when its spot says (null: from X, Y)
+    public string Ore;                                    // a cave goal to mine this ore ("copper", "iron"): no spot (Chapters.cs)
     public float X, Y;
     public bool HasPoint, Ready;                          // Ready: everything's in hand, it only needs taking there
 }
@@ -98,16 +99,23 @@ partial class Game
         if (!C("glowgill"))
             list.Add(Night ? AtSpot(G("glowgill", "Find the glow in the lagoon", "Something glows in the lagoon after dark. Fish there tonight and keep casting until it bites."), "lagoon")
                 : AtFire(G("glowgill", "Wait for night", "Something glows in the lagoon after dark. Rest by Tomas's campfire (<act>) to skip ahead to night, then fish the lagoon.")));
+        // Between the creatures, the chapters (Chapters.cs): tools for the fallen rocks, a home and copper for the
+        // wreck's hatch, iron for the dock, and Mara's recording for Tomas.
         else if (!C("tidecrawler"))
-            list.Add(Night ? AtFire(G("tidecrawler", "Wait for morning", "Whatever clicks on the rocky shore only comes out in daylight. Rest by the campfire (<act>) until morning."))
-                : AtSpot(G("tidecrawler", "Fish off the rocky shore", "Something clicks between the rocks on Saltmere's north shore in daylight. Cast there and keep trying."), "rocks"));
+            list.Add(!RocksCleared ? RocksGoal()
+                : Night ? AtFire(G("tidecrawler", "Wait for morning", "Whatever clicks on the rocky shore only comes out in daylight. Rest by the campfire (<act>) until morning."))
+                : AtSpot(G("tidecrawler", "Fish off the rocky shore", "Something clicks in the tide pools on Saltmere's north shore in daylight. Cast there and keep trying."), "rocks"));
         else if (!C("hollow_eel"))
-            list.Add(AtSpot(G("hollow_eel", "Fish by the old wreck", "The tide has gone out. Walk out to the old wreck off Saltmere's southwest shore and cast beside it."), "wreck"));
+            list.Add(!HatchOpen ? HatchGoal() : AtSpot(G("hollow_eel", "Fish by the old wreck", "The hatch is open, and something slipped out of it into the water. Cast beside the old wreck off Saltmere's southwest shore."), "wreck"));
         else if (!state.flags.dockFixed)
-            list.Add(AtTomas(G("keycard", "Show Tomas the key card", "The Hollow Eel was tangled up with a key card for Dr. Mara Ilao. Talk to Tomas about it.")));
+        {
+            if (DockGoal() is Goal dock) list.Add(dock);
+        }
         else if (!C("mirror_ray"))
             list.Add(Night ? AtFire(G("mirror_ray", "Wait for morning", "Something wide and silver glides past the end of the old dock, but only in daylight. Rest by the campfire (<act>) until morning."))
                 : AtSpot(G("mirror_ray", "Fish off the end of the dock", "Tomas mended the old dock east of camp. Walk to its end and cast into the deep water by day."), "deep"));
+        else if (!RecordingHeard)
+            list.Add(AtTomas(G("recording", "Play Tomas the recording", "Mara's waterproof recorder still crackles. Tomas needs to hear what she said.")));
         else if (!C("abyssal"))
             list.Add(Night ? AtSpot(G("abyssal", "The end of the dock, at night", "The deepest things only rise at night. Fish off the end of the old dock after dark."), "deep")
                 : AtFire(G("abyssal", "Wait for night", "Whatever is left down there only rises at night. Rest by the campfire (<act>) until dark, then fish off the end of the dock.")));
@@ -187,7 +195,7 @@ partial class Game
                 {
                     g.Text = $"Tatay Celso needs {ParolaNeeds} to {stage.what}. You have {string.Join(", ", stage.needs.Select(p => $"{Has(p.id)} {Items.ById[p.id].Name.ToLowerInvariant()}"))}.";
                     // Bars and crystal are on Pip's stall.
-                    if (stage.needs.Any(p => Has(p.id) < p.n && Items.Shop.Any(s => s.id == p.id))) { g.Text += " Pip sells what you're missing."; At(g, PipX, PipY + 14, "Pip's stall"); }
+                    if (stage.needs.Any(p => Has(p.id) < p.n && ShopStock().Any(s => s.id == p.id))) { g.Text += " Pip sells what you're missing."; At(g, PipX, PipY + 14, "Pip's stall"); }
                 }
                 list.Add(g);
             }
@@ -302,13 +310,27 @@ partial class Game
             if (home.kind != null) At(g, home.x, home.y, $"A {animal.Name}");
             return $"Pat a {animal.Name} (<act>): it gives one a day.";
         }
-        if (Items.Shop.Any(p => p.id == id)) { At(g, PipX, PipY + 14, "Pip's stall"); return "Pip sells them."; }
+        if (ShopStock().Any(p => p.id == id)) { At(g, PipX, PipY + 14, "Pip's stall"); return "Pip sells them."; }
+        // Bars Pip doesn't stock yet: smelt them (Chapters.cs).
+        if (id is "copper_bar" or "iron_bar")
+        {
+            string metal = id == "iron_bar" ? "iron" : "copper";
+            if (Has(metal + "_ore") >= 2)
+            {
+                if (HomeHas("furnace")) { AtHome(g, "furnace", "Your furnace"); return $"Smelt them at your furnace: 2 {metal} ore and 1 wood a bar."; }
+                if (HasHome) { AtHome(g, null, "Your shack"); return $"You have the ore. Build a furnace in your shack (10 stone, 2 wood) and smelt it: 2 {metal} ore and 1 wood a bar."; }
+                return $"You have the ore. Build a shack (<build>), put a furnace in it (10 stone, 2 wood) and smelt it: 2 {metal} ore and 1 wood a bar.";
+            }
+            g.Scene = "cave"; g.Ore = metal; g.Place = metal == "iron" ? "Iron ore" : "Copper ore"; g.HasPoint = true;
+            return $"Mine {metal} ore in Frostfang Caverns{(metal == "iron" ? " (floor 3 and below, with a copper pickaxe)" : "")}, then smelt it at a furnace: 2 ore and 1 wood a bar.";
+        }
         if (id == "wood") return "Chop trees (<act>) or pick up driftwood on the beaches.";
         if (Items.Recipes.FirstOrDefault(rc => rc.Out == id) is Recipe recipe)
         {
             string station = Items.StationName.GetValueOrDefault(recipe.Station, recipe.Station).ToLowerInvariant();
             if (recipe.Station == "fire") AtFire(g);
             else if (recipe.Station is "workbench" or "stove") At(g, recipe.Station == "workbench" ? 4 * T + 10 : 15 * T + 10, 3 * T + 8, $"Tomas's {station}", "house:tomas");
+            else if (recipe.Station == "furnace" && HomeHas("furnace")) AtHome(g, "furnace", "Your furnace");
             return $"Make them at a {station} from {string.Join(", ", recipe.Needs.Select(kv => $"{kv.Value} {IngredientName(kv.Key)}"))}.";
         }
         return Items.ById.TryGetValue(id, out var d) ? d.Desc : "";
@@ -321,8 +343,9 @@ partial class Game
         if (state.commons.Values.Sum() > 0 && Has("boat") == 0 && !state.tamed)
         {
             var g = E("explore:boat", "Build a sailboat", "");
-            bool shopping = Has("sailcloth") == 0 || Has("iron_bar") < 4;
-            if (shopping) { g.Text = "A boat takes you to the other islands. Buy sailcloth and 4 iron bars from Pip, gather 20 wood, then make it at the workbench in Tomas's hut."; At(g, PipX, PipY + 14, "Pip's stall"); }
+            if (Has("sailcloth") == 0) { g.Text = "A boat takes you to the other islands: 20 wood, 4 iron bars and sailcloth, made at a workbench. Pip sells the sailcloth."; At(g, PipX, PipY + 14, "Pip's stall"); }
+            else if (Has("iron_bar") < 4)
+                g.Text = $"Smelt 4 iron bars at a furnace from iron ore, which you mine in Frostfang Caverns (floor 3 and below) with a copper pickaxe{(ShopSells("iron_bar") ? ". Pip sells them too" : "")}. You have {Has("iron_bar")}.";
             else if (Has("wood") < 20) g.Text = $"Gather 20 wood (you have {Has("wood")}): chop trees with <act> or pick up driftwood. Then make the boat at the workbench in Tomas's hut.";
             else { g.Text = "You have everything. Make the boat at the workbench in Tomas's hut."; g.Ready = true; At(g, 4 * T + 10, 3 * T + 8, "Workbench", "house:tomas"); }
             list.Add(g);
@@ -456,10 +479,11 @@ partial class Game
     {
         if (g == null || !g.HasPoint) return null;
         if (InHouse)
-            return g.Scene == scene ? new(g.X, g.Y, g.Place, null) : new(RoomDoorWX, RoomDoorWY, "Door", "Go outside first.");
+            return g.Scene == scene ? (g.X < 0 ? null : new(g.X, g.Y, g.Place, null)) : new(RoomDoorWX, RoomDoorWY, "Door", "Go outside first.");
         if (scene == "cave")
         {
             if (g.Scene != "cave") return new(ropeTile.x * T + 5, ropeTile.y * T + 8, "Ladder", "Climb the ladder back to the surface first.");
+            if (g.Ore != null) return OreRoute(g);
             var s = Data.SpotById[g.Spot];
             if (SpotHere(s)) { var (sx, sy) = SpotPos(s); return new(sx, sy, s.Label, null); }
             if (s.Id != "ancientpool" && caveFloor == AncientFloor)
@@ -471,6 +495,7 @@ partial class Game
         string place = g.Place, how = null;
         if (g.Scene == "house:tomas") { gx = 160; gy = 72; how = "It's inside Tomas's hut."; }
         else if (g.Scene == "house:school") { gx = SchoolDoorX; gy = SchoolDoorY + 4; how = "It's inside the school."; }
+        else if (HouseDoor(g.Scene) is (float hx, float hy)) { gx = hx; gy = hy + 2; place = "Your shack"; how = "It's inside your shack: <act> at the door."; }
         else if (g.Scene == "cave") { gx = MouthDoorX; gy = MouthDoorY; place = "Frostfang Caverns"; how = "It's down in Frostfang Caverns."; }
         else if (g.Scene == "sea")
         {
@@ -559,6 +584,7 @@ partial class Game
             "house:tomas" => (160, 72),
             "house:school" => (SchoolDoorX, SchoolDoorY),
             "cave" => (MouthDoorX, MouthDoorY),
+            _ when HouseDoor(g.Scene) is (float hx, float hy) => (hx, hy),
             "sea" => scene == "world" ? SeaPoint(g.Spot) : null,
             _ => (g.X, g.Y)
         };
@@ -679,33 +705,56 @@ partial class Game
     {
         float top = 100, t = float.MaxValue;
         if (ux > 0) t = MathF.Min(t, (Gfx.LW - 46 - cx) / ux); else if (ux < 0) t = MathF.Min(t, (46 - cx) / ux);
-        if (uy > 0) t = MathF.Min(t, (Gfx.LH - 80 - cy) / uy); else if (uy < 0) t = MathF.Min(t, (top - cy) / uy);
+        // Above the hotbar along the bottom (1.20), with room for the label under a sideways arrow.
+        float bottom = MathF.Min(Gfx.LH - 80, HotbarShown && lastHotbarTop > 0 ? lastHotbarTop - 56 : Gfx.LH);
+        if (uy > 0) t = MathF.Min(t, (bottom - cy) / uy); else if (uy < 0) t = MathF.Min(t, (top - cy) / uy);
         float ax = cx + ux * t, ay = cy + uy * t;
         if (guideCardBottom > 0 && ax < CardX + CardW + 24 && ay < guideCardBottom + 26) ay = guideCardBottom + 26;
         return (ax, ay);
     }
 
     /* ---------- Getting started ---------- */
-    // The basics, ticked off as you do them. Old saves from well into the story count as done.
-    (string title, string hint, bool done)[] Basics()
+    // The basics, ticked off as you do them, on three pages: the first days, tools and a home, and the caverns (the
+    // last two follow the story's chapters, Chapters.cs). Old saves from well into the story count the first page as
+    // done; the others are worked out from what you have, so a save that already has a shack or a copper pickaxe ticks
+    // those off.
+    static readonly string[] BasicsPages = { "First days", "Tools and a home", "Into the caverns" };
+    (string title, string hint, bool done, int page)[] Basics()
     {
         bool old = state.Hinted("tut:legacy");
         bool H(string k) => old || state.Hinted("tut:" + k);
+        bool L(string k) => state.Hinted("tut:" + k);
+        int tier = PickTier;
         return new[]
         {
-            ("Talk to Tomas", "Walk up to him at his camp and press <act>.", state.flags.metTomas),
-            ("Catch a fish", "Face the water, hold <act> to power up a cast, then let go.", state.commons.Values.Sum() > 0 || state.caught.Count > 0),
-            ("Sell fish to Pip", "Pip's stall is just east of Tomas's camp.", H("sell")),
-            ("Buy bait from Pip", "Bait makes fish bite sooner. One goes on each cast.", H("buy")),
-            ("Eat something", "Open your bag (<bag>) and eat when the food bar runs low.", H("eat")),
-            ("Cook a fish", "Face a campfire and press <alt> to cook.", H("cook")),
-            ("Make something", "Use the workbench in Tomas's hut for tools and gear.", H("craft")),
-            ("Rest until night", "Press <act> by a campfire or a bed to skip ahead.", H("rest")),
-            ("Build something", "Press <build> to place a campfire, a fence, a shack...", old || state.builds.Count > 0 || state.rooms.Values.Any(r => r.Count > 0)),
-            ("Look at your Fesh-dex", "Press <dex> for the creatures and every fish you've found.", H("dex")),
-            ("Open the map", "Press <map>. Click the map to drop a pin.", H("map"))
+            ("Talk to Tomas", "Walk up to him at his camp and press <act>.", state.flags.metTomas, 0),
+            ("Catch a fish", "Face the water, hold <act> to power up a cast, then let go.", state.commons.Values.Sum() > 0 || state.caught.Count > 0, 0),
+            ("Sell fish to Pip", "Pip's stall is just east of Tomas's camp.", H("sell"), 0),
+            ("Buy bait from Pip", "Bait makes fish bite sooner. One goes on each cast.", H("buy"), 0),
+            ("Eat something", "Open your bag (<bag>) and eat when the food bar runs low.", H("eat"), 0),
+            ("Cook a fish", "Face a campfire and press <alt> to cook.", H("cook"), 0),
+            ("Rest until night", "Press <act> by a campfire or a bed to skip ahead.", H("rest"), 0),
+            ("Look at your Fesh-dex", "Press <dex> for the creatures and every fish you've found.", H("dex"), 0),
+            ("Open the map", "Press <map>. Click the map to drop a pin.", H("map"), 0),
+
+            ("Pick up driftwood and stones", "Walk over them on the beaches to pick them up.", L("gather") || Has("axe") > 0 || tier > 0, 1),
+            ("Make a stone axe", "At a workbench (Tomas's hut has one): 3 wood, 2 stone.", Has("axe") > 0, 1),
+            ("Make a stone pickaxe", "At a workbench: 3 wood and 3 stone.", tier > 0, 1),
+            ("Chop a tree", "Face a tree with your axe and press <act>.", L("chop"), 1),
+            ("Break a boulder", "Grey boulders give stone. Use your pickaxe.", L("boulder"), 1),
+            ("Build a shack", "Press <build> outdoors: 8 wood and 4 stone.", HasHome, 1),
+            ("Put a workbench in it", "Inside your shack, press <build>: 6 wood, 2 stone.", HomeHas("workbench"), 1),
+            ("Build a furnace", "Inside your shack: 10 stone and 2 wood.", HomeHas("furnace"), 1),
+
+            ("Climb down into the caverns", "Frostfang Caverns: across the bridge east of Saltmere.", state.caveDeepest > 0, 2),
+            ("Mine copper ore", "The orange rock in the cave walls. Any pickaxe.", L("ore:copper") || tier >= 2, 2),
+            ("Smelt a copper bar", "At your furnace: 2 copper ore and 1 wood.", L("smelted:copper_bar") || tier >= 2, 2),
+            ("Make a copper pickaxe", "At a workbench: 2 copper bars and 2 wood.", tier >= 2, 2),
+            ("Mine iron ore", "Floor 3 and deeper, with a copper pickaxe.", L("ore:iron") || tier >= 3, 2),
+            ("Smelt an iron bar", "At your furnace: 2 iron ore and 1 wood.", L("smelted:iron_bar") || tier >= 3, 2)
         };
     }
+    int basicsPage = -1;   // the Getting started page showing (-1: the first with something left to do)
 
     // Loading a save made before the guide, well into the story: the basics count as done (it's played them).
     // Every other game, new or old, does them for real.
@@ -810,10 +859,17 @@ partial class Game
             if (Gfx.PressedOutside(x, y, cw, ch)) ClosePanels();
             return;
         }
-        string count = $"{basics.Count(b => b.done)} of {basics.Length} done";
-        Gfx.Text(count, rx, ry0 + 34, FontKind.Ui600, 15, Muted);
-        float by0 = ry0 + 60;
-        foreach (var (title, hint, done) in basics)
+        // A page at a time, with its name and arrows.
+        if (basicsPage < 0) basicsPage = Enumerable.Range(0, BasicsPages.Length).FirstOrDefault(p => basics.Any(b => b.page == p && !b.done));
+        basicsPage = Math.Clamp(basicsPage, 0, BasicsPages.Length - 1);
+        var shown = basics.Where(b => b.page == basicsPage).ToList();
+        string count = $"{BasicsPages[basicsPage]}: {shown.Count(b => b.done)} of {shown.Count} done";
+        Gfx.Text(Gfx.Ellipsize(count, FontKind.Ui600, 15, rw - 96), rx, ry0 + 40, FontKind.Ui600, 15, Muted);
+        // Drawn arrows, not "<" and ">" buttons: those labels already name the goals' page buttons (Gfx.Seen).
+        if (PageArrow("basics:prev", false, rx + rw - 88, ry0 + 34, basicsPage > 0)) { basicsPage--; Sfx.Play("ui"); }
+        if (PageArrow("basics:next", true, rx + rw - 42, ry0 + 34, basicsPage < BasicsPages.Length - 1)) { basicsPage++; Sfx.Play("ui"); }
+        float by0 = ry0 + 72;
+        foreach (var (title, hint, done, _) in shown)
         {
             Gfx.Circle(rx + 10, by0 + 11, 10, done ? Pal.C("#3f8a4a") : Pal.C("#c9b48f"));
             if (done)
@@ -830,4 +886,19 @@ partial class Game
         if (Gfx.PressedOutside(x, y, cw, ch)) ClosePanels();
     }
     float lastJournalBottom;   // where the journal's lists ended (the autotest checks they fit the panel)
+
+    // A small button with a drawn arrow on it, named in Gfx.Seen by its key.
+    static bool PageArrow(string key, bool right, float x, float y, bool live)
+    {
+        const float w = 42, h = 30;
+        var fill = live && Gfx.Hover(x, y, w, h) ? Lighten(Pal.Sand, 0.14f) : Pal.Sand;
+        Gfx.Box(x, y, w, h, fill, Pal.Ink, 2, 5, 2);
+        float cx = x + w / 2, cy = y + h / 2, d = right ? 1 : -1;
+        var ink = live ? Pal.Ink : Pal.WithAlpha(Pal.Ink, 0.3f);
+        Gfx.Triangle(cx + 6 * d, cy, cx - 5 * d, cy - 7, cx - 5 * d, cy + 7, ink);
+#if DEBUG
+        Gfx.Seen[key] = new Rectangle(x, y, w, h);
+#endif
+        return live && Gfx.Click(x, y, w, h);
+    }
 }

@@ -445,48 +445,11 @@ partial class Game
         // The first conversation is always the introduction, even if you've already caught something strange
         // (before 1.16 an early Glowgill skipped it, and Tomas never asked for anything).
         else if (!state.flags.metTomas) MeetTomas();
-        else if (Has("mirror_ray"))
-        {
-            Talk(new()
-            {
-                Tm("Play that recording again..."),
-                Tm("She sank the ship herself. To send them home."),
-                Tm("That's my Mara. Stubborn as the tide."),
-                Tm("There's an old island saying: the deepest things only rise at night. Try the end of the dock after dark.")
-            });
-        }
-        else if (Has("hollow_eel"))
-        {
-            if (!state.flags.dockFixed)
-            {
-                Talk(new()
-                {
-                    Tm("Let me see that card."),
-                    Tm("Dr. Mara Ilao..."),
-                    Tm("Mara is my daughter. She signed on with the Halcyon three years ago. She never came home."),
-                    Tm("If she left something out there, I want to know. I'll patch up the old dock so you can reach the deep water.")
-                }, () => FadeThrough(() => { state.flags.dockFixed = true; BuildMap(); Save(); }, () => Toast("Tomas repaired the old dock, east of camp.", 3.5f)));
-            }
-            else Talk(new() { Tm("The dock should hold now. Something wide and silver glides past the end of it, mostly in daylight.") });
-        }
-        else if (Has("tidecrawler"))
-        {
-            Talk(new()
-            {
-                Tm("M.I.? Those initials..."),
-                Tm("Never mind me. The tide's out, so you can walk to the old wreck off the southwest shore."),
-                Tm("Whatever lives in that hull, go gently with it.")
-            });
-        }
-        else if (Has("glowgill"))
-        {
-            Talk(new()
-            {
-                Tm("A tag? \"Property of R/V Halcyon\"..."),
-                Tm("So that ship was carrying more than research gear."),
-                Tm("Something's been clicking around the rocky shore up north. Only in daylight. Might be worth a cast.")
-            });
-        }
+        // Between the creatures, Tomas sets you up for the next one (Chapters.cs).
+        else if (Has("mirror_ray")) TomasRecording();
+        else if (Has("hollow_eel")) TomasKeyCard();
+        else if (Has("tidecrawler")) TomasAfterTidecrawler();
+        else if (Has("glowgill")) TomasAfterGlowgill();
         else Talk(new() { Tm("The lagoon glows after dark. Rest by the fire if you want to wait for night.") });
     }
 
@@ -508,7 +471,8 @@ partial class Game
     // Tomas's requests ride along with whatever he has to say about the mystery.
     void TalkTomasWithRequests()
     {
-        if (!state.flags.metTomas || (state.Caught("hollow_eel") && !state.flags.dockFixed)) { TalkTomas(); return; }
+        // The story comes first: meeting him, the dock, and the start of each chapter (Chapters.cs).
+        if (!state.flags.metTomas || (state.Caught("hollow_eel") && !state.flags.dockFixed) || ChapterTalkDue) { TalkTomas(); return; }
         if (CanHandIn) { HandIn(); return; }
         TalkTomas();
         if (dlg != null && RequestLine() is Say line) dlg.Lines.Add(line);
@@ -563,10 +527,10 @@ partial class Game
     {
         var cr = Data.Creatures.FirstOrDefault(c => c.Spot == spot && !state.Caught(c.Id));
         if (cr == null || Eligible(cr)) return;
-        bool locked = cr.Req != null && !state.Caught(cr.Req);
-        string msg = locked ? cr.LockedHint : cr.TimeHint;
+        bool locked = cr.Req != null && !state.Caught(cr.Req), gated = !locked && !ChapterOpen(cr);
+        string msg = locked ? cr.LockedHint : gated ? GateHint(cr.Id) : cr.TimeHint;
         if (msg == null) return;
-        string key = cr.Id + (locked ? ":lock" : ":time");
+        string key = cr.Id + (locked ? ":lock" : gated ? ":gate" : ":time");
         if (state.Hinted(key)) return;
         state.hinted[key] = true;
         Save();
@@ -662,6 +626,7 @@ partial class Game
         mode = "panel";
         if (which == "map") ChooseChart();
         if (which is "dex" or "map") Learned(which);
+        if (which == "journal") basicsPage = -1;
         SetPrompt("");
     }
 
@@ -817,6 +782,8 @@ partial class Game
             return new Target { Type = "sail", Id = "saltmere", Label = Has("boat") > 0 ? "Sail somewhere" : "Asinan landing (you need a boat to sail)", AltType = "launch", AltLabel = "Take the helm" };
         if (Dist(x, y, 160, 72) < 10) return new Target { Type = "door", Id = "house:tomas", Label = "Go inside Tomas's hut" };
         if (Dist(x, y, MouthDoorX, MouthDoorY) < 14) return new Target { Type = "cave", Label = "Enter Frostfang Caverns" };
+        // The fallen rocks and the wreck's hatch, while the story needs them (Chapters.cs).
+        if (ChapterTarget() is Target chapter) return chapter;
         // Facing your own crab pot or bubo beats a campfire, a smoker or a rack close by, and a chicken wandering past.
         if (BuildAt(fx, fy) is Build pot && Data.BuildById[pot.id].Water)
         {
@@ -988,6 +955,8 @@ partial class Game
                     case "tree": HitTree(target.Tx, target.Ty); break;
                     case "bush": PickBush(target.Tx, target.Ty); break;
                     case "node": MineNode((Node)target.Ref); break;
+                    case "rockfall": BreakRocks(); break;
+                    case "hatch": TryHatch(); break;
                     case "photo":
                         Talk(new() { new Say("You", state.Caught("hollow_eel")
                             ? "Tomas and Mara on the old dock. She has his stubborn chin."
@@ -1231,9 +1200,11 @@ partial class Game
         albumPages = null;
         state.know ??= new(); state.letGo ??= new(); state.missed ??= new();
         goals.Clear(); tracked = null; guideWay = null; lastTrackedId = lastTrackedTitle = goalDoneTitle = null; goalDoneT = 0;
-        requestsKnown = null; journalPage = 0; seaPointCache = ("", 0, 0, 0, 0);
+        requestsKnown = null; journalPage = 0; basicsPage = -1; seaPointCache = ("", 0, 0, 0, 0);
         state.track ??= "";
         NoteGuideVersion(fresh);
+        NoteChapterVersion(fresh);
+        rockHits = 0;
         // A story finished without ever meeting Tomas (the early-Glowgill bug): he's met, so he gives requests.
         if (state.flags.ended) state.flags.metTomas = true;
         // The tide goes out after the Tidecrawler's catch card, in a fade: a game closed before then would never reach the wreck.

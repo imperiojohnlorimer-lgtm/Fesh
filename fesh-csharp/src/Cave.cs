@@ -371,6 +371,7 @@ partial class Game
         int count = ore.Tier >= 4 ? 1 : 2;
         Give(ore.Item, count);
         Give("stone");
+        Learned("ore:" + n.Kind);
         n.Mined = true;
         chopTile = (-1, -1);
         Sfx.Play("pickup");

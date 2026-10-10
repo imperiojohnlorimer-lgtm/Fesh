@@ -132,8 +132,13 @@ static class Gfx
     public static readonly Dictionary<string, Rectangle> Seen = new();   // debug builds: where each button was last drawn, by label
     static bool clickTaken;
     static List<Rectangle> now = new(), prev = new();
-    static readonly Dictionary<(FontKind, int), Font> fonts = new();
-    static readonly Dictionary<FontKind, byte[]> fontData = new();
+    static readonly Dictionary<(bool, FontKind, int), Font> fonts = new();
+    static readonly Dictionary<FontKind, byte[]> fontData = new(), clearData = new();
+    // The Clear font (Settings, "Font"): Atkinson Hyperlegible, made by the Braille Institute for low-vision readers,
+    // in place of the pixel and typewriter faces. Every layout was measured with the pixel font, so each kind is drawn at
+    // the size that makes it as wide as the pixel one (Fit), and moved so its capitals sit at the same height.
+    public static bool Clear => Settings.Data.clearFont;
+    static readonly Dictionary<FontKind, (float scale, float dy)> clearFit = new();
     static readonly Dictionary<string, Texture2D> art = new();
     static int[] codepoints;
     static Texture2D cork;
@@ -152,6 +157,11 @@ static class Gfx
         fontData[FontKind.Ui600] = Res("PixelifySans-SemiBold.ttf");
         fontData[FontKind.Ui700] = Res("PixelifySans-Bold.ttf");
         fontData[FontKind.Note] = Res("SpecialElite-Regular.ttf");
+        byte[] regular = Res("AtkinsonHyperlegible-Regular.ttf"), bold = Res("AtkinsonHyperlegible-Bold.ttf");
+        clearData[FontKind.Ui500] = regular;
+        clearData[FontKind.Ui600] = bold;
+        clearData[FontKind.Ui700] = bold;
+        clearData[FontKind.Note] = regular;
         var cps = Enumerable.Range(32, 95).ToList();
         cps.AddRange(new[] { 0xB7, 0xD7, 0xE9, 0x2013, 0x2014, 0x2018, 0x2019, 0x201C, 0x201D, 0x2026 });
         codepoints = cps.ToArray();
@@ -186,24 +196,50 @@ static class Gfx
     // ---------- Fonts and text ----------
     public static Font GetFont(FontKind k, float size)
     {
-        int px = Math.Max(6, (int)MathF.Round(size * Z));
-        if (fonts.TryGetValue((k, px), out var f)) return f;
-        f = LoadFontFromMemory(".ttf", fontData[k], px, codepoints, codepoints.Length);
+        float scale = Clear ? ClearFit(k).scale : 1;
+        return LoadFont(Clear, k, Math.Max(6, (int)MathF.Round(size * Z * scale)));
+    }
+
+    static Font LoadFont(bool clear, FontKind k, int px)
+    {
+        if (fonts.TryGetValue((clear, k, px), out var f)) return f;
+        f = LoadFontFromMemory(".ttf", clear ? clearData[k] : fontData[k], px, codepoints, codepoints.Length);
         SetTextureFilter(f.Texture, TextureFilter.Bilinear);
         // Pixelify Sans rasterizes its space far too narrow at many sizes, so words run together. Give it a real width.
-        unsafe
-        {
-            for (int i = 0; i < f.GlyphCount; i++)
-                if (f.Glyphs[i].Value == ' ' && f.Glyphs[i].AdvanceX < px * 0.25f) f.Glyphs[i].AdvanceX = (int)MathF.Round(px * 0.28f);
-        }
-        fonts[(k, px)] = f;
+        if (!clear)
+            unsafe
+            {
+                for (int i = 0; i < f.GlyphCount; i++)
+                    if (f.Glyphs[i].Value == ' ' && f.Glyphs[i].AdvanceX < px * 0.25f) f.Glyphs[i].AdvanceX = (int)MathF.Round(px * 0.28f);
+            }
+        fonts[(clear, k, px)] = f;
         return f;
     }
+
+    // How much bigger (or smaller) the Clear font is drawn so a line of it is as wide as the pixel font's, and how far
+    // down (in sizes) it moves so the middle of its capitals lines up with the pixel font's: buttons stay centred.
+    public static (float scale, float dy) ClearFit(FontKind k)
+    {
+        if (clearFit.TryGetValue(k, out var fit)) return fit;
+        const int refPx = 48;
+        const string sample = "The quick brown fox jumps over the lazy dog. Sold 3 fish for 120 coins!";
+        Font p = LoadFont(false, k, refPx), c = LoadFont(true, k, refPx);
+        float scale = Math.Clamp(MeasureTextEx(p, sample, refPx, 0).X / MeasureTextEx(c, sample, refPx, 0).X, 0.8f, 1.3f);
+        static unsafe float CapMid(Font f)
+        {
+            int i = GetGlyphIndex(f, 'H');
+            return (f.Glyphs[i].OffsetY + f.Recs[i].Height / 2f) / refPx;
+        }
+        return clearFit[k] = (scale, CapMid(p) - scale * CapMid(c));
+    }
+
+    // How far text of this kind and size is moved down from where it was asked for (only the Clear font is).
+    public static float TextDy(FontKind k, float size) => Clear ? ClearFit(k).dy * size : 0;
 
     public static void Text(string s, float x, float y, FontKind k, float size, Color c)
     {
         var f = GetFont(k, size);
-        DrawTextEx(f, s, new Vector2(MathF.Round(OX + x * Z), MathF.Round(OY + y * Z)), f.BaseSize, 0, c);
+        DrawTextEx(f, s, new Vector2(MathF.Round(OX + x * Z), MathF.Round(OY + (y + TextDy(k, size)) * Z)), f.BaseSize, 0, c);
     }
 
     public static void TextCenter(string s, float cx, float y, FontKind k, float size, Color c) =>
@@ -354,7 +390,7 @@ readonly struct Tilt
     public void Text(string s, float x, float y, FontKind k, float size, Color c)
     {
         var f = Gfx.GetFont(k, size);
-        DrawTextPro(f, s, Gfx.P(cx, cy), new Vector2((cx - x) * Gfx.Z, (cy - y) * Gfx.Z), deg, f.BaseSize, 0, c);
+        DrawTextPro(f, s, Gfx.P(cx, cy), new Vector2((cx - x) * Gfx.Z, (cy - y - Gfx.TextDy(k, size)) * Gfx.Z), deg, f.BaseSize, 0, c);
     }
 
     public Vector2 Point(float x, float y)

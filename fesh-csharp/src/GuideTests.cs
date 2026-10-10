@@ -40,16 +40,19 @@ partial class Game
         SetNight(true); yield return 2;
         Check($"at night the same step points at the lagoon ({guideWay?.Place})", tracked?.Id == "story:glowgill" && guideWay?.Place == "The lagoon" && goalDoneT == 0);
         state.caught.Add("glowgill"); yield return 2;
+        Check($"after the Glowgill, the chapter starts with Tomas ({tracked?.Id})", tracked?.Id == "story:tag" && guideWay?.Place == "Tomas");
+        // The chapters between the creatures have their own checks (ChapterTests.cs); here they're done.
+        state.hinted["ch:rocks"] = true; yield return 2;
         Check($"after the Glowgill, at night: rest until morning ({tracked?.Title})", tracked?.Id == "story:tidecrawler" && guideWay?.Place == "Campfire");
         SetNight(false); yield return 2;
         Check($"by day: the rocky shore ({guideWay?.Place})", guideWay?.Place == "Rocky shore");
-        state.caught.Add("tidecrawler"); state.flags.tideOut = true; yield return 2;
+        state.caught.Add("tidecrawler"); state.flags.tideOut = true; state.hinted["ch:hatch"] = true; yield return 2;
         Check($"then the old wreck ({guideWay?.Place})", tracked?.Id == "story:hollow_eel" && guideWay?.Place == "Old wreck");
         state.caught.Add("hollow_eel"); yield return 2;
         Check($"then show Tomas the key card ({tracked?.Title})", tracked?.Id == "story:keycard" && guideWay?.Place == "Tomas");
         state.flags.dockFixed = true; BuildMap(); yield return 2;
         Check($"then the deep water off the dock by day ({guideWay?.Place})", tracked?.Id == "story:mirror_ray" && guideWay?.Place == "Deep water");
-        state.caught.Add("mirror_ray"); SetNight(true); yield return 2;
+        state.caught.Add("mirror_ray"); state.hinted["ch:recording"] = true; SetNight(true); yield return 2;
         Check($"and the end of the dock at night ({tracked?.Title})", tracked?.Id == "story:abyssal" && guideWay?.Place == "Deep water");
         SetNight(false);
 
@@ -250,7 +253,8 @@ partial class Game
         bool asks = dlg?.Lines.Any(l => l.T.Contains("could you bring me")) == true;
         while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 2; }
         Check($"a finished story that never met Tomas still gets his requests ({state.req?.item})", state.flags.metTomas && asks && state.req != null);
-        Check($"and its old checklist counts as done ({Basics().Count(b => b.done)} of {Basics().Length})", Basics().All(b => b.done));
+        // The first page; tools, a home and the caverns (1.22) are ticked off by what you really have.
+        Check($"and its old checklist counts as done ({Basics().Count(b => b.done)} of {Basics().Length})", Basics().Where(b => b.page == 0).All(b => b.done));
 
         // A new game that rushes the story still has to do the basics.
         state = new State { created = true, flags = new Flags { metTomas = true }, look = new Look { name = "Quick" } };

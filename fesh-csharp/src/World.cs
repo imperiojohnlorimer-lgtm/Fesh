@@ -728,6 +728,7 @@ partial class Game
         pix.Rect(30, 136, 6, 1, "#4a2f1d");
         pix.Rect(32, 137, 4, 5, "#d9d2bf");
         pix.Rect(14, 155, 26, 1, "#cfe8ee");
+        DrawHatch();
     }
 
     /* ---------- Things you build ---------- */
@@ -1141,6 +1142,7 @@ partial class Game
         // On the title the view tours the islands with nobody in it (UiMenu.cs), and behind the creator of a new fisher too.
         if (!(mode == "title" || mode == "create" && creatorFor == "new")) list.Add((player.Y, DrawPlayer));
         if (Visible(26, 150)) list.Add((157, DrawWreck));
+        if (!RocksCleared && Visible(RockfallX, RockfallY)) list.Add((RockfallY + 3, DrawRockfall));
         foreach (var o in list.OrderBy(o => o.y)) o.draw();
     }
 

@@ -19,6 +19,7 @@ partial class Game
     bool Eligible(Creature cr) =>
         !state.Caught(cr.Id)
         && (cr.Req == null || state.Caught(cr.Req))
+        && ChapterOpen(cr)
         && (cr.Time == "any" || (cr.Time == "night") == Night);
 
     // The moon runs through eight phases, one per day; phase 4 is full. The first night of a new game is a full moon.

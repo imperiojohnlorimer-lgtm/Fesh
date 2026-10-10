@@ -174,7 +174,7 @@ partial class Game
         var buttons = new (string label, Action act, bool on)[]
         {
             ("Case board", () => TogglePanel("case"), false),
-            ($"Fesh-dex {state.caught.Count}/5", () => TogglePanel("dex"), false),
+            ("Fesh-dex", () => TogglePanel("dex"), false),
             ("Map", () => TogglePanel("map"), false),
             ("Tackle", () => TogglePanel("tackle"), false),
             ("Bag", () => TogglePanel("bag"), false),
@@ -466,6 +466,7 @@ partial class Game
     }
 
     /* ---------- Fesh-dex ---------- */
+    float lastCreaturesBottom;   // where the creatures page ended (the autotest checks it fits the screen)
     static readonly Dictionary<string, string> BiomeColor = new() { ["saltmere"] = "#5d9b45", ["frost"] = "#8fc3d6", ["dunes"] = "#e0a85a", ["mire"] = "#3f7d3a", ["atoll"] = "#2bb3a3", ["amihan"] = "#d59c4c", ["habagat"] = "#c9b9e0" };
     int logPage;   // one page per biome, then legends, odd catches and records
 
@@ -559,7 +560,7 @@ partial class Game
         float innerW = nw - padL - padR;
         bool log = dexTab == "log";
         var lead = Gfx.Wrap(log ? "Every fish across the islands, with your heaviest catch of each. A gold star counts trophy-sized catches."
-            : "Every strange creature you catch on Saltmere, plus what you know about the ones still out there.", FontKind.Note, 20, innerW);
+            : "The Saltmere mystery: every strange creature you catch, what you know about the ones still out there, and the story so far.", FontKind.Note, 20, innerW);
 
         // Creatures tab layout
         float cardW = (innerW - gap * 4) / 5, artW = cardW - 20, artH = artW * 0.6f;
@@ -571,7 +572,6 @@ partial class Game
         }).ToList();
         float cardH = cards.Max(c => 10 + artH + 10 + 30 + c.meta.Count * 21 + 6 + c.text.Count * 25 + 12);
         int kinds = Data.AllCommon.Count(f => state.commons.GetValueOrDefault(f.Id) > 0);
-        string summary = $"Fish caught: {kinds} of {Data.AllCommon.Length} kinds. Open the Fish log for the full list.";
 
         // Fish log layout: a card per spot, in two columns
         const float rowH = 27, headH = 34, cardGap = 12;
@@ -588,7 +588,7 @@ partial class Game
         float extrasH = oddH + 10 + 70 + 10 + sightH;
         float logH = logPage < Data.Biomes.Length ? Math.Max(60, cols.Max(c => c.Sum(i => heights[i] + cardGap))) : Math.Max(legendsH, extrasH);
 
-        float contentH = log ? 50 + 34 + logH : cardH + 24 + 30 + 32;
+        float contentH = log ? 50 + 34 + logH : cardH + 20 + ChapterStripH;
         float h = padT + 46 + 10 + lead.Count * 28 + 16 + contentH + padB + 6;
         float ny = Math.Max(14, (Gfx.LH - h) / 2);
         Gfx.Box(nx, ny, nw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
@@ -630,9 +630,10 @@ partial class Game
                 cy += meta.Count * 21 + 6;
                 Lines(text, cx + 10, cy, 25, FontKind.Note, 18, Pal.PaperInk);
             }
-            y += cardH + 24;
-            Gfx.Text("Fishing", x, y, FontKind.Ui700, 24, Pal.PaperInk);
-            Gfx.Text(summary, x, y + 32, FontKind.Note, 20, Pal.PaperInk);
+            y += cardH + 20;
+            // The chapters between the creatures (Chapters.cs), and what to do now.
+            DrawChapterStrip(x, y, innerW);
+            lastCreaturesBottom = ny + h;
             if (Gfx.PressedOutside(nx, ny, nw, h)) ClosePanels();
             return;
         }

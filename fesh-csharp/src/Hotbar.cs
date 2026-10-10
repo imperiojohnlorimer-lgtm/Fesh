@@ -45,6 +45,8 @@ partial class Game
     string HeldItem => SlotItem(HeldKey);
     // The tool drawn in your hand (Tools.cs names): null for food or empty hands.
     string HeldTool => HeldItem == null ? null : HeldKey switch { "rod" => "rod", "axe" => "axe", "pick" => "pick", "sword" => "sword", "spear" => "spear", _ => null };
+    // Food in your hand (drawn by Tools.FoodPose): what's held when it isn't a tool.
+    string HeldFood => HeldTool == null ? HeldItem : null;
 
     // Older saves have no hotbar: it starts with the tools you own, hands free. Anything odd in a saved one is tidied.
     void EnsureHotbar()
@@ -161,15 +163,21 @@ partial class Game
                 AirSwing("throw");
                 return;
             default:
+            {
+                // Up to your mouth: it shows the bite, even when it was your last one.
+                int had = Has(id);
                 Eat(id);
+                if (Has(id) < had) { eatItem = id; Swing("eat", 0.6f); }
                 return;
+            }
         }
     }
 
     // A swing at nothing in particular: the arms and the tool do the whole stroke, with a swish.
     void AirSwing(string tool)
     {
-        if (swingT > 0.05f) return;
+        // A bite (the "eat" swing) never holds a tool back (Codex): picking up the axe straight after swings it.
+        if (swingT > 0.05f && swingTool != "eat") return;
         Swing(tool, tool == "throw" ? 0.25f : 0.28f);
         Sfx.Play("swish");
     }

@@ -125,9 +125,21 @@ partial class Game
         // is in full on the tooltip (shopTip).
         const float rowH = 80, gap = 6;
         float colW = (w - 16) / 2;
-        for (int i = 0; i < Items.Shop.Length; i++)
+        lastShopBottom = 0;
+        // Copper and iron bars only once you've smelted that kind yourself (Chapters.cs): Pip says so in their place.
+        var stock = ShopStock().ToList();
+        if (stock.Count < Items.Shop.Length)
         {
-            var (id, price) = Items.Shop[i];
+            int i = stock.Count;
+            float rx = x + (i % 2) * (colW + 16), ry = y + (i / 2) * (rowH + gap);
+            var note = Gfx.Wrap("Copper and iron bars? Smelt your own first, from Frostfang's ore, and Pip will stock them for when you're in a hurry.", FontKind.Note, 16, colW - 24);
+            Gfx.Box(rx, ry, colW, rowH, Pal.C("rgba(201,180,143,0.25)"), Pal.C("#c9b48f"), 2, 5);
+            Lines(note, rx + 12, ry + (rowH - note.Count * 19) / 2, 19, FontKind.Note, 16, Muted);
+            lastShopBottom = Math.Max(lastShopBottom, ry + rowH);
+        }
+        for (int i = 0; i < stock.Count; i++)
+        {
+            var (id, price) = stock[i];
             var d = Items.ById[id];
             float rx = x + (i % 2) * (colW + 16), ry = y + (i / 2) * (rowH + gap);
             Gfx.Box(rx, ry, colW, rowH, CardBg, Pal.C("#c9b48f"), 2, 5);
@@ -143,7 +155,7 @@ partial class Game
             if (desc.Count > 2) desc = new() { desc[0], Gfx.Ellipsize(string.Join(" ", desc.Skip(1)), FontKind.Note, 15, colW - 76) };
             Lines(desc, rx + 62, ry + 43, 16, FontKind.Note, 15, Pal.PaperInk);
             if (Gfx.Hover(rx, ry, btnL, rowH)) shopTip = id;
-            lastShopBottom = ry + rowH;
+            lastShopBottom = Math.Max(lastShopBottom, ry + rowH);
             DrawIcon("coin", rx + 62, ry + 25, 18);
             Gfx.Text(price.ToString(), rx + 84, ry + 24, FontKind.Ui700, 18, Pal.C("#9a6a1a"));
             bool can1 = state.coins >= price;

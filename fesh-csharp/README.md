@@ -39,11 +39,12 @@ These are the defaults. Every one of them can be changed in the menu (Esc, then 
 | Hold Space (or mouse) | Lift the green bar while reeling; tap it for leaps and pumps |
 | Arrow keys / WASD | Haul up a sunken chest |
 | I | Bag (eat food here) |
+| 1–6, mouse wheel / V | Pick what's in your hands from the hotbar / use it (swing, cast, eat) |
 | B | Build outdoors, or furnish your shack |
 | 1–9, X | Pick a piece, take-down tool |
 | Click a nearby tile | Build there |
 | Tab | Map of the islands (click the chart to drop a pin) |
-| J / C | Fesh-dex (creatures and Fish log) / case board |
+| J / C | Fesh-dex (the mystery's creatures and chapters, and the Fish log) / case board |
 | Q | Journal: the goals open right now, and the Getting started list |
 | M | Sound on or off |
 | R | Get on and off your boat: board it from beside it, land it beside a shore. Ride Tidemane, or hop off (once you have it); from anywhere outdoors it whistles Tidemane over |
@@ -60,6 +61,26 @@ the tile in front (the pick bounces off the rock), a sword slashes, fists punch,
 traps up with both hands. The rod goes back over your shoulder as you load a cast, whips forward as you throw, and
 your other hand turns the reel while you reel in.
 
+## The hotbar
+Six slots along the bottom of the screen hold what's in your hands: your rod, axe, pickaxe, sword, spear, or food. Pick
+one with **1-6**, the mouse wheel or a click (the same key again puts it away); on a gamepad, flick the right stick. A
+tool slot always holds your best of that kind, and new tools fill an empty slot; put food or a tool on any slot from
+its card in your bag. Whatever you pick is in your hand: tools are carried, and food is held out in front of you.
+Use it with **E** when nothing's in front of you, **V**, a click on the ground, or B on a gamepad: tools swing (and
+still chop or mine what's there), the rod casts into any water, and food goes up to your mouth for a bite.
+
+## The Saltmere mystery
+Five strange creatures, a sunken research ship and Tomas's missing daughter. The **Fesh-dex** (J) shows the creatures
+you've caught and, under them, the mystery's **nine chapters**: between the creatures, Tomas helps you settle in.
+- After the first creature he asks you to make a **stone axe and a stone pickaxe** at his workbench, from driftwood and
+  stones off the beach, and to break up the **rocks fallen over the tide pools** on the rocky shore.
+- Later the old wreck's **hatch** is rusted shut. A copper pickaxe would open it, so you build **a shack of your own**
+  with **your own workbench and a furnace**, climb down into **Frostfang Caverns** for copper ore, smelt it into bars,
+  and make the pickaxe. (Tomas starts you off with five planks and five stones.)
+- Then the old dock needs **two iron bars**, from iron ore deeper down the caverns (floor 3 and below).
+- Pip only stocks copper and iron bars once you've smelted that kind yourself. Games saved before this change keep
+  buying them as before, and any chapter your save had already passed counts as done.
+
 ## Finding your way: the guide and the journal
 - **The goal card** under your health and food always shows the next step of whatever you're following, with how far
   it is. It works the story out from what you've done, so you can wander off, do things in any order, and it simply
@@ -71,9 +92,12 @@ your other hand turns the reel while you reel in.
   people have asked you for (Tomas, Niko, Lira, Maya, Tala, Bantay Joy, Tatay Celso, Dado, Manang Rosa's daily order)
   and somewhere new to explore. **Follow** any of them, or leave it on **Automatic** (the story, then a request you can
   hand in, then the rest). When someone asks you for something new, a note says it's in the journal.
-- **Getting started** in the journal ticks off the basics as you do them: talk, fish, sell, buy bait, eat, cook,
-  make something, rest, build, and open the Fesh-dex and the map. Its other tab, **Sea school**, shows your three
-  badges (see below) and opens the tide table once Lola Pacing has given it to you.
+- **Getting started** in the journal ticks off the basics as you do them, on three pages (the arrows turn them):
+  **First days** (talk, fish, sell, buy bait, eat, cook, rest, open the Fesh-dex and the map), **Tools and a home**
+  (pick up driftwood and stones, make a stone axe and pickaxe, chop a tree, break a boulder, build a shack, put a
+  workbench and a furnace in it) and **Into the caverns** (climb down, mine copper, smelt a bar, make a copper pickaxe,
+  mine iron, smelt an iron bar). Its other tab, **Sea school**, shows your three badges (see below) and opens the tide
+  table once Lola Pacing has given it to you.
 - Your goal shows on the map too. Don't want it? **Hide the arrow** in the journal, or Settings > Goal and arrow.
 
 ## Day, night and the menu
@@ -98,7 +122,8 @@ a cast or a fight, and Resume picks up exactly where you were. Turn that off in 
 The menu (Esc, Start, or the button at the top right) has three tabs. **Game:** resume, save now, change your look,
 quit to the title or quit; plus the day, the moon, today's and tomorrow's forecast and time played. **Settings:** music
 and sound volume, music and sound on or off, fullscreen, screen shake, pausing in the background, the length of a day,
-and a 12- or 24-hour clock. **Controls:** two keys for every action (click one and press the new key), and the gamepad
+a 12- or 24-hour clock, and the **font**: Pixel, or **Clear** (Atkinson Hyperlegible, made by the Braille Institute for
+readers with low vision) for anyone who finds the pixel and typewriter letters hard to read. **Controls:** two keys for every action (click one and press the new key), and the gamepad
 layout. The title screen has Continue (your most recent save), Load game, New game and Settings. Load game shows each
 slot with Play, Copy (into an empty slot), Rename (give the slot its own name, like "Robin, before the storm") and
 Delete. Behind the title the view tours the islands, from Saltmere and Starfall Atoll to Amihan and Habagat, a few
@@ -255,7 +280,8 @@ each set's progress. Point at any of your fish to see its name; with more than 2
 ## Pip, coins and Tomas's requests
 - **Pip** keeps a stall just east of Tomas's camp, open from 7 AM to 9 PM. Pip buys fish and materials (rare fish are worth far more, big fish
   more too) and sells bait (5), chum (8), cork bobbers (20), crab pots (40), spinner lures (45), berry saplings (15),
-  sailcloth (120), copper bars (30), iron bars (55), crystal (90) and suka, vinegar for paksiw (4). Your coins show in the HUD.
+  sailcloth (120), copper bars (30, once you've smelted one), iron bars (55, likewise), crystal (90) and suka, vinegar
+  for paksiw (4). Your coins show in the HUD.
 - **Tomas's requests:** once you've met him, Tomas asks for things (3 pond perch, 6 wood, 2 Arctic char, ...)
   and pays coins, sometimes with bait on top. The first twelve are a set list that sends you around the islands;
   after that he asks for random fish. When you have what he wants, his prompt says so. The bag shows the current request.
@@ -802,4 +828,5 @@ journal, the aquarium's layout and the real-fish notes, `FESH_EDU_TEST=1` for on
 fish go, sorting crabs and Ma'am Isay's class), or `FESH_ATLAS_TEST=1` for only the island guide and the fish album;
 the full play-through includes them too.
 
-Fonts: Pixelify Sans and Special Elite, both under the SIL Open Font License.
+Fonts: Pixelify Sans, Special Elite and Atkinson Hyperlegible (the Clear font, © Braille Institute of America; its
+licence is in `Assets/Fonts/AtkinsonHyperlegible-OFL.txt`), all under the SIL Open Font License.

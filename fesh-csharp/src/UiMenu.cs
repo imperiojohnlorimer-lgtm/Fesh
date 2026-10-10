@@ -503,6 +503,8 @@ partial class Game
         int li = Array.IndexOf(lengths, d.dayLength);
         d.dayLength = lengths[Pick("Length of a day", lengths.Select(m => m > 0 ? $"{m} min" : "Stopped").ToArray(), li < 0 ? 1 : li)];
         d.clock24 = Pick("Clock", new[] { "12-hour", "24-hour" }, d.clock24 ? 1 : 0) == 1;
+        // Clear is Atkinson Hyperlegible, for anyone who finds the pixel and typewriter letters hard to read (Gfx.Clear).
+        d.clearFont = Pick("Font", new[] { "Pixel", "Clear (easier to read)" }, d.clearFont ? 1 : 0) == 1;
         if (changed) { Settings.ApplyAudio(); Settings.Save(); }
         var note = d.dayLength > 0 ? $"A whole day and night on the island takes {d.dayLength} minutes of play. The clock stops while a menu, a panel or a conversation is open."
             : "The clock is stopped: it's only ever as late as resting makes it.";
