@@ -107,13 +107,13 @@ partial class Game
         pendingShot = "mount-01-climbing-on"; yield return 2;
         yield return 20;
         // It picks up speed rather than leaping to a gallop, but still covers ground fast.
-        float x0 = player.X;
+        float x0 = player.X, rideStarted = time;
         Inp.Hold(KeyboardKey.Right, true); yield return 4;
-        float early = player.X - x0;
-        yield return 26;
+        float early = player.X - x0, earlySeconds = time - rideStarted;
+        while (time - rideStarted < 0.5f) yield return 0;
         float half = player.X - x0;
         Inp.Hold(KeyboardKey.Right, false);
-        Check($"it picks up speed: {early:0.0} px in the first four frames, {half:0} in half a second", early < 4 * 92 / 60f && half > 36);
+        Check($"it picks up speed: {early:0.0} px in the first {earlySeconds:0.00} seconds, {half:0} in half a second", early < earlySeconds * 92 && half > 36);
         Check($"at full tilt it gallops, and you lean into it ({RidePose().Kind})", RidePose().Kind == "gallop");
         // Let go and it pulls up within a few pixels.
         float stopFrom = player.X;
@@ -150,9 +150,9 @@ partial class Game
         {
             player.X = (pm.px + 2) * T + 5; player.Y = pm.py * T + 7; player.Face = "left"; yield return 2;
             Inp.Hold(KeyboardKey.Left, true); yield return 40;
-            int prints = trackPrints.Count;
+            trackPrints.Clear();
             yield return 20;
-            Check($"pushing against a palm it stands its ground rather than galloping in place ({RidePose().Kind}, {mountSpeed:0.0} px/s)", RidePose().Kind == "stand" && trackPrints.Count == prints);
+            Check($"pushing against a palm it stands its ground rather than galloping in place ({RidePose().Kind}, {mountSpeed:0.0} px/s)", RidePose().Kind == "stand" && trackPrints.Count == 0);
             Inp.Hold(KeyboardKey.Left, false); yield return 2;
         }
         else Note("no palm with open sand beside it found for the wall check");

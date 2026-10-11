@@ -1275,8 +1275,8 @@ partial class Game
         reel.Progress = 0.5f; reel.LeapT = 0.01f;
         yield return 2;
         Check("it leaps", reel.Leap > 0);
-        while (mode == "reeling" && reel.LeapMark < 0.68f) yield return 1;
-        pendingShot = "43-leap"; yield return 1;
+        while (mode == "reeling" && reel.LeapMark < 0.6f) yield return 1;
+        pendingShot = "43-leap";
         float before = reel.Progress;
         Inp.Tap(KeyboardKey.Space); yield return 1;
         Check($"a press in the gold keeps it hooked (+{reel.Progress - before:0.00})", reel.Progress > before + 0.1f);

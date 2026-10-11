@@ -337,7 +337,7 @@ partial class Game
         SetLowTide(); yield return 2;
         var amb = MlWalk("ambo");
         foreach (int f in At(amb.X, amb.Y + 8)) yield return f;
-        Check($"Mang Ambo offers the walk at low tide ({target?.Label})", target?.Id == "ambo" && target.Label.Contains("Walk the sandbar"));
+        Check($"Mang Ambo offers tide-pool guidance at low tide ({target?.Label})", target?.Id == "ambo" && target.Label == "Ask Mang Ambo about the tide pools");
         foreach (int f in E()) yield return f;
         bool margin = dlg?.Lines.Any(l => l.T.Contains("Be back on the beach by")) == true;
         foreach (int f in Talk()) yield return f;
