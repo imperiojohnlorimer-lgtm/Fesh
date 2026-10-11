@@ -70,7 +70,7 @@ partial class Game
         /* ---------- Every page, once found ---------- */
         Note("Every island's page");
         state.charted = Regions.Select(r => r.Id).Concat(new[] { "habagat:islet:0" }).ToList();
-        state.caveDeepest = 12; state.inv["boat"] = 1; state.hinted["amihan"] = state.hinted["habagat"] = state.hinted["metJoy"] = true;
+        state.caveDeepest = 12; state.inv["boat"] = 1; state.hinted["amihan"] = state.hinted["habagat"] = state.hinted["metJoy"] = state.hinted["marilaya"] = true;
         foreach (var f in Data.AllCommon.Where((f, i) => i % 3 == 0)) state.commons[f.Id] = 1;
         Check("found, every place opens", Regions.All(AtlasOpen));
         OpenAtlas("saltmere"); yield return 2;

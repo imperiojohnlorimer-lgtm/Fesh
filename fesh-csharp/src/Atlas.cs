@@ -154,7 +154,27 @@ partial class Game
             "Tropical; the habagat brings rain and rough seas.",
             "Schools of small fish that come and go with the seasons, and the hunters that follow them.",
             "The habagat, the southwest monsoon, brings heavy rain to the western Philippines from about June to October. Some fish follow the seasons too: here, some schools come only in the amihan and others only in the habagat.",
-            new ProfilePoint[0], new (float, float, float, bool)[0], new (float, string)[0], new (float, string)[0], Diagram: "ocean", Biome: "habagat")
+            new ProfilePoint[0], new (float, float, float, bool)[0], new (float, string)[0], new (float, string)[0], Diagram: "ocean", Biome: "habagat"),
+        // Marilaya (1.23, Marilaya.cs): modelled on Marinduque. The cross-section runs north to south, from the north
+        // shore over the limestone hills and the forested uplands to Bundok Tindig and the south coast.
+        new("marilaya", "Marilaya Island", "Volcanic island with limestone hills",
+            "Shaped like a heart, far out east past Amihan, with Bundok Tindig, a forested volcano, at its southern point and hot springs at its western foot. Limestone hills with a cave rise in the north-east. A river runs down through the town on the west coast, and a survey stone stands on the hill above the harbour. Islets lie off the north-east, the east and the south-west, with a sandbar off Maniwaya at low tide.",
+            new[] { Wb("The harbour cove under the survey hill", "salt"), Wb("The river through the town: fresh upstream", "fresh"), Wb("The river mouth, where it meets the sea", "brackish"),
+                Wb("The hot springs at Tindig's foot: groundwater heated deep underground", "fresh"), Wb("The reef round the Tres Reyes islets", "salt"), Wb("The white beach on the south-east coast", "salt") },
+            "Tropical, with the two monsoons. The forest on Tindig keeps the high ground cool and damp.",
+            "Coconut palms and fields on the lowlands, forest on the mountain, bats roosting in the cave, lime butterflies raised in a nursery near the south-west coast, arrowroot on Mompong, tide-pool animals on the sandbar, and reef fish round the Tres Reyes.",
+            "Marilaya is made up, but modelled on Marinduque, a heart-shaped island province of about 952 square km. Mount Malindig, about 1,157 m, is listed by PHIVOLCS as potentially active, with sulfurous hot springs at Malbog, whose heat a DOST project uses to dry food. Station Balanacan (1906) became the origin of the Luzon Datum of 1911, and PRS92 still uses it. One explanation links the name Marinduque to Malindig. Coastline traced from OpenStreetMap (© OpenStreetMap contributors, ODbL).",
+            new[] { P(0, -25, 'u'), P(6, -4, 'c'), P(10, 0, 's'), P(14, 10, 'k'), P(20, 26, 'k'), P(26, 18, 'k'), P(32, 30, 'g'), P(42, 48, 'f'), P(52, 40, 'f'), P(60, 58, 'f'),
+                P(68, 85, 'f'), P(74, 110, 'r'), P(80, 80, 'f'), P(87, 30, 'f'), P(92, 4, 'p'), P(95, 0, 's'), P(100, -25, 'u') },
+            new (float, float, float, bool)[0], new[] { (8f, "North shore"), (20f, "Limestone hills"), (46f, "Forested uplands"), (74f, "Bundok Tindig"), (95f, "South coast") },
+            new[] { (12f, "hut") }),
+        new("marilayasea", "Marilaya's waters", "Open ocean",
+            "Deep water all round Marilaya, far out east past Amihan.",
+            new[] { Wb("Deep ocean, warm and open, with strong currents between the islands", "salt") },
+            "Tropical, with the two monsoons.",
+            "Schools of skipjack tuna, and diamondback squid out over the deep water.",
+            "Off Gasan, on Marinduque's south-west coast, fishers catch diamondback squid: big squid of the open sea, named for the diamond shape their wide fins make. Skipjack tuna school in warm surface water around the islands.",
+            new ProfilePoint[0], new (float, float, float, bool)[0], new (float, string)[0], new (float, string)[0], Diagram: "ocean", Biome: "marilaya")
     };
 
     public static readonly Dictionary<string, RegionInfo> RegionById = Regions.ToDictionary(r => r.Id);
@@ -167,6 +187,7 @@ partial class Game
         "amihansea" => state.Hinted("amihan"),
         "sanctuary" => state.Hinted("metJoy"),
         "habagatsea" => state.Hinted("habagat"),
+        "marilayasea" => state.Hinted("marilaya"),
         _ => Charted(r.Id)
     };
 
@@ -176,13 +197,13 @@ partial class Game
         var spots = r.Id switch
         {
             "caverns" => Data.Spots.Where(s => s.Scene == "cave"),
-            "opensea" or "amihansea" or "habagatsea" => Data.Spots.Where(s => s.Id == r.Id),
+            "opensea" or "amihansea" or "habagatsea" or "marilayasea" => Data.Spots.Where(s => s.Id == r.Id),
             "sanctuary" => Enumerable.Empty<Spot>(),
             _ => Data.Spots.Where(s => s.Scene == "world" && SpotKnown(s) && SpotRegion(s) == r.Id)
         };
         var list = spots.SelectMany(s => Data.Common[s.Id]).ToList();
         // An island's crab pots too (not the sanctuary's: no traps there).
-        if (r.Diagram == "profile" && r.Id != "sanctuary" && Data.PotCatch.TryGetValue(r.Biome ?? r.Id, out var pots)) list.AddRange(pots);
+        if (r.Diagram == "profile" && r.Id != "sanctuary" && PotCatchFor(r.Biome ?? r.Id) is CommonFish[] pots) list.AddRange(pots);
         return list.Distinct().ToList();
     }
 
@@ -193,9 +214,9 @@ partial class Game
         if (scene != "world") return RegionById.TryGetValue(RegionOf(state.exitX, state.exitY), out var inside) ? inside.Id : "saltmere";
         if (InAmihan && InSanctuary(player.X, player.Y)) return "sanctuary";
         int tx = (int)MathF.Floor(player.X / T), ty = (int)MathF.Floor((player.Y - 1.5f) / T);
-        if (TileAt(tx, ty) == '~' || Aboard && !OnFlat) return InAmihan ? "amihansea" : InHabagat ? "habagatsea" : "opensea";
+        if (TileAt(tx, ty) == '~' || Aboard && !OnFlat) return SeaSpotHere;
         string r = RegionAt(tx, ty);
-        return RegionById.ContainsKey(r) ? r : r.StartsWith("habagat:islet") ? "habagat:islet:0" : "saltmere";
+        return RegionById.ContainsKey(r) ? r : r.StartsWith("habagat:islet") ? "habagat:islet:0" : r.StartsWith("marilaya") ? "marilaya" : "saltmere";
     }
 
     // The guide page for a Fish log page (a biome).
@@ -209,6 +230,7 @@ partial class Game
     /* ---------- The guide's panel ---------- */
     string atlasRegion = "saltmere";
     float lastAtlasBottom;      // where the page's text ended (the autotest checks it fits)
+    float lastAtlasListBottom;  // where the list of places down the left ended (it closes up to fit)
     bool atlasZoom;             // the page's drawing is open big (click it; Back or Esc closes it)
 
     void OpenAtlas(string id = null)
@@ -244,19 +266,25 @@ partial class Game
         // The list of places down the left: the ones you've found by name, the rest as uncharted.
         float lx = x + pad, ly = y + pad + 44, lw = 220;
         string group = "";
+        static string Group(string id) => id is "saltmere" or "frost" or "dunes" or "mire" or "atoll" or "caverns" or "opensea" ? "The west"
+            : id.StartsWith("amihan") || id == "sanctuary" ? "Amihan" : id.StartsWith("marilaya") ? "Marilaya" : "Habagat";
+        // The rows close up a little when the list would run past the panel (Marilaya's two pages, 1.23, made it too long).
+        int groups = Regions.Select(r => Group(r.Id)).Distinct().Count();
+        float step = Math.Min(29, (h - 44 - pad * 2 - groups * 18) / Regions.Length), bh = step - 3, headH = step < 29 ? 18 : 20;
         foreach (var r in Regions)
         {
-            string g = r.Id is "saltmere" or "frost" or "dunes" or "mire" or "atoll" or "caverns" or "opensea" ? "The west" : r.Id.StartsWith("amihan") || r.Id == "sanctuary" ? "Amihan" : "Habagat";
-            if (g != group) { group = g; Gfx.Text(g, lx, ly + 2, FontKind.Ui700, 14, Muted); ly += 20; }
+            string g = Group(r.Id);
+            if (g != group) { group = g; Gfx.Text(g, lx, ly + 2, FontKind.Ui700, 14, Muted); ly += headH; }
             bool open = AtlasOpen(r), on = r.Id == atlasRegion;
             string label = open ? r.Name : "Uncharted";
 #if DEBUG
-            Gfx.Seen["atlas:" + r.Id] = new Rectangle(lx, ly, lw, 26);
+            Gfx.Seen["atlas:" + r.Id] = new Rectangle(lx, ly, lw, bh);
 #endif
-            if (Button(label, lx, ly, lw, 26, FontKind.Ui600, 15, on ? Pal.Lantern : open ? Pal.Sand : Pal.C("#eadfc0"), open ? Pal.Ink : Muted, 2, 2, 4, open && !on))
+            if (Button(label, lx, ly, lw, bh, FontKind.Ui600, bh < 24 ? 14 : 15, on ? Pal.Lantern : open ? Pal.Sand : Pal.C("#eadfc0"), open ? Pal.Ink : Muted, 2, 2, 4, open && !on))
             { atlasRegion = r.Id; atlasZoom = false; Sfx.Play("blip"); return; }
-            ly += 29;
+            ly += step;
         }
+        lastAtlasListBottom = ly;
 
         // The page.
         var reg = RegionById[atlasRegion];

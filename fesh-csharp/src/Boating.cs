@@ -6,7 +6,8 @@ partial class Game
 {
     bool Aboard => state.aboard && scene == "world" && Has("boat") > 0;
     (float x, float y) BoatPosition() => state.boatX > 0 && state.boatY > 0 ? (state.boatX, state.boatY)
-        : state.boatAt == "atoll" ? (AtollJettyX - 14, AtollJettyY) : state.boatAt == "asinan" ? (AsinanBoatX, AsinanBoatY) : (SaltJettyX + 14, SaltJettyY);
+        : state.boatAt == "atoll" ? (AtollJettyX - 14, AtollJettyY) : state.boatAt == "asinan" ? (AsinanBoatX, AsinanBoatY)
+        : state.boatAt == "marilaya" ? (MlBoatX, MlBoatY) : (SaltJettyX + 14, SaltJettyY);
 
     bool BoatCanStand(float x, float y)
     {
@@ -15,6 +16,8 @@ partial class Game
         {
             int tx = (int)MathF.Floor((x + ox) / T), ty = (int)MathF.Floor((y + oy) / T);
             if (tx <= 0 || ty <= 0 || tx >= COLS - 1 || ty >= ROWS - 1 || TileAt(tx, ty) is not ('~' or 'w' or 'l' or 'm' or 'o')) return false;
+            // Marilaya's sandbar runs a boat aground while the tide has it out (MarilayaPlaces.cs).
+            if (SandbarDryAt(x + ox, y + oy)) return false;
         }
         return !Solids().Any(r => r.Overlaps(new Box(x - 5, y - 3, 10, 6)));
     }
@@ -46,7 +49,7 @@ partial class Game
         if (scene != "world" || Has("boat") == 0 || Aboard || Riding) return false;
         // The sailing jetties keep their quick route and alternate helm action.
         if (Dist(player.X, player.Y, SaltJettyX, SaltJettyY) < 10 || Dist(player.X, player.Y, AtollJettyX, AtollJettyY) < 10
-            || Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 10) return false;
+            || Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 10 || Dist(player.X, player.Y, MlJettyX, MlJettyY) < 10) return false;
         var (x, y) = BoatPosition();
         return Dist(player.X, player.Y, x, y) < 23 && BoatCanStand(x, y);
     }
@@ -55,14 +58,16 @@ partial class Game
     {
         if (Has("boat") == 0) { Toast("Build a sailboat at a workbench: 20 wood, 4 iron bars and sailcloth from Pip.", 5); return; }
         if (Stormy) { Toast("Wait for the storm to pass before launching."); return; }
-        bool atoll = Dist(player.X, player.Y, AtollJettyX, AtollJettyY) < 12, asinan = Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 12;
-        if (!atoll && !asinan && Dist(player.X, player.Y, SaltJettyX, SaltJettyY) >= 12) return;
+        bool atoll = Dist(player.X, player.Y, AtollJettyX, AtollJettyY) < 12, asinan = Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 12,
+            marilaya = Dist(player.X, player.Y, MlJettyX, MlJettyY) < 12;
+        if (!atoll && !asinan && !marilaya && Dist(player.X, player.Y, SaltJettyX, SaltJettyY) >= 12) return;
         // Jetties can recover your owned boat, just as the original Sail route did.
-        float x = atoll ? AtollJettyX - 18 : asinan ? AsinanBoatX : SaltJettyX + 18, y = atoll ? AtollJettyY : asinan ? AsinanBoatY : SaltJettyY;
+        float x = atoll ? AtollJettyX - 18 : asinan ? AsinanBoatX : marilaya ? MlBoatX : SaltJettyX + 18,
+            y = atoll ? AtollJettyY : asinan ? AsinanBoatY : marilaya ? MlBoatY : SaltJettyY;
         if (!BoatCanStand(x, y)) { Toast("There isn't room to launch here."); return; }
         LeaveMount();
         state.boatX = x; state.boatY = y;
-        boatFace = atoll ? "left" : asinan ? "down" : "right";
+        boatFace = atoll || marilaya ? "left" : asinan ? "down" : "right";
         BoardBoat(checkDistance: false);
     }
 

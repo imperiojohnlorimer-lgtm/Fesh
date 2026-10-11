@@ -114,7 +114,21 @@ static class FishArt
         ["salay_salay"] = new("torpedo", "#9fb4c0", "#eef3f5", "#c8b04a", "bands", "#f2d04a", "A small silver scad with a bright yellow stripe down each side. Here it runs with the habagat."),
         ["alimango_crab"] = new("crab", "#4f6a3a", "#8aa070", "#33461f", null, null, "A heavy mud crab with big claws. Keep your fingers clear."),
         ["curacha_crab"] = new("crab", "#e0603a", "#f2a080", "#a83a1e", "specks", "#ffd0b0", "A spanner crab, bright red and shaped like a little shield."),
-        ["sugpo_shrimp"] = new("shrimp", "#4a5a5a", "#a8b8b0", "#2a3434", "specks", "#e8d84a", "A tiger prawn, banded dark and grey, with a fan of a tail.")
+        ["sugpo_shrimp"] = new("shrimp", "#4a5a5a", "#a8b8b0", "#2a3434", "specks", "#e8d84a", "A tiger prawn, banded dark and grey, with a fan of a tail."),
+        // Marilaya (1.23)
+        ["dilis"] = new("long", "#b8c8cc", "#eef4f4", "#8aa0a6", "bands", "#d8e6ea", "A tiny silver anchovy that comes in shoals of thousands. Dried and crunchy, it's a snack all over the islands."),
+        ["hasa_hasa"] = new("torpedo", "#5f86a0", "#e8eef0", "#3f5f78", "spots", "#33536a", "A short, deep-bodied mackerel with dark spots along its back. Fried, or in a sour sinigang."),
+        ["biya"] = new("long", "#a89a78", "#e2d8bc", "#7a6e52", "spots", "#5a4e36", "A sandy little goby that perches on its fins on the river bed, then darts."),
+        ["kanduli"] = new("cat", "#7a7a72", "#c8c8bc", "#56564e", null, null, "A grey sea catfish with long whiskers. Its fin spines sting, so hold it carefully."),
+        ["igat"] = new("eel", "#6a6a3a", "#b8b080", "#4a4a28", "spots", "#3a3a1e", "A mottled river eel as long as your arm. It hunts at night under the banks."),
+        ["pakol"] = new("deep", "#3f6f8a", "#9fc0cc", "#2f5268", "stripes", "#e8d24a", "A triggerfish with a locking spine on its back and teeth strong enough to crack sea urchins."),
+        ["paru_paro"] = new("deep", "#f2d04a", "#fbf0b0", "#e0a020", "bars", "#2a2a2a", "A yellow butterflyfish with a dark band over its eye. They often swim in pairs."),
+        ["suno"] = new("heavy", "#c8443a", "#e88878", "#9a2e26", "specks", "#4ab0e8", "A red coral trout freckled with tiny blue spots: the prize of the reef."),
+        ["pampano"] = new("deep", "#c8d0d4", "#f2f4f4", "#e8c84a", null, null, "A silver pompano with a blunt nose and yellow-tipped fins, off the white sand."),
+        ["dapa"] = new("deep", "#b0946a", "#e8dcc4", "#8a7250", "specks", "#6a5638", "A sandy flounder that lies flat on the bottom, both eyes on one side of its head."),
+        ["kalaso"] = new("long", "#b8a078", "#e8dcc0", "#8a7454", "bars", "#7a6448", "A lizardfish with a toothy grin, propped on its fins on the sand."),
+        ["gulyasan"] = new("torpedo", "#2f4f72", "#e8eef2", "#24405c", "bands", "#5a6a7a", "A skipjack tuna, dark stripes along its silver belly, from the schools off Marilaya."),
+        ["dalupapa"] = new("squid", "#b8484a", "#e8888a", "#8a2a2c", "specks", "#e8a8a0", "A big diamondback squid: its wide fins make a diamond the length of its mantle.")
     };
 
     // The fish in the box (x, y, w, h), facing right (flip faces left). Silhouette draws it all in one colour.

@@ -604,6 +604,21 @@ partial class Game
         bool guarded = guardian != null;
         guardian = null; guardianDue = false; rocks.Clear();
         tremor = null; evac = null;
+        // Anywhere on Marilaya or its waters: Aling Sela takes you in, and the boat is tied up at the harbour (Marilaya.cs).
+        if ((InMarilaya || InMlCave) && boss == null)
+        {
+            LeaveMount();
+            state.aboard = false;
+            FadeThrough(() =>
+            {
+                if (scene != "world") LoadScene("world");
+                player.X = MlWakeX; player.Y = MlWakeY; player.Face = "down";
+                state.hp = 35;
+                if (Has("boat") > 0) { state.boatAt = "marilaya"; state.boatX = state.boatY = 0; }
+                Save();
+            }, () => Toast(MlWakeWords(), 7));
+            return;
+        }
         if (InAmihan && boss == null)
         {
             LeaveMount();

@@ -906,11 +906,69 @@ static class CreatureArt
         }
     }
 
+    // The heart that rose (story 5): Marilaya on a surveyor's chart, its real outline in ink over pale sea, with the
+    // survey triangle from the stone on the hill (A) and the mark on Baltasar (B) to Tindig's summit (C), and a compass rose.
+    static void MarilayaScene(VCanvas g, float w, float h)
+    {
+        g.FillStyle = Paint.Linear(0, 0, 0, h, (0, "#f4e7c4"), (1, "#e6d3a4"));
+        g.BeginPath(); g.RectPath(0, 0, w, h); g.Fill();
+        // Sea, faintly tinted, with grid lines like a chart.
+        g.FillStyle = Paint.Of("rgba(78,163,191,0.18)");
+        g.BeginPath(); g.RectPath(w * 0.04f, h * 0.06f, w * 0.92f, h * 0.88f); g.Fill();
+        g.StrokeStyle = Paint.Of("rgba(110,90,60,0.25)"); g.LineWidth = Math.Max(1, w / 400);
+        for (int i = 1; i < 6; i++) { g.BeginPath(); g.MoveTo(w * (0.04f + 0.92f * i / 6), h * 0.06f); g.LineTo(w * (0.04f + 0.92f * i / 6), h * 0.94f); g.Stroke(); }
+        for (int i = 1; i < 4; i++) { g.BeginPath(); g.MoveTo(w * 0.04f, h * (0.06f + 0.88f * i / 4)); g.LineTo(w * 0.96f, h * (0.06f + 0.88f * i / 4)); g.Stroke(); }
+        // The island, its outline traced from the real Marinduque, fitted to the card's height.
+        float k = h * 0.84f / 32f, ox = w * 0.5f - 15f * k, oy = h * 0.08f;
+        (float, float) P(float lx, float ly) => (ox + lx * k, oy + ly * k);
+        g.FillStyle = Paint.Of("#8fbf6a");
+        g.BeginPath();
+        var (sx, sy) = P(Game.MlCoast[0].x, Game.MlCoast[0].y); g.MoveTo(sx, sy);
+        foreach (var (lx, ly) in Game.MlCoast.Skip(1)) { var (px, py) = P(lx, ly); g.LineTo(px, py); }
+        g.ClosePath(); g.Fill();
+        g.StrokeStyle = Paint.Of("#4a3a26"); g.LineWidth = Math.Max(1.5f, w / 260);
+        g.BeginPath(); g.MoveTo(sx, sy);
+        foreach (var (lx, ly) in Game.MlCoast.Skip(1)) { var (px, py) = P(lx, ly); g.LineTo(px, py); }
+        g.ClosePath(); g.Stroke();
+        foreach (var s in Game.MlIslets)
+        {
+            var (ix, iy) = P(s.cx, s.cy);
+            g.FillStyle = Paint.Of("#8fbf6a"); Ell(g, ix, iy, s.rx * k * 0.7f, s.ry * k * 0.7f);
+            g.BeginPath(); g.Ellipse(ix, iy, s.rx * k * 0.7f, s.ry * k * 0.7f); g.Stroke();
+        }
+        // Forest on the mountain at the southern point.
+        g.FillStyle = Paint.Of("#4f8a3e");
+        var (tx, ty) = P(15.7f, 25.6f); Ell(g, tx, ty, 4.2f * k, 3f * k);
+        // The survey triangle, dashed, and its three stations.
+        var (ax, ay) = P(6.6f, 2.0f); var (bx, by) = P(0.4f, 30.2f); var (cx, cy) = P(15.7f, 25.1f);
+        g.StrokeStyle = Paint.Of("#b5523b"); g.LineWidth = Math.Max(1.5f, w / 280);
+        void Dash(float x0, float y0, float x1, float y1)
+        {
+            int n = 14;
+            for (int i = 0; i < n; i += 2)
+            {
+                g.BeginPath(); g.MoveTo(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n); g.LineTo(x0 + (x1 - x0) * (i + 1) / n, y0 + (y1 - y0) * (i + 1) / n); g.Stroke();
+            }
+        }
+        Dash(ax, ay, bx, by); Dash(ax, ay, cx, cy); Dash(bx, by, cx, cy);
+        foreach (var (px, py, col) in new[] { (ax, ay, "#d9a43a"), (bx, by, "#d9a43a"), (cx, cy, "#2c5a28") })
+        {
+            g.FillStyle = Paint.Of("#3c342a"); Circ(g, px, py, w / 70);
+            g.FillStyle = Paint.Of(col); Circ(g, px, py, w / 110);
+        }
+        // A compass rose in the corner.
+        float rx = w * 0.84f, ry = h * 0.24f, r = w * 0.07f;
+        g.FillStyle = Paint.Of("#b5523b"); Poly(g, rx, ry - r, rx + r * 0.22f, ry, rx, ry + r * 0.15f, rx - r * 0.22f, ry);
+        g.FillStyle = Paint.Of("#4a3a26"); Poly(g, rx, ry + r, rx + r * 0.22f, ry, rx, ry - r * 0.15f, rx - r * 0.22f, ry);
+        g.FillStyle = Paint.Of("#6b5a45"); Poly(g, rx - r, ry, rx, ry - r * 0.18f, rx + r, ry, rx, ry + r * 0.18f);
+    }
+
     // Draws the underwater portrait at logical size w x h onto a canvas that is already scaled to device pixels.
     public static void Scene(VCanvas g, float w, float h, string id, bool sil)
     {
         if (id == "tsunami") { TsunamiScene(g, w, h); return; }
         if (id == "magayon") { MagayonScene(g, w, h); return; }
+        if (id == "marilaya") { MarilayaScene(g, w, h); return; }
         bool deep = id is "abyssal" or "coelacanth" or "starray" or "leviathan" or "tidemane" or "marlin" or "tarpon" or "bakunawa" or "platejaw";
         g.FillStyle = Paint.Linear(0, 0, 0, h, (0, deep ? "#1d3a5a" : "#3a8db0"), (1, deep ? "#050d18" : "#12304a"));
         g.BeginPath(); g.RectPath(0, 0, w, h); g.Fill();

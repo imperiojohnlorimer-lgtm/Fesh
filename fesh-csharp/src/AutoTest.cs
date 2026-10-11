@@ -39,7 +39,9 @@ partial class Game
         Inp.ScriptFocused = true;
         // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
         standStill = true;
-        script = Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "1" ? VolcanoScript().GetEnumerator()
+        script = Environment.GetEnvironmentVariable("FESH_MARILAYA_TEST") == "1" ? MarilayaScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_MARILAYA_TEST") == "review" ? MarilayaReviewScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "1" ? VolcanoScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "review" ? VolcanoReviewScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "title" ? TitleTourScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_HOTBAR_TEST") == "1" ? HotbarScript().GetEnumerator()
@@ -535,7 +537,7 @@ partial class Game
             Check($"{Data.Biomes[b].Name} can be walked to", reach.Any(t => biome[t.Item2, t.Item1] == bb && Buildable.Contains(map[t.Item2, t.Item1])));
         }
         Check("Starfall Atoll can't be walked to (boat only)", !reach.Any(t => biome[t.Item2, t.Item1] == 4));
-        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && s.Biome is not ("atoll" or "amihan" or "habagat")))
+        foreach (var s in Data.Spots.Where(s => s.Scene == "world" && s.Biome is not ("atoll" or "amihan" or "habagat" or "marilaya")))
         {
             bool ok = reach.Any(t => { float cx = t.Item1 * T + 5, cy = t.Item2 * T + 7; return Dist(cx, cy, s.X, s.Y) < s.R - 2 && CanStand(cx, cy); });
             Check($"{s.Label} ({Data.Biomes.First(b => b.Id == s.Biome).Name}) can be fished from land", ok);
@@ -2008,6 +2010,7 @@ partial class Game
         foreach (int frames in HotbarScript()) yield return frames;
         foreach (int frames in VolcanoScript()) yield return frames;
         foreach (int frames in ChapterScript()) yield return frames;
+        foreach (int frames in MarilayaScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

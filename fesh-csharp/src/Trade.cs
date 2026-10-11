@@ -246,7 +246,7 @@ partial class Game
             return;
         }
         if (state.weather == "storm") { Sfx.Play("nope"); Toast("Far too rough to sail in a storm. Wait for it to pass."); return; }
-        bool atoll = to == "atoll", asinan = to == "asinan";
+        bool atoll = to == "atoll", asinan = to == "asinan", marilaya = to == "marilaya";
         LeaveMount();
         race = null; raceArmed = false;
         Sfx.Play("splash");
@@ -254,15 +254,15 @@ partial class Game
         {
             state.boatAt = to;
             state.aboard = false; state.boatX = state.boatY = 0;
-            player.X = atoll ? AtollJettyX + 4 : asinan ? AsinanJettyX : SaltJettyX - 4;
-            player.Y = atoll ? AtollJettyY + 1 : asinan ? AsinanJettyY + 6 : SaltJettyY + 1;
-            player.Face = atoll ? "right" : asinan ? "down" : "left";
-            lastBiome = (byte)(atoll ? 4 : asinan ? 6 : 0);
+            player.X = atoll ? AtollJettyX + 4 : asinan ? AsinanJettyX : marilaya ? MlJettyX + 4 : SaltJettyX - 4;
+            player.Y = atoll ? AtollJettyY + 1 : asinan ? AsinanJettyY + 6 : marilaya ? MlJettyY : SaltJettyY + 1;
+            player.Face = atoll || marilaya ? "right" : asinan ? "down" : "left";
+            lastBiome = (byte)(atoll ? 4 : asinan ? 6 : marilaya ? 7 : 0);
             Save();
         }, () =>
         {
             var b = Data.Biomes[lastBiome];
-            Toast(atoll || asinan ? $"{b.Enter} ({b.Climate})" : b.Enter, 3.5f);
+            Toast(atoll || asinan || marilaya ? $"{b.Enter} ({b.Climate})" : b.Enter, 3.5f);
             if (atoll && !state.Hinted("visitedAtoll"))
             {
                 state.hinted["visitedAtoll"] = true;
@@ -271,8 +271,8 @@ partial class Game
         });
     }
 
-    // Once you've found the Habagat islands, a jetty asks where you'd like to sail (the panel "voyage").
-    bool VoyageChoice => state.Hinted("habagat") && Has("boat") > 0;
+    // Once you've found the Habagat islands or Marilaya, a jetty asks where you'd like to sail (the panel "voyage").
+    bool VoyageChoice => (state.Hinted("habagat") || state.Hinted("marilaya")) && Has("boat") > 0;
 
     void OpenVoyage()
     {
@@ -286,13 +286,15 @@ partial class Game
     {
         Backdrop();
         // Where you are now isn't offered.
-        string here = Dist(player.X, player.Y, AtollJettyX, AtollJettyY) < 14 ? "atoll" : Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 14 ? "asinan" : "saltmere";
+        string here = Dist(player.X, player.Y, AtollJettyX, AtollJettyY) < 14 ? "atoll" : Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 14 ? "asinan"
+            : Dist(player.X, player.Y, MlJettyX, MlJettyY) < 14 ? "marilaya" : "saltmere";
         var places = new List<(string id, string name, string sub)>
         {
             ("saltmere", "Saltmere", "Pip's jetty, by Tomas's camp"), ("atoll", "Starfall Atoll", "The atoll's jetty, out east"),
-            ("asinan", "Asinan", "The landing by the salt beds, in the Habagat islands")
+            ("asinan", "Asinan", "The landing by the salt beds, in the Habagat islands"),
+            ("marilaya", "Marilaya", "The harbour under the survey hill")
         };
-        places.RemoveAll(p => p.id == here || p.id == "asinan" && !state.Hinted("habagat"));
+        places.RemoveAll(p => p.id == here || p.id == "asinan" && !state.Hinted("habagat") || p.id == "marilaya" && !state.Hinted("marilaya"));
         const float w = 620, pad = 24, rowH = 62, gap = 10;
         float h = pad + 44 + 8 + 26 + 18 + places.Count * (rowH + gap) - gap + pad;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;

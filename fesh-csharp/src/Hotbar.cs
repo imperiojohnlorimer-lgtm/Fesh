@@ -259,7 +259,7 @@ partial class Game
     }
 
     // The open sea's fish by where the water is (SeaSpotHere goes by where you are).
-    string SeaSpotAt(float x, float y) => x >= EastStart * T ? "amihansea" : y >= HabagatTop * T ? "habagatsea" : "opensea";
+    string SeaSpotAt(float x, float y) => ZoneAt(x, y) switch { "marilaya" => "marilayasea", "amihan" => "amihansea", "habagat" => "habagatsea", _ => "opensea" };
 
     void CastFree(float power)
     {

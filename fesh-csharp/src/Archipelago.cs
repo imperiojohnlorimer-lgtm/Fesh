@@ -8,8 +8,11 @@ partial class Game
 {
     const int EastStart = 140;
     const int NikoAsohos = 3;
-    bool chartEast;
-    bool InAmihan => scene == "world" && player.X >= EastStart * T;
+    // The map panel's chart: 0 the west (Saltmere), 1 Amihan, 2 Marilaya (Chart.cs).
+    int chart;
+    bool chartEast { get => chart == 1; set => chart = value ? 1 : 0; }
+    // Marilaya sits on the eastern chart too, but it isn't Amihan (ZoneAt, Marilaya.cs).
+    bool InAmihan => scene == "world" && ZoneAt(player.X, player.Y) == "amihan";
     static readonly (string name, float cx, float cy, float rx, float ry)[] AmihanIslands =
     {
         ("Amihan Village", 166, 22, 15, 13),
@@ -32,7 +35,7 @@ partial class Game
     void GenerateArchipelago()
     {
         for (int y = 1; y < ROWS - 1; y++)
-            for (int x = EastStart; x < COLS - 1; x++)
+            for (int x = EastStart; x < MlStart; x++)
             {
                 double d = AmihanIslands.Min(i =>
                 {
@@ -56,7 +59,7 @@ partial class Game
                     map[y, x] = 's';
         // Palms, bamboo-like groves, and limestone / volcanic boulders reuse the coast-aware ground renderer.
         for (int y = 1; y < ROWS - 1; y++)
-            for (int x = EastStart + 1; x < COLS - 1; x++)
+            for (int x = EastStart + 1; x < MlStart; x++)
             {
                 if (map[y, x] != 'j') continue;
                 if (Data.Spots.Any(s => s.Scene == "world" && s.Biome == "amihan" && Dist(x * T + 5, y * T + 5, s.X, s.Y) < s.R + 12)) continue;

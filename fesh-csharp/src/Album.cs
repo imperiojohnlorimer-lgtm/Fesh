@@ -21,34 +21,34 @@ partial class Game
             new[] { "pating", "thunderfin", "pale_cave_shark", "sand_ray", "pagi", "starfall_ray" }),
         new("ancient", "Ancient lines",
             "Groups that split off early in the history of fish. Lobe-finned fish are closer kin to the first four-legged land animals than to a tuna. Bonytongues have teeth on their tongue. Some others start life as see-through, leaf-shaped larvae.",
-            new[] { "ancient_coelacanth", "sunscale_lungfish", "emerald_arowana", "mire_leviathan", "buan_buan", "haring_buan", "ghost_eel" }),
+            new[] { "ancient_coelacanth", "sunscale_lungfish", "emerald_arowana", "mire_leviathan", "buan_buan", "haring_buan", "ghost_eel", "igat" }),
         new("carps", "Carp, catfish and their kin",
             "Mostly fresh-water fish. In carp, catfish and many of their relatives, a chain of tiny bones links the swim bladder to the ear, giving them sharp hearing. A few pond and sea fish are distant cousins in the same big group.",
-            new[] { "bangus", "mud_carp", "moon_carp", "mirage_koi", "old_whiskers", "swamp_catfish", "hito", "moonglass_fish", "jungle_piranha", "blind_cavefish", "storm_eel" }),
+            new[] { "bangus", "mud_carp", "moon_carp", "mirage_koi", "old_whiskers", "swamp_catfish", "hito", "kanduli", "moonglass_fish", "jungle_piranha", "blind_cavefish", "storm_eel" }),
         new("cold", "Cold and deep waters",
             "Fish of icy lakes, polar seas and the deep. Cold water holds more oxygen than warm. Some polar fish make an antifreeze in their blood, and many deep-sea fish swim up toward the surface at night to feed and back down by day.",
             new[] { "arctic_char", "aurora_trout", "crystal_pike", "frost_smelt", "polar_cod", "abyssal_lanternfish" }),
         new("tunas", "Tunas, mackerels and billfish",
             "Built for speed: torpedo-shaped bodies, crescent tails, and fins that fold away into grooves. Tunas can keep their muscles warmer than the sea around them. Some slash through schools of fish with their long bills.",
-            new[] { "yellowfin_tuna", "bluefin_tuna", "silver_tuna", "tulingan", "tanigue", "alumahan", "sun_mackerel", "malasugi", "sailfish", "golden_marlin", "ironbill", "swordfish" }),
+            new[] { "yellowfin_tuna", "bluefin_tuna", "silver_tuna", "tulingan", "gulyasan", "tanigue", "alumahan", "hasa_hasa", "sun_mackerel", "malasugi", "sailfish", "golden_marlin", "ironbill", "swordfish" }),
         new("jacks", "Jacks and open-water fish",
             "Silver hunters and drifters of open water. Many swim in schools, and most are countershaded: dark on the back and pale on the belly, so they're hard to see from above or below.",
-            new[] { "talakitok", "galunggong", "matang_baka", "salay_salay", "talang_talang", "mahi_mahi", "amihan_barracuda", "flying_fish", "ocean_sunfish", "silver_moonfish" }),
+            new[] { "talakitok", "pampano", "galunggong", "matang_baka", "salay_salay", "talang_talang", "mahi_mahi", "amihan_barracuda", "flying_fish", "ocean_sunfish", "silver_moonfish" }),
         new("groupers", "Groupers, snappers and breams",
             "Big-mouthed fish of reefs and rocky bottoms. Many suck their prey in with a sudden gulp, and many groupers start life as females and become males as they grow.",
-            new[] { "lapu_lapu", "rusty_grouper", "blue_hole_grouper", "barnacle_bass", "maya_maya", "dalagang_bukid", "bisugo", "pond_perch" }),
+            new[] { "lapu_lapu", "suno", "rusty_grouper", "blue_hole_grouper", "barnacle_bass", "maya_maya", "dalagang_bukid", "bisugo", "pond_perch" }),
         new("reef", "Reef fish",
             "The colourful crowd of the coral reef. Grazing fish keep algae from smothering the coral, and some crunch up dead coral and turn it into sand.",
-            new[] { "striped_wrasse", "parrotfish", "clownfish", "moorish_idol", "pearl_angelfish", "labahita", "danggit" }),
+            new[] { "striped_wrasse", "parrotfish", "clownfish", "moorish_idol", "pearl_angelfish", "paru_paro", "pakol", "labahita", "danggit" }),
         new("shore", "Shore, pond and mangrove fish",
             "Fish of beaches, ponds, mangroves and river mouths. Many can move between fresh, brackish and salt water, and some can even breathe air.",
-            new[] { "banak", "kitang", "asohos", "sapsap", "tamban", "dalag", "oasis_tilapia", "desert_pupfish", "rock_goby", "seafoam_goby", "amihan_mudskipper", "mudskipper" }),
+            new[] { "banak", "kitang", "asohos", "sapsap", "tamban", "dilis", "dalag", "oasis_tilapia", "desert_pupfish", "rock_goby", "seafoam_goby", "biya", "amihan_mudskipper", "mudskipper", "dapa", "kalaso" }),
         new("crustaceans", "Crustaceans: not fish at all",
             "Crabs, lobsters, crayfish and shrimp have no backbone. They wear a hard outer skeleton, which they shed to grow, and have jointed legs: ten of them, counting the claws.",
             new[] { "shore_crab", "snow_crab", "king_crab", "ghost_crab", "crayfish", "spiny_lobster", "alimasag_crab", "alimango_crab", "curacha_crab", "sugpo_shrimp", "glow_shrimp" }),
         new("cephalopods", "Squid and octopus: not fish either",
             "Cephalopods are mollusks, like snails and clams, but fast and clever. Squid and octopuses have three hearts and blue blood, and many squirt ink and change colour in an instant.",
-            new[] { "lantern_squid", "giant_squid", "pugita", "pusit" })
+            new[] { "lantern_squid", "giant_squid", "pugita", "pusit", "dalupapa" })
     };
 
     // Family, water and food, for the real animal (or, for one made up for the game, the real one it's based on).
@@ -147,7 +147,21 @@ partial class Game
         ["lantern_squid"] = new("Lantern squids (Lycoteuthidae)", "salt", "Small fish and shrimp"),
         ["giant_squid"] = new("Giant squids (Architeuthidae)", "salt", "Fish and other squid"),
         ["pugita"] = new("Octopuses (Octopodidae)", "salt", "Crabs, clams and shrimp"),
-        ["pusit"] = new("Inshore squids (Loliginidae)", "salt", "Small fish and shrimp")
+        ["pusit"] = new("Inshore squids (Loliginidae)", "salt", "Small fish and shrimp"),
+        // Marilaya (1.23).
+        ["dilis"] = new("Anchovies (Engraulidae)", "salt,brackish", "Tiny drifting animals (zooplankton)"),
+        ["hasa_hasa"] = new("Tunas and mackerels (Scombridae)", "salt,brackish", "Filters plankton"),
+        ["biya"] = new("Gobies (Gobiidae)", "fresh,brackish,salt", "Shrimp, insects and small fish"),
+        ["kanduli"] = new("Sea catfishes (Ariidae)", "fresh,brackish,salt", "Crabs, shrimp, worms and small fish"),
+        ["igat"] = new("Freshwater eels (Anguillidae)", "fresh,brackish,salt", "Fish, crabs, frogs and worms, mostly at night"),
+        ["pakol"] = new("Triggerfishes (Balistidae)", "salt", "Many eat sea urchins, crabs, snails and bits of coral"),
+        ["paru_paro"] = new("Butterflyfishes (Chaetodontidae)", "salt", "Coral polyps, tiny worms and other small animals"),
+        ["suno"] = new("Groupers (Epinephelidae, once Serranidae)", "salt", "Hunts reef fish"),
+        ["pampano"] = new("Jacks (Carangidae)", "salt,brackish", "Snails, clams, crabs and small fish"),
+        ["dapa"] = new("Large-tooth flounders (Paralichthyidae)", "salt,brackish", "Small fish, shrimp and worms on the bottom"),
+        ["kalaso"] = new("Lizardfishes (Synodontidae)", "salt", "Ambushes small fish"),
+        ["gulyasan"] = new("Tunas and mackerels (Scombridae)", "salt", "Fish, squid and shrimp"),
+        ["dalupapa"] = new("Diamondback squids (Thysanoteuthidae)", "salt", "Fish and squid")
     };
 
     /* ---------- Pages ---------- */

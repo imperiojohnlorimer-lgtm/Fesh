@@ -58,6 +58,7 @@ partial class Game
             if (Dist(s.X, s.Y, player.X, player.Y) < 400) Stroll(s, dt, (x, y) => FolkCanStand(x, y));
         }
         UpdateHabagatFolk(dt);
+        UpdateMarilayaFolk(dt);
     }
 
     // Clear ground for someone's feet: dry land, nothing solid (bar Tomas himself), and not on top of you.

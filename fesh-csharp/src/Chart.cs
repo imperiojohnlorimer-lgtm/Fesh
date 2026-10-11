@@ -22,6 +22,7 @@ partial class Game
         byte b = BiomeAt(tx, ty);
         if (b < 5) return Data.Biomes[b].Id;
         if (b == 6) return HabagatRegion(tx, ty);
+        if (b == 7) return MarilayaRegion(tx, ty);
         var isle = AmihanIslands.OrderBy(i => (i.cx - tx) * (i.cx - tx) / (i.rx * i.rx) + (i.cy - ty) * (i.cy - ty) / (i.ry * i.ry)).First();
         return "amihan:" + isle.name;
     }
@@ -140,7 +141,8 @@ partial class Game
         float px = -uy, py = ux;
         Gfx.Circle(ax, ay, 20, Pal.WithAlpha(Pal.Ink, 0.75f));
         Gfx.Triangle(ax + ux * 15, ay + uy * 15, ax - ux * 6 + px * 9, ay - uy * 6 + py * 9, ax - ux * 6 - px * 9, ay - uy * 6 - py * 9, red);
-        string label = $"Pin {metres} m";
+        // With Aling Sela's survey compass (story 5), its bearing too, in degrees clockwise from north.
+        string label = Wears("survey_compass") ? $"Pin {metres} m, bearing {BearingTo(player.X, player.Y, state.pinX, state.pinY):0}" : $"Pin {metres} m";
         float lw = Gfx.Measure(label, FontKind.Ui700, 15);
         float lx = Math.Clamp(ax - lw / 2, 8, Gfx.LW - lw - 8), ly = ay + (uy > 0.5f ? -46 : 24);
         Gfx.Rect(lx - 6, ly - 2, lw + 12, 22, Pal.WithAlpha(Pal.Ink, 0.75f), 4);
@@ -149,7 +151,13 @@ partial class Game
 
     /* ---------- The chart ---------- */
     // Which chart to open: the one you're on (indoors and underground, the Saltmere one).
-    void ChooseChart() => chartEast = scene == "world" ? player.X >= EastStart * T : scene == "house:school";
+    void ChooseChart() => chart = scene == "world" ? ChartFor(player.X) : InHouse ? ChartFor(state.exitX) : 0;
+    static int ChartFor(float wx) => wx >= MlStart * T ? 2 : wx >= EastStart * T ? 1 : 0;
+    // Where each chart starts and ends, in tiles: the west up to Amihan, Amihan up to Marilaya, Marilaya to the edge.
+    static (int x0, int x1) ChartSpan(int c) => c == 2 ? (MlStart, COLS) : c == 1 ? (EastStart, MlStart) : (0, EastStart);
+    static readonly string[] ChartNames = { "Saltmere", "Amihan", "Marilaya" };
+    // Marilaya's chart is there once you've been east to Amihan (an uncharted island on it, until you find it).
+    bool ChartShown(int c) => c != 2 || state.Hinted("amihan") || state.Hinted("marilaya");
 
     void DrawMap()
     {
@@ -157,25 +165,35 @@ partial class Game
         Backdrop();
         RefreshMapTexture();
         const float pad = 18, head = 54;
-        float origin = chartEast ? EastStart * T : 0, chartW = chartEast ? (COLS - EastStart) * T : EastStart * T;
+        if (!ChartShown(chart)) chart = 1;
+        var (cx0, cx1) = ChartSpan(chart);
+        float origin = cx0 * T, chartW = (cx1 - cx0) * T;
         float chartH = ROWS * T;
         float scale = Math.Min(1120f / chartW, 550f / chartH);
-        float mw = chartW * scale, mh = chartH * scale, bw = mw + pad * 2, bh = mh + pad * 2 + head;
+        float mw = chartW * scale, mh = chartH * scale, bw = Math.Max(mw + pad * 2, 1040), bh = mh + pad * 2 + head;
         float bx = (Gfx.LW - bw) / 2, by = (Gfx.LH - bh) / 2;
         Gfx.Box(bx, by, bw, bh, Pal.Paper, Pal.Ink, 3, 8, 6);
-        string title = chartEast ? "Amihan sea chart" : "Map of the islands";
+        string title = chart == 2 ? (state.Hinted("marilaya") ? "Marilaya sea chart" : "The far eastern sea") : chartEast ? "Amihan sea chart" : "Map of the islands";
         Gfx.Text(title, bx + pad, by + pad, FontKind.Ui700, 28, Pal.PaperInk);
         // What's going on today: the weather, and the derby if it's on.
         string news = state.weather == "storm" ? $"Storm until {HourText((int)StormEnds())}" : state.weather == "rain" ? "Raining" : "Fair weather";
         if (DerbyOn) news += $"   ·   Derby: {(int)derbyT / 60}:{(int)derbyT % 60:00} left";
-        Gfx.Text(news, bx + pad + Gfx.Measure(title, FontKind.Ui700, 28) + 24, by + pad + 8, FontKind.Ui600, 17, Muted);
-        string other = chartEast ? "Saltmere" : "Amihan";
-        if (SmallButton(other, bx + bw - pad - SmallW("Close") - SmallW(other) - 14, by + pad - 4)) { chartEast = !chartEast; return; }
-        // The island guide (Atlas.cs), opened on the island you're on.
-        float gx = bx + bw - pad - SmallW("Close") - SmallW(other) - 28 - SmallW("Island guide");
+        float newsX = bx + pad + Gfx.Measure(title, FontKind.Ui700, 28) + 24;
+        // A button for each of the other charts, then the island guide (Atlas.cs), opened on the island you're on.
+        float tabX = bx + bw - pad - SmallW("Close") - 14;
+        for (int c = 2; c >= 0; c--)
+        {
+            if (c == chart || !ChartShown(c)) continue;
+            tabX -= SmallW(ChartNames[c]);
+            if (SmallButton(ChartNames[c], tabX, by + pad - 4)) { chart = c; return; }
+            tabX -= 14;
+        }
+        float gx = tabX - SmallW("Island guide");
         if (SmallButton("Island guide", gx, by + pad - 4)) { OpenAtlas(HereRegion()); return; }
         if (SmallButton("Close", bx + bw - pad - SmallW("Close"), by + pad - 4)) { ClosePanels(); return; }
-        float mx = bx + pad, my = by + pad + head;
+        // The weather between the title and the buttons, shortened if there isn't room.
+        if (gx - 16 - newsX > 40) Gfx.Text(Gfx.Ellipsize(news, FontKind.Ui600, 17, gx - 16 - newsX), newsX, by + pad + 8, FontKind.Ui600, 17, Muted);
+        float mx = bx + (bw - mw) / 2, my = by + pad + head;
         Gfx.Rect(mx - 2, my - 2, mw + 4, mh + 4, Pal.Ink);
         DrawTexturePro(mapTex, new Rectangle(origin, 0, chartW, chartH), Gfx.S(mx, my, mw, mh), Vector2.Zero, 0, Color.White);
         Vector2 M(float wx, float wy) => new(mx + (wx - origin) * scale, my + wy * scale);
@@ -191,6 +209,11 @@ partial class Game
         };
         foreach (var i in AmihanIslands) isles.Add(("amihan:" + i.name, i.name, i.cx * T, (i.cy + i.ry + 2) * T));
         foreach (var h in HabagatIslands.Where(h => h.name != "Daang Pulo")) isles.Add(("habagat:" + h.name, h.name, h.cx * T, (h.cy + h.ry + 1.5f) * T));
+        // Marilaya's (Marilaya.cs): the island across its middle, and its three groups of islets.
+        isles.Add(("marilaya", "Marilaya", MlWx(11.5f), MlWy(16.5f)));
+        isles.Add(("marilaya:north", "North islets", MlWx(25.6f), MlWy(1.4f)));
+        isles.Add(("marilaya:salomague", "Salomague", MlWx(27.6f), MlWy(15.0f)));
+        isles.Add(("marilaya:tresreyes", "Tres Reyes", MlWx(3.6f), MlWy(32.2f)));
         foreach (var (region, name, wx, wy) in isles)
         {
             if (!OnChart(wx, wy)) continue;
@@ -266,6 +289,8 @@ partial class Game
                     Place(i == 0 ? "Start" : $"Gate {i}", RaceGates[i].x, RaceGates[i].y, new() { i == 0 ? "Start and finish" : $"Regatta gate {i}", next ? "Next!" : "" }, next ? 1 : 4);
                 }
         }
+        // Marilaya's chart (MarilayaStory.cs): the harbour once you've found it, for sailing, and its places once charted.
+        if (chart == 2) MarilayaChartMarks(Place);
         foreach (var b in state.builds.Where(b => b.id == "dryrack" && Rack(b) is RackLoad r && r.fish.Count > 0))
             Place(RackDone(Rack(b)) ? "Rack (dry!)" : "Drying rack", b.x * T + 5, b.y * T + 5, new() { "Your drying rack", RackDone(Rack(b)) ? (RackIsGuso(Rack(b)) ? "The dried guso is ready" : "The dried fish are ready") : $"{(int)((DryGoal - Rack(b).dry) / DryRate)} minutes of sun to go" }, 2);
         if (Has("boat") > 0 && !Aboard) { var bp = BoatPosition(); Place("Your boat", bp.x, bp.y, new() { "Your boat", "Moored here. R beside it to board." }, 1); }
@@ -299,7 +324,7 @@ partial class Game
         Vector2 you = default;
         bool youOn = OnChart(youX, youY), youEast = youX >= origin + chartW;
         // Off this chart, an arrow at its edge level with you (with its label kept clear of the others).
-        string youTxt = youEast ? "You (Amihan sea)" : "You (Saltmere waters)";
+        string youTxt = ChartFor(youX) switch { 2 => "You (Marilaya waters)", 1 => "You (Amihan sea)", _ => "You (Saltmere waters)" };
         float youTw = Gfx.Measure(youTxt, FontKind.Ui700, 16);
         float arrowY = Math.Clamp(my + youY * scale, my + 20, my + mh - 20), arrowX = youEast ? mx + mw - 14 : mx + 14;
         if (youOn) { you = M(youX, youY); placed.Add(new Rectangle(you.X - 10, you.Y - 10, 20, 20)); }
@@ -311,7 +336,7 @@ partial class Game
             Gfx.Circle(m.X, m.Y, m.Label == "Pin" ? 7 : 6.5f, Pal.Ink);
             Gfx.Circle(m.X, m.Y, m.Label == "Pin" ? 5.5f : 5, m.Label == "Pin" ? Pal.C("#e04b3a") : m.Dot);
         }
-        var chart = new Rectangle(mx, my, mw, mh);
+        var chartBox = new Rectangle(mx, my, mw, mh);
         foreach (var m in marks.OrderBy(m => m.Prio))
         {
             var font = m.Size >= 20 ? FontKind.Ui700 : FontKind.Ui600;
@@ -323,7 +348,7 @@ partial class Game
             for (int i = 0; i < spots.Length && pick < 0; i++)
             {
                 var r = new Rectangle(m.X + spots[i].x, m.Y + spots[i].y, w, h);
-                if (r.X < chart.X || r.Y < chart.Y || r.X + r.Width > chart.X + chart.Width || r.Y + r.Height > chart.Y + chart.Height) continue;
+                if (r.X < chartBox.X || r.Y < chartBox.Y || r.X + r.Width > chartBox.X + chartBox.Width || r.Y + r.Height > chartBox.Y + chartBox.Height) continue;
                 if (!placed.Any(o => CheckCollisionRecs(o, r))) pick = i;
             }
             if (pick < 0) pick = 0;

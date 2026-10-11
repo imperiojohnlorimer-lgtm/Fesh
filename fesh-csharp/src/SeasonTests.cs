@@ -122,9 +122,10 @@ partial class Game
         bool same = true;
         void Tints(IEnumerable<CommonFish> fs) { foreach (var f in fs.Where(f => !Items.AddedLater.Contains(f.Id))) same &= Items.ById[f.Id].Tint == Items.TintAt(ti++); }
         bool Late(string b) => b == "habagat";
-        Tints(Data.Spots.Where(s => s.Scene != "sea" && !Late(s.Biome)).SelectMany(s => Data.Common[s.Id]));
+        bool Later(string b) => b == "marilaya";   // Marilaya (1.23) comes after everything, AddedLater included
+        Tints(Data.Spots.Where(s => s.Scene != "sea" && !Late(s.Biome) && !Later(s.Biome)).SelectMany(s => Data.Common[s.Id]));
         Tints(Data.PotCatch.Where(p => !Late(p.Key)).SelectMany(p => p.Value));
-        Tints(Data.Spots.Where(s => s.Scene == "sea" && !Late(s.Biome)).SelectMany(s => Data.Common[s.Id]));
+        Tints(Data.Spots.Where(s => s.Scene == "sea" && !Late(s.Biome) && !Later(s.Biome)).SelectMany(s => Data.Common[s.Id]));
         Tints(Data.Spots.Where(s => s.Scene != "sea" && Late(s.Biome)).SelectMany(s => Data.Common[s.Id]));
         Tints(Data.PotCatch.Where(p => Late(p.Key)).SelectMany(p => p.Value));
         int beforeNew = ti;

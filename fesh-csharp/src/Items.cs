@@ -143,13 +143,15 @@ static class Items
         new("dehooker", "Dehooker", "accessory", "Slips a hook out quickly and gently. A fish you let go is much likelier to be back, grown, and letting one go earns a little experience.", Icon: "dehooker"),
         new("steward_badge", "Steward's badge", "accessory", "For letting forty fish and crabs go. Where fish get to grow, they grow bigger: the fish you catch run a tenth heavier.", Icon: "stewardbadge"),
         new("gleaner_basket", "Gleaner's basket", "accessory", "A woven basket from Lola Pacing. Half as many finds again on every low tide.", Icon: "basket"),
-        new("tide_watch", "Tide watch", "accessory", "Tells the tide anywhere (hover over the clock), and you find octopus on the outer flats more often.", Icon: "tidewatch")
+        new("tide_watch", "Tide watch", "accessory", "Tells the tide anywhere (hover over the clock), and you find octopus on the outer flats more often.", Icon: "tidewatch"),
+        // Story 5 (1.23): Aling Sela's gift when the chart is inked.
+        new("survey_compass", "Survey compass", "accessory", "Aling Sela's old compass, from her years of making maps. The arrow to your map pin shows its bearing in degrees, as a surveyor would read it.", Icon: "compass")
     };
 
     static Items()
     {
         int i = 0;
-        void Spots(bool sea, bool late)
+        void Spots(bool sea, int late)
         {
             foreach (var s in Data.Spots.Where(s => (s.Scene == "sea") == sea && Late(s.Biome) == late))
                 foreach (var f in Data.Common[s.Id].Where(f => !AddedLater.Contains(f.Id)))
@@ -159,29 +161,32 @@ static class Items
                     All.Add(new ItemDef(f.Id, f.Name, "fish", $"{where} Eat it raw in a pinch, or cook it.", 6, FishIcon(f.Id), FishTints[i++ % FishTints.Length]));
                 }
         }
-        void Pots(bool late)
+        void Pots(int late)
         {
             foreach (var (biome, list) in Data.PotCatch.Where(p => Late(p.Key) == late))
                 foreach (var f in list)
                     All.Add(new ItemDef(f.Id, f.Name, "fish", $"Found in a crab pot on {Data.Biomes.First(b => b.Id == biome).Name}.", 6, FishIcon(f.Id), FishTints[i++ % FishTints.Length]));
         }
-        Spots(false, false);
-        Pots(false);
+        Spots(false, 0);
+        Pots(0);
         // The open sea's fish come after the pots, so adding them changed nobody else's colour; Habagat's come after
         // everything, for the same reason (land spots, then its pots, then its sea).
-        Spots(true, false);
-        Spots(false, true);
-        Pots(true);
-        Spots(true, true);
+        Spots(true, 0);
+        Spots(false, 1);
+        Pots(1);
+        Spots(true, 1);
         // Fish added to an older spot's list later on take their colours after everyone else's.
-        foreach (var s in Data.Spots.Where(s => s.Scene != "sea"))
+        foreach (var s in Data.Spots.Where(s => s.Scene != "sea" && Late(s.Biome) < 2))
             foreach (var f in Data.Common[s.Id].Where(f => AddedLater.Contains(f.Id)))
                 All.Add(new ItemDef(f.Id, f.Name, "fish", $"Caught at {s.Label}. Eat it raw in a pinch, or cook it.", 6, FishIcon(f.Id), FishTints[i++ % FishTints.Length]));
+        // Marilaya (1.23) after all of that: its spots, then its sea (its crab pots are Amihan's).
+        Spots(false, 2);
+        Spots(true, 2);
         ById = All.ToDictionary(d => d.Id);
     }
 
-    // Regions added after the open sea, whose fish are given their colours last.
-    static bool Late(string biome) => biome == "habagat";
+    // Regions added after the open sea, whose fish are given their colours later: Habagat (1), then Marilaya (2).
+    static int Late(string biome) => biome switch { "habagat" => 1, "marilaya" => 2, _ => 0 };
     // Fish added to an older land spot's list, given their colours after everything else so no other fish's changes.
     public static readonly HashSet<string> AddedLater = new() { "asohos" };
     public static string TintAt(int i) => FishTints[i % FishTints.Length];
@@ -864,6 +869,13 @@ static class ItemArt
                 p.Rect(4, 0, 4, 2, "#5e6468"); p.Rect(4, 10, 4, 2, "#5e6468");
                 p.Rect(2, 2, 8, 8, "#c8d0d8"); p.Rect(3, 3, 6, 6, "#dcecf2");
                 p.Rect(3, 6, 6, 3, "#4ea3bf"); p.Rect(4, 5, 2, 1, "#4ea3bf"); p.Rect(7, 6, 1, 1, "#dcecf2"); p.Rect(5, 3, 1, 3, "#10243a");
+                break;
+            case "compass":
+                // Aling Sela's survey compass: a brass case, a pale face and a needle pointing north.
+                p.Rect(3, 1, 6, 10, "#b8862f"); p.Rect(1, 3, 10, 6, "#b8862f"); p.Rect(2, 2, 8, 8, "#b8862f");
+                p.Rect(3, 3, 6, 6, "#f2ead6"); p.Rect(2, 4, 8, 4, "#f2ead6"); p.Rect(4, 2, 4, 8, "#f2ead6");
+                p.Rect(6, 3, 1, 3, "#c0392b"); p.Rect(5, 6, 1, 3, "#3c4a5a"); p.Rect(5, 5, 2, 2, "#3c342a");
+                p.Rect(5, 0, 2, 1, "#8a6420");
                 break;
             case "mooncharm":
                 p.Line(3, 1, 6, 4, "#c9a06a"); p.Line(9, 1, 6, 4, "#c9a06a");

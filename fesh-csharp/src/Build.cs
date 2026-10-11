@@ -29,9 +29,10 @@ partial class Game
     List<Box> Solids()
     {
         var list = StaticSolids();
-        if (scene == "world") { list.AddRange(IslandSolids()); list.AddRange(HabagatSolids()); }
+        if (scene == "world") { list.AddRange(IslandSolids()); list.AddRange(HabagatSolids()); list.AddRange(MlSolids()); }
         foreach (var b in SceneBuilds()) if (BuildBox(b) is Box r) list.Add(r);
         list.AddRange(SchoolRoomSolids());
+        list.AddRange(MlCaveSolids());
         if (scene == "cave")
             foreach (var n in nodes) if (!NodeMined(n)) list.Add(new Box(n.X * T + 1, n.Y * T + 2, 8, 7));
         return list;
@@ -62,7 +63,9 @@ partial class Game
         {
             int tx = (int)MathF.Floor(ax / T), ty = (int)MathF.Floor(ay / T);
             char t = TileAt(tx, ty);
-            if (!(Walkable(t) || wade && Wadeable(t) || swim && SwimOk(tx, ty, t) || flats && FlatOk(tx, ty)) || BridgeClosed(tx, ty)) return false;
+            // Marilaya's sandbar (MarilayaPlaces.cs): on foot only while it's out, and never waded while the sea's over it.
+            if (flats && OnSandbarTile(tx, ty)) { if (!SandbarOk(tx, ty)) return false; continue; }
+            if (!(Walkable(t) || wade && Wadeable(t) && !OnSandbarTile(tx, ty) || swim && SwimOk(tx, ty, t) || flats && FlatOk(tx, ty)) || BridgeClosed(tx, ty)) return false;
         }
         foreach (var r in Solids())
             if (x + 3 > r.X && x - 3 < r.X + r.W && y > r.Y && y - 3 < r.Y + r.H) return false;
@@ -115,7 +118,8 @@ partial class Game
             if (BuildAt(tx + i, ty) != null) return "Something is already here";
         }
         var area = new Box(tx * T, ty * T, d.W * T, T);
-        if (scene == "world" && IslandSolids().Concat(HabagatSolids()).Any(b => b.Overlaps(area))) return "Keep the island landmarks clear";
+        if (scene == "world" && IslandSolids().Concat(HabagatSolids()).Concat(MlSolids()).Any(b => b.Overlaps(area))) return "Keep the island landmarks clear";
+        if (scene == "world" && area.Overlaps(new Box(SelaX - 26, SelaY - 38, 52, 62))) return "Keep the village paths clear";
         if (scene == "world" && Islanders.Any(n => area.Overlaps(new Box(n.x - 26, n.y - 38, 52, 62)))) return "Keep the village paths clear";
         if (scene == "world" && HabagatFolk.Any(n => area.Overlaps(new Box(n.x - 26, n.y - 38, 52, 62)))) return "Keep the village paths clear";
         if (scene == "world" && area.Overlaps(new Box(JoyX - 12, JoyY - 14, 24, 20))) return "Keep the warden's platform clear";

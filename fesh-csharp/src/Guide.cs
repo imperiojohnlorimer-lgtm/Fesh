@@ -50,6 +50,7 @@ partial class Game
         RequestGoals(list);
         SeaGoals(list);
         MagayonGoals(list);
+        MarilayaGoals(list);
         SchoolGoals(list);
         ExploreGoals(list);
         return list;
@@ -462,7 +463,9 @@ partial class Game
     {
         if (x >= EastStart * T && Dist(x, y, JoyX, JoyY) < 60) return "amihan:sanctuary";
         byte b = BiomeAt((int)MathF.Floor(x / T), (int)MathF.Floor(y / T));
-        return b == 5 || b == 6 ? RegionOf(x, y) : b == 4 ? "atoll" : "west";
+        // On Marilaya each group of islets is its own crossing from the island (a boat, or Tidemane).
+        if (b == 7) return RegionOf(x, y);
+        return b is 5 or 6 ? RegionOf(x, y) : b == 4 ? "atoll" : "west";
     }
 
     static string Zone(string region) => region.Split(':')[0];
@@ -495,6 +498,7 @@ partial class Game
         string place = g.Place, how = null;
         if (g.Scene == "house:tomas") { gx = 160; gy = 72; how = "It's inside Tomas's hut."; }
         else if (g.Scene == "house:school") { gx = SchoolDoorX; gy = SchoolDoorY + 4; how = "It's inside the school."; }
+        else if (g.Scene == MlCaveKey) { (gx, gy) = MlPlace("cave"); gy += 6; place = "The cave"; how = "It's inside the cave."; }
         else if (HouseDoor(g.Scene) is (float hx, float hy)) { gx = hx; gy = hy + 2; place = "Your shack"; how = "It's inside your shack: <act> at the door."; }
         else if (g.Scene == "cave") { gx = MouthDoorX; gy = MouthDoorY; place = "Frostfang Caverns"; how = "It's down in Frostfang Caverns."; }
         else if (g.Scene == "sea")
@@ -523,26 +527,32 @@ partial class Game
         if (state.tamed) return new(gx, gy, place, $"Whistle for {Data.MountName} (<ride>) and swim across.{storm}");
         if (Has("boat") == 0) return new(gx, gy, place, "You'll need a boat to get there.");
         string name = to.StartsWith("amihan:") && to != "amihan:sanctuary" ? to[7..] : to.StartsWith("habagat:") ? (to.StartsWith("habagat:islet") ? "Daang Pulo" : to[8..])
-            : to switch { "atoll" => "Starfall Atoll", "amihan:sanctuary" => "the sanctuary", _ => "Saltmere" };
-        // Among Amihan's islands or Habagat's, it's your boat if it's moored out here (else Asinan's landing, on Asinan).
-        if (Zone(from) is "amihan" or "habagat")
+            : to.StartsWith("marilaya") ? (MlRegionNames.TryGetValue(to, out var mn) ? mn : "Marilaya") : to switch { "atoll" => "Starfall Atoll", "amihan:sanctuary" => "the sanctuary", _ => "Saltmere" };
+        // The Set sail panel offers Asinan once Habagat's found, and Marilaya once it's found (Trade.DrawVoyage).
+        bool sailAsinan = Zone(to) == "habagat" && VoyageChoice && state.Hinted("habagat"), sailMarilaya = Zone(to) == "marilaya" && VoyageChoice && state.Hinted("marilaya");
+        // Among Amihan's islands, Habagat's or Marilaya's, it's your boat if it's moored out here (else a landing with a
+        // Set sail route: Asinan's, on Asinan, or Marilaya's harbour, on Marilaya).
+        if (Zone(from) is "amihan" or "habagat" or "marilaya")
         {
             var (bx, by) = BoatPosition();
             if (Zone(GuideRegion(bx, by)) == Zone(from)) return new(bx, by, "Your boat", $"Board your boat (<ride>) and sail {Heading(bx, by, gx, gy)} to {name}.{storm}");
-            if (from != "habagat:Asinan") return null;
+            if (from != "habagat:Asinan" && from != "marilaya") return null;
         }
         switch (Zone(from))
         {
             case "west":
-                return new(SaltJettyX, SaltJettyY, "Pip's jetty", (Zone(to) == "habagat" && VoyageChoice ? "At Pip's jetty, sail to Asinan (<act>)."
+                return new(SaltJettyX, SaltJettyY, "Pip's jetty", (sailAsinan ? "At Pip's jetty, sail to Asinan (<act>)." : sailMarilaya ? "At Pip's jetty, sail to Marilaya (<act>)."
                     : to == "atoll" ? "At Pip's jetty, sail to Starfall Atoll (<act>)." : "At Pip's jetty, sail to Starfall Atoll (<act>), then take the helm there (<alt>).") + storm);
             case "atoll":
                 return new(AtollJettyX, AtollJettyY, "Atoll jetty", (to == "west" ? "At the atoll's jetty, sail back to Saltmere (<act>)."
-                    : Zone(to) == "habagat" && VoyageChoice ? "At the atoll's jetty, sail to Asinan (<act>)."
+                    : sailAsinan ? "At the atoll's jetty, sail to Asinan (<act>)." : sailMarilaya ? "At the atoll's jetty, sail to Marilaya (<act>)."
                     : $"At the atoll's jetty, take the helm (<alt>) and steer {Heading(AtollJettyX, AtollJettyY, gx, gy)} to {name}.") + storm);
             case "habagat":
-                return new(AsinanJettyX, AsinanJettyY, "Asinan landing", (to is "west" or "atoll" ? $"At Asinan's landing, sail to {name} (<act>)."
+                return new(AsinanJettyX, AsinanJettyY, "Asinan landing", (to is "west" or "atoll" || sailMarilaya ? $"At Asinan's landing, sail to {name} (<act>)."
                     : $"At Asinan's landing, take the helm (<alt>) and steer {Heading(AsinanJettyX, AsinanJettyY, gx, gy)} to {name}.") + storm);
+            case "marilaya":
+                return new(MlJettyX, MlJettyY, "Marilaya harbour", (to is "west" or "atoll" || sailAsinan ? $"At Marilaya's harbour, sail to {(sailAsinan ? "Asinan" : name)} (<act>)."
+                    : $"At Marilaya's harbour, take the helm (<alt>) and steer {Heading(MlJettyX, MlJettyY, gx, gy)} to {name}.") + storm);
             default:
                 return null;
         }
@@ -553,8 +563,7 @@ partial class Game
     {
         var c = seaPointCache;
         if (c.spot == spot && Dist(c.px, c.py, player.X, player.Y) < 40) return (c.x, c.y);
-        bool Fits(int tx, int ty) => worldMap[ty, tx] == '~' && (spot == "amihansea" ? tx >= EastStart && !InSanctuary(tx * T + 5, ty * T + 5)
-            : tx < EastStart && (spot == "habagatsea") == (ty >= HabagatTop));
+        bool Fits(int tx, int ty) => worldMap[ty, tx] == '~' && SeaSpotAt(tx * T + 5, ty * T + 5) == spot && !InSanctuary(tx * T + 5, ty * T + 5);
         int px = Math.Clamp((int)(player.X / T), 1, COLS - 2), py = Math.Clamp((int)(player.Y / T), 1, ROWS - 2);
         (float x, float y) best = (0, 0);
         bool Try(int tx, int ty)
@@ -583,6 +592,7 @@ partial class Game
         {
             "house:tomas" => (160, 72),
             "house:school" => (SchoolDoorX, SchoolDoorY),
+            MlCaveKey => MlPlace("cave"),
             "cave" => (MouthDoorX, MouthDoorY),
             _ when HouseDoor(g.Scene) is (float hx, float hy) => (hx, hy),
             "sea" => scene == "world" ? SeaPoint(g.Spot) : null,

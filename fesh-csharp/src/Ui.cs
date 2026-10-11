@@ -18,7 +18,7 @@ partial class Game
         bool title = mode == "title";
         if (!title) DrawHud();
         if (!title) DrawGuideArrow();
-        if (!title) DrawPinCompass();
+        if (!title) { DrawPinCompass(); DrawCacheCompass(); }
         if (!title) DrawFishingUi();
         if (!title && (BossFighting || BossOnLine || GuardianFighting)) DrawBossBar();
         if (!title && eclipse != null) DrawEclipseBar();
@@ -38,6 +38,7 @@ partial class Game
         if (mode == "platejaw") DrawGuardianCard();
         if (mode == "seacard") DrawSeaCard();
         if (mode == "magayoncard") DrawMagayonCard();
+        if (mode == "marilayacard") DrawMarilayaCard();
         if (mode == "panel" && panel == "dex") DrawDex();
         if (mode == "panel" && panel == "case") DrawCase();
         if (mode == "panel" && panel == "map") DrawMap();
@@ -59,6 +60,15 @@ partial class Game
         if (mode == "panel" && panel == "readings") DrawReadings();
         if (mode == "panel" && panel == "gobag") DrawGoBag();
         if (mode == "panel" && panel == "lahar") DrawLaharWatch();
+        if (mode == "panel" && panel == "mlrock") DrawMlRock();
+        if (mode == "panel" && panel == "mlpost") DrawMlPost();
+        if (mode == "panel" && panel == "mlsprings") DrawMlSprings();
+        if (mode == "panel" && panel == "mlmodel") DrawMlModel();
+        if (mode == "panel" && panel == "mlscope") DrawMlScope();
+        if (mode == "panel" && panel == "mlplot") DrawMlPlot();
+        if (mode == "panel" && panel == "mlcavemodel") DrawMlCaveModel();
+        if (mode == "panel" && panel == "mlkalutang") DrawMlKalutang();
+        if (mode == "panel" && panel == "mlnursery") DrawMlNursery();
         if (mode == "moon") DrawMoonCard();
         if (mode == "pause") DrawMenu();
     }
@@ -204,7 +214,7 @@ partial class Game
         };
         if (KnowTomorrow) lines.Add($"Tomorrow: {DescribeDay(state.tomorrow)}");
         // On Habagat (or anywhere with the tide watch), the tide matters for gleaning (Tides.cs).
-        if (InHabagat || Wears("tide_watch") && scene == "world") lines.Add(TideLine());
+        if (InHabagat || InMarilaya || Wears("tide_watch") && scene == "world") lines.Add(TideLine());
         float w = lines.Max(l => Gfx.Measure(l, FontKind.Ui500, 17)) + 24;
         Gfx.Rect(x, y, w, lines.Count * 23 + 14, NavyStrong, 5);
         for (int i = 0; i < lines.Count; i++) Gfx.Text(lines[i], x + 12, y + 8 + i * 23, FontKind.Ui500, 17, Pal.Paper);
@@ -467,7 +477,7 @@ partial class Game
 
     /* ---------- Fesh-dex ---------- */
     float lastCreaturesBottom;   // where the creatures page ended (the autotest checks it fits the screen)
-    static readonly Dictionary<string, string> BiomeColor = new() { ["saltmere"] = "#5d9b45", ["frost"] = "#8fc3d6", ["dunes"] = "#e0a85a", ["mire"] = "#3f7d3a", ["atoll"] = "#2bb3a3", ["amihan"] = "#d59c4c", ["habagat"] = "#c9b9e0" };
+    static readonly Dictionary<string, string> BiomeColor = new() { ["saltmere"] = "#5d9b45", ["frost"] = "#8fc3d6", ["dunes"] = "#e0a85a", ["mire"] = "#3f7d3a", ["atoll"] = "#2bb3a3", ["amihan"] = "#d59c4c", ["habagat"] = "#c9b9e0", ["marilaya"] = "#d46a7e" };
     int logPage;   // one page per biome, then legends, odd catches and records
 
     // The Fish log for an island: each fishing spot's fish, then what turns up in crab pots there. A filter (the Fish
@@ -477,7 +487,8 @@ partial class Game
         var b = Data.Biomes[page];
         string use = filter ?? dexFilter;
         var groups = Data.Spots.Where(s => s.Biome == b.Id).Select(s => (SpotKnown(s) ? s.Label : "???", Data.Common[s.Id].Where(f => PassesFilter(f, use)).ToList())).ToList();
-        groups.Add(("Crab pots", Data.PotCatch[b.Id].Where(f => PassesFilter(f, use)).ToList()));
+        // (Marilaya's pots bring up Amihan's crabs, so its page has none of its own.)
+        if (Data.PotCatch.TryGetValue(b.Id, out var pots)) groups.Add(("Crab pots", pots.Where(f => PassesFilter(f, use)).ToList()));
         return groups.Where(g => g.Item2.Count > 0).ToList();
     }
 
@@ -1025,6 +1036,7 @@ partial class Game
         DrawSaltBeds(live: false);
         var habagat = new List<(float y, Action draw)>();
         AddHabagatObjects(habagat, live: false);
+        AddMarilayaObjects(habagat, live: false);
         foreach (var o in habagat.OrderBy(o => o.y)) o.draw();
         DrawBuoysOnMap();
         (pix, scene, map, basePix, buildIndex) = (savedPix, savedScene, savedMap, savedBase, savedIndex);
@@ -1127,7 +1139,9 @@ partial class Game
         ("habagat", 2, "The vanishing moon", state.Hinted("habagat"), "Sail south and find the Habagat islands."),
         ("amihan", 3, "The restless sea", SeaStoryStarted, state.Hinted("metIsay") ? "Come back to Amihan Village on a later day, by daylight."
             : "Visit Amihan Village and introduce yourself to Ma'am Isay."),
-        ("baga", 4, "Beneath the clouds", MgStarted, "Visit Baga Island and speak with Manay Mila.")
+        ("baga", 4, "Beneath the clouds", MgStarted, "Visit Baga Island and speak with Manay Mila."),
+        ("marilaya", 5, "The heart that rose", MrMet || MrClueCount > 0, state.Hinted("marilaya") ? "Meet Aling Sela at Marilaya's harbour, under the survey hill."
+            : "Find the island shaped like a heart, far out east past Baga.")
     };
 
     void DrawCase()
@@ -1136,13 +1150,14 @@ partial class Game
         var story = CaseStories().FirstOrDefault(s => s.id == caseTab);
         if (story.id == null) { caseTab = "saltmere"; story = CaseStories()[0]; }
         if (!story.open) { DrawLockedCase(story); return; }
-        bool moon = caseTab == "habagat", sea = caseTab == "amihan", baga = caseTab == "baga";
-        var caseClues = moon ? Data.MoonClues : sea ? Data.SeaClues : baga ? Data.MagayonClues : null;
+        bool moon = caseTab == "habagat", sea = caseTab == "amihan", baga = caseTab == "baga", heart = caseTab == "marilaya";
+        var caseClues = moon ? Data.MoonClues : sea ? Data.SeaClues : baga ? Data.MagayonClues : heart ? Data.MarilayaClues : null;
         const float bx = 50, bw = 1180, border = 13, padT = 21, padX = 24, padB = 29, colGap = 24;
         float ix = bx + border, iw = bw - border * 2, cw = iw - padX * 2;
         const float qw = 693;
         var question = Gfx.Wrap(moon ? "Why does the moon go out over the Habagat sea?" : sea ? "When the ground shakes, what should Amihan Village do about the sea?"
             : baga ? "Baga is stirring. How do we read its signs, and keep everyone safe?"
+            : heart ? "Did Marilaya really rise from the sea? What does the island itself say?"
             : "How did these creatures end up around Saltmere Island?", FontKind.Note, 26, qw - 48);
         float qh = 19 + question.Count * 35 + 16;
         int count = caseClues?.Length ?? Data.Creatures.Length;
@@ -1172,13 +1187,17 @@ partial class Game
         const float tw = 827;
         string theoryText = moon ? Data.MoonTheories[MoonReturned ? Data.MoonTheories.Length - 1 : MoonClueCount]
             : sea ? Data.SeaTheories[SeaCaseClosed ? Data.SeaTheories.Length - 1 : SeaClueCount]
-            : baga ? Data.MagayonTheories[MgDone ? Data.MagayonTheories.Length - 1 : MgClueCount] : Data.Theories[state.caught.Count];
+            : baga ? Data.MagayonTheories[MgDone ? Data.MagayonTheories.Length - 1 : MgClueCount]
+            : heart ? (MrDone ? Data.MarilayaTheories[^1] : MrSorted ? "Sorted with the shore model: tides take hours, sand moves in storms or years, the rock rose over ages (or sometimes all at once). Last job: the chart, by triangulation." : Data.MarilayaTheories[MrClueCount])
+            : Data.Theories[state.caught.Count];
         var theory = Gfx.Wrap(theoryText, FontKind.Note, 20, tw - 48);
         float th = 19 + 26 + theory.Count * 29 + 19;
         float innerH = padT + 46 + 8 + qh + 32 + noteH + 35 + th + padB;
-        if (innerH + border * 2 + 6 > Gfx.LH - 8)
+        // Two steps down: a five-note board (the heart that rose, 1.23) can need the smaller one.
+        foreach (var (fs, lh) in new[] { (16f, 22f), (14f, 19f) })
         {
-            nfs = 16; nlh = 22;
+            if (innerH + border * 2 + 6 <= Gfx.LH - 8) break;
+            nfs = fs; nlh = lh;
             notes = MakeNotes();
             noteH = NoteH();
             innerH = padT + 46 + 8 + qh + 32 + noteH + 35 + th + padB;

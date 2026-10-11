@@ -186,8 +186,8 @@ partial class Game
         state.pots[key] = state.day;
         var biome = Data.Biomes[BiomeAt(b.x, b.y)].Id;
         var got = new List<string>();
-        // Most islands have one catch for their pots; Habagat's have three, picked by their Weight.
-        var kinds = Data.PotCatch[biome];
+        // Most islands have one catch for their pots; Habagat's have three, picked by their Weight. Marilaya's are Amihan's.
+        var kinds = PotCatchFor(biome);
         double roll = rng.NextDouble() * kinds.Sum(k => k.Weight);
         var crab = kinds[^1];
         foreach (var k in kinds) { if (roll < k.Weight) { crab = k; break; } roll -= k.Weight; }

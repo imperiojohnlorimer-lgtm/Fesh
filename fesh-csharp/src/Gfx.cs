@@ -51,6 +51,7 @@ static class Inp
     // back to the middle before it flicks again.
     public static float? ScriptRightX { get; set; }
     public static int RightFlick { get; private set; }
+    public static float RightX { get; private set; }   // the right stick across, past the dead zone (Marilaya's survey sight turns with it)
     static bool rightOut;
     public static bool UsingPad;          // the last input came from the gamepad: prompts name its buttons
     public static Vector2? PadCursor;     // the pointer the pad steers in menus (null: the mouse has it)
@@ -90,6 +91,7 @@ static class Inp
         stick = ScriptStick ?? (Pad ? new Vector2(GetGamepadAxisMovement(PadIndex, GamepadAxis.LeftX), GetGamepadAxisMovement(PadIndex, GamepadAxis.LeftY)) : Vector2.Zero);
         float rx = ScriptRightX ?? (Pad ? GetGamepadAxisMovement(PadIndex, GamepadAxis.RightX) : 0);
         RightFlick = 0;
+        RightX = MathF.Abs(rx) < Dead ? 0 : rx;
         if (MathF.Abs(rx) < 0.3f) rightOut = false;
         else if (MathF.Abs(rx) > 0.65f && !rightOut) { rightOut = true; RightFlick = rx > 0 ? 1 : -1; UsingPad = true; }
         if (stick.Length() < Dead) stick = Vector2.Zero;

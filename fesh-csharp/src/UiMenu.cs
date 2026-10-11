@@ -104,7 +104,8 @@ partial class Game
         (1890, 560, "Bakawan Island", "The Amihan Archipelago"),
         (265, 643, "Asinan", "The Habagat islands"),
         (645, 630, "Daang Pulo", "The Habagat islands"),
-        (LighthouseX - 90, LighthouseY + 14, "Parola", "The Habagat islands")
+        (LighthouseX - 90, LighthouseY + 14, "Parola", "The Habagat islands"),
+        (SelaX - 20, SelaY + 24, "Marilaya", "The heart-shaped island")
     };
     const float TitleStopSecs = 8, TitleFade = 0.8f, TitleDrift = 48;
     float titleT;
@@ -246,7 +247,7 @@ partial class Game
             return;
         }
         Gfx.Text(SlotTitle(s), tx, ty + 24, FontKind.Ui700, 27, Pal.PaperInk);
-        string where = s.scene == "cave" ? "Frostfang Caverns" : s.scene.StartsWith("house:") ? (s.scene == "house:tomas" ? "Tomas's hut" : s.scene == "house:school" ? "The school, Amihan Village" : "Your shack")
+        string where = s.scene == "cave" ? "Frostfang Caverns" : s.scene.StartsWith("house:") ? (s.scene == "house:tomas" ? "Tomas's hut" : s.scene == "house:school" ? "The school, Amihan Village" : s.scene == MlCaveKey ? "The cave, Marilaya" : "Your shack")
             : Data.Biomes[BiomeAt((int)(s.px / T), (int)((s.py - 1.5f) / T))].Name;
         Gfx.Text($"Day {s.day}, {ClockText(s.clock, 10)}  ·  {where}", tx, ty + 60, FontKind.Ui500, 18, Pal.PaperInk);
         Gfx.Text($"Creatures {s.caught.Count}/5  ·  {s.commons.Values.Sum()} fish caught  ·  {s.coins} coins", tx, ty + 84, FontKind.Ui500, 18, Pal.PaperInk);

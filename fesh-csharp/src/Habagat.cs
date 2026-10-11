@@ -9,7 +9,7 @@ namespace Fesh;
 partial class Game
 {
     public const int HabagatTop = 56;
-    bool InHabagat => scene == "world" && player.Y >= HabagatTop * T && player.X < EastStart * T;
+    bool InHabagat => scene == "world" && ZoneAt(player.X, player.Y) == "habagat";
 
     // Asinan and Parola, and the home islet of Daang Pulo, with its scatter of small islets.
     static readonly (string name, float cx, float cy, float rx, float ry)[] HabagatIslands =
@@ -143,7 +143,7 @@ partial class Game
             n++;
         }
         bool MountFits(float x, float y) => (Walkable(W(x, y - 1.5f)) || Swimmable(W(x, y - 1.5f)))
-            && !HabagatSolids().Concat(state.builds.Select(BuildBox).OfType<Box>()).Any(b => b.Overlaps(new Box(x - 6, y - 4, 12, 4)));
+            && !HabagatSolids().Concat(MlSolids()).Concat(state.builds.Select(BuildBox).OfType<Box>()).Any(b => b.Overlaps(new Box(x - 6, y - 4, 12, 4)));
         if (state.tamed && !state.riding && (state.mountX != 0 || state.mountY != 0) && !MountFits(state.mountX, state.mountY))
         {
             var spot = new[] { (12f, 0f), (-12f, 0f), (0f, 10f), (0f, -10f), (20f, 0f), (-20f, 0f), (0f, 18f) }

@@ -27,7 +27,7 @@ partial class Game
     }
 
     bool InHouse => scene.StartsWith("house:");
-    bool InOwnHouse => InHouse && scene is not ("house:tomas" or "house:school");
+    bool InOwnHouse => InHouse && scene is not ("house:tomas" or "house:school" or MlCaveKey);
     static string ShackKey(Build b) => $"house:{b.x},{b.y}";
 
     // The furniture or buildings that belong to the current scene.
@@ -36,6 +36,7 @@ partial class Game
         if (scene == "world") return state.builds;
         if (scene == "house:tomas") return TomasRoom;
         if (scene == "house:school") return SchoolRoom;
+        if (scene == MlCaveKey) return new List<Build>();
         if (InHouse)
         {
             if (!state.rooms.TryGetValue(scene, out var room)) state.rooms[scene] = room = new List<Build>();
@@ -45,7 +46,7 @@ partial class Game
     }
 
     bool SceneExists(string key) =>
-        key == "world" || key == "cave" || key == "house:tomas" || key == "house:school" && (AshPhase || BagaFolkAtSchool) || state.builds.Any(b => Data.BuildById[b.id].Door && ShackKey(b) == key);
+        key == "world" || key == "cave" || key == "house:tomas" || key == MlCaveKey || key == "house:school" && (AshPhase || BagaFolkAtSchool) || state.builds.Any(b => Data.BuildById[b.id].Door && ShackKey(b) == key);
 
     void LoadScene(string key)
     {
@@ -93,6 +94,7 @@ partial class Game
                 state.hinted["tomasHut"] = true;
                 Toast("Tomas's workbench and stove are yours to use. Press <act> at the workbench to craft an axe.", 5);
             }
+            else if (key == MlCaveKey) { if (!state.Hinted("mr:caveIn")) { state.hinted["mr:caveIn"] = true; Toast("A walkway runs through the cave, with lamps. Look at the three marked spots, and the model by the door.", 5); } }
             else if (!tomas && !state.Hinted("ownHouse"))
             {
                 state.hinted["ownHouse"] = true;
@@ -109,10 +111,12 @@ partial class Game
     int RoomDoorX => SCols / 2;
 
     // Walls around the edge (the top two rows are the back wall), wooden floor inside and a door at the bottom.
-    static (int w, int h) RoomSize(string key) => key == "house:tomas" ? (TomasW, TomasH) : key == "house:school" ? (SchoolW, SchoolH) : (ShackW, ShackH);
+    static (int w, int h) RoomSize(string key) => key == "house:tomas" ? (TomasW, TomasH) : key == "house:school" ? (SchoolW, SchoolH) : key == MlCaveKey ? (MlCaveW, MlCaveH) : (ShackW, ShackH);
 
     void BuildRoom(string key)
     {
+        // The cave on Marilaya is a chamber of rock, not a room (MarilayaCave.cs).
+        if (key == MlCaveKey) { BuildCaveRoom(); return; }
         bool tomas = key == "house:tomas", school = key == "house:school";
         var (w, h) = RoomSize(key);
         roomMap = new char[h, w];
@@ -190,7 +194,7 @@ partial class Game
 
     void RenderRoom(float t)
     {
-        DrawWindows();
+        if (InMlCave) DrawCaveWalls(); else DrawWindows();
         if (scene == "house:school") DrawSchoolShutters();
         var list = new List<(float y, Action draw)>();
         foreach (var b in SceneBuilds())
@@ -199,11 +203,13 @@ partial class Game
             else list.Add((b.y * T + 9, () => DrawBuild(b, t)));
         }
         if (scene == "house:school") AddSchoolRoomObjects(list);
+        if (InMlCave) AddMlCaveObjects(list);
         list.Add((player.Y, DrawPlayer));
         if (scene == "house:tomas" && TomasInBed) list.Add((TomasBedY - 3.5f, DrawTomasAsleep));
         foreach (var o in list.OrderBy(o => o.y)) o.draw();
         DrawParticles();
-        if (Night)
+        if (InMlCave) LightMlCave();
+        else if (Night)
         {
             // A dim room at night, lit by lamps, the furnace and the stove.
             Array.Fill(dark, 0.45f);

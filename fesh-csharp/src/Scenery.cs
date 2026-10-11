@@ -182,6 +182,14 @@ partial class Game
         if (Shore(g) && WetEdge.TryGetValue(g, out var wet)
             && (Pool(ShapePx(wx + 1, wy)) || Pool(ShapePx(wx - 1, wy)) || Pool(ShapePx(wx, wy + 1)) || Pool(ShapePx(wx, wy - 1)))) return wet;
         float v = VNoise(wx, wy, 26, 170) * 0.65f + VNoise(wx, wy, 8, 171) * 0.35f + (BayerAt(wx, wy) - 0.5f) * 0.16f;
+        // Marilaya's hills and Tindig are shaded by the light from the north-west (Marilaya.cs), through the same three
+        // tones, and a fourth, darker one in the deepest shade.
+        if (tx >= MlStart)
+        {
+            float shade = MlShade(wx, wy);
+            v += shade;
+            if (v < 0.1f && shade < -0.2f) return Pix.Mix(tones[0], Pal.C("#1f2f2a"), 0.22f);
+        }
         return tones[v < 0.38f ? 0 : v > 0.62f ? 2 : 1];
     }
 

@@ -41,6 +41,13 @@ partial class Game
                 .OrderBy(kv => Data.FishById[kv.Key].Rare ? 1 : 0).ThenByDescending(kv => kv.Value).FirstOrDefault();
             if (pick.Key == null) return;
             Take(pick.Key);
+            // Ordinary fish of this kind go first. Any premium left must belong to a fish still in the bag.
+            if (state.big.TryGetValue(pick.Key, out int big))
+            {
+                int remaining = Math.Min(big, Has(pick.Key));
+                if (remaining > 0) state.big[pick.Key] = remaining;
+                else state.big.Remove(pick.Key);
+            }
         }
     }
 

@@ -36,7 +36,7 @@ sealed class Actor { public float X, Y, WalkT; public string Face = "down"; publ
 partial class Game
 {
     // W x H is the view; the world is COLS x ROWS tiles of T pixels.
-    const int W = 320, H = 180, T = 10, COLS = 252, ROWS = 76;
+    const int W = 320, H = 180, T = 10, COLS = 336, ROWS = 76;
     const float FireX = 185, FireY = 86, TomasHomeX = 146, TomasHomeY = 82, Reach = 30;
     const int MaxBuilds = 150;
     static readonly HashSet<char> Buildable = new() { 's', 'g', 'n', 'e', 'D', 'j' };
@@ -234,6 +234,7 @@ partial class Game
     // Actions go through Bind (rebindable in the menu); Esc, Enter and the number keys are fixed.
     void HandleKeys()
     {
+        mlFreshPanel = false;
         if (rebind != null) { CaptureRebind(); return; }
         // While you type your fisher's name, a letter bound to fullscreen types the letter instead.
         if (mode == "create" || mode == "title" && renameSlot > 0 ? Bind.PressedNotTyping("fullscreen") : Bind.Pressed("fullscreen")) ToggleFullscreen();
@@ -287,6 +288,7 @@ partial class Game
             else if (mode == "platejaw") CloseGuardianCard();
             else if (mode == "seacard") CloseSeaCard();
             else if (mode == "magayoncard") CloseMagayonCard();
+            else if (mode == "marilayacard") CloseMarilayaCard();
             else if (mode == "build") ExitBuild();
             else if (mode is "waiting" or "charging") ReelIn("You reeled in.");
             else if (mode == "spear") EndSpear();
@@ -355,6 +357,7 @@ partial class Game
     {
         if (scene == "house:tomas") return "Tomas's hut";
         if (scene == "house:school") return "The school (evacuation centre)";
+        if (scene == MlCaveKey) return "The cave, Marilaya";
         if (InHouse) return "Your shack";
         if (scene == "cave") return caveFloor == AncientFloor ? "The Ancient Floor" : $"Caverns, floor {caveFloor}";
         float x = player.X, y = player.Y;
@@ -364,7 +367,9 @@ partial class Game
         char tile = TileAt((int)MathF.Floor(x / T), (int)MathF.Floor((y - 1.5f) / T));
         if (race != null) return $"Regatta · {RaceTime(race.T)}";
         if (InAmihan && InSanctuary(x, y)) return Aboard ? "Marine sanctuary · at the helm" : "Marine sanctuary";
-        if (Aboard) return InAmihan ? "Amihan sea · at the helm" : InHabagat ? "Habagat sea · at the helm" : "Open sea · at the helm";
+        if (Aboard) return InMarilaya ? "Marilaya waters · at the helm" : InAmihan ? "Amihan sea · at the helm" : InHabagat ? "Habagat sea · at the helm" : "Open sea · at the helm";
+        if (InMarilaya && OnSandbarTile((int)MathF.Floor(x / T), (int)MathF.Floor((y - 1.5f) / T))) return AmboBackBy() is string backBy ? $"The sandbar · back by {backBy}" : "The sandbar off Maniwaya";
+        if (InMarilaya && !WaterTile(tile)) return MarilayaPlaceName(x, y);
         if (InAmihan && !WaterTile(tile)) return AmihanIslands.OrderBy(i => Dist(x, y, i.cx * T, i.cy * T)).First().name;
         if (InHabagat && !WaterTile(tile))
         {
@@ -638,6 +643,9 @@ partial class Game
         // Baga's panels (Magayon.cs): the lahar watch always ends with the warning out, by you or by Ben.
         bool lahar = panel == "lahar";
         if (panel is "readings" or "gobag") { readings = null; gobag = null; }
+        // Marilaya's panels (MarilayaUi.cs): whatever was half done is simply put down; nothing earned is lost. A survey
+        // with both bearings in finishes the story however it's closed.
+        if (MlPanels.Contains(panel)) DropMlPanels();
         riddle = null;
         panel = null;
         dexFish = null;
@@ -719,6 +727,8 @@ partial class Game
         {
             // The school as the evacuation centre (Magayon.cs).
             if (scene == "house:school") return SchoolRoomTarget();
+            // The cave on Marilaya (MarilayaCave.cs).
+            if (scene == MlCaveKey) return MlCaveTarget();
             if (Dist(x, y, RoomDoorWX, RoomDoorWY) < 14) return new Target { Type = "exit", Label = "Go outside" };
             if (scene == "house:tomas" && Dist(x, y, PhotoX, PhotoY) < 12) return new Target { Type = "photo", Label = "Look at the photo" };
             // Tomas's bed is taken at night. You can wake him, though.
@@ -768,6 +778,8 @@ partial class Game
         if (Aboard) return HelmTarget();
         if (ArchipelagoTarget() is Target islandTarget) return islandTarget;
         if (HabagatTarget() is Target habagatTarget) return habagatTarget;
+        // Marilaya (MarilayaStory.cs): Aling Sela and the places the story looks at.
+        if (MarilayaTarget() is Target marilayaTarget) return marilayaTarget;
         if (SanctuaryTarget() is Target sanctuaryTarget) return sanctuaryTarget;
         if (Dist(x, y, tomasX, tomasY) < 16)
             return TomasInBed ? new Target { Type = "info", Label = "Tomas has gone to bed in his hut" }
@@ -780,6 +792,8 @@ partial class Game
             return new Target { Type = "sail", Id = "saltmere", Label = VoyageChoice ? "Sail somewhere" : "Sail back to Saltmere", AltType = "launch", AltLabel = "Take the helm / explore" };
         if (Dist(x, y, AsinanJettyX, AsinanJettyY) < 10)
             return new Target { Type = "sail", Id = "saltmere", Label = Has("boat") > 0 ? "Sail somewhere" : "Asinan landing (you need a boat to sail)", AltType = "launch", AltLabel = "Take the helm" };
+        if (Dist(x, y, MlJettyX, MlJettyY) < 10)
+            return new Target { Type = "sail", Id = "saltmere", Label = Has("boat") > 0 ? "Sail somewhere" : "Marilaya's harbour (you need a boat to sail)", AltType = "launch", AltLabel = "Take the helm" };
         if (Dist(x, y, 160, 72) < 10) return new Target { Type = "door", Id = "house:tomas", Label = "Go inside Tomas's hut" };
         if (Dist(x, y, MouthDoorX, MouthDoorY) < 14) return new Target { Type = "cave", Label = "Enter Frostfang Caverns" };
         // The fallen rocks and the wreck's hatch, while the story needs them (Chapters.cs).
@@ -865,6 +879,8 @@ partial class Game
         else if (target?.AltType == "troll") ToggleTroll();
         else if (target?.AltType == "unrack") UnloadRack((Build)target.Ref);
         else if (target?.AltType == "rackguso") LayGuso((Build)target.Ref);
+        else if (target?.AltType == "mlwait") WaitForTide();
+        else if (target?.AltType == "mlsun") WaitForSun();
     }
 
     void OnAlt2()
@@ -885,6 +901,7 @@ partial class Game
             case "platejaw": CloseGuardianCard(); return;
             case "seacard": CloseSeaCard(); return;
             case "magayoncard": CloseMagayonCard(); return;
+            case "marilayacard": CloseMarilayaCard(); return;
             case "build": BuildAction(); return;
             case "play":
                 // Nothing in front of you: use what you're holding (Hotbar.cs).
@@ -896,12 +913,16 @@ partial class Game
                         else { FaceToward(tomasX, tomasY); TalkTomasWithRequests(); }
                         break;
                     case "pip": FaceToward(PipX, PipY); TalkPip(); break;
-                    case "sail": if (Has("boat") > 0 && (VoyageChoice || Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 12)) OpenVoyage(); else Sail(target.Id); break;
+                    case "sail":
+                        if (Has("boat") > 0 && (VoyageChoice || Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 12 || Dist(player.X, player.Y, MlJettyX, MlJettyY) < 12)) OpenVoyage();
+                        else Sail(target.Id);
+                        break;
                     case "boat": BoardBoat(); break;
                     case "land": LandBoat(); break;
                     case "trolling": WindIn("You wind the trolling line in."); break;
                     case "islander": TalkIslander(target.Id); break;
                     case "habagatfolk": TalkHabagat(target.Id); break;
+                    case "marilaya": UseMarilaya(target); break;
                     case "saltbed": RakeSalt(); break;
                     case "rack": UseRack((Build)target.Ref); break;
                     case "rackguso": LayGuso((Build)target.Ref); break;
@@ -1108,7 +1129,11 @@ partial class Game
                 if (Aboard) { state.boatX = player.X; state.boatY = player.Y; }
                 DiscoverArchipelago();
                 DiscoverHabagat();
+                DiscoverMarilaya();
                 ChartNearIslets();
+                ChartNearMlIslets();
+                AmboCalls();
+                UpdateSandbar(dt);
                 UpdateReefWalk();
                 WarnRisingTide();
                 if (mode == "play") { UpdateTroll(dt); UpdateRegatta(dt); CheckEclipse(); }
@@ -1193,6 +1218,8 @@ partial class Game
         ResetMagayon();
         bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear(); seaLife.Clear(); glowTrail.Clear();
         habagatWalk.Clear();
+        // Marilaya's story (1.23): its panels and the storytellers' gathering are never carried over.
+        DropMlPanels(); mlGather = null; mlWalk.Clear(); mlCardKind = "done"; barCutOffT = 0;
         // The Sea school's moment-to-moment bits (1.17).
         landed = null; releaseFx = null; sorting = null; quiz = null; riddle = null; warnedTide = int.MinValue;
         dexFish = null; dexExtra = null; atlasZoom = false;
@@ -1248,12 +1275,13 @@ partial class Game
         }
         int rescued = RescueStranded();
         ReconcileAlbum();
+        ReconcileMarilaya();
         if (state.tamed && !state.riding && state.mountX == 0 && state.mountY == 0) { state.mountX = player.X + 12; state.mountY = player.Y; }
         ReindexBuilds();
         if (scene == "world") FillLoose();
         critters.Clear();
         lastBiome = scene == "world" ? PlayerBiome() : (byte)0;
-        chartEast = player.X >= EastStart * T;
+        chart = ChartFor(player.X);
         mode = "play";
         if (fresh || !state.flags.metTomas)
         {
@@ -1267,7 +1295,7 @@ partial class Game
             Toast($"Starfall Atoll has grown since you were last there, and the sea took the old shoreline. The {sunk} thing{(sunk == 1 ? "" : "s")} you built there {(sunk == 1 ? "is" : "are")} back in your bag.", 7);
         else if (rescued > 0)
             Toast($"New islands have risen in the south since you were last out there. Your boat was found and tied up at {(state.boatAt == "atoll" ? "the atoll's jetty" : "Pip's jetty")}.", 7);
-        else Toast($"Welcome back to {(InAmihan ? "Amihan" : InHabagat ? "Habagat" : "Saltmere")}. Day {state.day}, {ClockText(state.clock, 10)}.");
+        else Toast($"Welcome back to {(InMarilaya ? "Marilaya" : InAmihan ? "Amihan" : InHabagat ? "Habagat" : "Saltmere")}. Day {state.day}, {ClockText(state.clock, 10)}.");
         hasSave = true;
         Save();
     }

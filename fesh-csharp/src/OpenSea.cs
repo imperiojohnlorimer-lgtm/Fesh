@@ -37,7 +37,7 @@ partial class Game
     }
 
     // Which sea you're on: Amihan's to the east, Habagat's along the bottom of the map, the open sea between.
-    string SeaSpotHere => InAmihan ? "amihansea" : InHabagat ? "habagatsea" : "opensea";
+    string SeaSpotHere => SeaSpotAt(player.X, player.Y);
 
     // The open-sea target: whichever sea you're in, aimed at the fish. Nothing is fished inside the sanctuary.
     Target SeaTarget()

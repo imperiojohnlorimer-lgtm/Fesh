@@ -105,7 +105,9 @@ static class Data
         new("mire", "Mirewood", "Jungle", "Mirewood. Everything here is green and dripping."),
         new("atoll", "Starfall Atoll", "Tropical", "Starfall Atoll. Warm water, white sand, and something big out past the reef."),
         new("amihan", "Amihan Archipelago", "Tropical", "Amihan. Palm villages, limestone lagoons, mangroves and volcanic shores."),
-        new("habagat", "Habagat Islands", "Tropical", "Habagat. Salt beds, a scatter of limestone islets and an old lighthouse, where the southwest wind blows.")
+        new("habagat", "Habagat Islands", "Tropical", "Habagat. Salt beds, a scatter of limestone islets and an old lighthouse, where the southwest wind blows."),
+        // 1.23: Marilaya, the island of story 5 (Marilaya.cs), modelled on Marinduque.
+        new("marilaya", "Marilaya Island", "Tropical", "Marilaya. Green hills, a river town, a forested mountain at the southern point, and islets all round.")
     };
 
     // Tidemane, the hippocamp of the Starwell: fished up and fought on the atoll, then ridden as a mount.
@@ -266,6 +268,36 @@ static class Data
             // One for each monsoon (Seasons.cs). Added last, so no older fish changes colour.
             new("dalagang_bukid", "Dalagang-bukid (fusilier)", 1.5f, Kg: .4f, Season: "amihan"),
             new("salay_salay", "Salay-salay (yellowstripe scad)", 1.4f, Kg: .3f, Style: "runner", Season: "habagat")
+        },
+        // Marilaya (1.23, Marilaya.cs): the harbour cove, the river, the Tres Reyes reef, the white beach, and its waters.
+        // They take their colours after every other fish (Items), so nothing older changes colour.
+        ["mlharbour"] = new CommonFish[]
+        {
+            new("dilis", "Dilis (anchovy)", 1f, Kg: .015f, Depth: "shallow"),
+            new("hasa_hasa", "Hasa-hasa (short mackerel)", 1.3f, Kg: .2f, Style: "runner")
+        },
+        ["mlriver"] = new CommonFish[]
+        {
+            new("biya", "Biya (tank goby)", 1f, Kg: .08f, Style: "bottom", Depth: "shallow"),
+            new("kanduli", "Kanduli (sea catfish)", 1.6f, Kg: 1.2f, Style: "bottom"),
+            new("igat", "Igat (giant mottled eel)", 2.6f, 2, true, "night", Kg: 4f, Style: "bottom")
+        },
+        ["mlreef"] = new CommonFish[]
+        {
+            new("pakol", "Pakol (triggerfish)", 1.7f, Kg: 1.2f),
+            new("paru_paro", "Paru-paro (butterflyfish)", 1.2f, Time: "day", Kg: .15f, Depth: "shallow"),
+            new("suno", "Suno (coral trout)", 2.5f, 2, true, Kg: 3f, Style: "bottom")
+        },
+        ["mlbeach"] = new CommonFish[]
+        {
+            new("pampano", "Pampano (snubnose pompano)", 1.8f, Kg: 1.5f, Style: "runner"),
+            new("dapa", "Dapa (flounder)", 1.6f, Kg: .6f, Style: "bottom"),
+            new("kalaso", "Kalaso (lizardfish)", 1.3f, Kg: .3f)
+        },
+        ["marilayasea"] = new CommonFish[]
+        {
+            new("gulyasan", "Gulyasan (skipjack tuna)", 2f, Kg: 5f, Style: "runner"),
+            new("dalupapa", "Dalupapa (diamondback squid)", 2.4f, 2, true, Kg: 15f, Style: "bottom", Depth: "deep")
         }
     };
 
@@ -380,6 +412,26 @@ static class Data
         "Case closed. Everyone followed the plan: go-bags, the shelter, the warning. Baga is still a volcano: the danger zone and the channel stay closed."
     };
 
+    // The heart that rose on Marilaya (MarilayaStory.cs): Aling Sela's lola's story, and what the island itself says.
+    public static readonly (string Key, string Title, string Finding, string Source)[] MarilayaClues =
+    {
+        ("mr:legend", "The heart that rose", "Her lola's telling: Mutya Maria and Garduke fled Datu Batumbakal and were lost in a storm. A heart-shaped island rose there.", "Aling Sela, at the harbour"),
+        ("mr:layers", "The sea in the stone", "Shells and coral in the limestone, and an old wave notch high and dry: this rock was sea floor once.", "The rock face in the north-east hills"),
+        ("mr:karst", "Water's patient work", "Rain, made a weak acid by carbon dioxide, dissolves limestone into caves over thousands of years. Drips build stalactites.", "The cave in the north-east hills"),
+        ("mr:springs", "Heat under Tindig", "The hot spring stays near 56 C all night while the stream cools: the heat comes from hot rock under Tindig.", "The hot springs at Tindig's foot"),
+        ("mr:tide", "The sandbar that comes and goes", "The water climbs the same post and falls again, about twice a day here: the sea moves, not the island.", "The tide post off Maniwaya")
+    };
+    public static readonly string[] MarilayaTheories =
+    {
+        "No leads yet. Aling Sela at the harbour has a story about how the island rose.",
+        "Aling Sela's lola said the island rose out of the sea in one night. What does the island itself say?",
+        "Something here was once under the sea. But how did it end up so high?",
+        "Rocks, caves, springs and tides each tell part of it. Keep looking.",
+        "One more place to look. Tides, sand and rock all change the shore, in very different ways.",
+        "Every clue is in. Sort them with Aling Sela: what changes in hours, in years, and over ages?",
+        "Case closed. The island did rise from the sea: built by a volcano and lifted over ages. Now it's on the chart, measured from the survey stone."
+    };
+
     // By how many clues you have (any of them), then the last once the moon is back.
     public static readonly string[] MoonTheories =
     {
@@ -421,7 +473,13 @@ static class Data
         new("asinan", "Asinan flats", "Fish the salt flats", Game.AsinanSpotX, Game.AsinanSpotY, 30, "habagat"),
         new("pulo", "Islet reef", "Fish the islet reef", Game.PuloSpotX, Game.PuloSpotY, 30, "habagat"),
         new("parola", "Parola pier", "Fish off the pier", Game.ParolaSpotX, Game.ParolaSpotY, 30, "habagat"),
-        new("habagatsea", "Habagat Sea", "Fish the open sea", 0, 0, 30, "habagat", "sea")
+        new("habagatsea", "Habagat Sea", "Fish the open sea", 0, 0, 30, "habagat", "sea"),
+        // Marilaya (Marilaya.cs). Their fish take their colours after everyone else's (Items).
+        new("mlharbour", "Harbour cove", "Fish the harbour cove", Game.MlHarbourSpotX, Game.MlHarbourSpotY, 30, "marilaya"),
+        new("mlriver", "River mouth", "Fish the river mouth", Game.MlRiverSpotX, Game.MlRiverSpotY, 28, "marilaya"),
+        new("mlreef", "Tres Reyes reef", "Fish the Tres Reyes reef", Game.MlReefSpotX, Game.MlReefSpotY, 30, "marilaya"),
+        new("mlbeach", "White beach", "Fish off the white beach", Game.MlBeachSpotX, Game.MlBeachSpotY, 30, "marilaya"),
+        new("marilayasea", "Marilaya waters", "Fish the open sea", 0, 0, 30, "marilaya", "sea")
     };
     public static readonly Dictionary<string, Spot> SpotById = Spots.ToDictionary(s => s.Id);
 

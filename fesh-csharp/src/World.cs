@@ -41,9 +41,9 @@ partial class Game
     readonly HashSet<(int, int)> hoofprints = new();
     const float PipX = 210, PipY = 101;
     readonly HashSet<(int, int)> bridgeSet = new();
-    // Per biome, in Data.Biomes order (Habagat, the last, places its own trees in GenerateHabagat).
-    static readonly char[] InnerGround = { 'g', 'n', 'D', 'j', 's', 'j', 'g' }, ShoreGround = { 's', 'e', 's', 's', 's', 's', 's' }, TreeKind = { 't', 'f', 'c', 'h', 'h', 'h', 'h' };
-    static readonly float[] TreeDensity = { 0, 0.12f, 0.05f, 0.24f, 0.16f, 0.12f, 0.1f }, BoulderDensity = { 0, 0.025f, 0.03f, 0.015f, 0, 0.015f, 0.02f };
+    // Per biome, in Data.Biomes order (Habagat and Marilaya, the last two, place their own trees: GenerateHabagat, GenerateMarilaya).
+    static readonly char[] InnerGround = { 'g', 'n', 'D', 'j', 's', 'j', 'g', 'g' }, ShoreGround = { 's', 'e', 's', 's', 's', 's', 's', 's' }, TreeKind = { 't', 'f', 'c', 'h', 'h', 'h', 'h', 't' };
+    static readonly float[] TreeDensity = { 0, 0.12f, 0.05f, 0.24f, 0.16f, 0.12f, 0.1f, 0 }, BoulderDensity = { 0, 0.025f, 0.03f, 0.015f, 0, 0.015f, 0.02f, 0 };
     static readonly HashSet<char> Land = new() { 's', 'g', 'p', 't', 'n', 'e', 'i', 'D', 'j', 'f', 'c', 'h', 'R' };
     static readonly HashSet<char> Water = new() { '~', 'w', 'l', 'T', 'x', 'r', 'o', 'm', 'I', 'k' };
 
@@ -258,6 +258,7 @@ partial class Game
 
         GenerateArchipelago();
         GenerateHabagat();
+        GenerateMarilaya();
         RenderBase();
         mapTexDirty = true;
     }
@@ -281,6 +282,7 @@ partial class Game
     // The ground drawn under a tree, bush or the cave mouth.
     char Ground(char t, int x, int y) => t switch
     {
+        't' or 'h' or 'R' or 'y' when biome[y, x] == 7 => MlGroundUnder(x, y),
         't' => 'g', 'f' => 'n', 'c' => 'D', 'C' => 'n', 'h' => biome[y, x] switch { 2 => 'g', 4 => 's', 6 => HabagatPalmGround(x, y), _ => 'j' }, 'R' or 'y' => InnerGround[biome[y, x]], _ => t
     };
 
@@ -415,6 +417,8 @@ partial class Game
         DrawRipples(t);
         DrawFoam(t);
         DrawTideFlats(t);
+        DrawSandbar();
+        DrawPools();
     }
 
     void DrawSpots(float t)
@@ -1129,6 +1133,7 @@ partial class Game
         AddRestlessSeaObjects(list);
         AddMagayonObjects(list);
         if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
+        AddMarilayaObjects(list);
         if (Has("boat") > 0 && !Aboard)
         {
             var (bx, by) = BoatPosition();

@@ -84,7 +84,7 @@ partial class Game
         Inp.Hold(KeyboardKey.Right, true); yield return 30; Inp.Hold(KeyboardKey.Right, false); yield return 2;
         Check("Tidemane can cross the same deep channel", Riding && player.X > 1400 && Swimming);
         yield return 2;
-        Check($"swimming on Tidemane over deep water, you can fish the open sea (prompt: {prompt.Text})", target?.Type == "spot" && target.Id is "amihansea" or "opensea");
+        Check($"swimming on Tidemane over deep water, you can fish the open sea (prompt: {prompt.Text})", target?.Type == "spot" && target.Id is "amihansea" or "opensea" or "marilayasea");
         state.riding = false; state.tamed = false;
 
         // Each island is reached by transport, then its spot must be fishable from that island's connected land.
@@ -195,7 +195,7 @@ partial class Game
             for (int ty = 1; ty < ROWS - 1 && shore == null; ty++)
             {
                 float x = tx * T + 5, y = ty * T + 9.75f;
-                if (Walkable(TileAt(tx, ty)) && CanStand(x, y) && !CanStand(x, MathF.Round(y))) shore = (x, y);
+                if (Walkable(TileAt(tx, ty)) && ZoneAt(x, y) == "amihan" && CanStand(x, y) && !CanStand(x, MathF.Round(y))) shore = (x, y);
             }
         Check("the shoreline regression starts at a valid fractional position", shore != null);
         if (shore is (float sx, float sy))

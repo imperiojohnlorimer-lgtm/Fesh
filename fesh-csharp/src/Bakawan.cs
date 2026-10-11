@@ -228,8 +228,8 @@ partial class Game
     {
         if (scene != "world") return false;
         float dx = (x / T - BakawanCX) / GlowRX, dy = (y / T - BakawanCY) / GlowRY;
-        // The sea only: the mangrove pool inland is fresh.
-        return dx * dx + dy * dy < 1 && TileUnder(x, y) is '~' or 'w';
+        // The sea only: the mangrove pool inland is fresh. Marilaya's own shallows, at the ellipse's western edge, don't glow.
+        return dx * dx + dy * dy < 1 && TileUnder(x, y) is '~' or 'w' && !NearMarilaya(x, y);
     }
 
     // Whatever is moving through the water leaves sparks behind it that glow and fade: the boat's wake and bow wave,

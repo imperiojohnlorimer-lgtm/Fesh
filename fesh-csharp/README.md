@@ -511,6 +511,47 @@ rush down the channel and spill past its banks. The case closes with a card, 150
 Manay Mila has an **abaca line** for you the next day. Finishing doesn't make Baga safe: an advisory reopens its north
 shore and reef four days after the order, and the danger zone and the channel stay closed.
 
+## The heart that rose (story 5, Marilaya)
+**Marilaya** is a big green island far out east, past Amihan, on a sea chart of its own (the map's **Marilaya** tab
+appears once you've been to Amihan). It's made up, but modelled on **Marinduque**, the heart-shaped island in the middle
+of the Philippines: its coast is traced from the real island's outline, and its places follow Marinduque's. A sheltered
+harbour lies under a survey hill in the north-west (like Balanacan), a river town with a footbridge on the west coast
+(Boac), a forested volcano, **Bundok Tindig**, stands at the southern point (Mount Malindig) with hot springs at its foot
+(Malbog), limestone hills with a cave rise in the north-east (the Bathala Caves), a white beach faces south-east (Poctoy),
+and islets lie off the north-east (Polo, Maniwaya with its low-tide sandbar, and Mompong, where arrowroot grows), the east
+(Salomague) and the south-west (the three Tres Reyes). A notice on Amihan Village's landing tells you about it; sail east
+past Baga, or swim there on Tidemane, and after that the Set sail panel goes there too. Its harbour, river, reef, beach
+and open water have thirteen new kinds to catch, and a kalutang plays its music.
+
+**Aling Sela**, a retired surveyor who fishes, lives above the harbour. She tells you her lola's version of the story
+people tell about Marinduque: Mutya Maria and Garduke the fisherman fled her father, Datu Batumbakal, and were lost in a
+storm, and where they vanished a heart-shaped island rose from the sea. (Other tellings differ; this one follows the
+telling in *Tales from the 7,000 Isles*, 2011.) Then she asks for help: she wants a **discovery trail** for the island's
+children, from the shore to Tindig's top, with a sign at every stop saying what the island itself tells us. She lends
+you her **survey compass**. Four stops, in any order (you can even start before you meet her):
+- **The rock face** in the north-east hills: brush the dust off (hold the mouse button, or A on a gamepad) to sketch the
+  shells and coral set in the limestone and an old wave notch high and dry, then click the layers from the oldest up.
+- **The cave**: follow its walkway past a dripping stalactite, shells in the wall and a roost of bats (watched from behind
+  the rope), then hold the button on the model by the door to watch the cave being made.
+- **The hot springs**: read the gauges on the spring and on the stream, find the line that stayed hot all night on
+  Lorna's record, and warm her **dryer** with the spring's heat. After that she dries fish for you (three at a time,
+  two hours, rain or shine).
+- **The tide post** off Maniwaya: read where the water meets it at low tide and again at high tide (or wait there).
+  **Mang Ambo** helps you visit the sandbar at low tide to see the tide pools, with a time to be back by: the low part
+  near the beach goes under first.
+
+Then put what you saw beside the right handle of Aling Sela's **shore model** in the town square (the tide, waves moving
+sand, or the land rising, slowly or all at once in a quake). The island did rise from the sea, just not in one night.
+The last job is a surveyor's: climb the trail to Tindig's top and set up the **heliotrope** (a signal mirror) with her
+grandson Jun, sight Baltasar's target and Jun's flash from the survey stone above the harbour, sail to Baltasar and sight
+the flash again, and plot the two lines with Aling Sela. Where they cross is the summit: that's triangulation. On the
+real Marinduque, Station Balanacan became the origin of the Luzon Datum of 1911, its direction fixed by sighting a mark
+on Baltazar, in the Tres Reyes. You get 200 coins, and the survey compass is yours (your map pin's arrow shows its
+bearing). Afterwards Aling Sela sets you a cache hunt by bearing and distance, Mang Iyo teaches the **kalutang** in the
+town square, and Aling Nita shows you her lime butterflies.
+
+Once all five stories are finished, the storytellers gather at Marilaya's harbour to see you home.
+
 ## The Sea school
 New in **1.17.0**: three ways to learn about the sea that also make you a better fisher. Each has a badge in the
 journal's **Sea school** tab, bronze, silver and gold, with a prize at every step; gold in all three is a diploma.
@@ -825,8 +866,11 @@ sheets show all four headings while moving, fishing and holding a catch (plus th
 Set `FESH_DIRECTION_TEST=1` alongside `FESH_AUTOTEST` and `FESH_SAVE` to run only the direction checks, or
 `FESH_GUSO_TEST=1` for only the guso farm and Bakawan's night lights, `FESH_GUIDE_TEST=1` for only the guide, the
 journal, the aquarium's layout and the real-fish notes, `FESH_EDU_TEST=1` for only the Sea school (tides, letting
-fish go, sorting crabs and Ma'am Isay's class), or `FESH_ATLAS_TEST=1` for only the island guide and the fish album;
+fish go, sorting crabs and Ma'am Isay's class), `FESH_ATLAS_TEST=1` for only the island guide and the fish album, or `FESH_MARILAYA_TEST=1` for only Marilaya and story 5;
 the full play-through includes them too.
 
 Fonts: Pixelify Sans, Special Elite and Atkinson Hyperlegible (the Clear font, © Braille Institute of America; its
 licence is in `Assets/Fonts/AtkinsonHyperlegible-OFL.txt`), all under the SIL Open Font License.
+
+Marilaya's coastline is traced from Marinduque's outline in OpenStreetMap: map data © OpenStreetMap contributors,
+available under the Open Database License (openstreetmap.org/copyright).

@@ -41,9 +41,9 @@ partial class Game
         int ti = 0;
         bool same = true;
         void Tints(IEnumerable<CommonFish> fs) { foreach (var f in fs.Where(f => !Items.AddedLater.Contains(f.Id))) same &= Items.ById[f.Id].Tint == Items.TintAt(ti++); }
-        Tints(Data.Spots.Where(s => s.Scene != "sea" && s.Biome != "habagat").SelectMany(s => Data.Common[s.Id]));
+        Tints(Data.Spots.Where(s => s.Scene != "sea" && s.Biome is not ("habagat" or "marilaya")).SelectMany(s => Data.Common[s.Id]));
         Tints(Data.PotCatch.Where(p => p.Key != "habagat").SelectMany(p => p.Value));
-        Tints(Data.Spots.Where(s => s.Scene == "sea" && s.Biome != "habagat").SelectMany(s => Data.Common[s.Id]));
+        Tints(Data.Spots.Where(s => s.Scene == "sea" && s.Biome is not ("habagat" or "marilaya")).SelectMany(s => Data.Common[s.Id]));
         Check("no older fish changed colour", same);
         var habagatFish = Data.Spots.Where(s => s.Biome == "habagat").SelectMany(s => Data.Common[s.Id]).Concat(Data.PotCatch["habagat"]).ToList();
         Check($"all {habagatFish.Count} Habagat catches are in the bag's item list with pictures", habagatFish.All(f => Items.ById.ContainsKey(f.Id) && FishArt.Looks.ContainsKey(f.Id)));

@@ -38,7 +38,9 @@ static class Music
         // The fight with Tidemane: fast, minor and driving.
         ["boss"] = new(52, Minor, 150, new[] { (0, Min), (8, Maj), (10, Maj), (7, Maj) }, "pulse", "tri", null, true, 8, 0.9f, 0.07f),
         // Up to School Rise (RestlessSea.cs): urgent and steady, Amihan's marimba over a walking beat, never frightening.
-        ["alarm"] = new(57, Minor, 126, new[] { (0, Min), (5, Min), (8, Maj), (7, Maj) }, "marimba", "tri", "pad", true, 41, 0.7f, 0.07f)
+        ["alarm"] = new(57, Minor, 126, new[] { (0, Min), (5, Min), (8, Maj), (7, Maj) }, "marimba", "tri", "pad", true, 41, 0.7f, 0.07f),
+        // Marilaya (1.23): kalutang-led. Pairs of wooden bars struck together, each a definite pitch, over a plucked bass.
+        ["marilaya"] = new(62, Major, 112, new[] { (0, Maj), (5, Maj), (7, Maj), (9, Min) }, "kalutang", "pluck", null, false, 47, 0.8f, 0.08f)
     };
 
     static readonly ConcurrentDictionary<string, float[]> pcm = new();
@@ -166,6 +168,12 @@ static class Music
                 Kick(buf, t0, 0.18f);
                 Kick(buf, t0 + beat * 2, 0.14f);
             }
+            else if (d.Lead == "kalutang")
+            {
+                // The kalutang ensemble's steady pattern: a high bar and a low bar answering each other on the beats.
+                for (int s = 0; s < 8; s++)
+                    if (s % 2 == 0 || r.NextDouble() < 0.3) Note(buf, t0 + s * beat / 2, Hz(d.Root + 12 + (s % 4 == 0 ? 7 : s % 2 == 0 ? 0 : 4)), 0.14f, "kalutang", s % 4 == 0 ? 0.05f : 0.035f);
+            }
             else if (d.Seed == 6)
             {
                 // Water dripping somewhere in the cave.
@@ -180,7 +188,7 @@ static class Music
     {
         int s0 = (int)(start * Rate), n = (int)(dur * Rate);
         bool pad = inst == "pad";
-        float decaySec = inst switch { "bell" => 1.6f, "pluck" => 0.25f, "bandurria" => 0.9f, "marimba" => 0.35f, "steel" => 0.6f, "musicbox" => 0.9f, "pulse" => 0.45f, "gong" => 0.8f, "agung" => 1.4f, _ => dur };
+        float decaySec = inst switch { "bell" => 1.6f, "pluck" => 0.25f, "bandurria" => 0.9f, "marimba" => 0.35f, "steel" => 0.6f, "musicbox" => 0.9f, "pulse" => 0.45f, "gong" => 0.8f, "agung" => 1.4f, "kalutang" => 0.14f, _ => dur };
         double decay = Math.Exp(Math.Log(0.001) / (decaySec * Rate));
         double ph = 0, g = 1, step = freq / Rate;
         int attack = pad ? (int)(0.3f * Rate) : (int)(0.005f * Rate), release = (int)(0.3f * Rate);
@@ -202,6 +210,8 @@ static class Music
                 // Bossed gongs: a round fundamental with clanging, out-of-tune overtones that die away first.
                 "gong" => Math.Sin(ph * Math.Tau) + 0.45 * Math.Sin(ph * Math.Tau * 2.41) * g + 0.2 * Math.Sin(ph * Math.Tau * 3.93) * g * g,
                 "agung" => Math.Sin(ph * Math.Tau) + 0.3 * Math.Sin(ph * Math.Tau * 2.02) + 0.15 * Math.Sin(ph * Math.Tau * 0.5),
+                // Kalutang: a struck wooden bar, its pitch clear but short, with a bar's out-of-tune overtone and a woody knock.
+                "kalutang" => Math.Sin(ph * Math.Tau) + 0.5 * Math.Sin(ph * Math.Tau * 2.76) * g + (i < Rate / 200 ? 0.6 * Math.Sin(i * 1.7) : 0),
                 _ => Math.Sin(ph * Math.Tau)
             };
             double env = i < attack ? (double)i / attack : 1;

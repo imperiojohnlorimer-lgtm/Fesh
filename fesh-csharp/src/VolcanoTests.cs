@@ -451,7 +451,7 @@ partial class Game
         TogglePanel("case"); yield return 3;
         Check($"a new game's Case board has all four stories, the tabs fitting beside Close ({lastCaseTabRight:0})",
             new[] { "The Halcyon", "The vanishing moon", "The restless sea", "Beneath the clouds" }.All(n => Gfx.Seen.ContainsKey(n)) && lastCaseTabRight < 50 + 1180 - 13 - 24 - SmallW("Close") - 4);
-        Check("stories 2, 3 and 4 are locked", CaseStories().Count(s => !s.open) == 3 && CaseStories()[0].open);
+        Check("stories 2, 3, 4 and 5 are locked", CaseStories().Count(s => !s.open) == 4 && CaseStories()[0].open);
         bool clicked = ClickButton("Beneath the clouds"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 2;
         Check($"a locked story's tab opens by a real click, to a locked note that fits ({caseTab}, {lastCaseBottom:0})", clicked && caseTab == "baga" && mode == "panel" && lastCaseBottom <= Gfx.LH);
         Check("its hint points the way without giving the story away", CaseStories()[3].hint.Contains("Manay Mila") && !CaseStories()[3].hint.Contains("volcano"));
