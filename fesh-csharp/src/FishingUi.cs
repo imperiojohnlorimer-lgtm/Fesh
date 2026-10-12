@@ -231,13 +231,9 @@ partial class Game
 
     void DrawTackle()
     {
-        Backdrop();
-        const float cw = 1160, ch = 660, pad = 24;
-        float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Tackle box", x + pad, y + pad, FontKind.Ui700, 36, Pal.PaperInk);
-        if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) ClosePanels();
-        Gfx.Text("Your best rod is used automatically. Click the arrows to change the rest.", x + pad, y + pad + 48, FontKind.Note, 18, Muted);
+        const float pad = 24;
+        var (x, y, cw, ch) = PanelFrame("Tackle box", "Your best rod is used automatically. Click the arrows to change the rest.");
+        if (PanelClose()) ClosePanels();
 
         // Left: the rod and the slots
         float lx = x + pad, ly = y + pad + 84, lw = 640, rowH = 70;

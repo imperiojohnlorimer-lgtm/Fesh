@@ -135,12 +135,15 @@ static class AnimalArt
         int left = (int)MathF.Round(x) - w / 2, top = (int)MathF.Round(y) - h + 1 - frame;
         int headCol = w <= 8 ? 4 : w - 6;
         p.Rect(left + 1, (int)MathF.Round(y) + 1, w - 2, 1, "rgba(0,0,0,0.2)");
+        // Pose 3 is lying down asleep: the legs tucked under (the bottom two rows go) and the body lowered onto them, the
+        // head resting a row lower still.
+        if (pose == 3) { top += 2; h -= 2; }
         for (int r = 0; r < h; r++)
             for (int c = 0; c < w; c++)
             {
                 char ch = s.Rows[r][c];
                 if (ch == '.') continue;
-                int dr = pose == 1 && c >= headCol && r <= 3 ? 1 : pose == 2 && c <= 1 && r <= 3 ? -1 : 0;
+                int dr = (pose is 1 or 3) && c >= headCol && r <= 3 ? 1 : pose == 2 && c <= 1 && r <= 3 ? -1 : 0;
                 p.Rect(left + (flip ? w - 1 - c : c), top + r + dr, 1, 1, s.Colors[ch]);
             }
     }

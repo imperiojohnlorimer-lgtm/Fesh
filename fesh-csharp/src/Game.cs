@@ -999,6 +999,7 @@ partial class Game
     void Update(float dt)
     {
         time += dt;
+        LookData.Now = time;
         if (toastTimer > 0) toastTimer -= dt;
         toastAlpha = Math.Clamp(toastAlpha + (toastTimer > 0 ? dt : -dt) / 0.25f, 0, 1);
         UpdateFloaters(dt);
@@ -1240,7 +1241,7 @@ partial class Game
         boatFace = "right"; sailFurl = 1; sprayT = 0; mountDir = 1;
         EnsureHotbar();
         // Tidemane (Tidemane.cs): no whistle still on its way from another game, no momentum, no hop half done.
-        call = null; whistleT = 0; hopT = 0; rideVel = (0, 0); mountSpeed = 0; mountGaitFrame = -1; shoreHopT = 0; trackPrints.Clear();
+        call = null; whistleT = 0; hopT = 0; rideVel = (0, 0); mountSpeed = 0; mountGaitFrame = -1; shoreHopT = 0; trackPrints.Clear(); footprints.Clear(); leaps.Clear();
         derbyT = 0; heldT = 0; iframes = 0; hurtFlash = 0; quake = 0; pointerHold = false; caveFloor = 1;
         mapTexDirty = true;
         titleView = "main";

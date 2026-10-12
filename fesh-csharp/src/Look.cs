@@ -33,10 +33,10 @@ static class LookData
     // Game.HandsPose). ArmsBehind tucks them behind the body, for a back view with the hands out in front.
     public static void DrawPerson(Pix p, Look look, int x, int y, string face, int step, bool shadow = true, int bob = 0,
         bool blink = false, int arms = 0, int swing = 0, int lean = 0, string head = null,
-        (int x, int y)? hand = null, (int x, int y)? hand2 = null, bool armsBehind = false) =>
+        (int x, int y)? hand = null, (int x, int y)? hand2 = null, bool armsBehind = false, bool idle = true) =>
         DrawFigure(p, Skins[look.skin % Skins.Length], HairColors[look.hairColor % HairColors.Length], Shirts[look.shirt % Shirts.Length],
             Pants[look.pants % Pants.Length], look.hair == 1, look.hat % Hats.Length, null, x, y, face, step, shadow, bob, blink, arms, swing, lean, head,
-            hand, hand2, armsBehind);
+            hand, hand2, armsBehind, idle);
 
     // Where the shoulders are for an upper body at (ux, uy): the near and far one in a side view, the right and left
     // one from the front or back. Arms hang from here, so a hand placed relative to them stays on the arm.
@@ -49,11 +49,25 @@ static class LookData
         "right" => (ux + 1, uy - 7), "left" => (ux - 2, uy - 7), _ => (ux - 4, uy - 7)
     };
 
+    // The game's clock, for people blinking on their own (0 outside the game, so sprite sheets never blink).
+    public static float Now;
+    public static bool AutoBlink = true;
+
     // The same, in any colours (Tomas isn't in the creator's palettes). Cap is the cap's colour (hat 3), else the shirt's.
     public static void DrawFigure(Pix p, string skin, string hair, string shirt, string pants, bool longHair, int hat, string cap,
         int x, int y, string face, int step, bool shadow = true, int bob = 0, bool blink = false, int arms = 0, int swing = 0,
-        int lean = 0, string head = null, (int x, int y)? hand = null, (int x, int y)? hand2 = null, bool armsBehind = false)
+        int lean = 0, string head = null, (int x, int y)? hand = null, (int x, int y)? hand2 = null, bool armsBehind = false, bool idle = true)
     {
+        // Standing about, everyone blinks and now and then glances aside, each on their own beat (they already breathe
+        // through the bob their callers pass; you do all this yourself: Game.DrawPlayer passes idle false).
+        if (idle && step == 0 && Now > 0 && AutoBlink)
+        {
+            int seed = (shirt.Length * 31 + skin[1] * 7 + hair[2] * 13 + pants[3] * 3) & 255;
+            float beat = 3.4f + seed / 255f * 2.2f;
+            if (!blink) blink = (Now + beat * 1.7f) % beat < 0.12f;
+            float look = (Now * 0.5f + seed * 0.37f) % 7.5f;
+            if (head == null && arms == 0 && face == "down" && look < 0.7f) head = seed % 2 == 0 ? "left" : "right";
+        }
         string farPants = Shade(pants, 0.72f), shirtShade = Shade(shirt, 0.82f), hem = Shade(shirt, 0.9f);
         const string shoe = "#2e2420", farShoe = "#1f1815";
         bool side = face is "left" or "right";

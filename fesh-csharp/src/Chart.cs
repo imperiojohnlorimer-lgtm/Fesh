@@ -94,7 +94,15 @@ partial class Game
             sea[y, x] = true;
             queue.Enqueue((x + 1, y)); queue.Enqueue((x - 1, y)); queue.Enqueue((x, y + 1)); queue.Enqueue((x, y - 1));
         }
-        bool Open(int wx, int wy) => wx < 0 || wy < 0 || wx >= PW || wy >= PH || Wet(shape[wy * PW + wx]) && sea[wy / T, wx / T];
+        bool SeaTile(int tx, int ty) => tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS || sea[ty, tx];
+        // Water in a land tile's rounded-off corner belongs to the sea beside it, so the inked coast follows the curve.
+        bool Open(int wx, int wy)
+        {
+            if (wx < 0 || wy < 0 || wx >= PW || wy >= PH) return true;
+            if (!Wet(shape[wy * PW + wx])) return false;
+            int tx = wx / T, ty = wy / T, cx = wx % T < T / 2 ? -1 : 1, cy = wy % T < T / 2 ? -1 : 1;
+            return sea[ty, tx] || SeaTile(tx + cx, ty) || SeaTile(tx, ty + cy) || SeaTile(tx + cx, ty + cy);
+        }
         Color paper = Pal.C("#d9c8a0"), hatch = Pal.C("#c2ae84"), ink = Pal.C("#6b5a3e");
         for (int wy = 0; wy < img.H; wy++)
             for (int wx = 0; wx < img.W; wx++)
@@ -162,40 +170,48 @@ partial class Game
     void DrawMap()
     {
         islandHover = null;
-        Backdrop();
         RefreshMapTexture();
         const float pad = 18, head = 54;
         if (!ChartShown(chart)) chart = 1;
         var (cx0, cx1) = ChartSpan(chart);
         float origin = cx0 * T, chartW = (cx1 - cx0) * T;
         float chartH = ROWS * T;
-        float scale = Math.Min(1120f / chartW, 550f / chartH);
-        float mw = chartW * scale, mh = chartH * scale, bw = Math.Max(mw + pad * 2, 1040), bh = mh + pad * 2 + head;
-        float bx = (Gfx.LW - bw) / 2, by = (Gfx.LH - bh) / 2;
-        Gfx.Box(bx, by, bw, bh, Pal.Paper, Pal.Ink, 3, 8, 6);
+        float scale = Math.Min(1180f / chartW, 590f / chartH);
+        float mw = chartW * scale, mh = chartH * scale;
         string title = chart == 2 ? (state.Hinted("marilaya") ? "Marilaya sea chart" : "The far eastern sea") : chartEast ? "Amihan sea chart" : "Map of the islands";
-        Gfx.Text(title, bx + pad, by + pad, FontKind.Ui700, 28, Pal.PaperInk);
+        // The shared panel frame (Ui.PanelFrame), with a compass before the title.
+        var (bx, by, bw, bh) = PanelFrame("      " + title);
+        DrawCompass(bx + PanelPad + 16, by + PanelPad + 15, 15);
         // What's going on today: the weather, and the derby if it's on.
         string news = state.weather == "storm" ? $"Storm until {HourText((int)StormEnds())}" : state.weather == "rain" ? "Raining" : "Fair weather";
         if (DerbyOn) news += $"   ·   Derby: {(int)derbyT / 60}:{(int)derbyT % 60:00} left";
-        float newsX = bx + pad + Gfx.Measure(title, FontKind.Ui700, 28) + 24;
+        float newsX = bx + PanelPad + Gfx.Measure("      " + title, FontKind.Ui700, PanelTitleSize) + 24;
         // A button for each of the other charts, then the island guide (Atlas.cs), opened on the island you're on.
-        float tabX = bx + bw - pad - SmallW("Close") - 14;
+        float tabX = PanelCloseX - 14;
         for (int c = 2; c >= 0; c--)
         {
             if (c == chart || !ChartShown(c)) continue;
             tabX -= SmallW(ChartNames[c]);
-            if (SmallButton(ChartNames[c], tabX, by + pad - 4)) { chart = c; return; }
+            if (SmallButton(ChartNames[c], tabX, by + PanelPad - 6)) { chart = c; return; }
             tabX -= 14;
         }
         float gx = tabX - SmallW("Island guide");
-        if (SmallButton("Island guide", gx, by + pad - 4)) { OpenAtlas(HereRegion()); return; }
-        if (SmallButton("Close", bx + bw - pad - SmallW("Close"), by + pad - 4)) { ClosePanels(); return; }
+        if (SmallButton("Island guide", gx, by + PanelPad - 6)) { OpenAtlas(HereRegion()); return; }
+        if (PanelClose()) { ClosePanels(); return; }
         // The weather between the title and the buttons, shortened if there isn't room.
-        if (gx - 16 - newsX > 40) Gfx.Text(Gfx.Ellipsize(news, FontKind.Ui600, 17, gx - 16 - newsX), newsX, by + pad + 8, FontKind.Ui600, 17, Muted);
-        float mx = bx + (bw - mw) / 2, my = by + pad + head;
-        Gfx.Rect(mx - 2, my - 2, mw + 4, mh + 4, Pal.Ink);
+        if (gx - 16 - newsX > 40) Gfx.Text(Gfx.Ellipsize(news, FontKind.Ui600, 17, gx - 16 - newsX), newsX, by + PanelPad + 8, FontKind.Ui600, 17, Muted);
+        // A narrow chart sits on the left, with its key beside it.
+        float mx = bw - mw > 380 ? bx + pad + 7 : bx + (bw - mw) / 2, my = by + bh - pad - mh + 4;
+        // A sea chart's frame: a thin rule, a gap, then the ink border, and faint lines of a grid over the chart.
+        Gfx.Rect(mx - 7, my - 7, mw + 14, mh + 14, Pal.Ink, 2);
+        Gfx.Rect(mx - 5, my - 5, mw + 10, mh + 10, Pal.Paper, 1);
+        Gfx.Rect(mx - 3, my - 3, mw + 6, mh + 6, Pal.Ink);
         DrawTexturePro(mapTex, new Rectangle(origin, 0, chartW, chartH), Gfx.S(mx, my, mw, mh), Vector2.Zero, 0, Color.White);
+        var grid = Pal.C("rgba(241,230,200,0.13)");
+        for (float gxw = MathF.Ceiling(origin / 200) * 200; gxw < origin + chartW; gxw += 200) Gfx.Rect(mx + (gxw - origin) * scale, my, 1, mh, grid);
+        for (float gyw = 200; gyw < chartH; gyw += 200) Gfx.Rect(mx, my + gyw * scale, mw, 1, grid);
+        // A narrow chart leaves room at the sides: a key to the marks.
+        if (bw - mw > 380) DrawMapKey(mx + mw + 30, my + 8, bx + bw - (mx + mw + 30) - pad);
         Vector2 M(float wx, float wy) => new(mx + (wx - origin) * scale, my + wy * scale);
         bool OnChart(float wx, float wy) => wx >= origin && wx < origin + chartW && wy >= 0 && wy < chartH;
 
@@ -341,24 +357,30 @@ partial class Game
         {
             var font = m.Size >= 20 ? FontKind.Ui700 : FontKind.Ui600;
             float w = Gfx.Measure(m.Label, font, m.Size), h = m.Size + 4;
-            var spots = m.HasDot
-                ? new (float x, float y)[] { (-w / 2, 7), (-w / 2, -h - 6), (9, -h / 2), (-w - 9, -h / 2), (-w / 2, 22), (-w / 2, -h - 20), (24, -h / 2), (-w - 24, -h / 2), (12, 12), (-w - 12, -h - 10) }
-                : new (float x, float y)[] { (-w / 2, 0), (-w / 2, -24), (-w / 2, 24), (-w / 2, -44), (-w / 2, 44) };
-            int pick = -1;
-            for (int i = 0; i < spots.Length && pick < 0; i++)
+            var spots = m.HasDot ? LabelSpots(w, h) : new List<(float x, float y)> { (-w / 2, 0), (-w / 2, -24), (-w / 2, 24), (-w / 2, -44), (-w / 2, 44) };
+            int pick = -1, least = 0, leastHits = int.MaxValue;
+            for (int i = 0; i < spots.Count && pick < 0; i++)
             {
-                var r = new Rectangle(m.X + spots[i].x, m.Y + spots[i].y, w, h);
+                var r = new Rectangle(m.X + spots[i].x - 3, m.Y + spots[i].y - 1, w + 6, h + 2);
                 if (r.X < chartBox.X || r.Y < chartBox.Y || r.X + r.Width > chartBox.X + chartBox.Width || r.Y + r.Height > chartBox.Y + chartBox.Height) continue;
-                if (!placed.Any(o => CheckCollisionRecs(o, r))) pick = i;
+                int hits = placed.Count(o => CheckCollisionRecs(o, r));
+                if (hits == 0) pick = i;
+                else if (hits < leastHits) { leastHits = hits; least = i; }
             }
-            if (pick < 0) pick = 0;
+            // Nowhere clear: a person or a small place keeps only its dot (its name shows when you point at it); a more
+            // important mark takes the least crowded spot.
+            bool hidden = pick < 0 && m.HasDot && m.Prio >= 3;
+            if (hidden && !(Dist(Gfx.Mouse.X, Gfx.Mouse.Y, m.X, m.Y) < 10)) continue;
+            if (pick < 0) pick = least;
             var at = new Rectangle(m.X + spots[pick].x, m.Y + spots[pick].y, w, h);
-            placed.Add(at);
-            if (m.HasDot && pick >= 4)
+            placed.Add(new Rectangle(at.X - 3, at.Y - 1, at.Width + 6, at.Height + 2));
+            if (m.HasDot && MathF.Abs(spots[pick].x + w / 2) + MathF.Abs(spots[pick].y + h / 2) > 26)
             {
                 float lx = Math.Clamp(m.X, at.X, at.X + at.Width), ly = Math.Clamp(m.Y, at.Y, at.Y + at.Height);
                 Gfx.Line(m.X, m.Y, lx, ly, 1.5f, Pal.WithAlpha(m.Text, 0.7f));
             }
+            // A soft dark plate under a mark's name, so it reads over sand and forest alike.
+            if (m.HasDot) Gfx.Rect(at.X - 3, at.Y - 1, at.Width + 6, at.Height + 2, Pal.C("rgba(12,26,38,0.5)"), 3);
             Shadowed(m.Label, at.X, at.Y, font, m.Size, m.Text);
             // A charted island's name opens its page in the island guide.
             if (m.Region != null)
@@ -425,6 +447,59 @@ partial class Game
         else if (Gfx.Hover(mx, my, mw, mh)) Gfx.Text("Click to drop a pin, or an island's name to read about it", mx + 10, my + mh - 26, FontKind.Ui600, 15, Pal.C("rgba(241,230,200,0.8)"));
         islandHover = null;
         if (Gfx.PressedOutside(bx, by, bw, bh)) ClosePanels();
+    }
+
+    // Where a dot's name may go, nearest first: under, over, right and left of it, then the same further out (with a
+    // leader line), then the diagonals.
+    static List<(float x, float y)> LabelSpots(float w, float h)
+    {
+        var list = new List<(float, float)>();
+        foreach (float d in new[] { 7f, 20f, 34f, 50f })
+        {
+            list.Add((-w / 2, d)); list.Add((-w / 2, -h - d + 1)); list.Add((d + 2, -h / 2)); list.Add((-w - d - 2, -h / 2));
+            list.Add((d, d * 0.6f)); list.Add((-w - d, d * 0.6f)); list.Add((d, -h - d * 0.6f)); list.Add((-w - d, -h - d * 0.6f));
+        }
+        return list;
+    }
+
+    // A small compass rose, north up, in ink and gold.
+    static void DrawCompass(float cx, float cy, float r)
+    {
+        Gfx.Circle(cx, cy, r, Pal.Ink);
+        Gfx.Circle(cx, cy, r - 2, Pal.Paper);
+        for (int i = 0; i < 4; i++)
+        {
+            float a = i * MathF.PI / 2 - MathF.PI / 2, b = a + MathF.PI / 2;
+            float tx = cx + MathF.Cos(a) * (r - 1), ty = cy + MathF.Sin(a) * (r - 1);
+            float lx = cx + MathF.Cos(a - MathF.PI / 4) * r * 0.28f, ly = cy + MathF.Sin(a - MathF.PI / 4) * r * 0.28f;
+            float qx = cx + MathF.Cos(a + MathF.PI / 4) * r * 0.28f, qy = cy + MathF.Sin(a + MathF.PI / 4) * r * 0.28f;
+            var c = i == 0 ? Pal.Buoy : Pal.Ink;
+            Gfx.Triangle(tx, ty, lx, ly, cx, cy, c);
+            Gfx.Triangle(tx, ty, cx, cy, qx, qy, i == 0 ? Pal.C("#e87a5f") : Pal.C("#5a4a38"));
+        }
+        Gfx.Circle(cx, cy, 2.2f, Pal.Lantern);
+    }
+
+    // The key beside a narrow chart: what each mark means.
+    void DrawMapKey(float x, float y, float w)
+    {
+        Gfx.Text("Key", x, y, FontKind.Ui700, 20, Pal.PaperInk);
+        float ky = y + 34;
+        void Row(Color dot, string what, bool you = false)
+        {
+            if (you) { Gfx.Circle(x + 8, ky + 9, 6.5f, White); Gfx.Circle(x + 8, ky + 9, 5, Pal.Buoy); }
+            else { Gfx.Circle(x + 8, ky + 9, 5.5f, Pal.Ink); Gfx.Circle(x + 8, ky + 9, 4, dot); }
+            foreach (var line in Gfx.Wrap(what, FontKind.Ui600, 15, w - 24)) { Gfx.Text(line, x + 22, ky, FontKind.Ui600, 15, Muted); ky += 19; }
+            ky += 8;
+        }
+        Row(Pal.C("#7fd6f0"), "Fishing spot");
+        Row(Pal.C("#8a8f93"), "Closed for now");
+        Row(Pal.Lantern, "Someone to meet, or a place");
+        Row(Pal.C("#7fd36b"), "Your goal");
+        Row(Pal.Buoy, "You", you: true);
+        ky += 6;
+        foreach (var line in Gfx.Wrap("Click the chart to drop a pin. Click an island's name to read about it.", FontKind.Ui500, 14, w))
+        { Gfx.Text(line, x, ky, FontKind.Ui500, 14, Muted); ky += 18; }
     }
 
     // What's at a spot: whether it's open, how much of it you've caught, and what's biting there now.

@@ -208,7 +208,7 @@ partial class Game
         Learned(k == 'R' ? "boulder" : "chop");
         state.felled[$"{x},{y}"] = state.day;
         stumps[(x, y)] = k;
-        worldMap[y, x] = Ground(k, x, y);
+        worldMap[y, x] = FelledGround(k, x, y);
         trees.RemoveAll(t => t.x == x && t.y == y);
         RenderTile(x, y);
         mapTexDirty = true;

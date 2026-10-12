@@ -283,8 +283,42 @@ partial class Game
     char Ground(char t, int x, int y) => t switch
     {
         't' or 'h' or 'R' or 'y' when biome[y, x] == 7 => MlGroundUnder(x, y),
-        't' => 'g', 'f' => 'n', 'c' => 'D', 'C' => 'n', 'h' => biome[y, x] switch { 2 => 'g', 4 => 's', 6 => HabagatPalmGround(x, y), _ => 'j' }, 'R' or 'y' => InnerGround[biome[y, x]], _ => t
+        't' => NeighbourGround(x, y, 'g'), 'f' => 'n', 'c' => 'D', 'C' => 'n',
+        'h' => biome[y, x] switch { 2 => 'g', 3 => 'j', 4 => NeighbourGround(x, y, 's'), 6 => HabagatPalmGround(x, y), _ => NeighbourGround(x, y, 'j') },
+        'R' or 'y' => NeighbourGround(x, y, InnerGround[biome[y, x]]), _ => t
     };
+
+    // What a tree, bush or boulder leaves behind when it's chopped or broken: the same as before the ground under them was
+    // drawn from their neighbours, so what you can do on the tile afterwards doesn't change.
+    char FelledGround(char t, int x, int y) => t switch
+    {
+        't' or 'h' or 'R' or 'y' when biome[y, x] == 7 => MlGroundUnder(x, y),
+        't' => 'g', 'h' => biome[y, x] switch { 2 => 'g', 4 => 's', 6 => HabagatPalmGround(x, y), _ => 'j' }, 'R' or 'y' => InnerGround[biome[y, x]], _ => Ground(t, x, y)
+    };
+
+    // A tree, bush or boulder stands on whichever ground most of the tiles beside it are, so it doesn't sit on a square
+    // of some other ground (the islands' palms used to stand on squares of dark forest floor in the middle of grass).
+    char NeighbourGround(int x, int y, char fallback)
+    {
+        char best = fallback; int bestN = 0, fallbackN = 0;
+        Span<char> seen = stackalloc char[4];
+        Span<int> count = stackalloc int[4];
+        int kinds = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            int nx = x + (i == 0 ? 1 : i == 1 ? -1 : 0), ny = y + (i == 2 ? 1 : i == 3 ? -1 : 0);
+            if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
+            char c = worldMap[ny, nx];
+            if (!Shore(c)) continue;
+            int k = 0;
+            while (k < kinds && seen[k] != c) k++;
+            if (k == kinds) { seen[kinds] = c; count[kinds] = 0; kinds++; }
+            count[k]++;
+            if (c == fallback) fallbackN = count[k];
+            if (count[k] > bestN) { bestN = count[k]; best = c; }
+        }
+        return fallbackN == bestN ? fallback : best;
+    }
 
     // Habagat's palms grow on the beaches and inland too: they stand on whichever their neighbours mostly are.
     char HabagatPalmGround(int x, int y)
@@ -304,6 +338,8 @@ partial class Game
     // The whole outdoor base layer: depth, the rounded coast, every tile's ground and details, then where the foam goes.
     void RenderBase()
     {
+        for (int y = 0; y < ROWS; y++)
+            for (int x = 0; x < COLS; x++) groundCache[y, x] = Ground(worldMap[y, x], x, y);
         ComputeDepth();
         for (int y = 0; y < ROWS; y++)
             for (int x = 0; x < COLS; x++) ShapeTile(x, y);
@@ -315,8 +351,17 @@ partial class Game
     // Redraws one world tile into the base layer (also used after chopping a tree).
     void RenderTile(int x, int y)
     {
-        ShapeTile(x, y);
-        PaintTile(x, y);
+        // The ground under a tree or boulder beside it can follow this tile (NeighbourGround), the grounds blend across tile
+        // borders (Scenery.ShapeAt), and a tile's paint reads the shape a pixel round it, so the ring of tiles grows by
+        // one at each step.
+        void Ring(int r, Action<int, int> act)
+        {
+            for (int j = Math.Max(0, y - r); j <= Math.Min(ROWS - 1, y + r); j++)
+                for (int i = Math.Max(0, x - r); i <= Math.Min(COLS - 1, x + r); i++) act(i, j);
+        }
+        Ring(1, (i, j) => groundCache[j, i] = Ground(worldMap[j, i], i, j));
+        Ring(2, ShapeTile);
+        Ring(3, PaintTile);
     }
 
     void PaintTile(int x, int y)
@@ -403,6 +448,9 @@ partial class Game
 
     void DrawWater(float t)
     {
+        DrawCaustics(t);
+        DrawGlints(t);
+        PlanMoonPath(t);
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
         for (int y = vy0; y <= vy1; y++)
             for (int x = vx0; x <= vx1; x++)
@@ -415,6 +463,8 @@ partial class Game
                 if ((t * 0.35 + k) % 1 < 0.2 && Wet(ShapePx(gx, gy)) && Wet(ShapePx(gx + 1, gy))) pix.Rect(gx, gy, 2, 1, c);
             }
         DrawRipples(t);
+        DrawLeaps(t);
+        DrawWaves(t);
         DrawFoam(t);
         DrawTideFlats(t);
         DrawSandbar();
@@ -528,21 +578,29 @@ partial class Game
     int Sway(int tx, int ty)
     {
         float wind = Stormy ? 3.2f : 1.1f, amp = Stormy ? 1.4f : 0.62f;
-        return (int)MathF.Round(MathF.Sin(time * wind + tx * 0.7f + ty * 1.3f) * amp);
+        // A passing gust (Ambience.cs) bends the tree over and shakes it a little harder.
+        float g = Gust(tx * T + 5, ty * T);
+        return (int)MathF.Round(MathF.Sin(time * wind + tx * 0.7f + ty * 1.3f) * amp * (1 + g) + g * 1.6f);
     }
 
     void DrawHut()
     {
         pix.Rect(150, 68, 21, 3, "rgba(0,0,0,0.2)");
         pix.Rect(151, 57, 18, 12, "#9a6a3a");
+        pix.Rect(166, 57, 3, 12, "rgba(40,20,10,0.25)");
         foreach (int y in new[] { 60, 63, 66 }) pix.Rect(151, y, 18, 1, "#7a5230");
         pix.Rect(158, 62, 4, 7, "#3b2a1d");
-        pix.Rect(164, 60, 3, 3, Night ? "#f3c25b" : "#bfe0ea");
+        Window(164, 60, 3, 3, "#bfe0ea");
         for (int i = 0; i < 10; i++)
         {
+            // Red roof tiles, lit on the west slope and shaded on the east, with a ridge highlight.
             int half = 2 + (int)(i * 1.25);
-            pix.Rect(160 - half, 48 + i, half * 2, 1, i % 2 == 1 ? "#963f2d" : "#b5523b");
+            string lit = i % 2 == 1 ? "#a8472f" : "#c45d41", shade = i % 2 == 1 ? "#7f3424" : "#94442f";
+            pix.Rect(160 - half, 48 + i, half, 1, lit);
+            pix.Rect(160, 48 + i, half, 1, shade);
         }
+        pix.Rect(159, 48, 2, 1, "#e07a5c");
+        pix.Rect(151, 58, 18, 1, "rgba(40,20,10,0.3)");
         // A stone chimney with smoke curling away on the wind.
         pix.Rect(164, 47, 3, 6, "#7d8288"); pix.Rect(164, 47, 3, 1, "#9aa0a5");
         for (int k = 0; k < 4; k++)
@@ -635,7 +693,7 @@ partial class Game
             DrawRider(x, y, arms, pump, hands, lean);
             (x, y) = (bx, by);
         }
-        else LookData.DrawPerson(pix, state.look, x, y, f, walk, bob: bob, blink: blink, arms: arms, swing: pump, lean: lean, head: glance,
+        else LookData.DrawPerson(pix, state.look, x, y, f, walk, idle: false, bob: bob, blink: blink, arms: arms, swing: pump, lean: lean, head: glance,
             hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
         if (InWater && !Riding)
         {
@@ -783,36 +841,37 @@ partial class Game
 
     void DrawShack(int X, int Y)
     {
-        string win = Night ? "#f3c25b" : "#bfe0ea";
         pix.Rect(X, Y + 9, 20, 1, "rgba(0,0,0,0.2)");
         pix.Rect(X + 1, Y - 3, 18, 12, "#a8794a");
+        pix.Rect(X + 16, Y - 3, 3, 12, "rgba(40,20,10,0.22)");
         foreach (int o in new[] { 0, 3, 6 }) pix.Rect(X + 1, Y + o, 18, 1, "#8a5f36");
         pix.Rect(X + 8, Y + 3, 4, 6, "#3b2a1d");
         pix.Rect(X + 11, Y + 6, 1, 1, "#f3c25b");
-        pix.Rect(X + 3, Y + 1, 3, 3, win); pix.Rect(X + 14, Y + 1, 3, 3, win);
+        Window(X + 3, Y + 1, 3, 3, "#bfe0ea"); Window(X + 14, Y + 1, 3, 3, "#bfe0ea");
         for (int i = 0; i < 8; i++)
         {
             int half = 2 + (int)(i * 1.3);
-            pix.Rect(X + 10 - half, Y - 11 + i, half * 2, 1, i % 2 == 1 ? "#3d6d8c" : "#4c84a8");
+            pix.Rect(X + 10 - half, Y - 11 + i, half, 1, i % 2 == 1 ? "#4a7d9c" : "#5a93b6");
+            pix.Rect(X + 10, Y - 11 + i, half, 1, i % 2 == 1 ? "#33607d" : "#40739a");
         }
     }
 
     // A bahay kubo: woven bamboo walls raised on four stilts, a steep nipa roof, and bamboo steps up to the door.
     void DrawKubo(int X, int Y)
     {
-        string win = Night ? "#f3c25b" : "#3a3024";
         pix.Rect(X, Y + 9, 20, 1, "rgba(0,0,0,0.2)");
         foreach (int sx in new[] { 2, 7, 12, 17 }) { pix.Rect(X + sx, Y + 3, 1, 7, "#6b4a2b"); pix.Rect(X + sx, Y + 3, 1, 1, "#8a6440"); }
         pix.Rect(X + 1, Y + 2, 18, 2, "#a8844e");
         pix.Rect(X + 2, Y - 6, 16, 8, "#d9bf86");
         for (int i = 0; i < 16; i += 2) pix.Rect(X + 2 + i, Y - 6 + (i / 2 % 2), 1, 7, "#c4a668");
         pix.Rect(X + 8, Y - 4, 4, 6, "#4a3a2a");
-        pix.Rect(X + 3, Y - 4, 3, 3, win); pix.Rect(X + 14, Y - 4, 3, 3, win);
+        Window(X + 3, Y - 4, 3, 3, "#3a3024"); Window(X + 14, Y - 4, 3, 3, "#3a3024");
         for (int s = 0; s < 3; s++) pix.Rect(X + 8, Y + 4 + s * 2, 4, 1, "#c9a06a");
         for (int i = 0; i < 9; i++)
         {
             int half = 3 + i * 9 / 8;
-            pix.Rect(X + 10 - half, Y - 15 + i, half * 2, 1, i % 3 == 0 ? "#9a7440" : "#c8a25e");
+            pix.Rect(X + 10 - half, Y - 15 + i, half, 1, i % 3 == 0 ? "#a07a44" : "#d4ae68");
+            pix.Rect(X + 10, Y - 15 + i, half, 1, i % 3 == 0 ? "#80602f" : "#ad8a4c");
         }
         pix.Rect(X - 1, Y - 7, 22, 1, "#80643e");
     }
@@ -1073,7 +1132,21 @@ partial class Game
                 "cat" => ph < 0.35f ? 2 : 0,
                 _ => 0
             };
+        // At night an animal standing still curls up to sleep, with the odd z drifting up (not the night birds and tarsiers).
+        bool asleep = Night && !moving && a.Hearts <= 0 && a.Kind is not ("tarsier" or "hornbill" or "cat");
+        if (asleep) pose = 3;
         AnimalArt.Draw(pix, a.Kind, a.X, a.Y, a.Flip, moving ? (int)(time * 8) % 2 : 0, pose);
+        if (asleep)
+        {
+            float zt = (time * 0.6f + a.HomeX * 0.07f) % 3f;
+            if (zt < 1.6f)
+            {
+                var (_, zh) = AnimalArt.Size(a.Kind);
+                var zc = Pal.Rgba(230, 236, 250, 0.7f * (1 - zt / 1.6f));
+                int zx = (int)a.X + 3 + (int)(zt * 3), zy = (int)a.Y - zh - (int)(zt * 6);
+                pix.Rect(zx, zy, 3, 1, zc); pix.Rect(zx + 1, zy + 1, 1, 1, zc); pix.Rect(zx, zy + 2, 3, 1, zc);
+            }
+        }
         if (a.Hearts > 0)
         {
             var (_, h) = AnimalArt.Size(a.Kind);
@@ -1334,7 +1407,11 @@ partial class Game
         LightEclipse();
         LightFireflies(t);
         LightBaga(t);
+        LightWindows();
+        KeepMoonPath();
         ApplyDark(new Color(8, 16, 40, 255));
+        GlowWindows(t, k);
+        DrawMoonPath(k);
         // With the moon in Bakunawa's jaws, the surf doesn't catch any moonlight.
         if (eclipse == null || eclipse.Phase == "spit") DrawMoonlitShore(t, k);
         // Bakawan's glowing water and its alitaptap (Bakawan.cs).
@@ -1406,6 +1483,7 @@ partial class Game
 
     void RenderWorld(float t)
     {
+        litWindows.Clear();
         UpdateCamera();
         pix.CamX = camX; pix.CamY = camY;
         pix.CopyFrom(basePix, camX, camY, scene == "world" ? Pal.Sea : scene == "cave" ? Pal.C("#0b0908") : Pal.C("#140f0c"));
@@ -1421,6 +1499,7 @@ partial class Game
             DrawGusoFarm(t);
             DrawLoose(t);
             DrawMountGround();
+            DrawBuildingShadows();
             DrawBugs(t);
             DrawSpots(t);
             DrawSchools(t);
@@ -1442,12 +1521,15 @@ partial class Game
             DrawParticles();
             DrawLeaves();
             DrawCloudShadows(t);
+            DrawMist(t);
             DrawSkyLife(t);
             DrawSnow(t);
             DrawWeatherTint();
             DrawSunGlow();
+            DrawSunBeams(t);
             if (Darkness > 0) DrawNight(t);
             DrawEclipseSky();
+            DrawRainSplashes(t);
             DrawRain(t);
             DrawAshfall(Raylib.GetFrameTime());
             DrawGhost(t);

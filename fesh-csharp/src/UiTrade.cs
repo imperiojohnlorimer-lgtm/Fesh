@@ -17,21 +17,18 @@ partial class Game
     /* ---------- Pip's stall ---------- */
     void DrawShop()
     {
-        Backdrop();
-        const float cw = 1080, ch = 680, pad = 24;
-        float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
+        const float pad = 24;
         shopTip = null;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Pip's stall", x + pad, y + pad, FontKind.Ui700, 36, Pal.PaperInk);
-        float tx = x + pad + Gfx.Measure("Pip's stall", FontKind.Ui700, 36) + 28;
+        var (x, y, cw, ch) = PanelFrame("Pip's stall");
+        float tx = x + pad + Gfx.Measure("Pip's stall", FontKind.Ui700, PanelTitleSize) + 28;
         foreach (var (id, label) in new[] { ("sell", "Sell"), ("buy", "Buy"), ("derby", "Derby") })
         {
             float w = SmallW(label);
-            if (Button(label, tx, y + pad - 2, w, 44, FontKind.Ui700, 20, shopTab == id ? Pal.Lantern : Pal.Sand, Pal.Ink, 4)) { shopTab = id; shopPage = 0; }
+            if (Button(label, tx, y + PanelPad - 6, w, 44, FontKind.Ui700, 20, shopTab == id ? Pal.Lantern : Pal.Sand, Pal.Ink, 4)) { shopTab = id; shopPage = 0; }
             tx += w + 10;
         }
         DrawCoins(tx + 20, y + pad + 6);
-        if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) ClosePanels();
+        if (PanelClose()) ClosePanels();
         float ly = y + pad + 62;
         if (shopTab == "sell") DrawSellList(x + pad, ly, cw - pad * 2, y + ch - pad - ly);
         else if (shopTab == "buy") DrawBuyList(x + pad, ly, cw - pad * 2);
@@ -191,12 +188,9 @@ partial class Game
 
     void DrawTank()
     {
-        Backdrop();
-        const float cw = 1000, ch = 690, pad = 24;
-        float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Aquarium", x + pad, y + pad, FontKind.Ui700, 36, Pal.PaperInk);
-        if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) { ClosePanels(); return; }
+        const float pad = 24;
+        var (x, y, cw, ch) = PanelFrame("Aquarium", null, 1000, 690);
+        if (PanelClose()) { ClosePanels(); return; }
         Gfx.Text("Up to four fish. Rare ones are worth showing off.", x + pad, y + pad + 46, FontKind.Note, 19, Muted);
         var tank = Tank(tankKey);
         float bottom = 0;

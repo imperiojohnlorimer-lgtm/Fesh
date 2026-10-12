@@ -14,13 +14,10 @@ partial class Game
 
     void DrawBag()
     {
-        Backdrop();
-        const float bw = 1120, bh = 600, pad = 24, slot = 66, gapS = 8;
+        const float pad = 24, slot = 66, gapS = 8;
         const int cols = 10;
-        float bx = (Gfx.LW - bw) / 2, by = (Gfx.LH - bh) / 2;
-        Gfx.Box(bx, by, bw, bh, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Bag", bx + pad, by + pad, FontKind.Ui700, 40, Pal.PaperInk);
-        if (SmallButton("Close", bx + bw - pad - SmallW("Close"), by + pad)) ClosePanels();
+        var (bx, by, bw, bh) = PanelFrame("Bag");
+        if (PanelClose()) ClosePanels();
 
         // Food and the rod in use.
         float fx = bx + 140, fy = by + pad + 6;
@@ -150,7 +147,6 @@ partial class Game
 
     void DrawCraft()
     {
-        Backdrop();
         bool tabs = craftStation == "workbench";
         var all = Items.Recipes.Where(r => Items.StationMakes(craftStation, r) && RecipeKnown(r)).ToList();
         var inTab = tabs ? all.Where(r => Items.Category(r) == craftTab).ToList() : all;
@@ -160,10 +156,8 @@ partial class Game
         const float cw = 900, pad = 24, rowH = 66, tabH = 44;
         float top = pad + 48 + 34 + (tabs ? tabH + 12 : 0);
         float h = top + Math.Min(inTab.Count, CraftPerPage) * (rowH + 8) + pad + (pages > 1 ? 48 : 0);
-        float x = (Gfx.LW - cw) / 2, y = Math.Max(10, (Gfx.LH - h) / 2);
-        Gfx.Box(x, y, cw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text(Items.StationName[craftStation], x + pad, y + pad, FontKind.Ui700, 36, Pal.PaperInk);
-        if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) ClosePanels();
+        var (x, y, _, _) = PanelFrame(Items.StationName[craftStation], null, cw, h);
+        if (PanelClose()) ClosePanels();
         string hint = craftStation switch
         {
             "workbench" => craftTab switch

@@ -109,6 +109,25 @@ partial class Game
     static bool SmallButton(string label, float x, float y) =>
         Button(label, x, y, SmallW(label), 44, FontKind.Ui700, 20, Pal.Sand, Pal.Ink, 4);
 
+    // The paper panels share one frame: the big ones (bag, tackle box, journal, map, Pip's stall, the tide table) the
+    // same size and place, the rest (workbench, aquarium, island guide) centred at their own size, all with the title in
+    // the same spot and Close top right (PanelClose). The Fesh-dex notebook, the album, the Case board and Marilaya's
+    // activity panels keep their own looks.
+    const float PanelX = 50, PanelY = 20, PanelW = 1180, PanelH = 680, PanelPad = 24, PanelTitleSize = 34;
+    static (float x, float y, float w, float h) panelAt = (PanelX, PanelY, PanelW, PanelH);
+    static (float x, float y, float w, float h) PanelFrame(string title, string subtitle = null, float w = PanelW, float h = PanelH)
+    {
+        Backdrop();
+        float x = (Gfx.LW - w) / 2, y = Math.Max(8, (Gfx.LH - h) / 2);
+        panelAt = (x, y, w, h);
+        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        Gfx.Text(title, x + PanelPad, y + PanelPad - 2, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
+        if (subtitle != null) Gfx.Text(subtitle, x + PanelPad, y + PanelPad + 44, FontKind.Note, 18, Muted);
+        return panelAt;
+    }
+    static float PanelCloseX => panelAt.x + panelAt.w - PanelPad - SmallW("Close");
+    static bool PanelClose() => SmallButton("Close", PanelCloseX, panelAt.y + PanelPad - 6);
+
     static void Backdrop()
     {
         DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Pal.C("rgba(6,14,24,0.74)"));
@@ -129,16 +148,17 @@ partial class Game
     }
 
     /* ---------- HUD ---------- */
+    // The status card (top left): the day and time with the weather, your coins, where you are, then health and food.
+    // It's always the same size whatever it says, and the goal card (Guide.cs) sits under it at the same width.
+    const float HudX = 13, HudY = 13, HudW = 372, HudH = 98;
+    (string text, float x, float y)? meterTip;   // the health or food reading under the mouse, drawn over the goal card
     void DrawHud()
     {
         const float m = 13, h = 36, fs = 20;
-        float x = m;
-        string weather = state.weather switch { "rain" => " · Rain", "storm" => " · Storm", _ => "" };
-        string clock = $"Day {state.day} · {ClockText(state.clock, 10)}{weather}";
-        // Sized for a wide time, so the chips beside it don't shuffle about as the minutes tick by.
-        float cw = Math.Max(Gfx.Measure(clock, FontKind.Ui600, fs), Gfx.Measure($"Day {state.day} · {(Settings.Data.clock24 ? "00:00" : "00:00 PM")}{weather}", FontKind.Ui600, fs)) + 50;
-        Gfx.Rect(x, m, cw, h, Navy, 5);
-        float ix = x + 20, iy = m + h / 2;
+        float x = HudX, y = HudY, w = HudW;
+        Gfx.Rect(x, y, w, HudH, Navy, 6);
+        // The time, with the sun or the moon in its phase.
+        float ix = x + 21, iy = y + 18;
         if (Night)
         {
             // The moon in its current phase: a shadow slides across it over eight days.
@@ -150,37 +170,42 @@ partial class Game
         {
             for (int i = 0; i < 8; i++)
             {
-                float a = i * MathF.PI / 4;
+                float a = i * MathF.PI / 4 + time * 0.15f;
                 Gfx.Circle(ix + MathF.Cos(a) * 9, iy + MathF.Sin(a) * 9, 1.6f, Pal.Lantern);
             }
             Gfx.Circle(ix, iy, 5.5f, Pal.Lantern);
         }
-        Gfx.Text(clock, x + 36, m + (h - fs) / 2 - 1, FontKind.Ui600, fs, Pal.Paper);
-        Gfx.Block(x, m, cw, h);
-        if (Gfx.Hover(x, m, cw, h)) clockTip = x;
-        x += cw + 7;
-        string area = AreaName();
-        float aw = Gfx.Measure(area, FontKind.Ui600, fs) + 24;
-        Gfx.Rect(x, m, aw, h, Navy, 5);
-        Gfx.Text(area, x + 12, m + (h - fs) / 2 - 1, FontKind.Ui600, fs, Pal.Paper);
-        x += aw + 7;
+        string clock = $"Day {state.day} · {ClockText(state.clock, 10)}";
+        Gfx.Text(clock, x + 38, y + 18 - fs / 2 - 1, FontKind.Ui600, fs, Pal.Paper);
+        float clockEnd = x + 38 + Gfx.Measure(clock, FontKind.Ui600, fs);
+        if (state.weather is "rain" or "storm") DrawWeatherIcon(clockEnd + 18, iy, state.weather == "storm");
+        // Coins, right-aligned.
         string coins = state.coins.ToString();
-        float coinW = Gfx.Measure(coins, FontKind.Ui600, fs) + 50;
-        Gfx.Rect(x, m, coinW, h, Navy, 5);
-        DrawIcon("coin", x + 8, m + 6, 24);
-        Gfx.Text(coins, x + 38, m + (h - fs) / 2 - 1, FontKind.Ui600, fs, Pal.Lantern);
-        // The goal you're following goes under them (Guide.cs), drawn first so the meters' labels show over it.
+        // A very big purse shrinks to fit its corner rather than pushing into the time.
+        float cfs = fs, coinTw = Gfx.Measure(coins, FontKind.Ui600, cfs);
+        while (coinTw > 64 && cfs > 12) coinTw = Gfx.Measure(coins, FontKind.Ui600, --cfs);
+        Gfx.Text(coins, x + w - 14 - coinTw, y + 18 - cfs / 2 - 1, FontKind.Ui600, cfs, Pal.Lantern);
+        DrawIcon("coin", x + w - 14 - coinTw - 28, y + 6, 24);
+        if (Gfx.Hover(x, y, w - 14 - coinTw - 34, 36)) clockTip = x;
+        // Where you are.
+        Gfx.Rect(x + 12, y + 37, w - 24, 1, Pal.C("rgba(255,255,255,0.12)"));
+        DrawPin(x + 21, y + 49);
+        Gfx.Text(Gfx.Ellipsize(AreaName(), FontKind.Ui600, 16, w - 52), x + 38, y + 41, FontKind.Ui600, 16, Pal.C("#cfe3ea"));
+        // Health and food, side by side.
+        DrawHealthMeter(x, y + 62, w / 2, 36);
+        DrawFoodMeter(x + w / 2, y + 62, w / 2, 36);
+        Gfx.Block(x, y, w, HudH);
+        // The goal you're following goes under it (Guide.cs), then a meter's reading over both.
         DrawGuideCard();
-        // Health and food sit on a second row under the clock.
-        DrawHealthMeter(m, m + h + 7, h);
-        DrawFoodMeter(m + 136 + 7, m + h + 7, h);
+        if (meterTip is var (tipText, tipX0, tipY0)) MeterLabel(tipText, tipX0, tipY0);
+        meterTip = null;
 
         bool live = mode is not ("panel" or "catch" or "odd" or "pause" or "ending");
         // The menu button (the same as Esc), far right.
         float rx = Gfx.LW - m - h;
         if (Button("", rx, m, h, h, FontKind.Ui600, fs, Pal.Sand, Pal.Ink, 2, 2, 5, live)) OpenPause();
         for (int i = 0; i < 3; i++) Gfx.Rect(rx + 9, m + 10 + i * 7, h - 18, 3, Pal.Ink, 1);
-        rx -= 7;
+        rx -= 6;
         var buttons = new (string label, Action act, bool on)[]
         {
             ("Case board", () => TogglePanel("case"), false),
@@ -190,15 +215,35 @@ partial class Game
             ("Bag", () => TogglePanel("bag"), false),
             (mode == "build" ? "Done" : "Build", ToggleBuild, mode == "build")
         };
+        // Every button the same width, sized for the longest label.
+        const float bfs = 18;
+        float bw = buttons.Max(b => Gfx.Measure(b.label, FontKind.Ui600, bfs)) + 22;
         foreach (var (label, act, on) in buttons)
         {
-            float w = Gfx.Measure(label, FontKind.Ui600, fs) + 24;
-            rx -= w;
-            if (Button(label, rx, m, w, h, FontKind.Ui600, fs, on ? Pal.Lantern : Pal.Sand, Pal.Ink, 2, 2, 5, live)) act();
-            rx -= 7;
+            rx -= bw;
+            if (Button(label, rx, m, bw, h, FontKind.Ui600, bfs, on ? Pal.Lantern : Pal.Sand, Pal.Ink, 2, 2, 5, live)) act();
+            rx -= 6;
         }
-        if (clockTip is float tipX) DrawClockTip(tipX, m + h + 6);
+        if (clockTip is float tipX) DrawClockTip(tipX, HudY + HudH + 6);
         clockTip = null;
+    }
+
+    // A little cloud with rain under it (or a bolt, in a storm), beside the time.
+    static void DrawWeatherIcon(float cx, float cy, bool storm)
+    {
+        var cloud = storm ? Pal.C("#9aa8b8") : Pal.C("#d6e2ea");
+        Gfx.Circle(cx - 5, cy - 1, 5, cloud); Gfx.Circle(cx + 2, cy - 4, 6.5f, cloud); Gfx.Circle(cx + 8, cy, 4.5f, cloud);
+        Gfx.Rect(cx - 9, cy - 1, 21, 6, cloud, 3);
+        if (storm) Gfx.Triangle(cx + 2, cy + 3, cx - 3, cy + 12, cx + 3, cy + 9, Pal.Lantern);
+        else for (int i = 0; i < 3; i++) Gfx.Rect(cx - 5 + i * 6, cy + 7, 2, 5, Pal.C("#7fc3e8"), 1);
+    }
+
+    // A map pin, for the place name.
+    static void DrawPin(float cx, float cy)
+    {
+        Gfx.Circle(cx, cy - 3, 5, Pal.Buoy);
+        Gfx.Triangle(cx - 4.3f, cy - 0.5f, cx, cy + 7, cx + 4.3f, cy - 0.5f, Pal.Buoy);
+        Gfx.Circle(cx, cy - 3, 2, Pal.C("#fbe3d6"));
     }
 
     // Hovering over the clock: the moon, and what the weather will do next.
@@ -221,39 +266,34 @@ partial class Game
     }
 
     // A small fish icon and a bar that goes from green to amber to red as you get hungry.
-    void DrawFoodMeter(float x, float y, float h)
+    void DrawFoodMeter(float x, float y, float w, float h)
     {
-        const float bw = 92;
-        float w = 30 + bw + 14;
-        Gfx.Rect(x, y, w, h, Navy, 5);
-        DrawIcon("grilled_fish", x + 7, y + 6, 24);
+        float bw = w - 34 - 14;
+        DrawIcon("grilled_fish", x + 7, y + 4, 24);
         float f = state.food / 100f;
         var c = f > 0.5f ? Pal.C("#7fd36b") : f > 0.25f ? Pal.Lantern : Pal.Buoy;
         if (Starving && (int)(time * 3) % 2 == 0) c = Pal.C("#ff8b7a");
-        Gfx.Rect(x + 34, y + 12, bw, 12, Pal.C("rgba(0,0,0,0.35)"), 3);
-        if (f > 0) Gfx.Rect(x + 34, y + 12, Math.Max(6, bw * f), 12, c, 3);
-        Gfx.Block(x, y, w, h);
-        if (Gfx.Hover(x, y, w, h)) MeterLabel($"Food {state.food:0}/100", x, y + h + 6);
+        Gfx.Rect(x + 34, y + 11, bw, 12, Pal.C("rgba(0,0,0,0.35)"), 3);
+        if (f > 0) Gfx.Rect(x + 34, y + 11, Math.Max(6, bw * f), 12, c, 3);
+        if (Gfx.Hover(x, y, w, h)) meterTip = ($"Food {state.food:0}/100", x, y + h + 6);
     }
 
     // A pixel heart and a red bar. It flashes when you're hurt and beats when you're nearly out.
-    void DrawHealthMeter(float x, float y, float h)
+    void DrawHealthMeter(float x, float y, float w, float h)
     {
-        const float bw = 92;
-        float w = 30 + bw + 14, f = state.hp / 100f;
-        Gfx.Rect(x, y, w, h, hurtFlash > 0 ? Pal.C("rgba(150,30,30,0.85)") : Navy, 5);
+        float bw = w - 34 - 14, f = state.hp / 100f;
+        if (hurtFlash > 0) Gfx.Rect(x + 4, y, w - 8, h - 4, Pal.C("rgba(150,30,30,0.85)"), 5);
         string[] heart = { ".XX.XX.", "XXXXXXX", "XXXXXXX", ".XXXXX.", "..XXX..", "...X..." };
         float px = f < 0.25f ? 3 + 0.5f * MathF.Max(0, MathF.Sin(time * 9)) : 3;
-        float hx = x + 18 - 3.5f * px, hy = y + h / 2 - 3 * px;
+        float hx = x + 20 - 3.5f * px, hy = y + 17 - 3 * px;
         for (int r = 0; r < heart.Length; r++)
             for (int c = 0; c < heart[r].Length; c++)
                 if (heart[r][c] == 'X') Gfx.Rect(hx + c * px, hy + r * px, px, px, r == 1 && c == 1 ? Pal.C("#ff9a8a") : Pal.C("#e04b3a"));
         var col = f > 0.5f ? Pal.C("#e8574a") : f > 0.25f ? Pal.C("#f08a3a") : Pal.C("#ff4040");
         if (f < 0.25f && (int)(time * 3) % 2 == 0) col = Pal.C("#ffb0a0");
-        Gfx.Rect(x + 34, y + 12, bw, 12, Pal.C("rgba(0,0,0,0.35)"), 3);
-        if (f > 0) Gfx.Rect(x + 34, y + 12, Math.Max(6, bw * f), 12, col, 3);
-        Gfx.Block(x, y, w, h);
-        if (Gfx.Hover(x, y, w, h)) MeterLabel($"Health {state.hp:0}/100", x, y + h + 6);
+        Gfx.Rect(x + 34, y + 11, bw, 12, Pal.C("rgba(0,0,0,0.35)"), 3);
+        if (f > 0) Gfx.Rect(x + 34, y + 11, Math.Max(6, bw * f), 12, col, 3);
+        if (Gfx.Hover(x, y, w, h)) meterTip = ($"Health {state.hp:0}/100", x, y + h + 6);
     }
 
     // A meter's reading under it, on a dark chip so it reads over the goal card.
@@ -314,12 +354,14 @@ partial class Game
         if (toastAlpha <= 0 || toastMsg == "") return;
         const float fs = 22, lh = 27;
         float a = toastAlpha;
-        var lines = Gfx.Wrap(toastMsg, FontKind.Ui600, fs, 1100);
+        // Clear of the status and goal cards on the left and the buttons along the top.
+        const float left = HudX + HudW + 14, right = Gfx.LW - 13;
+        var lines = Gfx.Wrap(toastMsg, FontKind.Ui600, fs, right - left - 40);
         float w = lines.Max(l => Gfx.Measure(l, FontKind.Ui600, fs)) + 40, h = lines.Count * lh + 22;
-        float x = Gfx.LW / 2 - w / 2, y = 115 - 6 * (1 - a);
+        float cx = (left + right) / 2, x = cx - w / 2, y = 62 - 6 * (1 - a);
         Gfx.Box(x, y, w, h, Pal.WithAlpha(Pal.Paper, a), Pal.WithAlpha(Pal.Ink, a), 2, 5);
         for (int i = 0; i < lines.Count; i++)
-            Gfx.TextCenter(lines[i], Gfx.LW / 2, y + 11 + i * lh, FontKind.Ui600, fs, Pal.WithAlpha(Pal.PaperInk, a));
+            Gfx.TextCenter(lines[i], cx, y + 11 + i * lh, FontKind.Ui600, fs, Pal.WithAlpha(Pal.PaperInk, a));
     }
 
     /* ---------- Dialogue ---------- */
@@ -1041,8 +1083,14 @@ partial class Game
         DrawBuoysOnMap();
         (pix, scene, map, basePix, buildIndex) = (savedPix, savedScene, savedMap, savedBase, savedIndex);
         FogUncharted(img);
+        // Printed on parchment: every colour drawn a little toward the paper.
+        var paper = Pal.C("#efe2c0");
+        for (int i = 0; i < img.Buf.Length; i++) img.Buf[i] = Pix.Mix(img.Buf[i], paper, 0.1f);
         if (mapTex.Id != 0) UnloadTexture(mapTex);
+        // Shrunk smoothly (mipmaps), so the coasts and the shallows don't break up into stair steps.
         mapTex = Gfx.ToTexture(img.Buf, img.W, img.H, TextureFilter.Point);
+        GenTextureMipmaps(ref mapTex);
+        SetTextureFilter(mapTex, TextureFilter.Trilinear);
         mapTexDirty = false;
     }
 

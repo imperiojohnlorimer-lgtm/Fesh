@@ -205,7 +205,7 @@ partial class Game
     {
         float lx = MlLx(wx + 0.5f), ly = MlLy(wy + 0.5f), e = 0.12f;
         float gx = (MlHeight(lx + e, ly) - MlHeight(lx - e, ly)) / (2 * e), gy = (MlHeight(lx, ly + e) - MlHeight(lx, ly - e)) / (2 * e);
-        return Math.Clamp((gx + gy) * 0.55f, -0.42f, 0.42f);
+        return Math.Clamp((gx + gy) * 1.3f, -0.55f, 0.55f);
     }
 
     // The forest on the volcano and the high middle of the island; limestone shows through in the hills of the north-east.
@@ -245,6 +245,17 @@ partial class Game
             }
         // The sandbar off Maniwaya, out at low tide (MarilayaPlaces.cs).
         MakeSandbar();
+        // Tindig's upper slopes: the forest gives way to a ring of mossy meadow, then bare rock and scree near the top.
+        for (int y = 0; y < ROWS; y++)
+            for (int x = MlStart; x < COLS; x++)
+            {
+                if (map[y, x] is not ('j' or 'g')) continue;
+                float lx = (x - MlX + 0.5f) / MlS, ly = (y - MlY + 0.5f) / MlS;
+                if (!InTindig(lx, ly)) continue;
+                float h = MlHeight(lx, ly) + (VNoise(x * T, y * T, 30, 704) - 0.5f) * 0.1f;
+                if (h > 0.6f) map[y, x] = 'e';
+                else if (h > 0.42f) map[y, x] = 'g';
+            }
         // Tindig's rocky top.
         for (int y = (int)(MlY + (TindigLY - 1) * MlS); y <= MlY + (TindigLY + 1) * MlS; y++)
             for (int x = (int)(MlX + (TindigLX - 1) * MlS); x <= MlX + (TindigLX + 1) * MlS; x++)
@@ -296,10 +307,12 @@ partial class Game
                 float lx = (x - MlX + 0.5f) / MlS, ly = (y - MlY + 0.5f) / MlS;
                 double roll = Pix.Hash(x, y, 703);
                 bool mountain = InTindig(lx, ly);
-                char kind = t switch
+                // Thick forest low on Tindig, thinning out higher up so the slope shows (boulders stay as rare as ever).
+                double forest = mountain ? .42 - .3 * Math.Clamp((MlHeight(lx, ly) - .25f) / .2f, 0, 1) : .3;
+                char kind = mountain && t == 'g' ? (roll < .1 ? 't' : roll < .13 ? 'R' : '\0') : t switch
                 {
                     's' => roll < .08 ? 'h' : '\0',
-                    'j' => roll < (mountain ? .42 : .3) ? 't' : roll < (mountain ? .44 : .33) ? 'R' : '\0',
+                    'j' => roll < forest ? 't' : roll < forest + (mountain ? .02 : .03) ? 'R' : '\0',
                     'e' => roll < .14 ? 'R' : roll < .21 ? 't' : '\0',
                     _ => roll < .06 ? 'h' : roll < .085 ? 't' : roll < .105 ? 'y' : roll < .115 ? 'R' : '\0'
                 };

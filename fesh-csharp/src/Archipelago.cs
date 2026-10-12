@@ -265,41 +265,76 @@ partial class Game
                 int x = (int)MathF.Round(s.X), y = (int)MathF.Round(s.Y), bob = s.Moving ? 0 : (int)(time % 3 / 2);
                 // Ducked, hands over their heads, while the ground shakes (RestlessSea.cs).
                 if (Shaking) { DrawDucked(look, x, y, s.Face); return; }
-                LookData.DrawPerson(pix, look, x, y, s.Face, s.Step, bob: bob);
+                // Getting on with a chore while they stand about (Ambience.cs).
+                string chore = ChoreNow(n.id, x, y, s.Face, s.Moving);
+                var hands = chore != null ? ChoreHands(chore, x, y, s.Face) : default;
+                if (chore != null) LookData.DrawPerson(pix, look, x, y, s.Face, s.Step, bob: bob, arms: 4, hand: hands.hand, hand2: hands.hand2);
+                else LookData.DrawPerson(pix, look, x, y, s.Face, s.Step, bob: bob);
                 // A woven salakot and a sash distinguish the village fishers; both ride the walk's bounce.
                 int up = bob + (s.Step is 2 or 4 ? 1 : 0);
                 pix.Rect(x - 5, y - 14 - up, 11, 2, "#ddbc78");
                 pix.Rect(x - 3, y - 16 - up, 7, 2, "#f0d596");
                 pix.Rect(x - 2, y - 7 - up, 4, 2, n.shirt);
+                if (chore != null) DrawChoreProp(chore, x, y, s.Face);
             }));
         }
     }
 
+    // A limestone tower like the real karsts of El Nido: a rounded top under a cap of forest, steep fluted sides lit from
+    // the west, shrubs clinging to the ledges, and fallen blocks at its foot.
     void DrawKarst(float x, float y, int height)
     {
+        int X = (int)x, Y = (int)y, top = Y - height;
+        pix.Rect(X - 13, Y - 1, 28, 3, "rgba(18,46,40,0.22)");
         for (int row = 0; row < height; row++)
         {
-            int half = 5 + row * 8 / height;
-            pix.Rect(x - half, y - height + row, half * 2, 1, row % 7 < 2 ? "#aaa998" : "#c8c7ae");
-            pix.Rect(x + half / 2, y - height + row, half / 2, 1, "#808f80");
+            float k = row / (float)height;
+            // Domed for the first rows, then sides that bulge a little and flare at the foot.
+            float half = row < 6 ? 7.5f * MathF.Sqrt(1 - MathF.Pow((6 - row) / 6f, 2)) : 7.5f + 2.2f * MathF.Sin(k * MathF.PI * 0.9f) + (k > 0.85f ? (k - 0.85f) * 22 : 0);
+            int hw = Math.Max(1, (int)MathF.Round(half)), yy = top + row;
+            for (int i = -hw; i < hw; i++)
+            {
+                float u = (i + 0.5f) / hw;   // -1 at the lit west edge, 1 at the shaded east
+                bool groove = (i + 40) % 4 == 0 && Pix.Hash(X + i, row / 5, 941) < 0.7;
+                string c = u < -0.55f ? "#dcd8c4" : u < 0.1f ? "#c4c0aa" : u < 0.6f ? "#a8a592" : "#868777";
+                if (groove) c = u < 0.1f ? "#a9a691" : "#74766a";
+                if (row % 9 == 8 && Pix.Hash(X + i, row, 942) < 0.6) c = "#8f8d7c";
+                pix.Rect(X + i, yy, 1, 1, c);
+            }
+            // Shrubs on the ledges, and vines hanging down the shaded side.
+            if (row > 7 && row % 9 == 0) { pix.Rect(X - hw, yy - 1, 3, 2, "#4f8a3c"); pix.Rect(X - hw + 1, yy - 2, 1, 1, "#6aa84f"); }
+            if (row > 4 && row < height * 0.6f && Pix.Hash(X, row, 943) < 0.35) pix.Rect(X + hw - 2, yy, 1, 1, "#3f6e35");
         }
-        pix.Rect(x - 5, y - height - 2, 10, 3, "#548b46");
-        pix.Rect(x - 12, y - 5, 6, 4, "#769756");
-        pix.Rect(x - 8, y - height + 12, 4, 1, "#e3dbc0");
+        // The forest cap.
+        foreach (var (ox, oy, r) in new[] { (-3, 2, 4.2f), (3, 1, 4f), (0, -1, 4.6f), (-6, 4, 2.6f), (6, 4, 2.6f) })
+        {
+            Disc(X + ox, top + oy + 1, r, Pal.C("#2f5e2c"));
+            Disc(X + ox - 0.5f, top + oy, r - 0.8f, Pal.C("#4a8a3c"));
+            Disc(X + ox - 1.5f, top + oy - 1, r * 0.45f, Pal.C("#6aa84f"));
+        }
+        // Fallen blocks and a fern at the foot.
+        pix.Rect(X - 13, Y - 4, 4, 3, "#a8a592"); pix.Rect(X - 13, Y - 4, 4, 1, "#d0ccb6");
+        pix.Rect(X + 10, Y - 3, 3, 2, "#868777");
+        pix.Rect(X - 9, Y - 3, 3, 2, "#4f8a3c"); pix.Rect(X - 8, Y - 4, 1, 1, "#6aa84f");
     }
 
     void DrawBahay(float x, float y, string trim)
     {
-        // Raised timber walls, woven panels and a broad thatched roof.
+        // Raised timber walls, woven panels and a broad thatched roof, lit from the west, casting its shadow east.
         pix.Rect(x - 17, y + 3, 34, 2, "rgba(0,0,0,0.2)");
         pix.Rect(x - 14, y - 5, 2, 10, "#65452e"); pix.Rect(x + 12, y - 5, 2, 10, "#65452e");
         pix.Rect(x - 16, y - 19, 32, 19, "#b98b52");
         for (int i = -14; i < 16; i += 4) pix.Rect(x + i, y - 18, 1, 16, "#dfbc78");
         pix.Rect(x - 3, y - 11, 7, 11, "#3c342a");
-        pix.Rect(x - 13, y - 12, 7, 6, "#485d56"); pix.Rect(x + 7, y - 12, 6, 6, "#485d56");
+        Window((int)x - 13, (int)y - 12, 7, 6, "#485d56"); Window((int)x + 7, (int)y - 12, 6, 6, "#485d56");
         pix.Rect(x - 16, y - 2, 32, 2, trim);
-        for (int i = 0; i < 12; i++) pix.Rect(x - 9 - i, y - 31 + i, 18 + i * 2, 1, i % 3 == 0 ? "#967342" : "#ceb36b");
-        pix.Rect(x - 21, y - 19, 42, 2, "#80643e");
+        // The right-hand wall in shade, and the eaves' shadow along the top of the walls.
+        pix.Rect(x + 13, y - 19, 3, 17, "rgba(40,24,10,0.22)");
+        pix.Rect(x - 16, y - 17, 32, 2, "rgba(40,24,10,0.28)");
+        ThatchRoof((int)x, (int)y - 31, 12, 9, 1);
+        pix.Rect(x - 21, y - 19, 42, 2, "#80643e"); pix.Rect(x - 21, y - 19, 20, 1, "#9a7a4a");
         pix.Rect(x - 4, y + 1, 9, 2, "#c7a06a");
+        // A potted plant by the steps.
+        pix.Rect(x + 8, y - 1, 3, 2, "#a0522d"); pix.Rect(x + 8, y - 3, 3, 2, "#4f8a3c"); pix.Rect(x + 9, y - 4, 1, 1, "#6aa84f");
     }
 }

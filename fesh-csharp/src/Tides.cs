@@ -220,13 +220,9 @@ partial class Game
 
     void DrawTides()
     {
-        Backdrop();
-        const float cw = 1160, ch = 660, pad = 24;
-        float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Tide table", x + pad, y + pad, FontKind.Ui700, 34, Pal.PaperInk);
-        Gfx.Text("The sea on Habagat's flats, for three days. Below the sandy line you can glean.", x + pad, y + pad + 44, FontKind.Note, 18, Muted);
-        if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) { CloseTides(); return; }
+        const float pad = 24;
+        var (x, y, cw, ch) = PanelFrame("Tide table", "The sea on Habagat's flats, for three days. Below the sandy line you can glean.");
+        if (PanelClose()) { CloseTides(); return; }
 
         // Lola's question, and her answer once you've clicked.
         float gy0 = y + pad + 84;

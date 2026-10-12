@@ -39,7 +39,11 @@ partial class Game
         Inp.ScriptFocused = true;
         // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
         standStill = true;
-        script = Environment.GetEnvironmentVariable("FESH_MARILAYA_TEST") == "1" ? MarilayaScript().GetEnumerator()
+        // People's own blinking would make pixel checks on faces depend on the moment (the scenery shots keep it).
+        LookData.AutoBlink = Environment.GetEnvironmentVariable("FESH_SCENIC") == "1";
+        script = Environment.GetEnvironmentVariable("FESH_SCENIC") == "1" ? ScenicScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_SCENIC") == "checks" ? GraphicsScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_MARILAYA_TEST") == "1" ? MarilayaScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MARILAYA_TEST") == "review" ? MarilayaReviewScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "1" ? VolcanoScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "review" ? VolcanoReviewScript().GetEnumerator()
@@ -78,6 +82,7 @@ partial class Game
 
     partial void AutoTestAfterDraw()
     {
+        ExportPixShot();
         if (pendingShot == null) return;
         Rlgl.DrawRenderBatchActive();
         var img = LoadImageFromScreen();
@@ -2011,6 +2016,7 @@ partial class Game
         foreach (int frames in VolcanoScript()) yield return frames;
         foreach (int frames in ChapterScript()) yield return frames;
         foreach (int frames in MarilayaScript()) yield return frames;
+        foreach (int frames in GraphicsScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

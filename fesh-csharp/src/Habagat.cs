@@ -437,8 +437,11 @@ partial class Game
     {
         int x = (int)MathF.Round(s.X), y = (int)MathF.Round(s.Y), bob = s.Moving ? 0 : (int)(time % 3 / 2);
         var (skin, hair, shirt, pants, longHair, hat) = FolkLook(id);
+        string chore = ChoreNow(id, x, y, s.Face, s.Moving);
+        var hands = chore != null ? ChoreHands(chore, x, y, s.Face) : default;
         LookData.DrawFigure(pix, skin, hair, shirt, pants, longHair, hat, "#e04b3a", x, y, s.Face, s.Step, bob: bob,
-            blink: (time + x * 0.01f) % 4.1f < 0.12f);
+            blink: (time + x * 0.01f) % 4.1f < 0.12f, arms: chore != null ? 4 : 0, hand: chore != null ? hands.hand : null, hand2: chore != null ? hands.hand2 : null);
+        if (chore != null) DrawChoreProp(chore, x, y, s.Face);
         if (id == "rosa")
         {
             // A wide salakot against the sun.

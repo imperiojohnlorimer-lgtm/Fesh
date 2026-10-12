@@ -30,11 +30,11 @@ partial class Game
     static readonly Dictionary<char, Color[]> GroundTones = new()
     {
         ['g'] = Tones("#548f40", "#5d9b45", "#67a74b"),
-        ['j'] = Tones("#397233", "#3f7d3a", "#47883f"),
+        ['j'] = Tones("#3e7836", "#45833d", "#4d8e43"),
         ['s'] = Tones("#e0c68c", "#e8cf96", "#efd9a6"),
         ['p'] = Tones("#c6a872", "#cdb07a", "#d5ba86"),
         ['n'] = Tones("#dde8ef", "#e8f0f4", "#f3f8fa"),
-        ['e'] = Tones("#aea99d", "#b7b2a6", "#c1bcb0"),
+        ['e'] = Tones("#a29d91", "#b5b0a4", "#c7c2b5"),
         ['D'] = Tones("#e0ae64", "#e9b96e", "#efc37d"),
         ['i'] = Tones("#b5dded", "#bfe3f0", "#cae8f3"),
         ['k'] = Tones("#b5dded", "#bfe3f0", "#cae8f3")
@@ -62,7 +62,9 @@ partial class Game
     // Which ground spreads into which where two meet: grass creeps over sand, snow over gravel, and so on.
     static int Prio(char g) => g switch { 'j' => 7, 'g' => 6, 'n' => 5, 'D' => 4, 'e' => 3, 's' => 2, 'p' => 1, _ => 0 };
 
-    char GroundAt(int tx, int ty) => tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS ? '~' : Ground(worldMap[ty, tx], tx, ty);
+    // Each tile's ground, worked out once per bake (RenderBase, and round a tile RenderTile repaints).
+    readonly char[,] groundCache = new char[ROWS, COLS];
+    char GroundAt(int tx, int ty) => tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS ? '~' : groundCache[ty, tx];
 
     // Smooth value noise in 0..1 with cells of the given size in pixels.
     static float VNoise(int x, int y, int cell, int seed)
@@ -80,19 +82,154 @@ partial class Game
     // water's inside corners fill in with land. Each corner is a quarter circle about the tile's middle.
     char ShapeAt(int wx, int wy)
     {
+        char s = CoastShape(wx, wy);
+        if (s is 'w' or '~') return SeaShape(wx, wy, s);
+        if (!Shore(s)) return s;
+        char g = GroundShape(wx, wy, s);
+        return g == 'p' && wx >= MlStart * T ? MlFootpath(wx, wy) : g;
+    }
+
+    // Marilaya's trail and lanes are whole tiles of path underfoot, but they're drawn as a footpath a few pixels wide
+    // along their line, winding through whatever ground is either side.
+    char MlFootpath(int wx, int wy)
+    {
+        float lx = MlLx(wx + 0.5f), ly = MlLy(wy + 0.5f);
+        float d = Math.Min(PolyDist(lx, ly, MlTrail), PolyDist(lx, ly, MlLanes)) * MlS * T;
+        if (d < 2.6f + (VNoise(wx, wy, 5, 369) - 0.5f) * 2f) return 'p';
+        // Off the path: the ground most of the tiles round it are.
+        int tx = wx / T, ty = wy / T;
+        Span<char> seen = stackalloc char[8];
+        Span<int> count = stackalloc int[8];
+        int kinds = 0, best = -1;
+        for (int oy = -1; oy <= 1; oy++)
+            for (int ox = -1; ox <= 1; ox++)
+            {
+                char c = GroundAt(tx + ox, ty + oy);
+                if (c == 'p' || !Shore(c)) continue;
+                int k = 0;
+                while (k < kinds && seen[k] != c) k++;
+                if (k == kinds) { if (kinds == 8) continue; seen[kinds] = c; count[kinds++] = 0; }
+                count[k]++;
+                if (best < 0 || count[k] > count[best]) best = k;
+            }
+        return best < 0 ? 'g' : seen[best];
+    }
+
+    char CoastShape(int wx, int wy)
+    {
         int tx = wx / T, ty = wy / T, px = wx - tx * T, py = wy - ty * T;
         char g = GroundAt(tx, ty);
         bool land = Shore(g);
         if (!land && !Pool(g)) return g;
         int cx = px < T / 2 ? -1 : 1, cy = py < T / 2 ? -1 : 1;
         char a = GroundAt(tx + cx, ty), b = GroundAt(tx, ty + cy), c = GroundAt(tx + cx, ty + cy);
-        if (land ? !(Pool(a) && Pool(b) && Pool(c)) : !(Shore(a) && Shore(b) && Shore(c))) return g;
         float dx = px + 0.5f - T / 2f, dy = py + 0.5f - T / 2f;
-        return dx * dx + dy * dy <= T * T / 4f ? g : c;
+        // Water that only touches at a tile's corner (a creek running diagonally) flows on through it in a smooth channel,
+        // rather than showing as squares that meet at a point.
+        if (!land && Wet(g) && SameWater(g, c) && Shore(a) && Shore(b))
+        {
+            // Distance from the line joining this tile's middle to the diagonal tile's middle.
+            float off = MathF.Abs(dx * cy - dy * cx) / 1.4142f;
+            return off < ChannelHalf || dx * dx + dy * dy <= T * T / 4f ? g : (MathF.Abs(dx) > MathF.Abs(dy) ? a : b);
+        }
+        if (land && Wet(a) && SameWater(a, b) && Shore(c))
+        {
+            // The same corner seen from one of the two land tiles beside it: the channel cuts across its corner.
+            float ox = dx - cx * T / 2f, oy = dy - cy * T / 2f;   // from the shared corner
+            if (MathF.Abs(ox * cy + oy * cx) / 1.4142f < ChannelHalf) return a;
+        }
+        // Otherwise the coast is traced through the tile middles, eased, with a pixel of wobble: a straight shore stays on
+        // the tile edge, a corner comes out round and a staircase of tiles becomes a smooth slope. Anything that's neither
+        // land nor water (a dock, a rock in the shallows) counts as this tile's own kind, so nothing changes beside it.
+        float wob = (VNoise(wx, wy, 9, 367) - 0.5f) * 2.4f, wob2 = (VNoise(wx + 3000, wy, 9, 368) - 0.5f) * 2.4f;
+        float fx = (wx + 0.5f + wob) / T - 0.5f, fy = (wy + 0.5f + wob2) / T - 0.5f;
+        int x0 = (int)MathF.Floor(fx), y0 = (int)MathF.Floor(fy);
+        float ax = Ease(fx - x0), ay = Ease(fy - y0);
+        float Water(char t) => Pool(t) ? 1 : Shore(t) ? 0 : land ? 0 : 1;
+        char c00 = GroundAt(x0, y0), c10 = GroundAt(x0 + 1, y0), c01 = GroundAt(x0, y0 + 1), c11 = GroundAt(x0 + 1, y0 + 1);
+        float w00 = (1 - ax) * (1 - ay), w10 = ax * (1 - ay), w01 = (1 - ax) * ay, w11 = ax * ay;
+        float v = Water(c00) * w00 + Water(c10) * w10 + Water(c01) * w01 + Water(c11) * w11;
+        if (land ? v < 0.5f : v >= 0.5f) return g;
+        // This pixel goes over to the other side: it takes the ground (or water) of the nearest tile of that kind.
+        char best = g; float bw = -1;
+        void Try(char t, float w) { if ((land ? Pool(t) : Shore(t)) && w > bw) { bw = w; best = t; } }
+        Try(c00, w00); Try(c10, w10); Try(c01, w01); Try(c11, w11);
+        return best;
+    }
+    const float ChannelHalf = 4.2f;
+    // Two waters that join up through a corner: the same pond or lagoon, or both the sea.
+    static bool SameWater(char a, char b) => a == b || (SeaLike(a) && SeaLike(b) && Wet(a) && Wet(b));
+
+    // Smooth weights for blending between tile middles (bilinear, eased so corners come out round).
+    static float Ease(float t) => t * t * (3 - 2 * t);
+
+    // Where the shallows end. The sea's tiles are only shallow or deep, so the line between them used to step along
+    // the tile grid. Here it's traced through the tile middles instead, with a pixel or so of wobble: a straight run
+    // stays exactly on the tile edge, a staircase becomes a slope and a corner comes out round. It stays a sharp line
+    // (GroundPixel's ShallowRim), so the wading limit still reads.
+    char SeaShape(int wx, int wy, char s)
+    {
+        float warpX = (VNoise(wx, wy + 5000, 11, 361) - 0.5f) * 3f, warpY = (VNoise(wx + 5000, wy, 11, 362) - 0.5f) * 3f;
+        float fx = (wx + 0.5f + warpX) / T - 0.5f, fy = (wy + 0.5f + warpY) / T - 0.5f;
+        int x0 = (int)MathF.Floor(fx), y0 = (int)MathF.Floor(fy);
+        float ax = Ease(fx - x0), ay = Ease(fy - y0);
+        float Deep(int x, int y) => GroundAt(x, y) is '~' or 'd' or 'b' ? 1 : 0;
+        float v = (Deep(x0, y0) * (1 - ax) + Deep(x0 + 1, y0) * ax) * (1 - ay) + (Deep(x0, y0 + 1) * (1 - ax) + Deep(x0 + 1, y0 + 1) * ax) * ay;
+        // Only the sea's own two letters swap; a reef rock, a jetty or the ice keep theirs.
+        int tx = wx / T, ty = wy / T;
+        if (GroundAt(tx, ty) is not ('w' or '~')) return s;
+        return v >= 0.5f ? '~' : 'w';
+    }
+
+    // Which ground a land pixel shows. Each tile's ground fills its middle, and between tile middles the grounds blend
+    // the same eased way as the shallows, with a ragged edge from two scales of noise, so grass meets sand, a forest
+    // meets a meadow and a path wanders in soft curves instead of along the tile grid. A stronger ground (Prio) wins a
+    // little more than half the way.
+    char GroundShape(int wx, int wy, char s)
+    {
+        // The sampling point wanders a few pixels (two scales), so long straight runs of tiles become gentle waves.
+        float warpX = (VNoise(wx, wy + 7000, 17, 363) - 0.5f) * 8f + (VNoise(wx, wy + 7000, 6, 365) - 0.5f) * 3f;
+        float warpY = (VNoise(wx + 7000, wy, 17, 364) - 0.5f) * 8f + (VNoise(wx + 7000, wy, 6, 366) - 0.5f) * 3f;
+        float fx = (wx + 0.5f + warpX) / T - 0.5f, fy = (wy + 0.5f + warpY) / T - 0.5f;
+        int x0 = (int)MathF.Floor(fx), y0 = (int)MathF.Floor(fy);
+        float ax = Ease(fx - x0), ay = Ease(fy - y0);
+        Span<char> gs = stackalloc char[4];
+        Span<float> ws = stackalloc float[4];
+        gs[0] = GroundAt(x0, y0); ws[0] = (1 - ax) * (1 - ay);
+        gs[1] = GroundAt(x0 + 1, y0); ws[1] = ax * (1 - ay);
+        gs[2] = GroundAt(x0, y0 + 1); ws[2] = (1 - ax) * ay;
+        gs[3] = GroundAt(x0 + 1, y0 + 1); ws[3] = ax * ay;
+        // All one ground (or only water besides): nothing to blend.
+        bool mixed = false;
+        for (int i = 0; i < 4; i++) if (Shore(gs[i]) && gs[i] != s) { mixed = true; break; }
+        if (!mixed) return s;
+        char best = s; float bestScore = float.MinValue;
+        for (int i = 0; i < 4; i++)
+        {
+            char g = gs[i];
+            if (!Shore(g)) continue;
+            float w = 0;
+            for (int j = 0; j < 4; j++) if (gs[j] == g) w += ws[j];
+            float n = (VNoise(wx, wy, 5, 370 + g) - 0.5f) * 0.3f + (VNoise(wx, wy, 2, 380 + g) - 0.5f) * 0.16f;
+            float score = w + n + Prio(g) * 0.025f;
+            if (score > bestScore) { bestScore = score; best = g; }
+        }
+        return best;
     }
 
     void ShapeTile(int x, int y)
     {
+        // A tile among eight of the same can't take anything from its neighbours (every blend and wobble above reaches
+        // less than a tile), so it's filled straight away; that's most of the map, and keeps the bake quick.
+        char g = GroundAt(x, y);
+        bool same = !(g == 'p' && x >= MlStart);
+        for (int oy = -1; oy <= 1 && same; oy++)
+            for (int ox = -1; ox <= 1 && same; ox++) same = GroundAt(x + ox, y + oy) == g;
+        if (same)
+        {
+            for (int py = 0; py < T; py++) Array.Fill(shape, g, (y * T + py) * PW + x * T, T);
+            return;
+        }
         for (int py = 0; py < T; py++)
             for (int px = 0; px < T; px++) shape[(y * T + py) * PW + x * T + px] = ShapeAt(x * T + px, y * T + py);
     }
@@ -128,6 +265,17 @@ partial class Game
         for (int y = 0; y < ROWS; y++)
             for (int x = 0; x < COLS; x++)
                 if (dist[y, x] > 0) depth[y, x] = 1 + dist[y, x];
+        // The same chamfer distance the other way: how far each land tile is from any water.
+        for (int y = 0; y < ROWS; y++)
+            for (int x = 0; x < COLS; x++) dist[y, x] = Shore(GroundAt(x, y)) ? Far : 0;
+        for (int y = 0; y < ROWS; y++)
+            for (int x = 0; x < COLS; x++)
+                dist[y, x] = MathF.Min(dist[y, x], MathF.Min(MathF.Min(At(x - 1, y) + 1, At(x, y - 1) + 1), MathF.Min(At(x - 1, y - 1) + Diag, At(x + 1, y - 1) + Diag)));
+        for (int y = ROWS - 1; y >= 0; y--)
+            for (int x = COLS - 1; x >= 0; x--)
+                dist[y, x] = MathF.Min(dist[y, x], MathF.Min(MathF.Min(At(x + 1, y) + 1, At(x, y + 1) + 1), MathF.Min(At(x + 1, y + 1) + Diag, At(x - 1, y + 1) + Diag)));
+        for (int y = 0; y < ROWS; y++)
+            for (int x = 0; x < COLS; x++) landDist[y, x] = dist[y, x] >= Far ? 0 : dist[y, x];
     }
 
     // Depth at a pixel, blended between tile centres so the water shades off smoothly.
@@ -168,17 +316,7 @@ partial class Game
         }
         if (PondTones.TryGetValue(g, out var pond)) return RampAt(pond, DepthAt(wx, wy), wx, wy);
         if (!GroundTones.TryGetValue(g, out var tones)) return Pal.C(TileCol.TryGetValue(g, out var tc) ? tc.Item1 : "#e8cf96");
-        int tx = wx / T, ty = wy / T, px = wx - tx * T, py = wy - ty * T;
-        // A stronger ground creeps a ragged few pixels into the one beside it.
-        int p = Prio(g);
-        if (p > 0 && g == GroundAt(tx, ty))
-        {
-            char n = Creep(tx + 1, ty, T - 1 - px, wy, (tx + 1) * T, p);
-            if (n == '\0') n = Creep(tx - 1, ty, px, wy, tx * T, p);
-            if (n == '\0') n = Creep(tx, ty + 1, T - 1 - py, wx, (ty + 1) * T + 9000, p);
-            if (n == '\0') n = Creep(tx, ty - 1, py, wx, ty * T + 9000, p);
-            if (n != '\0') { g = n; tones = GroundTones[n]; }
-        }
+        int tx = wx / T;
         if (Shore(g) && WetEdge.TryGetValue(g, out var wet)
             && (Pool(ShapePx(wx + 1, wy)) || Pool(ShapePx(wx - 1, wy)) || Pool(ShapePx(wx, wy + 1)) || Pool(ShapePx(wx, wy - 1)))) return wet;
         float v = VNoise(wx, wy, 26, 170) * 0.65f + VNoise(wx, wy, 8, 171) * 0.35f + (BayerAt(wx, wy) - 0.5f) * 0.16f;
@@ -187,19 +325,82 @@ partial class Game
         if (tx >= MlStart)
         {
             float shade = MlShade(wx, wy);
-            v += shade;
-            if (v < 0.1f && shade < -0.2f) return Pix.Mix(tones[0], Pal.C("#1f2f2a"), 0.22f);
+            v += shade * 0.6f;
+            var c = tones[v < 0.38f ? 0 : v > 0.62f ? 2 : 1];
+            return MlRelief(wx, wy, g, c, shade);
         }
-        return tones[v < 0.38f ? 0 : v > 0.62f ? 2 : 1];
+        // Everywhere else the islands rise gently from their shores into low rolling ground, lit the same way.
+        float isle = IsleShade(wx, wy);
+        v += isle * 0.5f;
+        var col = tones[v < 0.38f ? 0 : v > 0.62f ? 2 : 1];
+        return isle > 0 ? Pix.Mix(col, ReliefLight, isle * 0.4f) : Pix.Mix(col, ReliefShadow, -isle * 0.55f);
     }
 
-    // The neighbouring ground if it reaches this far (d pixels from the shared edge, along a ragged line) into a ground
-    // of priority p; otherwise '\0'.
-    char Creep(int nx, int ny, int d, int along, int line, int p)
+    // How far each land tile is from water (tiles), for the islands' gentle rise (ComputeDepth fills it).
+    readonly float[,] landDist = new float[ROWS, COLS];
+
+    // The height of the land at a pixel: rising from the shore and levelling off inland, with broad low swells.
+    float IsleHeight(float wx, float wy)
     {
-        if (d > 3) return '\0';
-        char n = GroundAt(nx, ny);
-        return Prio(n) > p && d < (int)(VNoise(along, line, 4, 181) * 4.2f) ? n : '\0';
+        float fx = wx / T - 0.5f, fy = wy / T - 0.5f;
+        int x0 = (int)MathF.Floor(fx), y0 = (int)MathF.Floor(fy);
+        float ax = fx - x0, ay = fy - y0;
+        float D(int x, int y) => landDist[Math.Clamp(y, 0, ROWS - 1), Math.Clamp(x, 0, COLS - 1)];
+        float d = (D(x0, y0) * (1 - ax) + D(x0 + 1, y0) * ax) * (1 - ay) + (D(x0, y0 + 1) * (1 - ax) + D(x0 + 1, y0 + 1) * ax) * ay;
+        float rise = 1 - MathF.Exp(-d / 3.2f);
+        return rise + (VNoise((int)wx, (int)wy, 70, 750) - 0.5f) * 0.9f * Math.Min(1, d / 5);
+    }
+
+    // Light from the north-west on that height, -0.3 to 0.3.
+    float IsleShade(int wx, int wy)
+    {
+        const float e = 4;
+        float gx = (IsleHeight(wx + e, wy) - IsleHeight(wx - e, wy)) / (2 * e), gy = (IsleHeight(wx, wy + e) - IsleHeight(wx, wy - e)) / (2 * e);
+        return Math.Clamp((gx + gy) * 9f, -0.3f, 0.3f);
+    }
+
+    /* ---------- Relief ---------- */
+    // Marilaya's hills in 3/4 view: slopes facing the light (north-west) warm and lighter, slopes facing away cool and
+    // darker, and the height cut into a few broken steps. Where a step's edge faces you (the higher ground to the north)
+    // there's a low rock face under a lit rim; where it faces away, only a soft dark line. They're only paint: you can
+    // walk over them as before, and where the trail crosses one it's cut into steps.
+    static readonly Color ReliefLight = Pal.C("#fff1b8"), ReliefShadow = Pal.C("#173548");
+    static readonly Color[] LedgeFace = Tones("#8e8068", "#776a55", "#5f5444", "#4b4237");
+    static readonly Color[] LedgeFaceRock = Tones("#a8a294", "#8f897c", "#767165", "#5d5950");
+    static readonly Color[] LedgeStairs = Tones("#d8c294", "#a88d62");
+    const int LedgeLevels = 5, LedgeFaceH = 3;
+
+    static float ReliefHeight(int wx, int wy) => MlHeight(MlLx(wx + 0.5f), MlLy(wy + 0.5f)) + (VNoise(wx, wy, 23, 720) - 0.5f) * 0.06f;
+    static int LedgeLevel(float h) => h < 0.16f ? 0 : 1 + (int)((h - 0.16f) * LedgeLevels / 0.84f);
+    // Not every step has a face all the way round: they come and go, so it reads as ground, not a wedding cake.
+    static bool LedgeOn(int wx, int wy, int level) => VNoise(wx, wy, 34, 730 + level) > 0.5f;
+
+    Color MlRelief(int wx, int wy, char g, Color c, float shade)
+    {
+        c = shade > 0 ? Pix.Mix(c, ReliefLight, shade * 0.55f) : Pix.Mix(c, ReliefShadow, -shade * 0.8f);
+        if (g == 's') return c;
+        float h0 = ReliefHeight(wx, wy);
+        // High ground a touch lighter and cooler, as if nearer the sky.
+        if (h0 > 0.3f) c = Pix.Mix(c, Pal.C("#dfe8d8"), Math.Min(0.14f, (h0 - 0.3f) * 0.25f));
+        if (h0 < 0.1f) return c;
+        int l0 = LedgeLevel(h0);
+        // A face: the ground a pixel or three to the north is a step higher.
+        for (int k = 1; k <= LedgeFaceH; k++)
+        {
+            int lu = LedgeLevel(ReliefHeight(wx, wy - k));
+            if (lu <= l0 || !LedgeOn(wx, wy - k, lu) || !Shore(ShapePx(wx, wy - k))) continue;
+            if (g == 'p') return LedgeStairs[(wy - k) % 2 == 0 ? 0 : 1];
+            var face = g == 'e' || ShapePx(wx, wy - k) == 'e' ? LedgeFaceRock : LedgeFace;
+            var fc = face[Math.Min(face.Length - 1, k - 1 + ((Pix.Hash(wx, wy, 741) < 0.18) ? 1 : 0))];
+            return shade > 0 ? Pix.Mix(fc, ReliefLight, shade * 0.25f) : Pix.Mix(fc, ReliefShadow, -shade * 0.35f);
+        }
+        // Shadow at the foot of a face.
+        int lf = LedgeLevel(ReliefHeight(wx, wy - LedgeFaceH - 1));
+        if (lf > l0 && LedgeOn(wx, wy - LedgeFaceH - 1, lf)) return Pix.Mix(c, ReliefShadow, 0.3f);
+        // The lit rim along the top of a face.
+        int ld = LedgeLevel(ReliefHeight(wx, wy + 1));
+        if (ld < l0 && LedgeOn(wx, wy, l0)) return g == 'p' ? LedgeStairs[0] : Pix.Mix(c, ReliefLight, 0.32f);
+        return c;
     }
 
     void PaintGround(int x, int y)
@@ -215,7 +416,23 @@ partial class Game
 
     // Small things baked into the ground in clusters: flowers, shells, pebbles, dune ripples, snow glints.
     // Everything stays inside the tile's middle 8x8 so it never pokes out into a rounded-off corner.
+    // Details stay on their own ground: anything that landed where a neighbouring ground has blended in is painted over
+    // with that ground again.
     void PaintGroundDetail(int x, int y, char t)
+    {
+        PaintGroundDetailRaw(x, y, t);
+        char own = Ground(t, x, y);
+        if (!Shore(own)) return;
+        for (int py = 0; py < T; py++)
+            for (int px = 0; px < T; px++)
+            {
+                int wx = x * T + px, wy = y * T + py;
+                char s = shape[wy * PW + wx];
+                if (s != own) worldBase.Buf[wy * worldBase.W + wx] = GroundPixel(wx, wy, s);
+            }
+    }
+
+    void PaintGroundDetailRaw(int x, int y, char t)
     {
         var g = worldBase;
         int X = x * T, Y = y * T;
@@ -259,6 +476,13 @@ partial class Game
                 else if (h < 0.3) { g.Rect(X + 1, Y + ay, 5, 1, "#d3e0e8"); g.Rect(X + 2, Y + ay - 1, 3, 1, "#ffffff"); }
                 break;
             case 'e':
+                if (x >= MlStart)
+                {
+                    // Scree on Marilaya's high rock: loose stones, each lit on top with a shadow under it, and cracks.
+                    if (h < 0.45) { g.Rect(X + ax, Y + ay, 3, 2, "#9a958a"); g.Rect(X + ax, Y + ay, 2, 1, "#d9d4c7"); g.Rect(X + ax, Y + ay + 2, 3, 1, "#7a766c"); }
+                    if (h2 < 0.3) { g.Rect(X + 2 + (int)(h2 * 10), Y + 6, 1, 1, "#8a857a"); g.Rect(X + 3 + (int)(h2 * 10), Y + 7, 2, 1, "#8a857a"); }
+                    break;
+                }
                 if (h < 0.25) { g.Rect(X + ax, Y + ay, 2, 1, "#8f8a7e"); g.Rect(X + ax + 1, Y + ay - 1, 1, 1, "#d4cfc2"); }
                 break;
             case 'i':
@@ -358,12 +582,15 @@ partial class Game
                 bool tuft = g switch { 'g' => h < 0.38, 'j' => h < 0.45, 'D' => h < 0.06, 's' => bi is 0 or 4 or 6 && h < 0.04, _ => false };
                 if (!tuft || BuildAt(x, y) != null) continue;
                 int bx = x * T + 2 + (int)(Pix.Hash(x, y, 151) * 6), by = y * T + 4 + (int)(Pix.Hash(x, y, 152) * 5);
-                int s = (int)MathF.Round(MathF.Sin(t * wind + bx * 0.21f + by * 0.17f) * amp);
+                // A gust (Ambience.cs) flattens the grass the way it's blowing, and its tips catch the light.
+                float gust = Gust(bx, by);
+                int s = (int)MathF.Round(MathF.Sin(t * wind + bx * 0.21f + by * 0.17f) * amp * (1 + gust) + gust * 2.2f);
                 if (MathF.Abs(player.X - bx) < 6 && MathF.Abs(player.Y - by) < 4 && scene == "world") s = player.X < bx ? 2 : -2;
                 var (dark, light) = g switch
                 {
                     'j' => ("#2f6a2e", "#5fae4c"), 'D' => ("#b8904a", "#dcb66c"), 's' => ("#9fae72", "#c6cf98"), _ => ("#3f7a32", "#7cbf5a")
                 };
+                if (gust > 0.55f) light = g switch { 'j' => "#86c86a", 'D' => "#ecd08e", 's' => "#dde3b4", _ => "#a6dc80" };
                 bool flower = g == 'g' && h < 0.05;
                 if (flower)
                 {
@@ -487,6 +714,8 @@ partial class Game
         if (live && chopTile == (tx, ty) && shakeT > 0) X += (int)MathF.Round(MathF.Sin(time * 70) * 1.5f);
         int bx = X + 5, by = Y + 9, sw = kind is 't' or 'f' or 'h' ? Sway(tx, ty) : 0;
         float s = 0.9f + 0.2f * (float)Pix.Hash(tx, ty, 61);
+        // Higher up Marilaya's hills the trees grow smaller, so the slope shows between them.
+        if (tx >= MlStart) s *= 1 - 0.3f * Math.Clamp((MlHeight(MlLx(X + 5), MlLy(Y + 5)) - 0.28f) / 0.35f, 0, 1);
         int m = Pix.Hash(tx, ty, 62) < 0.5 ? 1 : -1;
         var (height, half) = kind switch { 't' => (30, 12), 'f' => (31, 9), 'h' => (30, 12), 'c' => (21, 7), _ => (0, 0) };
         bool Hides(float x, float y) => y < by - 1 && y > by - height && MathF.Abs(x - bx) < half;
@@ -515,9 +744,10 @@ partial class Game
 
     void DrawOak(int tx, int ty, int bx, int by, int sw, float s, int m)
     {
-        pix.Rect(bx - 2, by - 14, 4, 14, Bark);
-        pix.Rect(bx - 2, by - 14, 1, 14, BarkLight);
-        pix.Rect(bx + 1, by - 14, 1, 14, BarkDark);
+        int trunk = (int)MathF.Round(14 * s);
+        pix.Rect(bx - 2, by - trunk, 4, trunk, Bark);
+        pix.Rect(bx - 2, by - trunk, 1, trunk, BarkLight);
+        pix.Rect(bx + 1, by - trunk, 1, trunk, BarkDark);
         pix.Rect(bx - 3, by - 2, 6, 2, Bark); pix.Rect(bx - 3, by - 2, 1, 1, BarkLight);
         pix.Rect(bx - 4, by - 1, 1, 1, BarkDark); pix.Rect(bx + 3, by - 1, 1, 1, BarkDark);
         float cy = by - 17 * s, r = 7.5f * s;

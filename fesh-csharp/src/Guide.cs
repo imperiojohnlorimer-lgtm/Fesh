@@ -35,7 +35,7 @@ partial class Game
     int journalPage;
     float guideCardBottom;            // where the HUD card ended (edge arrows keep below it)
     (string spot, float px, float py, float x, float y) seaPointCache = ("", 0, 0, 0, 0);
-    const float CardX = 13, CardY = 99, CardW = 372;
+    const float CardX = HudX, CardY = HudY + HudH + 8, CardW = HudW;
     const int JournalRows = 5;
 
     bool GuideOn => Settings.Data.guide;
@@ -611,7 +611,7 @@ partial class Game
         {
             // Just done: a moment of green before the next goal.
             var done = Gfx.Wrap(goalDoneTitle, FontKind.Ui600, 16, w - 2 * pad);
-            float dh = pad + 20 + done.Count * 20 + pad - 4;
+            float dh = Math.Max(pad + 20 + done.Count * 20 + pad - 4, pad + 22 + 3 * 19 + pad - 2);
             Gfx.Box(x, y, w, dh, Pal.C("rgba(32,90,48,0.92)"), Pal.C("#7fd36b"), 2, 5);
             Gfx.Text("Goal done!", x + pad, y + pad - 2, FontKind.Ui700, 17, Pal.C("#bff2b0"));
             Lines(done, x + pad, y + pad + 20, 20, FontKind.Ui600, 16, Pal.Paper);
@@ -630,7 +630,8 @@ partial class Game
         var how = guideWay?.How is string hw ? Gfx.Wrap(Bind.Fix(hw), FontKind.Ui600, 15, w - 2 * pad - 16) : new List<string>();
         string dist = guideWay != null ? $"{(int)MathF.Round(Dist(player.X, player.Y, guideWay.X, guideWay.Y) * 0.15f)} m" : "";
         float distW = dist == "" ? 0 : Gfx.Measure(dist, FontKind.Ui600, 15) + 10;
-        float h = pad + 22 + text.Count * 19 + (how.Count > 0 ? 6 + how.Count * 19 : 0) + pad - 2;
+        // Always room for three lines of text, so the card keeps its size from one goal to the next.
+        float h = pad + 22 + Math.Max(3, text.Count) * 19 + (how.Count > 0 ? 6 + how.Count * 19 : 0) + pad - 2;
         bool hover = Gfx.Hover(x, y, w, h) && mode == "play";
         Gfx.Box(x, y, w, h, NavyStrong, hover ? Pal.Lantern : Pal.C("rgba(243,194,91,0.55)"), 2, 5);
         // A little gold marker, like the one over the goal.
@@ -640,7 +641,7 @@ partial class Game
         if (dist != "") Gfx.Text(dist, x + w - pad - distW + 10, y + pad, FontKind.Ui600, 15, Pal.C("#9fc3d1"));
         float ty = y + pad + 22;
         Lines(text, x + pad, ty, 19, FontKind.Ui500, 15, Pal.Paper);
-        ty += text.Count * 19;
+        ty += Math.Max(3, text.Count) * 19;
         if (how.Count > 0)
         {
             ty += 6;
@@ -704,16 +705,17 @@ partial class Game
         if (!(sx > 30 && sx < Gfx.LW - 30 && sy > 90 && sy < Gfx.LH - 40)) return null;
         // Both chevrons and the bob: pointing down it reaches 18 px above its y and 11 below; pointing up, the reverse.
         bool OnCard(float y, bool up) => guideCardBottom > 0 && sx > CardX - 14 && sx < CardX + CardW + 14
-            && y + (up ? 18 : 11) > CardY - 4 && y - (up ? 11 : 18) < guideCardBottom + 4;
+            && y + (up ? 18 : 11) > CardY - 4 && y - (up ? 11 : 18) < guideCardBottom + 4
+            || sx > HudX - 14 && sx < HudX + HudW + 14 && y - (up ? 11 : 18) < HudY + HudH + 4;
         if (!OnCard(sy - 76, false)) return (sx, sy - 76, false);
         if (!OnCard(sy + 26, true)) return (sx, sy + 26, true);
-        return (sx, guideCardBottom + 16, true);
+        return (sx, MathF.Max(guideCardBottom, HudY + HudH) + 16, true);
     }
 
     // Where the line from the middle of the view leaves it, inset from the edges, and kept below the HUD card.
     (float x, float y) EdgePoint(float cx, float cy, float ux, float uy)
     {
-        float top = 100, t = float.MaxValue;
+        float top = HudY + HudH + 12, t = float.MaxValue;
         if (ux > 0) t = MathF.Min(t, (Gfx.LW - 46 - cx) / ux); else if (ux < 0) t = MathF.Min(t, (46 - cx) / ux);
         // Above the hotbar along the bottom (1.20), with room for the label under a sideways arrow.
         float bottom = MathF.Min(Gfx.LH - 80, HotbarShown && lastHotbarTop > 0 ? lastHotbarTop - 56 : Gfx.LH);
@@ -784,15 +786,11 @@ partial class Game
     /* ---------- The journal ---------- */
     void DrawJournal()
     {
-        Backdrop();
-        const float cw = 1120, ch = 650, pad = 24;
-        float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Journal", x + pad, y + pad, FontKind.Ui700, 36, Pal.PaperInk);
-        Gfx.Text("Where to go next. Follow a goal and the arrow points the way.", x + pad, y + pad + 46, FontKind.Note, 18, Muted);
-        if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) { ClosePanels(); return; }
+        const float pad = 24;
+        var (x, y, cw, ch) = PanelFrame("Journal", "Where to go next. Follow a goal and the arrow points the way.");
+        if (PanelClose()) { ClosePanels(); return; }
         string toggle = GuideOn ? "Hide the arrow" : "Show the arrow";
-        if (SmallButton(toggle, x + cw - pad - SmallW("Close") - 12 - SmallW(toggle), y + pad - 2))
+        if (SmallButton(toggle, PanelCloseX - 12 - SmallW(toggle), y + pad - 6))
         {
             Settings.Data.guide = !Settings.Data.guide;
             Settings.Save();

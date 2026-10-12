@@ -252,16 +252,13 @@ partial class Game
 
     void DrawAtlas()
     {
-        Backdrop();
         // A fish's card (click one under "Fish here") or the drawing made big, in place of the page.
-        if (dexFish != null) { DrawFishCard(); return; }
-        if (atlasZoom) { DrawAtlasZoom(); return; }
-        const float w = 1200, h = 664, pad = 22;
-        float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Island guide", x + pad, y + pad - 4, FontKind.Ui700, 30, Pal.PaperInk);
-        if (SmallButton("Close", x + w - pad - SmallW("Close"), y + pad - 6)) { ClosePanels(); return; }
-        if (SmallButton("Fish album", x + w - pad - SmallW("Close") - 12 - SmallW("Fish album"), y + pad - 6)) { OpenAlbum(); return; }
+        if (dexFish != null) { Backdrop(); DrawFishCard(); return; }
+        if (atlasZoom) { Backdrop(); DrawAtlasZoom(); return; }
+        const float pad = 22;
+        var (x, y, w, h) = PanelFrame("Island guide", null, 1200, 664);
+        if (PanelClose()) { ClosePanels(); return; }
+        if (SmallButton("Fish album", PanelCloseX - 12 - SmallW("Fish album"), y + PanelPad - 6)) { OpenAlbum(); return; }
 
         // The list of places down the left: the ones you've found by name, the rest as uncharted.
         float lx = x + pad, ly = y + pad + 44, lw = 220;

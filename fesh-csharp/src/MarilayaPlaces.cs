@@ -211,19 +211,30 @@ partial class Game
     void DrawTindigTop()
     {
         int x0 = (int)TindigX, y0 = (int)TindigY;
-        for (int j = -7; j <= 7; j++)
-            for (int i = -11; i <= 11; i++)
+        // An old crater, seen from above in the same light as the hills: the rim catches the sun on its north-west side,
+        // the far inner wall faces you, and the floor is grassed over.
+        for (int j = -8; j <= 8; j++)
+            for (int i = -12; i <= 12; i++)
             {
-                float d = i * i / 121f + j * j / 49f;
+                float d = i * i / 144f + j * j / 64f;
                 if (d > 1) continue;
-                string c = d > 0.72f ? (j < 0 ? "#cfc9bc" : "#9d978b") : d > 0.5f ? (j < 0 ? "#8a857a" : "#b3ad9f") : (Pix.Hash(x0 + i, y0 + j, 931) < .5 ? "#6f9a4e" : "#5f8a44");
+                float lit = -(i * 0.6f + j) / 9f;   // + toward the north-west
+                string c;
+                if (d > 0.74f) c = lit > 0.25f ? "#dcd6c8" : lit > -0.3f ? "#b9b3a5" : "#8e897d";
+                else if (d > 0.5f) c = j < 0 ? (lit > 0.3f ? "#8d887c" : "#a39d90") : "#7a766b";
+                else c = Pix.Hash(x0 + i, y0 + j, 931) < .5 ? "#6f9a4e" : (j > 2 ? "#557d3e" : "#628c46");
                 pix.Rect(x0 + i, y0 + j, 1, 1, c);
             }
-        // A wisp of cloud catching on the summit some days.
+        // Moss and a few stones on the crater floor.
+        pix.Rect(x0 - 3, y0 + 1, 2, 1, "#8ab868"); pix.Rect(x0 + 3, y0 - 1, 2, 1, "#8ab868");
+        pix.Rect(x0 + 1, y0 + 2, 2, 1, "#9a958a"); pix.Rect(x0 + 1, y0 + 2, 1, 1, "#d9d4c7");
+        // A wisp of cloud catching on the summit some days, drifting through and thinning out.
         if ((state.day + (int)(time / 40)) % 3 == 0)
         {
-            int dx = (int)(MathF.Sin(time * 0.2f) * 3);
-            pix.Rect(x0 - 16 + dx, y0 - 16, 20, 2, "rgba(255,255,255,0.5)"); pix.Rect(x0 - 10 + dx, y0 - 18, 12, 2, "rgba(255,255,255,0.4)");
+            float k = time % 40 / 40f, fade = MathF.Sin(k * MathF.PI);
+            int dx = (int)(-20 + k * 40);
+            var c1 = Pal.Rgba(255, 255, 255, 0.45f * fade); var c2 = Pal.Rgba(255, 255, 255, 0.3f * fade);
+            pix.Rect(x0 - 16 + dx, y0 - 16, 20, 2, c1); pix.Rect(x0 - 10 + dx, y0 - 18, 12, 2, c2); pix.Rect(x0 - 20 + dx, y0 - 14, 9, 1, c2);
         }
     }
 

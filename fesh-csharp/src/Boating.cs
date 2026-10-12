@@ -293,7 +293,7 @@ partial class Game
             string glance = !fishing && !underWay && idleT > 3 && (idleT - 3) % 7 < 1 ? (player.Face == "left" ? "down" : player.Face == "down" ? "right" : "down") : null;
             if (!blinkHit)
             {
-                LookData.DrawPerson(pix, state.look, sx, sy, player.Face, 0, shadow: false, blink: time % 3.7f < 0.12f,
+                LookData.DrawPerson(pix, state.look, sx, sy, player.Face, 0, shadow: false, idle: false, blink: time % 3.7f < 0.12f,
                     arms: holding ? 2 : fishing ? 3 : 0, swing: pump, head: glance);
                 if (!endOn) R(-5, -1, 5, 2, LookData.Pants[state.look.pants % LookData.Pants.Length]);
             }

@@ -449,6 +449,8 @@ partial class Game
         char g = FlatOpen(ftx, fty) ? 's' : TileAt(ftx, fty);
         string col = g switch { 's' or 'p' => "#d8bb7e", 'D' => "#d9a457", 'n' or 'i' => "#ffffff", 'e' => "#a19c90", _ => Wadeable(g) || Riding && Swimmable(g) ? "#cfe8ee" : null };
         if (col == null || scene != "world") return;
+        // Boots leave prints in sand and snow that fade after a while (Ambience.cs).
+        if (!Riding && g is 's' or 'D' or 'n') AddFootprint(g == 'n');
         // Hooves kick up a lot more than boots do.
         for (int i = 0; i < (Riding ? 4 : 2); i++)
             particles.Add(new Particle { X = player.X + Rand(-2, 2), Y = player.Y, Vx = Rand(-10, 10), Vy = Rand(-22, -10), Life = Rand(0.18f, 0.3f), Color = col });

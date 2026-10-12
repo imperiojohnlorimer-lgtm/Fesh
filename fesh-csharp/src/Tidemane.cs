@@ -44,7 +44,7 @@ partial class Game
         if (StarwellFound || scene != "world" || Dist(player.X, player.Y, StarwellX, StarwellY) > GladeR * T - 6) return;
         state.hinted["starwell"] = true;
         Sfx.Play("odd");
-        Toast("A hidden pool ringed by palms: the Starwell. The trackPrints run right up to the water, and stop.", 5);
+        Toast("A hidden pool ringed by palms: the Starwell. The hoofprints run right up to the water, and stop.", 5);
         Save();
     }
 
@@ -1121,7 +1121,7 @@ partial class Game
             float k = 1 - hopT / HopUp;
             seat = ((int)MathF.Round(hopFromX + (seat.x - hopFromX) * k), (int)MathF.Round(hopFromY + (seat.y - hopFromY) * k - MathF.Sin(k * MathF.PI) * 5));
         }
-        void Rider() => LookData.DrawPerson(pix, state.look, seat.x, seat.y, player.Face, 0, shadow: false,
+        void Rider() => LookData.DrawPerson(pix, state.look, seat.x, seat.y, player.Face, 0, shadow: false, idle: false,
             blink: time % 3.7f < 0.12f, arms: arms, swing: pump, lean: lean, hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
         if (player.Face is "up" or "down")
         {
@@ -1266,6 +1266,7 @@ partial class Game
     void DrawMountGround()
     {
         mountGlints.Clear();
+        DrawFootprints();
         foreach (var (hx, hy, life, dir) in trackPrints)
         {
             var c = Pal.Rgba(60, 44, 24, 0.22f * Math.Min(1, life / 1.5f));
