@@ -184,7 +184,8 @@ Everything you catch is tracked in the Fesh-dex's **Fish log**, island by island
 - The map opens on the chart you're on (Saltmere, which also shows the Habagat islands along its bottom, or Amihan). On the other chart, an arrow at the edge shows which way
   you are.
 - Islands are only **charted** once you set foot on them; until then they're a rough outline, with no spots marked.
-- Labels move apart instead of piling up, with a short line back to their dot when they have to.
+- The chart is drawn on parchment in a frame, with a faint grid and a compass; a narrow chart (Marilaya) has a key beside it.
+- Labels move apart instead of piling up, each on a soft dark plate, with a short line back to their dot when they have to. Where there's no room, a person's or a small place's name waits until you point at its dot.
 - **Hover a dot** to see what's there: whether a spot is open (and why not), how many of its fish you've caught, and
   what's biting there now; Pip's hours; whether your crab pots are ready; where Tidemane and your boat are waiting.
 - **Click the chart to drop a pin.** An arrow at the edge of the view points to it with the distance, and it goes
@@ -673,6 +674,13 @@ coelacanth meets Platejaw the same way.
 Platejaw is made up, but it's based on a real fish: **Dunkleosteus**, an armoured placoderm that lived about 380 to
 360 million years ago. Its card on the Fish log's last page tells you about it.
 
+## How it looks
+- Coasts, the edge of the shallows and the borders between grass, sand, forest and snow follow smooth, natural curves rather than the square grid underneath; creeks flow on through tile corners. You still wade, walk and build exactly where you could before.
+- Every island rises gently from its shore, lit from the north-west. Marilaya's hills are shaded properly, and Bundok Tindig climbs through thinning forest and a band of meadow to bare rock and scree, with low rock ledges (only scenery: they never block you) and a footpath winding up to the crater.
+- The world moves: gusts of wind across the grass and trees, waves washing up the beaches, light playing in the shallows, sun glinting on the sea, mist in the early morning, beams of light at sunrise and sunset, rain splashing, footprints in sand and snow, fish leaping now and then, and animals curling up to sleep at night.
+- Villagers blink and glance about, and some sweep their yards or mend nets by day. In the evening their windows glow, and on clear nights the moon leaves a path of light on the sea.
+- The HUD keeps one card of the same size in the corner (the time and weather, coins, where you are, health and food), with your goal underneath; the big panels share one frame with Close in the same place.
+
 ## Music
 Every island has its own looping tune, and so do Frostfang Caverns, the insides of houses and the fights with
 Tidemane and Platejaw. Rain adds its own patter. Like the sound effects, the music is composed by code at startup, so there are
@@ -867,7 +875,7 @@ Set `FESH_DIRECTION_TEST=1` alongside `FESH_AUTOTEST` and `FESH_SAVE` to run onl
 `FESH_GUSO_TEST=1` for only the guso farm and Bakawan's night lights, `FESH_GUIDE_TEST=1` for only the guide, the
 journal, the aquarium's layout and the real-fish notes, `FESH_EDU_TEST=1` for only the Sea school (tides, letting
 fish go, sorting crabs and Ma'am Isay's class), `FESH_ATLAS_TEST=1` for only the island guide and the fish album, or `FESH_MARILAYA_TEST=1` for only Marilaya and story 5;
-the full play-through includes them too.
+the full play-through includes them too. `FESH_SCENIC=1` saves a screenshot tour of every island (the world view alone at 4x, by day, at night, in rain, mist and sunset, then the HUD and panels) and runs the graphics checks; `FESH_SCENIC=checks` runs only the checks.
 
 Fonts: Pixelify Sans, Special Elite and Atkinson Hyperlegible (the Clear font, © Braille Institute of America; its
 licence is in `Assets/Fonts/AtkinsonHyperlegible-OFL.txt`), all under the SIL Open Font License.
