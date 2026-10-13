@@ -534,48 +534,11 @@ partial class Game
     // zone, the channel, and the three places to decide about.
     void DrawBagaMap(float mx, float my, float mw, float mh, LaharWatch w)
     {
-        const float wx0 = 2180, wy0 = 312;
-        float s = Math.Min(mw / 250, mh / 205);
+        const float wx0 = LaharMapX0, wy0 = LaharMapY0, s = 2;
         (float, float) P(float wx, float wy) => (mx + (wx - wx0) * s, my + (wy - wy0) * s);
-        Gfx.Rect(mx, my, mw, mh, Pal.C("#2f6f98"), 6);
-        var clip = Gfx.S(mx, my, mw, mh);
-        Raylib.BeginScissorMode((int)clip.X, (int)clip.Y, (int)MathF.Ceiling(clip.Width), (int)MathF.Ceiling(clip.Height));
-        try
-        {
-            for (int ty = (int)(wy0 / T); ty <= (int)((wy0 + mh / s) / T); ty++)
-                for (int tx = (int)(wx0 / T); tx <= (int)((wx0 + mw / s) / T); tx++)
-                {
-                    char c = worldMap[ty, tx];
-                    string col = c == '~' ? "#2f6f98" : c == 'w' ? "#4a98c0" : c == 's' ? "#e8d8a8" : c == 'b' ? "#9a6a3a" : "#9fc07a";
-                    var (px, py) = P(tx * T, ty * T);
-                    Gfx.Rect(px, py, T * s + 0.6f, T * s + 0.6f, Pal.C(col));
-                }
-            // The permanent danger zone (dashed, roughly) and the cone.
-            var (kx, ky) = P(PdzX, PdzY);
-            for (int i = 0; i < 48; i += 2)
-            {
-                float a0 = i / 48f * MathF.Tau, a1 = (i + 1) / 48f * MathF.Tau;
-                Gfx.Line(kx + MathF.Cos(a0) * PdzRX * s, ky + MathF.Sin(a0) * PdzRY * s, kx + MathF.Cos(a1) * PdzRX * s, ky + MathF.Sin(a1) * PdzRY * s, 3, Pal.C("#d8323a"));
-            }
-            var (cx, cy) = P(ConeX, ConeBaseY - 25);
-            Gfx.Circle(cx, cy, 40 * s, Pal.C("#8a8580"));
-            Gfx.Circle(cx, cy, 16 * s, Pal.C("#6d6862"));
-            Gfx.Circle(cx, cy, 6 * s, Pal.C("#45413f"));
-            // The channel, with mud in it once the lahar has come.
-            for (int i = 1; i < LaharChannel.Length; i++)
-            {
-                var (ax, ay) = P(LaharChannel[i - 1].x, LaharChannel[i - 1].y);
-                var (bx, by) = P(LaharChannel[i].x, LaharChannel[i].y);
-                Gfx.Line(ax, ay, bx, by, 7 * s, Pal.C("#5d554d"));
-                Gfx.Line(ax, ay, bx, by, 4.5f * s, w.T >= 0 ? Pal.C("#8a7a62") : Pal.C("#9a9288"));
-            }
-            foreach (var (hx, hy, c) in new[] { (MilaX, MilaY, "#c0392b"), (BenX, BenY, "#2a8a8a") })
-            {
-                var (px, py) = P(hx - 14, hy - 20);
-                Gfx.Rect(px, py, 28 * s, 16 * s, Pal.C(c), 2);
-            }
-        }
-        finally { Raylib.EndScissorMode(); }
+        // Baga's real ground, with its cone, houses, trees and stones drawn on it (LaharArt.cs).
+        Gfx.Rect(mx - 3, my - 3, mw + 6, mh + 6, Pal.Ink, 6);
+        PixelScene(mx, my, LaharMapW, LaharMapH, s, p => PaintLaharMap(p, w), 40);
         Gfx.Rect(mx + 8, my + 8, 200, 26, Pal.C("rgba(16,36,58,0.8)"), 4);
         Gfx.Text("Baga, the north side", mx + 16, my + 12, FontKind.Ui700, 16, Color.White);
         // The route to the jetty stays open; the channel crossing and the mouth are what to close.
@@ -602,39 +565,11 @@ partial class Game
 
     void DrawLaharCam(float vx, float vy, float vw, float vh, LaharWatch w)
     {
-        Gfx.Rect(vx, vy, vw, vh, Pal.C(w.Live ? "#5a6a72" : "#6a6a62"), 6);
-        // A grey slope with the channel cut down it to the beach and the sea.
-        Gfx.Triangle(vx, vy + 40, vx + vw * 0.7f, vy + vh, vx, vy + vh, Pal.C("#6f6a62"));
-        Gfx.Rect(vx, vy + vh - 40, vw, 40, Pal.C("#3a7fa8"));
-        Gfx.Rect(vx + vw * 0.55f, vy + vh - 58, vw * 0.45f, 22, Pal.C("#d8c49a"));
-        float ax = vx + 40, ay = vy + 60, bx = vx + vw * 0.66f, by = vy + vh - 50;
-        Gfx.Line(ax, ay, bx, by, 18, Pal.C("#4d453d"));
-        Gfx.Line(ax, ay, bx, by, 12, Pal.C("#7d746a"));
-        if (w.T >= 0)
-        {
-            float k = Math.Min(1, w.T / 4);
-            float hx = ax + (bx - ax) * k, hy = ay + (by - ay) * k;
-            Gfx.Line(ax, ay, hx, hy, 14, Pal.C("#8a7a62"));
-            for (int i = 0; i < 8; i++)
-            {
-                float u = (time * 1.4f + i * 0.13f) % 1 * k;
-                Gfx.Circle(ax + (bx - ax) * u, ay + (by - ay) * u, 4, Pal.C("#5a4a3a"));
-            }
-            // Spilling past the banks at the mouth.
-            if (w.T > 3.5f)
-            {
-                float s = Math.Min(1, (w.T - 3.5f) / 2);
-                Gfx.Circle(bx, by, 10 + s * 46, Pal.Rgba(138, 122, 98, 0.85f));
-            }
-        }
-        // Rain streaks while it's live.
-        if (w.Live)
-            for (int i = 0; i < 30; i++)
-            {
-                float rx = vx + (i * 37 % (int)vw), ry = vy + ((time * 300 + i * 53) % vh);
-                Gfx.Line(rx, ry, rx - 3, ry + 10, 1, Pal.Rgba(220, 230, 240, 0.5f));
-            }
-        Gfx.Text(w.Live ? "LIVE  channel camera" : "RECORDED  channel camera", vx + 10, vy + 8, FontKind.Ui700, 15, Color.White);
+        // The station camera (LaharArt.cs): a pixel scene of the channel, painted from the flow's clock.
+        Gfx.Rect(vx - 3, vy - 3, vw + 6, vh + 6, Pal.Ink, 6);
+        PixelScene(vx, vy, LcW, LcH, 4, p => PaintLaharCam(p, w), 41);
+        Gfx.Text(w.Live ? "LIVE  channel camera" : "RECORDED  channel camera", vx + 14, vy + 10, FontKind.Ui700, 15, Color.White);
+        Gfx.Text($"{(int)(state.clock / 60) % 24:00}:{(int)state.clock % 60:00}", vx + vw - 78, vy + vh - 26, FontKind.Ui600, 14, Pal.Rgba(255, 255, 255, 0.8f));
     }
 
     /* ---------- The school as the evacuation centre ---------- */

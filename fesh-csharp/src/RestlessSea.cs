@@ -589,11 +589,28 @@ partial class Game
                     pix.Rect(wx, wy, 1, 1, v > 0.7f ? "#6f5a3e" : v > 0.4f ? "#7d6646" : "#8a7250");
                 }
         if (PondDry)
-            for (int i = 0; i < 4; i++)
+        {
+            // A few bangus stranded on the mud beside what's left of the water, gasping: mostly still, one twitching now and then
+            // (they used to swim in circles in the puddle, which looked like a full pond).
+            var spots = new[] { (1630, 244, 0), (1653, 236, 1), (1658, 247, 2), (1640, 233, 3) };
+            foreach (var (fx, fy, k) in spots)
             {
-                float fx = 1638 + i * 4, fy = 238 + (i % 2) * 3, flip = (int)((t * 4 + i) % 2);
-                pix.Rect(fx, fy - flip, 3, 1, "#c8d4dc");
+                float cycle = 4.5f + k * 1.3f, ph = (t + k * 2.1f) % cycle;
+                bool flap = ph < 0.45f;
+                int lift = flap ? (int)(MathF.Sin(ph / 0.45f * MathF.PI) * 2) : 0;
+                int dir = k % 2 == 0 ? 1 : -1;
+                pix.Rect(fx - 2 * dir + (dir < 0 ? -2 : 0), fy + 1, 7, 1, "rgba(40,28,16,0.25)");
+                for (int i = 0; i < 6; i++)
+                {
+                    int bx = fx + i * dir, by = fy - (flap ? (i % 3 == 1 ? lift : 0) : 0);
+                    pix.Rect(bx, by, 1, 1, i == 0 ? "#6f7d86" : "#aebbc3");
+                    pix.Rect(bx, by + 1, 1, 1, "#e2e9eb");
+                }
+                pix.Rect(fx + 6 * dir, fy - 1, 1, 1, "#8d9ba3"); pix.Rect(fx + 6 * dir, fy + 1, 1, 1, "#8d9ba3");   // the tail
+                pix.Rect(fx + dir, fy - 1, 2, 1, "#8d9ba3");   // the back fin
+                if (flap && ph < 0.2f) pix.Rect(fx + 2 * dir, fy - 2 - lift, 1, 1, "#d8e8ee");   // a drop thrown off
             }
+        }
     }
 
     /* ---------- Coconuts shaken loose (looks only) ---------- */
@@ -669,8 +686,8 @@ partial class Game
         if (duck) { DrawDucked(look, x, y, m.Face); return; }
         LookData.DrawPerson(pix, look, x, y, m.Face, step);
         int up = step is 2 or 4 ? 1 : 0;
-        pix.Rect(x - 5, y - 14 - up, 11, 2, "#ddbc78");
-        pix.Rect(x - 3, y - 16 - up, 7, 2, "#f0d596");
+        pix.Rect(x - 5, y - 14 - LookData.Stature - up, 11, 2, "#ddbc78");
+        pix.Rect(x - 3, y - 16 - LookData.Stature - up, 7, 2, "#f0d596");
     }
 
     // Ducked down low with your forearms up round your head and your hands clasped over it, while the ground shakes.
@@ -678,8 +695,8 @@ partial class Game
     {
         LookData.DrawPerson(pix, look, x, y, face, 0, bob: -3);
         string skin = LookData.Skins[look.skin % LookData.Skins.Length], shirt = LookData.Shirts[look.shirt % LookData.Shirts.Length];
-        pix.Rect(x - 4, y - 9, 1, 3, shirt); pix.Rect(x + 3, y - 9, 1, 3, shirt);
-        pix.Rect(x - 3, y - 11, 3, 1, skin); pix.Rect(x + 1, y - 11, 2, 1, skin);
+        pix.Rect(x - 4, y - 9 - LookData.Stature, 1, 3, shirt); pix.Rect(x + 3, y - 9 - LookData.Stature, 1, 3, shirt);
+        pix.Rect(x - 3, y - 11 - LookData.Stature, 3, 1, skin); pix.Rect(x + 1, y - 11 - LookData.Stature, 2, 1, skin);
     }
 
     // A green route sign on a post: a running figure and an arrow up the route.
@@ -929,4 +946,17 @@ partial class Game
         SeaStoryStarted && !state.Hinted("rs:carpio") ? "Ask Ma'am Isay about the shaking"
         : state.Hinted("rs:carpio") && state.Hinted("rs:berberoka") && state.Hinted("rs:mark") && !state.Hinted("rs:signs") ? "Tell Ma'am Isay what you've found"
         : state.Hinted("rs:signs") && SignsUp == SignSpots.Length && !state.Hinted("rs:drill") ? "Run the drill with Ma'am Isay" : null;
+}
+
+partial class Game
+{
+    // The bed of the drained bangus pond (Niko's, story 3): everything the mud covers (DrawPond) is ground while it's dry or filling,
+    // outside the puddle left in the middle. Tidemane gallops over it (it isn't swum), and you don't wade it.
+    bool DryMud(float x, float y)
+    {
+        if (!PondClosed || scene != "world" || MathF.Abs(x - 1645) > 45 || MathF.Abs(y - 240) > 32) return false;
+        if (TileAt((int)MathF.Floor(x / T), (int)MathF.Floor(y / T)) != 'l') return false;
+        float r = MathF.Sqrt(MathF.Pow((x - 1645) / 30f, 2) + MathF.Pow((y - 240) / 20f, 2));
+        return r >= 0.32f + (PondRefilling ? 0.5f : 0);
+    }
 }

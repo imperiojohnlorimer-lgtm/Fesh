@@ -1113,10 +1113,13 @@ partial class Game
         float tabX = x + Gfx.Measure("Case board", FontKind.Ui700, 40) + 28, room = right - tabX, fs = 19, pad = 30;
         float TabW((string id, int n, string name, bool open, string hint) s) =>
             Math.Max(Gfx.Measure(s.name, FontKind.Ui700, fs), Gfx.Measure($"Story {s.n}", FontKind.Ui600, 13) + (s.open ? 0 : 16)) + pad;
-        while (fs > 13 && stories.Sum(s => TabW(s) + 8) > room) { fs -= 1; pad = Math.Max(16, pad - 3); }
+        // Every tab is as wide as the widest, so the row reads as one set (they used to differ with their names).
+        float Common() => stories.Max(TabW);
+        while (fs > 13 && (Common() + 8) * stories.Length > room) { fs -= 1; pad = Math.Max(16, pad - 3); }
+        float common = Common();
         foreach (var s in stories)
         {
-            float w = TabW(s);
+            float w = common;
             bool sel = caseTab == s.id;
             var fill = sel ? Pal.Lantern : s.open ? Pal.Sand : Pal.C("#b9a98a");
             if (!sel && Gfx.Hover(tabX, y, w, 48)) fill = Lighten(fill, 0.14f);
@@ -1150,14 +1153,71 @@ partial class Game
         Gfx.Rect(x + 4.2f * k, y + 7.5f * k, 1.6f * k, 3 * k, Pal.C("#e9dfc6"));
     }
 
+    // One frame for every story (1.28): the board used to grow and shrink with each story's clues, so flipping tabs resized the
+    // whole panel. Now the question, the notes and the theory are sized for the biggest of them (every clue counted as found), and
+    // the locked page sits in the same frame.
+    string CaseQuestion(string id) => id switch
+    {
+        "habagat" => "Why does the moon go out over the Habagat sea?",
+        "amihan" => "When the ground shakes, what should Amihan Village do about the sea?",
+        "baga" => "Baga is stirring. How do we read its signs, and keep everyone safe?",
+        "marilaya" => "Did Marilaya really rise from the sea? What does the island itself say?",
+        _ => "How did these creatures end up around Saltmere Island?"
+    };
+
+    List<(string title, string finding, string source)> CaseClueTexts(string id)
+    {
+        var clues = id switch { "habagat" => Data.MoonClues, "amihan" => Data.SeaClues, "baga" => Data.MagayonClues, "marilaya" => Data.MarilayaClues, _ => null };
+        return clues != null ? clues.Select(c => (c.Title, c.Finding, c.Source)).ToList()
+            : Data.Creatures.Select(cr => (Data.Clues[cr.Id].Title, Data.Clues[cr.Id].Finding, $"Found on the {cr.Name}")).ToList();
+    }
+
+    IEnumerable<string> CaseTheoryTexts(string id) => id switch
+    {
+        "habagat" => Data.MoonTheories,
+        "amihan" => Data.SeaTheories,
+        "baga" => Data.MagayonTheories,
+        "marilaya" => Data.MarilayaTheories.Append("Sorted with the shore model: tides take hours, sand moves in storms or years, the rock rose over ages (or sometimes all at once). Last job: the chart, by triangulation."),
+        _ => Data.Theories
+    };
+
+    const float CaseBx = 50, CaseBw = 1180, CaseBorder = 13, CasePadT = 21, CasePadX = 24, CasePadB = 14, CaseColGap = 24, CaseQw = 693, CaseTw = 827;
+
+    (float nfs, float nlh, float noteH, float qh, float th, float innerH) CaseLayout()
+    {
+        float iw = CaseBw - CaseBorder * 2, cw = iw - CasePadX * 2;
+        var stories = CaseStories();
+        (float, float, float, float, float, float) last = default;
+        foreach (var (fs, lh) in new[] { (19f, 27f), (16f, 22f), (14f, 19f) })
+        {
+            float noteH = 181; int qlines = 1, tlines = 1;
+            foreach (var s in stories)
+            {
+                var clues = CaseClueTexts(s.id);
+                float noteW = (cw - CaseColGap * (clues.Count - 1)) / clues.Count;
+                foreach (var c in clues)
+                    noteH = Math.Max(noteH, 29 + Gfx.Wrap(c.title, FontKind.Ui700, 21, noteW - 32).Count * 24 + 8 + Gfx.Wrap(c.finding, FontKind.Note, fs, noteW - 32).Count * lh + 11
+                        + Gfx.Wrap(c.source, FontKind.Ui500, 16, noteW - 32).Count * 20 + 16);
+                qlines = Math.Max(qlines, Gfx.Wrap(CaseQuestion(s.id), FontKind.Note, 26, CaseQw - 48).Count);
+                foreach (var t in CaseTheoryTexts(s.id)) tlines = Math.Max(tlines, Gfx.Wrap(t, FontKind.Note, 20, CaseTw - 48).Count);
+            }
+            float qh = 19 + qlines * 35 + 16, th = 19 + 26 + tlines * 29 + 19;
+            float innerH = CasePadT + 46 + 8 + qh + 32 + noteH + 26 + th + CasePadB;
+            last = (fs, lh, noteH, qh, th, innerH);
+            if (innerH + CaseBorder * 2 + 6 <= Gfx.LH - 8) break;
+        }
+        return last;
+    }
+
     // A story not begun yet: its name, that it's locked, and where it starts.
     void DrawLockedCase((string id, int n, string name, bool open, string hint) s)
     {
-        const float bx = 50, bw = 1180, border = 13, padT = 21, padX = 24, nw = 660;
+        const float bx = CaseBx, bw = CaseBw, border = CaseBorder, padT = CasePadT, padX = CasePadX, nw = 660;
         float ix = bx + border, iw = bw - border * 2;
+        var lay = CaseLayout();
         var hint = Gfx.Wrap(s.hint, FontKind.Note, 22, nw - 80);
         float noteH = 96 + 46 + 40 + hint.Count * 30 + 30;
-        float innerH = padT + 54 + 34 + noteH + 44;
+        float innerH = lay.innerH;
         float h = innerH + border * 2, by = Math.Max(4, (Gfx.LH - h - 6) / 2);
         lastCaseBottom = by + h + 6;
         Gfx.Rect(bx, by + 6, bw, h, Pal.Ink, 6);
@@ -1168,7 +1228,9 @@ partial class Game
         Gfx.Text("Case board", x, y + 2, FontKind.Ui700, 40, Pal.C("#fff7e6"));
         if (SmallButton("Close", ix + iw - padX - SmallW("Close"), y)) { ClosePanels(); return; }
         if (DrawCaseTabs(x, y, ix + iw - padX - SmallW("Close") - 16)) return;
-        y += 54 + 34;
+        // The note sits in the middle of the space the open boards use.
+        float room = innerH - (padT + 54) - 20;
+        y += 54 + Math.Max(10, (room - noteH) / 2);
         float nx = ix + iw / 2 - nw / 2, cx = nx + nw / 2;
         Gfx.Rect(nx + 2, y + 4, nw, noteH, Pal.C("rgba(0,0,0,0.25)"));
         Gfx.Rect(nx, y, nw, noteH, Pal.C("#e9dfc6"));
@@ -1177,6 +1239,7 @@ partial class Game
         Gfx.TextCenter($"Story {s.n}: {s.name}", cx, y + 96, FontKind.Ui700, 30, Pal.PaperInk);
         Gfx.TextCenter("Not unlocked yet.", cx, y + 96 + 46, FontKind.Note, 24, Muted);
         Lines(hint.Select(l => l).ToList(), cx - (hint.Count > 0 ? hint.Max(l => Gfx.Measure(l, FontKind.Note, 22)) : 0) / 2, y + 96 + 46 + 40, 30, FontKind.Note, 22, Pal.PaperInk);
+        if (Gfx.PressedOutside(bx, by, bw, h)) ClosePanels();
     }
 
     // The four stories in order, all on the board from the start (1.21): one not begun yet shows locked, with a hint where
@@ -1200,19 +1263,14 @@ partial class Game
         if (!story.open) { DrawLockedCase(story); return; }
         bool moon = caseTab == "habagat", sea = caseTab == "amihan", baga = caseTab == "baga", heart = caseTab == "marilaya";
         var caseClues = moon ? Data.MoonClues : sea ? Data.SeaClues : baga ? Data.MagayonClues : heart ? Data.MarilayaClues : null;
-        const float bx = 50, bw = 1180, border = 13, padT = 21, padX = 24, padB = 29, colGap = 24;
+        const float bx = CaseBx, bw = CaseBw, border = CaseBorder, padT = CasePadT, padX = CasePadX, colGap = CaseColGap, qw = CaseQw, tw = CaseTw;
         float ix = bx + border, iw = bw - border * 2, cw = iw - padX * 2;
-        const float qw = 693;
-        var question = Gfx.Wrap(moon ? "Why does the moon go out over the Habagat sea?" : sea ? "When the ground shakes, what should Amihan Village do about the sea?"
-            : baga ? "Baga is stirring. How do we read its signs, and keep everyone safe?"
-            : heart ? "Did Marilaya really rise from the sea? What does the island itself say?"
-            : "How did these creatures end up around Saltmere Island?", FontKind.Note, 26, qw - 48);
-        float qh = 19 + question.Count * 35 + 16;
+        // The same frame, notes, question and theory sizes for every story (CaseLayout).
+        var lay = CaseLayout();
+        float nfs = lay.nfs, nlh = lay.nlh, noteH = lay.noteH, qh = lay.qh, th = lay.th, innerH = lay.innerH;
+        var question = Gfx.Wrap(CaseQuestion(caseTab), FontKind.Note, 26, qw - 48);
         int count = caseClues?.Length ?? Data.Creatures.Length;
         float noteW = (cw - colGap * (count - 1)) / count;
-        // The clues' writing shrinks a size if the board would otherwise run off the screen (the vanishing moon's full
-        // board did by a few pixels; the restless sea's by more).
-        float nfs = 19, nlh = 27;
         List<(bool got, List<string> title, List<string> text, List<string> src)> MakeNotes() => caseClues != null
             ? caseClues.Select(c =>
             {
@@ -1230,26 +1288,12 @@ partial class Game
                     src: got ? Gfx.Wrap($"Found on the {cr.Name}", FontKind.Ui500, 16, noteW - 32) : new List<string>());
             }).ToList();
         var notes = MakeNotes();
-        float NoteH() => Math.Max(181, notes.Max(n => 29 + n.title.Count * 24 + 8 + n.text.Count * nlh + 11 + n.src.Count * 20 + 16));
-        float noteH = NoteH();
-        const float tw = 827;
         string theoryText = moon ? Data.MoonTheories[MoonReturned ? Data.MoonTheories.Length - 1 : MoonClueCount]
             : sea ? Data.SeaTheories[SeaCaseClosed ? Data.SeaTheories.Length - 1 : SeaClueCount]
             : baga ? Data.MagayonTheories[MgDone ? Data.MagayonTheories.Length - 1 : MgClueCount]
             : heart ? (MrDone ? Data.MarilayaTheories[^1] : MrSorted ? "Sorted with the shore model: tides take hours, sand moves in storms or years, the rock rose over ages (or sometimes all at once). Last job: the chart, by triangulation." : Data.MarilayaTheories[MrClueCount])
             : Data.Theories[state.caught.Count];
         var theory = Gfx.Wrap(theoryText, FontKind.Note, 20, tw - 48);
-        float th = 19 + 26 + theory.Count * 29 + 19;
-        float innerH = padT + 46 + 8 + qh + 32 + noteH + 35 + th + padB;
-        // Two steps down: a five-note board (the heart that rose, 1.23) can need the smaller one.
-        foreach (var (fs, lh) in new[] { (16f, 22f), (14f, 19f) })
-        {
-            if (innerH + border * 2 + 6 <= Gfx.LH - 8) break;
-            nfs = fs; nlh = lh;
-            notes = MakeNotes();
-            noteH = NoteH();
-            innerH = padT + 46 + 8 + qh + 32 + noteH + 35 + th + padB;
-        }
         float h = innerH + border * 2, by = Math.Max(4, (Gfx.LH - h - 6) / 2);
         lastCaseBottom = by + h + 6;
 
@@ -1308,14 +1352,15 @@ partial class Game
             DrawSplineSegmentBezierQuadratic(Gfx.P(a.X, a.Y), Gfx.P(mid.X, mid.Y), Gfx.P(b.X, b.Y), 3 * Gfx.Z, PinRed);
         }
         foreach (var p in pins.Concat(lockedPins)) Pin(p.X, p.Y);
-        y += noteH + 35;
+        y += noteH + 26;
 
         float tx = ix + iw / 2 - tw / 2;
         var tt = new Tilt(tx + tw / 2, y + th / 2, 0.6f);
         tt.Rect(tx + 1, y + 3, tw, th, shadow);
         tt.Rect(tx, y, tw, th, White);
-        tt.Text("Current theory", tx + 24, y + 19, FontKind.Ui700, 21, Rust);
-        for (int i = 0; i < theory.Count; i++) tt.Text(theory[i], tx + 24, y + 19 + 26 + i * 29, FontKind.Note, 20, Pal.PaperInk);
+        float off = Math.Max(0, (th - (19 + 26 + theory.Count * 29 + 19)) / 2);   // the same box for every story: the words sit in its middle
+        tt.Text("Current theory", tx + 24, y + 19 + off, FontKind.Ui700, 21, Rust);
+        for (int i = 0; i < theory.Count; i++) tt.Text(theory[i], tx + 24, y + 19 + 26 + off + i * 29, FontKind.Note, 20, Pal.PaperInk);
 
         if (Gfx.PressedOutside(bx, by, bw, h)) ClosePanels();
     }

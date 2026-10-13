@@ -4,7 +4,17 @@ namespace Fesh;
 
 // An ore rock on the current cave floor. Kind is one of Game.Ores.
 sealed class Node { public string Kind; public int X, Y; public bool Mined; }
-sealed class Monster { public string Kind; public float X, Y, Vx, Vy, Kx, Ky, Hp, Timer, Hurt; public bool Flip, Dead; }
+// Phase: "" moving about, "windup" (it has picked its line and shows it), "dash" (the lunge itself), "recover" (open to a
+// blow) or "stun" (a crab that charged into a wall). Max is its hit points as spawned, for the health bar (0: the kind's own).
+sealed class Monster
+{
+    public string Kind; public float X, Y, Vx, Vy, Kx, Ky, Hp, Timer, Hurt, Max;
+    public bool Flip, Dead, Hit;
+    public string Phase = ""; public float PhaseT, AimX, AimY, Touch, Stagger, Cool;
+}
+// How a monster attacks: it starts a windup within Range, rushes along the line it locked at the start of it, and is
+// open for Recover afterwards. Touch is what merely bumping into it costs; Radius is how near its dash must pass.
+sealed record AttackKind(float Range, float Windup, float DashSpeed, float DashTime, float Recover, int Touch, float Radius);
 sealed record MonsterKind(string Name, int Hp, int Damage, float Speed, int MinFloor, string Drop, float DropChance, bool Flies, string Color);
 sealed record OreKind(string Kind, string Item, int Tier, string Color, int MinFloor, int MaxFloor);
 
@@ -25,11 +35,23 @@ partial class Game
 
     static readonly Dictionary<string, MonsterKind> MonsterKinds = new()
     {
-        ["slime"] = new("cave slime", 5, 8, 26, 1, "slime_gel", 0.7f, false, "#5fd06b"),
-        ["bat"] = new("cave bat", 3, 6, 42, 2, "bat_wing", 0.5f, true, "#7a5a8e"),
-        ["crab"] = new("rock crab", 12, 12, 18, 5, "crab_shell", 0.6f, false, "#8a8f93"),
-        ["shade"] = new("shade", 16, 16, 34, 9, "shadow_essence", 0.55f, true, "#9b6be0")
+        // Damage is what a lunge costs (before armour); Speed is how fast it closes in (you walk at 52). Deeper floors
+        // grow tougher (MonsterHp), and every kind now rushes you in a short, shown lunge (MonsterAttacks).
+        ["slime"] = new("cave slime", 8, 12, 30, 1, "slime_gel", 0.7f, false, "#5fd06b"),
+        ["bat"] = new("cave bat", 6, 10, 62, 2, "bat_wing", 0.5f, true, "#7a5a8e"),
+        ["crab"] = new("rock crab", 18, 18, 38, 5, "crab_shell", 0.6f, false, "#8a8f93"),
+        ["shade"] = new("shade", 24, 22, 54, 9, "shadow_essence", 0.55f, true, "#9b6be0")
     };
+    static readonly Dictionary<string, AttackKind> MonsterAttacks = new()
+    {
+        ["slime"] = new(40, 0.45f, 105, 0.32f, 0.85f, 4, 9),
+        ["bat"] = new(66, 0.45f, 140, 0.35f, 0.75f, 4, 9),
+        ["crab"] = new(44, 0.65f, 115, 0.42f, 1.10f, 7, 11),
+        ["shade"] = new(66, 0.70f, 155, 0.35f, 1.00f, 6, 9)
+    };
+    // A monster's hit points on a floor: tougher the deeper below the floor it first appears (up to 1.7 times).
+    int MonsterHp(string kind) => (int)MathF.Ceiling(MonsterKinds[kind].Hp * Math.Min(1.7f, 1 + 0.07f * Math.Max(0, caveFloor - MonsterKinds[kind].MinFloor)));
+    static float MonsterMax(Monster m) => m.Max > 0 ? m.Max : MonsterKinds[m.Kind].Hp;
 
     // Each ore turns up on a range of floors and needs a pickaxe of at least its tier.
     static readonly OreKind[] Ores =
@@ -230,17 +252,26 @@ partial class Game
             nodes.Add(new Node { Kind = kind, X = x, Y = y });
         }
 
-        // Monsters, more and nastier the deeper you go, never right by the ladder.
-        var kinds = ancient ? new List<string> { "shade", "shade", "shade", "crab", "crab" }
-            : MonsterKinds.Where(kv => caveFloor >= kv.Value.MinFloor).Select(kv => kv.Key).ToList();
-        int count = ancient ? 5 : 3 + caveFloor / 2;
+        // Monsters, more and nastier the deeper you go (3 on the first floors, 9 on the eleventh), never right by the ladder
+        // and never in a heap: each lair is a few tiles from the last.
+        var kinds = ancient ? new List<string> { "shade", "shade", "shade", "crab", "crab" } : null;
+        int count = ancient ? 5 : Math.Min(9, 3 + (int)MathF.Floor(0.6f * (caveFloor - 1)));
         var lairs = dist.Where(kv => kv.Value > 14 && caveMap[kv.Key.Item2, kv.Key.Item1] is 'F' or 'G').Select(kv => kv.Key).OrderBy(_ => r.Next()).ToList();
-        for (int i = 0; i < count && i < lairs.Count; i++)
+        var placed = new List<(int, int)>();
+        foreach (var (mx, my) in lairs)
         {
-            string kind = ancient ? kinds[i] : kinds[r.Next(kinds.Count)];
-            var (mx, my) = lairs[i];
-            monsters.Add(new Monster { Kind = kind, X = mx * T + 5, Y = my * T + 7, Hp = MonsterKinds[kind].Hp, Timer = (float)r.NextDouble() });
+            if (placed.Count >= count) break;
+            if (!ancient && placed.Any(p => Math.Abs(p.Item1 - mx) + Math.Abs(p.Item2 - my) < 5)) continue;
+            string kind = ancient ? kinds[placed.Count] : PickMonster(r);
+            placed.Add((mx, my));
+            monsters.Add(new Monster { Kind = kind, X = mx * T + 5, Y = my * T + 7, Hp = MonsterHp(kind), Max = MonsterHp(kind), Timer = (float)r.NextDouble() });
         }
+        if (!ancient && placed.Count < Math.Min(count, 3))
+            foreach (var (mx, my) in lairs.Where(l => !placed.Contains(l)).Take(3 - placed.Count))
+            {
+                string kind = PickMonster(r);
+                monsters.Add(new Monster { Kind = kind, X = mx * T + 5, Y = my * T + 7, Hp = MonsterHp(kind), Max = MonsterHp(kind), Timer = (float)r.NextDouble() });
+            }
 
         caveMap[sy, sx] = 'U';
         map = caveMap;
@@ -452,18 +483,40 @@ partial class Game
         bool flies = MonsterKinds[m.Kind].Flies;
         int left = (int)MathF.Round(m.X) - w / 2, top = (int)MathF.Round(m.Y) - h + 1 - (flies ? 6 + (int)MathF.Round(MathF.Sin(t * 5 + m.X) * 1.5f) : 0);
         pix.Rect(m.X - w / 2 + 1, m.Y + 1, w - 2, 1, "rgba(0,0,0,0.3)");
+        // The warning before a lunge: the line it will take (fixed once the windup is half over), a shake, a red flush, and a mark.
+        bool winding = m.Phase == "windup";
+        if (winding)
+        {
+            var atk = MonsterAttacks[m.Kind];
+            float k0 = m.PhaseT / atk.Windup, pulse = 0.35f + 0.35f * MathF.Abs(MathF.Sin(t * (10 + 14 * k0)));
+            float reach = atk.DashSpeed * atk.DashTime, y0 = m.Y - (flies ? 6 : 3);
+            for (float s = 6; s < reach + 4; s += 3)
+                pix.Rect(m.X + m.AimX * s, y0 + m.AimY * s, 1, 1, Pal.Rgba(255, 106, 90, pulse * (1 - 0.4f * s / reach)));
+            left += (int)MathF.Round(MathF.Sin(t * 60) * (0.4f + k0));
+        }
+        else if (m.Phase == "dash") pix.Rect(m.X - m.AimX * 5, m.Y - 3 - m.AimY * 5, 2, 1, Pal.Rgba(255, 255, 255, 0.35f));
+        bool stunned = m.Phase == "stun";
         for (int r = 0; r < h; r++)
             for (int c = 0; c < w; c++)
             {
                 char ch = rows[r][c];
                 if (ch == '.') continue;
-                pix.Rect(left + (m.Flip ? w - 1 - c : c), top + r, 1, 1, m.Hurt > 0 ? "#ffffff" : MonsterPixel(m.Kind, ch));
+                string col = m.Hurt > 0 ? "#ffffff" : winding && (int)(t * 16) % 2 == 0 ? "#ff8a7a" : MonsterPixel(m.Kind, ch);
+                pix.Rect(left + (m.Flip ? w - 1 - c : c), top + r, 1, 1, col);
+            }
+        if (winding) { pix.Rect(m.X - 1, top - 10, 3, 5, "#10243a"); pix.Rect(m.X, top - 9, 1, 3, "#ff6a5a"); pix.Rect(m.X, top - 5, 1, 1, "#ff6a5a"); }
+        if (stunned)
+            for (int i = 0; i < 3; i++)
+            {
+                float a = t * 5 + i * MathF.Tau / 3;
+                pix.Rect(m.X + MathF.Cos(a) * 6, top - 3 + MathF.Sin(a) * 1.5f, 1, 1, "#ffd76a");
             }
         var k = MonsterKinds[m.Kind];
-        if (m.Hp < k.Hp)
+        float max = MonsterMax(m);
+        if (m.Hp < max)
         {
             pix.Rect(m.X - 6, top - 4, 12, 2, "#10243a");
-            pix.Rect(m.X - 6, top - 4, (int)MathF.Ceiling(12 * Math.Max(0, m.Hp) / k.Hp), 2, "#e04b3a");
+            pix.Rect(m.X - 6, top - 4, (int)MathF.Ceiling(12 * Math.Max(0, m.Hp) / max), 2, "#e04b3a");
         }
     }
 
@@ -495,6 +548,12 @@ partial class Game
         float dx = m.X - player.X, dy = m.Y - player.Y, d = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));
         m.Kx = dx / d * 130; m.Ky = dy / d * 130;
         m.Vx = m.Vy = 0; m.Timer = 0.5f;
+        // A real blade interrupts a windup (once in a while: it can't be held off for ever); fists and a pickaxe only scuff it.
+        if (m.Phase == "windup" && m.Stagger <= 0 && Items.Weapons.Any(w => Has(w.id) > 0))
+        {
+            m.Phase = "recover"; m.PhaseT = MathF.Max(0, MonsterAttacks[m.Kind].Recover - 0.45f); m.Stagger = 1.2f;
+            Floater("Interrupted!", m.X, m.Y - 16, "#ffd76a");
+        }
         Sfx.Play("hit");
         Burst(m.X, m.Y - 4, "#ffffff", 4);
         if (m.Hp > 0) return;
@@ -519,6 +578,40 @@ partial class Game
         return Dist(x, y, ropeTile.x * T + 5, ropeTile.y * T + 5) > 24;
     }
 
+    string PickMonster(Random r)
+    {
+        (string kind, int w)[] table = caveFloor switch
+        {
+            <= 1 => new[] { ("slime", 1) },
+            <= 4 => new[] { ("slime", 60), ("bat", 40) },
+            <= 8 => new[] { ("slime", 35), ("bat", 30), ("crab", 35) },
+            _ => new[] { ("slime", 20), ("bat", 25), ("crab", 30), ("shade", 25) }
+        };
+        int roll = r.Next(table.Sum(t => t.w));
+        foreach (var (kind, w) in table) { if (roll < w) return kind; roll -= w; }
+        return table[0].kind;
+    }
+
+    // Moves a monster in steps of at most 3 px so a fast lunge can't skip over a wall. Returns which axes were blocked.
+    (bool x, bool y) MoveMonster(Monster m, float mx, float my, bool stopOnBlock = false)
+    {
+        int n = Math.Max(1, (int)MathF.Ceiling(MathF.Max(MathF.Abs(mx), MathF.Abs(my)) / 3f));
+        float sx = mx / n, sy = my / n;
+        bool bx = false, by = false;
+        for (int i = 0; i < n; i++)
+        {
+            if (!bx) { if (MonsterCanBe(m, m.X + sx, m.Y)) m.X += sx; else bx = true; }
+            // A lunge ends the moment either axis is blocked, so it never slides off the line it showed.
+            if (stopOnBlock && bx) break;
+            if (!by) { if (MonsterCanBe(m, m.X, m.Y + sy)) m.Y += sy; else by = true; }
+            if (stopOnBlock && by) break;
+            if (bx && by) break;
+        }
+        return (bx, by);
+    }
+
+    // Each monster wanders, then closes in when it has seen you, and within reach of you stops, shows the line it has picked
+    // (its windup: you can sidestep it), rushes along it, and is open to a blow afterwards. Only two attack at once.
     void UpdateMonsters(float dt)
     {
         iframes = Math.Max(0, iframes - dt);
@@ -528,35 +621,101 @@ partial class Game
         {
             if (m.Dead) continue;
             var k = MonsterKinds[m.Kind];
+            var atk = MonsterAttacks[m.Kind];
             m.Hurt = Math.Max(0, m.Hurt - dt);
+            m.Touch = Math.Max(0, m.Touch - dt);
+            m.Stagger = Math.Max(0, m.Stagger - dt);
+            m.Cool = Math.Max(0, m.Cool - dt);
             float dx = player.X - m.X, dy = player.Y - 3 - m.Y, d = MathF.Sqrt(dx * dx + dy * dy);
-            bool chase = d < (k.Flies ? 95 : 75) && Dist(player.X, player.Y, ropeTile.x * T + 5, ropeTile.y * T + 5) > 24;
-            m.Timer -= dt;
-            if (m.Kind == "slime")
-            {
-                // Slimes hop: a quick burst, then a pause.
-                if (m.Timer <= 0)
-                {
-                    m.Timer = 1.0f;
-                    float ang = chase ? MathF.Atan2(dy, dx) : Rand(0, MathF.Tau);
-                    m.Vx = MathF.Cos(ang) * k.Speed * 2.2f; m.Vy = MathF.Sin(ang) * k.Speed * 2.2f;
-                }
-                else if (m.Timer < 0.6f) m.Vx = m.Vy = 0;
-            }
-            else if (m.Timer <= 0)
-            {
-                m.Timer = m.Kind == "bat" ? Rand(0.2f, 0.5f) : Rand(0.6f, 1.4f);
-                float ang = chase ? MathF.Atan2(dy, dx) + (m.Kind == "bat" ? Rand(-0.9f, 0.9f) : Rand(-0.3f, 0.3f)) : Rand(0, MathF.Tau);
-                float sp = chase ? k.Speed : (rng.NextDouble() < 0.4 ? 0 : k.Speed * 0.4f);
-                m.Vx = MathF.Cos(ang) * sp; m.Vy = MathF.Sin(ang) * sp;
-            }
-            float mx = (m.Vx + m.Kx) * dt, my = (m.Vy + m.Ky) * dt;
+            bool safe = Dist(player.X, player.Y, ropeTile.x * T + 5, ropeTile.y * T + 5) <= 24;
+            bool chase = d < (k.Flies ? 140 : 115) && !safe;
             float fade = MathF.Pow(0.02f, dt);
-            m.Kx *= fade; m.Ky *= fade;
-            if (MonsterCanBe(m, m.X + mx, m.Y)) m.X += mx; else { m.Vx = -m.Vx; m.Kx = 0; }
-            if (MonsterCanBe(m, m.X, m.Y + my)) m.Y += my; else { m.Vy = -m.Vy; m.Ky = 0; }
-            if (MathF.Abs(m.Vx) > 1) m.Flip = m.Vx < 0;
-            if (d < 8 && iframes <= 0 && m.Hurt <= 0 && mode != "fade") HurtPlayer(k.Damage, m);
+            if (m.Phase == "")
+            {
+                m.Timer -= dt;
+                int busy = monsters.Count(o => !o.Dead && o.Phase is "windup" or "dash");
+                if (chase && d < atk.Range && m.Cool <= 0 && busy < 2 && mode != "fade")
+                {
+                    m.Phase = "windup"; m.PhaseT = 0; m.Hit = false;
+                    m.Vx = m.Vy = 0;
+                    if (d > 0.5f) { m.AimX = dx / d; m.AimY = dy / d; } else { m.AimX = m.Flip ? -1 : 1; m.AimY = 0; }
+                    Sfx.Play("warn");
+                }
+                else if (m.Kind == "slime")
+                {
+                    // Slimes hop: a quick burst, then a pause.
+                    if (m.Timer <= 0)
+                    {
+                        m.Timer = chase ? 0.75f : 1.1f;
+                        float ang = chase ? MathF.Atan2(dy, dx) : Rand(0, MathF.Tau);
+                        float burst = chase ? 2.3f : 1.6f;
+                        m.Vx = MathF.Cos(ang) * k.Speed * burst; m.Vy = MathF.Sin(ang) * k.Speed * burst;
+                    }
+                    else if (m.Timer < (chase ? 0.4f : 0.6f)) m.Vx = m.Vy = 0;
+                }
+                else if (m.Timer <= 0)
+                {
+                    m.Timer = m.Kind == "bat" ? Rand(0.2f, 0.45f) : Rand(0.4f, 1.0f);
+                    float ang = chase ? MathF.Atan2(dy, dx) + (m.Kind == "bat" ? Rand(-0.9f, 0.9f) : Rand(-0.3f, 0.3f)) : Rand(0, MathF.Tau);
+                    float sp = chase ? k.Speed : (rng.NextDouble() < 0.4 ? 0 : k.Speed * 0.4f);
+                    m.Vx = MathF.Cos(ang) * sp; m.Vy = MathF.Sin(ang) * sp;
+                }
+                float mx = (m.Vx + m.Kx) * dt, my = (m.Vy + m.Ky) * dt;
+                m.Kx *= fade; m.Ky *= fade;
+                var (bx, by) = MoveMonster(m, mx, my);
+                if (bx) { m.Vx = -m.Vx; m.Kx = 0; }
+                if (by) { m.Vy = -m.Vy; m.Ky = 0; }
+                if (MathF.Abs(m.Vx) > 1) m.Flip = m.Vx < 0;
+            }
+            else
+            {
+                m.PhaseT += dt;
+                m.Kx *= fade; m.Ky *= fade;
+                if (m.Phase == "windup")
+                {
+                    // Crabs and shades keep their eyes on you for the first half of the warning, then the line is fixed.
+                    if (m.Kind is "crab" or "shade" && m.PhaseT < atk.Windup * 0.5f && d > 1)
+                    {
+                        m.AimX = dx / d; m.AimY = dy / d;
+                    }
+                    if (MathF.Abs(m.AimX) > 0.2f) m.Flip = m.AimX < 0;
+                    MoveMonster(m, m.Kx * dt, m.Ky * dt);
+                    if (m.PhaseT >= atk.Windup) { m.Phase = "dash"; m.PhaseT = 0; Sfx.Play("splash"); }
+                }
+                else if (m.Phase == "dash")
+                {
+                    float step = atk.DashSpeed * dt;
+                    var (bx, by) = MoveMonster(m, m.AimX * step, m.AimY * step, stopOnBlock: true);
+                    if (!m.Hit && iframes <= 0 && mode != "fade" && Dist(m.X, m.Y, player.X, player.Y - 3) < atk.Radius)
+                    {
+                        m.Hit = true;
+                        HurtPlayer(k.Damage, m);
+                    }
+                    if (bx || by)
+                    {
+                        // Straight into a wall: a crab is stunned for a good while, the others just stop.
+                        Burst(m.X, m.Y - 3, "#c9c2ae", 5);
+                        m.Phase = m.Kind == "crab" ? "stun" : "recover"; m.PhaseT = 0;
+                        if (m.Kind == "crab") Floater("Crash!", m.X, m.Y - 14, "#ffd76a");
+                    }
+                    else if (m.PhaseT >= atk.DashTime) { m.Phase = "recover"; m.PhaseT = 0; }
+                }
+                else if (m.Phase == "stun")
+                {
+                    if (m.PhaseT >= 1.4f) { m.Phase = ""; m.Cool = 0.5f; m.Timer = 0; }
+                }
+                else if (m.Phase == "recover")
+                {
+                    MoveMonster(m, m.Kx * dt, m.Ky * dt);
+                    if (m.PhaseT >= atk.Recover) { m.Phase = ""; m.Cool = 0.35f; m.Timer = 0; }
+                }
+            }
+            // Just bumping into one still hurts, but a good deal less than being caught by a lunge.
+            if (d < 7 && iframes <= 0 && m.Touch <= 0 && mode != "fade" && m.Phase is not ("windup" or "stun"))
+            {
+                m.Touch = 1f;
+                HurtPlayer(atk.Touch, m);
+            }
         }
         monsters.RemoveAll(m => m.Dead);
     }
@@ -569,7 +728,7 @@ partial class Game
     {
         float taken = dmg * ArmourMul;
         state.hp = Math.Max(0, state.hp - taken);
-        iframes = 0.9f;
+        iframes = 0.75f;
         hurtFlash = 0.35f;
         lastHitT = time;
         Sfx.Play("hurt");
@@ -713,11 +872,12 @@ partial class Game
         foreach (var o in list.OrderBy(o => o.y)) o.draw();
         DrawFishing(t);
         DrawParticles();
+        DrawCaveSparkles(t);
 
         // Always dark underground: your own light, daylight down the ladder, and anything that glows.
         bool ancient = caveFloor == AncientFloor;
         Array.Fill(dark, ancient ? 0.62f : 0.72f);
-        LightHole(player.X, player.Y - 6, Wears("headlamp") ? 100 : 64, 0.95f);
+        LightHole(player.X, player.Y - 6, (Wears("headlamp") ? 100 : 64) + MathF.Sin(t * 8.3f) * 1.2f + MathF.Sin(t * 3.1f) * 0.8f, 0.95f);
         LightHole(ropeTile.x * T + 5, ropeTile.y * T, 46, 0.9f);
         if (fish != null) LightHole(fish.Bx, fish.By, 14, 0.5f);
         foreach (var n in nodes)
@@ -732,6 +892,8 @@ partial class Game
             if (guardian != null) LightHole(guardian.X, guardian.Y - 6, 30, 0.6f);
         }
         ApplyDark(new Color(5, 4, 8, 255));
+        DrawCaveDust(t);
+        foreach (var m in monsters) if (m.Kind == "slime") pix.Glow(m.X, m.Y - 3, 9, Pal.Rgba(110, 230, 120, 0.16f));
         foreach (var n in nodes)
             if (!n.Mined && n.Kind is "crystal" or "abyssite")
                 pix.Glow(n.X * T + 5, n.Y * T, 12, n.Kind == "crystal" ? Pal.Rgba(127, 232, 255, 0.25f) : Pal.Rgba(155, 107, 224, 0.28f));

@@ -72,7 +72,7 @@ partial class Game
     public const float MlJettyX = (MlJettyX1 + 0.5f) * 10, MlJettyY = MlJettyRow * 10 + 7;
     const float MlBoatX = (MlJettyX0 - 1.2f) * 10, MlBoatY = MlJettyRow * 10 + 5;
     // Aling Sela's house above the harbour, and where you wake if you faint anywhere on Marilaya's waters.
-    const float SelaX = (MlX + 5.9f * MlS) * T, SelaY = (MlY + 4.7f * MlS) * T;
+    const float SelaX = (MlX + 6.65f * MlS) * T, SelaY = (MlY + 4.7f * MlS) * T;
     const float MlWakeX = SelaX, MlWakeY = SelaY + 9;
     // The river (Boac's), from the hills to the west coast, in trace units.
     static readonly (float x, float y)[] MlRiver = { (10.6f, 14.4f), (9.2f, 13.6f), (7.8f, 13.3f), (6.4f, 12.9f), (4.4f, 12.3f), (2.6f, 12.0f), (1.0f, 11.8f) };

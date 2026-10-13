@@ -953,8 +953,8 @@ partial class Game
     {
         LookData.DrawFigure(p, "#b07a52", "#2b1d14", "#f2ecf8", "#3f4a7a", true, 0, "#e04b3a", x, y, face, step, bob: bob, blink: blink);
         // Her glasses and a pencil behind her ear.
-        if (face is "down") { p.Rect(x - 2, y - 10 - bob, 2, 1, "#10243a"); p.Rect(x + 1, y - 10 - bob, 2, 1, "#10243a"); }
-        p.Rect(face == "left" ? x + 2 : x - 3, y - 12 - bob, 1, 2, "#f2c94a");
+        if (face is "down") { p.Rect(x - 2, y - 10 - LookData.Stature - bob, 2, 1, "#10243a"); p.Rect(x + 1, y - 10 - LookData.Stature - bob, 2, 1, "#10243a"); }
+        p.Rect(face == "left" ? x + 2 : x - 3, y - 12 - LookData.Stature - bob, 1, 2, "#f2c94a");
     }
 
     /* ---------- The school, outdoors ---------- */

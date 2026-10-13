@@ -48,7 +48,7 @@ partial class Game
     // The sea from the foamy edge out to the deep, and the ponds from their edge to their middle.
     // Tones 0-1 are the shallows (wadeable), 2 and up the deep; ShallowRim marks the line between them.
     static readonly Color[] SeaTones = Tones("#3d97b8", "#2f7fa3", "#266893", "#225e89", "#1f5580", "#1c4d77");
-    static readonly Color ShallowRim = Pal.C("#21597f");
+    static readonly Color ShallowRim = Pal.C("#21597f"), BankWater = Pal.C("#2e7a62");
     static readonly Dictionary<char, Color[]> PondTones = new()
     {
         ['l'] = Tones("#3fb5a5", "#2a9d8f", "#228a7e"), ['o'] = Tones("#3cc4bb", "#22a6a0", "#1b928d"), ['m'] = Tones("#5e7449", "#4f6440", "#44573a")
@@ -314,7 +314,25 @@ partial class Game
             float far = Math.Clamp((d - 2) / 2, 0, 1);
             return RampAt(SeaTones, Math.Max(2, d + (VNoise(wx, wy, 48, 175) - 0.5f) * 1.2f * far), wx, wy);
         }
-        if (PondTones.TryGetValue(g, out var pond)) return RampAt(pond, DepthAt(wx, wy), wx, wy);
+        if (PondTones.TryGetValue(g, out var pond))
+        {
+            var pc = RampAt(pond, DepthAt(wx, wy), wx, wy);
+            // Banks: the water takes on the green of what's beside it for a pixel or two (the old light rim next to dark grass
+            // looked cut out), and where a river runs into the sea it takes the sea's colour over the last few pixels.
+            if (g is 'l' or 'o')
+            {
+                int landD = 9;
+                for (int k = 1; k <= 3 && landD > 3; k++)
+                    if (Shore(ShapePx(wx + k, wy)) || Shore(ShapePx(wx - k, wy)) || Shore(ShapePx(wx, wy + k)) || Shore(ShapePx(wx, wy - k))) landD = k;
+                if (landD <= 3) pc = Pix.Mix(pc, BankWater, landD == 1 ? 0.55f : landD == 2 ? 0.32f : 0.14f);
+                int seaD = 9;
+                for (int k = 2; k <= 8 && seaD > 8; k += 2)
+                    if (SeaLike(ShapePx(wx + k, wy)) && ShapePx(wx + k, wy) != 'd' || SeaLike(ShapePx(wx - k, wy)) && ShapePx(wx - k, wy) != 'd'
+                        || SeaLike(ShapePx(wx, wy + k)) && ShapePx(wx, wy + k) != 'd' || SeaLike(ShapePx(wx, wy - k)) && ShapePx(wx, wy - k) != 'd') seaD = k;
+                if (seaD <= 8) pc = Pix.Mix(pc, SeaTones[0], 0.7f * (1 - (seaD - 2) / 8f));
+            }
+            return pc;
+        }
         if (!GroundTones.TryGetValue(g, out var tones)) return Pal.C(TileCol.TryGetValue(g, out var tc) ? tc.Item1 : "#e8cf96");
         int tx = wx / T;
         if (Shore(g) && WetEdge.TryGetValue(g, out var wet)
@@ -665,11 +683,11 @@ partial class Game
         foreach (var tr in trees)
             if (tr.kind is 't' or 'h' && tr.x >= vx0 && tr.x <= vx1 && tr.y >= vy0 && tr.y <= vy1 + 2 && fxRng.Next(++seen) == 0) pick = tr;
         if (pick.x < 0) return;
-        float bx = pick.x * T + 5, by = pick.y * T + 9;
+        float bx = pick.x * T + 5, by = pick.y * T + 9, tall = TreeScale(pick.kind);
         string[] cols = pick.kind == 't' ? new[] { "#5aa047", "#7cc25a", "#c9b34a" } : new[] { "#4caa55", "#6fc46a" };
         leaves.Add(new Leaf
         {
-            X = bx + (float)fxRng.NextDouble() * 18 - 9, Y = by - 14 - (float)fxRng.NextDouble() * 8, Ground = by + (float)fxRng.NextDouble() * 10 - 2,
+            X = bx + ((float)fxRng.NextDouble() * 18 - 9) * tall, Y = by - (14 + (float)fxRng.NextDouble() * 8) * tall, Ground = by + (float)fxRng.NextDouble() * 10 - 2,
             Vx = Stormy ? -30 : (float)fxRng.NextDouble() * 6 - 3, Vy = 7 + (float)fxRng.NextDouble() * 5, Life = 7, Phase = (float)fxRng.NextDouble() * 6,
             Color = Pal.C(cols[fxRng.Next(cols.Length)])
         });
@@ -686,13 +704,16 @@ partial class Game
     }
 
     /* ---------- Trees ---------- */
-    static readonly Color Bark = Pal.C("#6b4a2b"), BarkLight = Pal.C("#8a6239"), BarkDark = Pal.C("#4e3520"), TreeShadow = Pal.Rgba(18, 46, 40, 0.24f),
+    static readonly Color Bark = Pal.C("#6b4a2b"), BarkLight = Pal.C("#8a6239"), BarkDark = Pal.C("#4e3520"), TreeShadow = Pal.Rgba(12, 36, 34, 0.32f),
         TreeShadowSoft = Pal.Rgba(18, 46, 40, 0.12f);
-    static readonly Color[] OakLeaf = Tones("#24502a", "#2f6428", "#3f7d35", "#5aa047", "#7cc25a"),
+    // The canopies are deliberately a different green from the ground: deeper and bluer in the shade, a warm yellow-green
+    // in the light, and ringed by a dark outline, so a tree reads against grass of any tone (0 outline, 1 shade, 2 body,
+    // 3 light, 4 highlight).
+    static readonly Color[] OakLeaf = Tones("#14382a", "#1d5a38", "#2b7a40", "#4a9a42", "#9bd75c"),
         FirLeaf = Tones("#173a2c", "#234a37", "#2e5e46", "#3f7a5a"),
-        PalmLeaf = Tones("#1f5a2b", "#2f7a3a", "#4caa55"), JunglePalmLeaf = Tones("#173f22", "#24602f", "#3a8a45"),
+        PalmLeaf = Tones("#143f2a", "#237a3c", "#52b448", "#a2dc62"), JunglePalmLeaf = Tones("#0f3321", "#1b6a35", "#47a548", "#92d65a"),
         CactusSkin = Tones("#2a5226", "#3d6e2f", "#4f8a3c", "#6aa84f", "#8fc76a"),
-        BushLeaf = Tones("#24502a", "#2f6428", "#3f7d35", "#5aa047");
+        BushLeaf = Tones("#14382a", "#1d5a38", "#2b7a40", "#6cb84c");
     static readonly Color Snow = Pal.C("#eef5f8"), SnowBright = Pal.C("#ffffff");
 
     // A filled round blob of pixel rows, for canopies and bushes.
@@ -713,11 +734,13 @@ partial class Game
         int X = tx * T, Y = ty * T;
         if (live && chopTile == (tx, ty) && shakeT > 0) X += (int)MathF.Round(MathF.Sin(time * 70) * 1.5f);
         int bx = X + 5, by = Y + 9, sw = kind is 't' or 'f' or 'h' ? Sway(tx, ty) : 0;
-        float s = 0.9f + 0.2f * (float)Pix.Hash(tx, ty, 61);
+        // Trees are properly tall now: a big oak stands three to four times as high as you do, a palm nearly as much.
+        float s = (0.9f + 0.2f * (float)Pix.Hash(tx, ty, 61)) * TreeScale(kind);
         // Higher up Marilaya's hills the trees grow smaller, so the slope shows between them.
         if (tx >= MlStart) s *= 1 - 0.3f * Math.Clamp((MlHeight(MlLx(X + 5), MlLy(Y + 5)) - 0.28f) / 0.35f, 0, 1);
         int m = Pix.Hash(tx, ty, 62) < 0.5 ? 1 : -1;
         var (height, half) = kind switch { 't' => (30, 12), 'f' => (31, 9), 'h' => (30, 12), 'c' => (21, 7), _ => (0, 0) };
+        height = (int)(height * TreeScale(kind)); half = (int)(half * TreeScale(kind));
         bool Hides(float x, float y) => y < by - 1 && y > by - height && MathF.Abs(x - bx) < half;
         bool fade = live && height > 0 && scene == "world" && (Hides(player.X, player.Y) || !TomasInBed && Hides(tomasX, tomasY));
         switch (kind)
@@ -745,39 +768,58 @@ partial class Game
     void DrawOak(int tx, int ty, int bx, int by, int sw, float s, int m)
     {
         int trunk = (int)MathF.Round(14 * s);
-        pix.Rect(bx - 2, by - trunk, 4, trunk, Bark);
-        pix.Rect(bx - 2, by - trunk, 1, trunk, BarkLight);
-        pix.Rect(bx + 1, by - trunk, 1, trunk, BarkDark);
-        pix.Rect(bx - 3, by - 2, 6, 2, Bark); pix.Rect(bx - 3, by - 2, 1, 1, BarkLight);
-        pix.Rect(bx - 4, by - 1, 1, 1, BarkDark); pix.Rect(bx + 3, by - 1, 1, 1, BarkDark);
+        int tw = Math.Max(4, (int)MathF.Round(2.6f + s * 1.4f)), th = tw / 2;   // a thicker trunk for a bigger tree
+        pix.Rect(bx - th, by - trunk, tw, trunk, Bark);
+        pix.Rect(bx - th, by - trunk, 1, trunk, BarkLight); if (tw >= 5) pix.Rect(bx - th + 1, by - trunk, 1, trunk, BarkLight);
+        pix.Rect(bx - th + tw - 1, by - trunk, 1, trunk, BarkDark);
+        pix.Rect(bx - th - 1, by - 2, tw + 2, 2, Bark); pix.Rect(bx - th - 1, by - 2, 1, 1, BarkLight);
+        pix.Rect(bx - th - 2, by - 1, 1, 1, BarkDark); pix.Rect(bx - th + tw + 1, by - 1, 1, 1, BarkDark);
         float cy = by - 17 * s, r = 7.5f * s;
+        // Five overlapping lobes (the low one fills the gap above the trunk, so no sky shows through the middle).
         Span<(float ox, float oy, float r)> lobes = stackalloc (float, float, float)[]
         {
-            (0.5f, -1, r), (-5.5f * m, 3, r * 0.68f), (6 * m, 2.5f, r * 0.64f), (2 * m, -6, r * 0.56f)
+            (0.5f * s, -1 * s, r), (-5.5f * m * s, 3 * s, r * 0.68f), (6 * m * s, 2.5f * s, r * 0.64f), (2 * m * s, -6 * s, r * 0.56f), (0.5f * m * s, 4.5f * s, r * 0.62f)
         };
-        foreach (var l in lobes) Disc(bx + l.ox + sw, cy + l.oy + 1, l.r + 1, OakLeaf[0]);
-        foreach (var l in lobes) Disc(bx + l.ox + sw, cy + l.oy + 0.5f, l.r, OakLeaf[1]);
-        foreach (var l in lobes) Disc(bx + l.ox + sw - 0.5f, cy + l.oy - 0.5f, l.r - 0.9f, OakLeaf[2]);
-        foreach (var l in lobes) Disc(bx + l.ox + sw - 1.5f, cy + l.oy - 2, l.r * 0.52f, OakLeaf[3]);
-        Disc(bx + sw - 2.5f, cy - 4.5f, r * 0.24f, OakLeaf[4]);
-        // Clumps of leaves: a few darker and lighter flecks.
-        for (int i = 0; i < 8; i++)
+        // The top moves most in the wind, the base hardly at all.
+        float Wob(float oy) => sw * Math.Clamp(0.55f - oy / (r * 3f), 0.3f, 1f);
+        // The silhouette: every lobe's outline, with a few leafy bumps on the outward side so it isn't a row of circles.
+        foreach (var l in lobes)
         {
-            float a = (float)Pix.Hash(tx, ty, 200 + i) * MathF.Tau, d = (float)Pix.Hash(tx, ty, 210 + i) * r * 0.75f;
-            pix.Rect(bx + sw + MathF.Cos(a) * d * 1.2f, cy + MathF.Sin(a) * d * 0.8f, 1, 1, i % 3 == 0 ? OakLeaf[3] : OakLeaf[1]);
+            float lx = bx + l.ox + Wob(l.oy), ly = cy + l.oy;
+            Disc(lx, ly + 0.8f, l.r + 1, OakLeaf[0]);
+            float outward = MathF.Atan2(l.oy + 1, l.ox + 0.01f);
+            for (int i = 0; i < 4; i++)
+            {
+                float a = outward + ((float)Pix.Hash(tx, ty * 7 + i, 200 + (int)(l.ox * 3)) - 0.5f) * 2.4f, d = l.r + 0.2f;
+                Disc(lx + MathF.Cos(a) * d, ly + 0.8f + MathF.Sin(a) * d, 1.7f, OakLeaf[0]);
+                Disc(lx + MathF.Cos(a) * (d - 0.3f), ly + 0.4f + MathF.Sin(a) * (d - 0.3f), 1.1f, OakLeaf[1]);
+            }
+        }
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy), cy + l.oy + 0.5f, l.r, OakLeaf[1]);
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy) - 0.6f, cy + l.oy - 0.8f, l.r - 1.1f, OakLeaf[2]);
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy) - 1.4f, cy + l.oy - 2.1f, l.r * 0.6f, OakLeaf[3]);
+        // Clumps of sunlit leaves along the upper-left of every lobe: little scallops, never dark specks.
+        foreach (var l in lobes)
+        {
+            float lx = bx + l.ox + Wob(l.oy) - 1.4f, ly = cy + l.oy - 2.1f;
+            for (int i = 0; i < 3; i++)
+            {
+                float a = MathF.PI * (1.12f + 0.2f * i) + ((float)Pix.Hash(tx, ty, 215 + i + (int)(l.ox * 2)) - 0.5f) * 0.3f, d = l.r * 0.42f;
+                Disc(lx + MathF.Cos(a) * d, ly + MathF.Sin(a) * d * 0.9f, MathF.Max(1.1f, l.r * 0.2f), OakLeaf[4]);
+            }
         }
     }
 
     void DrawFir(int tx, int ty, int bx, int by, int sw, float s)
     {
-        pix.Rect(bx - 1, by - 6, 3, 6, Bark);
-        pix.Rect(bx - 1, by - 6, 1, 6, BarkLight);
+        pix.Rect(bx - 1, by - (int)(6 * s), 3, (int)(6 * s), Bark);
+        pix.Rect(bx - 1, by - (int)(6 * s), 1, (int)(6 * s), BarkLight);
         // Four tiers, widest at the bottom, a little uneven; the top sways the most.
         for (int k = 0; k < 4; k++)
         {
             int o = (int)MathF.Round(sw * k / 3f), yb = by - 5 - (int)(k * 6 * s);
             int hwMax = (int)MathF.Round((8.5f - k * 1.9f) * s) + (Pix.Hash(tx, ty, 220 + k) < 0.3 ? -1 : 0);
-            int rows = k == 3 ? 9 : 8;
+            int rows = Math.Max(8, (int)(6 * s) + 3) + (k == 3 ? 1 : 0);   // the tiers overlap whatever the size
             for (int r = 0; r < rows; r++)
             {
                 int hw = (int)MathF.Round(hwMax * (r + 1) / (float)rows), yy = yb - rows + 1 + r, x0 = bx + o - hw;
@@ -794,28 +836,106 @@ partial class Game
         pix.Rect(bx + sw, by - 5 - (int)(18 * s) - 9, 1, 1, SnowBright);
     }
 
+    // Cacti: five kinds by tile (a saguaro with two arms, with one, a plain ribbed column, a barrel with a flower, a prickly pear),
+    // each fluted with ribs, lit from the left, with an outline and pairs of pale spines, 1.5 times the first drawing.
+    static readonly Color[] CactusShade = Tones("#173a1c", "#2f6a34", "#478c43", "#6fb25a", "#a6d884");   // outline, shade, body, light, highlight
+
+    void CactusPart(int x, int y, int w, int h, bool round, Color outline)
+    {
+        // The outline first (one pixel round), then the body column by column: dark on the right, light on the left, a rib line
+        // down the middle, and a few spines.
+        if (round) { pix.Rect(x - 1, y + 1, w + 2, h - 1, outline); pix.Rect(x, y - 1, w, 2, outline); }
+        else pix.Rect(x - 1, y - 1, w + 2, h + 1, outline);
+        for (int c = 0; c < w; c++)
+        {
+            float u = w <= 1 ? 0.5f : c / (float)(w - 1);
+            var tone = u < 0.18f ? CactusShade[3] : u < 0.8f ? CactusShade[2] : CactusShade[1];
+            int top = round && (c == 0 || c == w - 1) ? y + 1 : y;
+            pix.Rect(x + c, top, 1, h - (top - y), tone);
+            if (u < 0.18f) pix.Rect(x + c, top, 1, 1, CactusShade[4]);
+            if (w >= 5 && c == w / 2) pix.Rect(x + c, top + 1, 1, h - (top - y) - 1, CactusShade[1]);
+        }
+        for (int k = 2; k < h - 1; k += 3)
+        {
+            pix.Rect(x + 1, y + k, 1, 1, Pal.C("#f2ecd0"));
+            if (w >= 4) pix.Rect(x + w - 2, y + k + 1, 1, 1, Pal.C("#d8d2b0"));
+        }
+    }
+
     void DrawCactus(int tx, int ty, int bx, int by, float s, int m)
     {
-        int top = by - (int)(19 * s);
-        int lx = m > 0 ? -1 : 1;   // which side the low arm is on
-        int la = by - 9, ra = by - 12 - (int)(Pix.Hash(tx, ty, 230) * 3);
-        Span<(int x, int y, int w, int h)> parts = stackalloc (int, int, int, int)[]
+        var ol = CactusShade[0];
+        int kind = (int)(Pix.Hash(tx, ty, 230) * 5) % 5;
+        float k = s;   // s already carries TreeScale
+        int trunkW = Math.Max(5, (int)MathF.Round(3.4f * k)), tx0 = bx - trunkW / 2;
+        var ground = Pal.Rgba(10, 30, 20, 0.28f);
+        if (kind == 3)
         {
-            (bx - 2, top, 5, by - top),
-            (lx < 0 ? bx - 5 : bx + 3, la, 3, 2), (lx < 0 ? bx - 7 : bx + 5, la - 6, 3, 8),
-            (lx < 0 ? bx + 3 : bx - 5, ra, 3, 2), (lx < 0 ? bx + 5 : bx - 7, ra - 5, 3, 7)
-        };
-        void Capsule(int x, int y, int w, int h, Color c) { pix.Rect(x, y + 1, w, h - 1, c); pix.Rect(x + 1, y, w - 2, 1, c); }
-        foreach (var p in parts) Capsule(p.x - 1, p.y - 1, p.w + 2, p.h + 1, CactusSkin[0]);
-        foreach (var p in parts)
-        {
-            Capsule(p.x, p.y, p.w, p.h, CactusSkin[2]);
-            if (p.h > 2) { pix.Rect(p.x, p.y + 1, 1, p.h - 1, CactusSkin[3]); pix.Rect(p.x + p.w - 1, p.y + 1, 1, p.h - 1, CactusSkin[1]); }
+            // A barrel: short and fat (widest in the middle), ribbed, with a crown of flowers.
+            int w = (int)MathF.Round(9 * k), h = (int)MathF.Round(9 * k);
+            pix.Rect(bx - w / 2 - 1, by - 1, w + 2, 2, ground);
+            for (int r = 0; r < h; r++)
+            {
+                float f = (r + 0.5f) / h, half = w / 2f * MathF.Sqrt(MathF.Max(0.05f, 1 - MathF.Pow(2 * f - 1, 2) * 0.55f));
+                int x0 = (int)MathF.Round(bx - half), x1 = (int)MathF.Round(bx + half);
+                for (int x = x0; x <= x1; x++)
+                {
+                    float u = (x - bx) / MathF.Max(1, half);
+                    bool edge = x == x0 || x == x1 || r == h - 1 || r == 0;
+                    var c = edge ? ol : u < -0.55f ? CactusShade[3] : u < 0.45f ? CactusShade[2] : CactusShade[1];
+                    if (!edge && (MathF.Abs(u + 0.45f) < 0.1f || MathF.Abs(u - 0.05f) < 0.1f || MathF.Abs(u - 0.55f) < 0.1f)) c = CactusShade[1];
+                    if (!edge && r % 3 == 1 && (MathF.Abs(u + 0.45f) < 0.1f || MathF.Abs(u - 0.05f) < 0.1f)) c = Pal.C("#f2ecd0");
+                    pix.Rect(x, by - h + r, 1, 1, c);
+                }
+            }
+            for (int i = 0; i < 3; i++) pix.Rect(bx - 3 + i * 3, by - h - 1, 2, 2, i % 2 == 0 ? Pal.C("#f0b8c4") : Pal.C("#f3d96a"));
+            return;
         }
-        pix.Rect(bx - 1, top + 1, 1, by - top - 2, CactusSkin[4]);
-        pix.Rect(bx + 1, top + 2, 1, by - top - 3, CactusSkin[1]);
-        for (int i = 0; i < 5; i++) pix.Rect(bx + (i % 2 == 0 ? -3 : 3), top + 3 + i * 3, 1, 1, "#f2ecd0");
-        if (Pix.Hash(tx, ty, 5) > 0.6) { pix.Rect(bx - 1, top - 1, 3, 1, "#f2a5b5"); pix.Rect(bx, top - 2, 1, 1, "#e04b3a"); }
+        if (kind == 4)
+        {
+            // A prickly pear: flat paddles on paddles, with red fruit along the rims.
+            void Paddle(float cx, float cy, float rx, float ry)
+            {
+                for (int dy = (int)-ry - 1; dy <= ry + 1; dy++)
+                    for (int dx = (int)-rx - 1; dx <= rx + 1; dx++)
+                    {
+                        float d = dx * dx / (rx * rx) + dy * dy / (ry * ry);
+                        if (d > 1.18f) continue;
+                        float lit = -dx / rx * 0.5f - dy / ry * 0.6f;
+                        var c = d > 0.86f ? ol : lit > 0.3f ? CactusShade[3] : lit > -0.25f ? CactusShade[2] : CactusShade[1];
+                        pix.Rect(cx + dx, cy + dy, 1, 1, c);
+                        if (d < 0.8f && Pix.Hash((int)cx + dx, (int)cy + dy, 231) < 0.09) pix.Rect(cx + dx, cy + dy, 1, 1, Pal.C("#f2ecd0"));
+                    }
+            }
+            pix.Rect(bx - 6, by - 1, 12, 2, ground);
+            Paddle(bx, by - 5 * k, 4.2f * k, 5 * k);
+            Paddle(bx - 6 * k * m, by - 11 * k, 3.4f * k, 4.2f * k);
+            Paddle(bx + 5 * k * m, by - 13 * k, 3.6f * k, 4.4f * k);
+            foreach (var (fx, fy) in new[] { (bx - 8 * k * m, by - 15 * k), (bx + 7 * k * m, by - 18 * k), (bx - 2 * k, by - 18 * k) })
+                pix.Rect(fx, fy, 2, 2, Pal.C("#d6455c"));
+            return;
+        }
+        // The saguaros: a tall trunk (rounded at the top) with elbows, one or two arms, or none.
+        int top = by - (int)MathF.Round((kind == 2 ? 26 : 21) * k);
+        pix.Rect(bx - trunkW / 2 - 2, by - 1, trunkW + 4, 2, ground);
+        int armW = Math.Max(3, trunkW - 2);
+        if (kind != 2)
+        {
+            // A low arm (out at the elbow, then up) and, for kind 0, a higher one on the other side.
+            int la = by - (int)(8 * k), lh = (int)(8 * k), reach = (int)(4 * k) + trunkW / 2;
+            int lx = m < 0 ? bx - reach - armW + 1 : bx + reach - 1;
+            CactusPart(m < 0 ? bx - reach - armW + 1 : bx, la, reach + armW - 1, armW, false, ol);
+            CactusPart(lx, la - lh, armW, lh + armW, true, ol);
+            if (kind == 0)
+            {
+                int ra = by - (int)(13 * k), rh = (int)(6 * k);
+                int rx2 = m < 0 ? bx + reach - 1 : bx - reach - armW + 1;
+                CactusPart(m < 0 ? bx : bx - reach - armW + 1, ra, reach + armW - 1, armW, false, ol);
+                CactusPart(rx2, ra - rh, armW, rh + armW, true, ol);
+            }
+        }
+        CactusPart(tx0, top, trunkW, by - top, true, ol);
+        if (Pix.Hash(tx, ty, 5) > 0.55) { pix.Rect(bx - 1, top - 2, 3, 1, Pal.C("#f2a5b5")); pix.Rect(bx, top - 3, 1, 1, Pal.C("#e04b3a")); }
     }
 
     void DrawPalm(int tx, int ty, int bx, int by, int sw, float s, int m)
@@ -849,41 +969,126 @@ partial class Game
                 float u = j / len, fx = cx + ca * j + sw * u, fy = cy + sa * j * 0.7f + 6 * u * u;
                 pix.Rect(fx, fy, 1, 2, leaf[1]);
                 if (j % 2 == 0 && u > 0.25f) pix.Rect(fx, fy + 2, 1, 1, leaf[0]);
-                if (u < 0.85f && (upper || j % 2 == 1)) pix.Rect(fx, fy, 1, 1, leaf[2]);
+                if (u < 0.85f && (upper || j % 2 == 1)) pix.Rect(fx, fy, 1, 1, upper && j % 3 == 0 ? leaf[3] : leaf[2]);
             }
         }
         Disc(cx, cy, 1.6f, leaf[0]);
         pix.Rect(cx - 1, cy - 1, 2, 1, leaf[2]);
     }
 
+    // Bushes: bigger and rounder than they were, like the oaks (a dark outline, deep shade, a lit crown), in three shapes by tile
+    // (a low wide mound, a tall one, a tuft of lobes), with the berries sitting in the shade where they show.
     void DrawBush(int tx, int ty, int bx, int by)
     {
-        pix.Rect(bx - 6, by - 1, 12, 2, TreeShadow);
-        Span<(float ox, float oy, float r)> lobes = stackalloc (float, float, float)[] { (-3, -3, 3.2f), (3, -3, 3.2f), (0, -5, 4) };
-        foreach (var l in lobes) Disc(bx + l.ox, by + l.oy + 1, l.r + 1, BushLeaf[0]);
-        foreach (var l in lobes) Disc(bx + l.ox, by + l.oy + 0.5f, l.r, BushLeaf[1]);
-        foreach (var l in lobes) Disc(bx + l.ox - 0.5f, by + l.oy - 0.5f, l.r - 0.9f, BushLeaf[2]);
-        Disc(bx - 1.5f, by - 6.5f, 1.6f, BushLeaf[3]);
-        // Red berries, or little green calamansi on Habagat's bushes.
+        float s = (0.95f + 0.18f * (float)Pix.Hash(tx, ty, 63)) * 1.35f;
+        int shape = (int)(Pix.Hash(tx, ty, 64) * 3) % 3, m = Pix.Hash(tx, ty, 65) < 0.5 ? 1 : -1;
+        pix.Rect(bx - 8 * s, by - 1, (int)(16 * s), 2, TreeShadow);
+        pix.Rect(bx - 6 * s + 2, by + 1, (int)(12 * s), 1, TreeShadowSoft);
+        int sw = Sway(tx, ty) / 2;
+        (float ox, float oy, float r)[] lobes = shape switch
+        {
+            0 => new[] { (-4 * m * s, -3 * s, 3.4f * s), (3 * m * s, -3.2f * s, 3.6f * s), (0, -5.5f * s, 4.2f * s), (-1 * m * s, -2.5f * s, 3.8f * s) },
+            1 => new[] { (0, -4 * s, 4 * s), (-1.5f * m * s, -8 * s, 3.4f * s), (2.5f * m * s, -6 * s, 3.4f * s), (-3.2f * m * s, -2.4f * s, 3 * s) },
+            _ => new[] { (-5 * m * s, -2.5f * s, 3 * s), (0, -3.5f * s, 3.8f * s), (5 * m * s, -2.5f * s, 3 * s), (-2 * m * s, -6.5f * s, 3 * s), (2.5f * m * s, -6 * s, 2.8f * s) }
+        };
+        float Wob(float oy) => sw * Math.Clamp(0.4f - oy / (10 * s), 0.2f, 1);
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy), by + l.oy + 0.8f, l.r + 1, BushLeaf[0]);
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy), by + l.oy + 0.4f, l.r, BushLeaf[1]);
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy) - 0.5f, by + l.oy - 0.7f, l.r - 1.0f, BushLeaf[2]);
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy) - 1.1f, by + l.oy - 1.6f, l.r * 0.55f, OakLeaf[3]);
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy) - 1.6f, by + l.oy - 2.4f, MathF.Max(1.1f, l.r * 0.22f), BushLeaf[3]);
+        // Red berries, or little green calamansi on Habagat's bushes: in the middle and lower part, where the shade is.
         bool calamansi = BiomeAt(tx, ty) == 6;
         if (state.picked.GetValueOrDefault($"{tx},{ty}") != state.day)
-            foreach (var (ox, oy) in new[] { (-4, -3), (1, -6), (-1, -2), (3, -3), (-2, -6), (4, -5) })
+            for (int i = 0; i < 7; i++)
             {
+                int ox = (int)((Pix.Hash(tx, ty, 66 + i) - 0.5) * 11 * s), oy = (int)(-Pix.Hash(tx, ty, 80 + i) * 5.5 * s - 1.5 * s);
                 pix.Rect(bx + ox, by + oy, 1, 1, calamansi ? "#9ccc3a" : "#e04b3a");
-                if (ox % 2 == 0) pix.Rect(bx + ox, by + oy - 1, 1, 1, calamansi ? "#e0f08a" : "#ff9a8a");
+                if (i % 2 == 0) pix.Rect(bx + ox, by + oy - 1, 1, 1, calamansi ? "#e0f08a" : "#ff9a8a");
             }
     }
 
-    // Boulders: snow-capped, sandstone or mossy depending on the island.
+    // Boulders: no two alike. Each tile's hash picks one of six builds (a dome, a wide slab, a tall standing stone, a pair, a
+    // cluster of three, a leaning wedge), its mirroring, a tone shift and a few extras (a crack, moss on the green islands, a
+    // snow cap on Frostfang, a sandy dust in the Dunes), all lit from the upper left and ringed with a dark outline.
+    static readonly (string ol, string dk, string md, string lt, string hi)[] BoulderPalettes =
+    {
+        ("#2a2f33", "#4a5155", "#6d7478", "#979fa3", "#c4cacc"),   // grey (Saltmere and the islands)
+        ("#34414c", "#556573", "#7d8e9c", "#a9bac6", "#d9e6ee"),   // Frostfang's blue-grey
+        ("#5e3722", "#8f5835", "#b2744a", "#d09a68", "#ecc796"),   // Sunscald's sandstone
+        ("#2a3331", "#46544f", "#667770", "#8f9f96", "#bccbc2")    // Mirewood's damp stone
+    };
+
     void DrawBoulder(int tx, int ty, int X, int Y)
     {
         byte bi = BiomeAt(tx, ty);
-        var (ol, dk, md, lt) = bi == 2 ? ("#6e4128", "#9a5f3a", "#b5764a", "#d69a68") : bi == 1 ? ("#3f4a52", "#5e6b74", "#7d8b95", "#a9b6be")
-            : ("#35393b", "#4f5558", "#6e7478", "#8f959a");
-        pix.Rect(X, Y + 8, 11, 2, TreeShadow);
-        Rock(pix, X, Y, ol, dk, md, lt);
-        if (bi == 1) { pix.Rect(X + 3, Y + 2, 4, 1, "#ffffff"); pix.Rect(X + 2, Y + 3, 4, 1, "#eef5f8"); pix.Rect(X + 7, Y + 3, 1, 1, "#eef5f8"); }
-        if (bi == 3) { pix.Rect(X + 3, Y + 2, 3, 1, "#4caa55"); pix.Rect(X + 2, Y + 3, 2, 1, "#3f8a45"); pix.Rect(X + 7, Y + 6, 1, 1, "#3f8a45"); }
+        var pal = BoulderPalettes[bi == 1 ? 1 : bi == 2 ? 2 : bi == 3 ? 3 : 0];
+        double hv = Pix.Hash(tx, ty, 70), hm = Pix.Hash(tx, ty, 71), ht = Pix.Hash(tx, ty, 72);
+        int variant = (int)(hv * 6) % 6, dir = hm < 0.5 ? 1 : -1;
+        // One tint for the whole boulder: warmer or cooler, a little lighter or darker.
+        Color Tone(string hex) => Pix.Mix(Pal.C(hex), ht < 0.33 ? Pal.C("#9a8468") : ht < 0.66 ? Pal.C("#66788a") : Pal.C("#8f8f8f"), 0.10f + 0.1f * (float)Pix.Hash(tx, ty, 73));
+        var cols = new[] { Tone(pal.ol), Tone(pal.dk), Tone(pal.md), Tone(pal.lt), Tone(pal.hi) };
+        int cx = X + 5, baseY = Y + 9;
+        // The shadow falls to the right on the ground.
+        (int dx, int w, int h, float p)[] blobs = variant switch
+        {
+            0 => new[] { (0, 10, 8, 2f) },
+            1 => new[] { (0, 12, 6, 2.6f) },
+            2 => new[] { (0, 8, 12, 1.7f) },
+            3 => new[] { (-2, 8, 7, 2f), (3, 6, 5, 2f) },
+            4 => new[] { (-3, 5, 5, 2f), (1, 8, 9, 2f), (4, 4, 4, 2f) },
+            _ => new[] { (0, 10, 9, 1.4f) }
+        };
+        int minX = int.MaxValue, maxX = int.MinValue;
+        foreach (var b in blobs) { minX = Math.Min(minX, cx + b.dx * dir - b.w / 2); maxX = Math.Max(maxX, cx + b.dx * dir + b.w / 2); }
+        pix.Rect(minX + 2, baseY, maxX - minX, 2, TreeShadow);
+        pix.Rect(minX + 4, baseY + 2, Math.Max(1, maxX - minX - 4), 1, TreeShadowSoft);
+        // Back to front: the smaller stones behind, the biggest last.
+        int idx = 0;
+        foreach (var b in blobs.OrderBy(b => b.h))
+            RockBlob(cx + b.dx * dir, baseY, b.w, b.h, b.p, tx, ty, idx++, cols, bi, dir, variant == 5);
+        // A crack, and moss, on some.
+        int topY = baseY - blobs.Max(b => b.h);
+        if (Pix.Hash(tx, ty, 74) < 0.4)
+        {
+            int kx = cx + (int)(Pix.Hash(tx, ty, 75) * 5 - 2) * dir, ky = topY + 3;
+            pix.Rect(kx, ky, 1, 1, cols[0]); pix.Rect(kx + dir, ky + 1, 1, 1, cols[0]); pix.Rect(kx + dir, ky + 2, 1, 1, cols[0]); pix.Rect(kx + 2 * dir, ky + 3, 1, 1, cols[0]);
+        }
+        if (bi is 0 or 3 && Pix.Hash(tx, ty, 76) < (bi == 3 ? 0.7 : 0.4))
+        {
+            var moss = Pal.C("#5c8a3c"); var mossL = Pal.C("#8ab84e");
+            int mx = cx - 3 * dir, my = topY + 1;
+            pix.Rect(mx, my + 1, 3, 1, moss); pix.Rect(mx + dir, my, 2, 1, mossL); pix.Rect(mx, my + 2, 2, 1, moss); pix.Rect(mx - dir, my + 3, 1, 1, moss);
+        }
+    }
+
+    // One rock: rows from the top, each as wide as a superellipse of exponent p says, shaded by where its surface faces
+    // (light from the upper left), dithered between tones, with a dark outline and a darker foot.
+    void RockBlob(int cx, int baseY, int w, int h, float p, int tx, int ty, int idx, Color[] cols, byte bi, int dir, bool wedge)
+    {
+        for (int r = 0; r < h; r++)
+        {
+            float f = (r + 0.5f) / h;   // 0 top .. 1 bottom
+            float half = w / 2f * MathF.Pow(1 - MathF.Pow(1 - f, p), 1 / p);
+            // The jagged edge: a pixel of wobble from a hash, a wedge leaning with its top to the left.
+            half += ((float)Pix.Hash(tx + idx, ty * 9 + r, 77) - 0.5f) * 1.1f;
+            float lean = wedge ? (1 - f) * 1.8f * dir : 0;
+            int y = baseY - h + r;
+            int x0 = (int)MathF.Round(cx + lean - half), x1 = (int)MathF.Round(cx + lean + half);
+            if (x1 <= x0) x1 = x0 + 1;
+            for (int x = x0; x <= x1; x++)
+            {
+                float nx = (x - (cx + lean)) / MathF.Max(1, half);
+                bool edge = x == x0 || x == x1 || r == 0;
+                // Which way this part of the surface faces: up and to the left is light, down and to the right is dark.
+                float L = -nx * 0.55f * dir + (0.55f - f) * 1.0f + ((float)Pix.Hash(x, y, 78) - 0.5f) * 0.18f + (BayerAt(x, y) - 0.5f) * 0.22f;
+                Color c = edge ? cols[0] : r == h - 1 ? cols[1] : L > 0.55f ? cols[4] : L > 0.28f ? cols[3] : L > -0.12f ? cols[2] : cols[1];
+                // Snow on top of Frostfang's boulders, scalloped along its lower edge; dust in the Dunes.
+                if (bi == 1 && !edge && f < 0.4f + (float)Pix.Hash(x, y, 79) * 0.12f) c = f < 0.22f ? Snow : SnowBright;
+                else if (bi == 1 && edge && r < h / 2) c = cols[0];
+                pix.Rect(x, y, 1, 1, c);
+            }
+        }
     }
 
     // A round-shouldered rock filling most of a tile, with a dark outline so it reads on any ground, lit from the upper left.

@@ -71,7 +71,7 @@ partial class Game
     {
         slotInfo = new State[SaveFile.Slots + 1];
         slotBad = new bool[SaveFile.Slots + 1];
-        var face = new Pix(16, 18);
+        var face = new Pix(16, 20);
         for (int n = 1; n <= SaveFile.Slots; n++)
         {
             slotInfo[n] = SaveFile.Read(n);
@@ -79,8 +79,8 @@ partial class Game
             if (slotTex[n].Id != 0) { UnloadTexture(slotTex[n]); slotTex[n] = default; }
             if (slotInfo[n] == null) continue;
             Array.Fill(face.Buf, Color.Blank);
-            LookData.DrawPerson(face, slotInfo[n].look, 8, 16, "down", 0, shadow: false);
-            slotTex[n] = Gfx.ToTexture(face.Buf, 16, 18, TextureFilter.Point);
+            LookData.DrawPerson(face, slotInfo[n].look, 8, 18, "down", 0, shadow: false);
+            slotTex[n] = Gfx.ToTexture(face.Buf, 16, 20, TextureFilter.Point);
         }
         hasSave = SaveFile.Any();
         newestSlot = SaveFile.Newest();
@@ -156,17 +156,25 @@ partial class Game
         if (slotInfo == null) RefreshSlots();
         if (titleView == "slots") { DrawSlots(); return; }
         if (titleView == "settings") { DrawMenu(); return; }
+        // The title as it was: the big "Fesh", the line about the game, and the menu over the world's tour; now with a sea under the
+        // letters and a fish leaping over them (TitleArt.cs), and the words set with a soft shadow so they read on any island.
         const float logo = 176, tfs = 26, tlh = 35;
         var tag = Gfx.Wrap(TitleTagline, FontKind.Note, tfs, 600);
         int newest = newestSlot;
-        float total = 160 + 22 + tag.Count * tlh + 26 + 56 + 14 + 44 + (newest > 0 ? 30 : 0);
+        float total = 160 + 40 + tag.Count * tlh + 26 + 56 + 14 + 44 + (newest > 0 ? 30 : 0);
         float y = (Gfx.LH - total) / 2 - 10;
         float cx = Gfx.LW / 2;
         Gfx.TextCenter("Fesh", cx, y + 21, FontKind.Ui700, logo, Pal.C("rgba(0,0,0,0.22)"));
         Gfx.TextCenter("Fesh", cx, y + 10, FontKind.Ui700, logo, Pal.Ink);
         Gfx.TextCenter("Fesh", cx, y, FontKind.Ui700, logo, Pal.Sand);
-        y += 160 + 22;
-        for (int i = 0; i < tag.Count; i++) Gfx.TextCenter(tag[i], cx, y + i * tlh, FontKind.Note, tfs, Pal.Paper);
+        // The waves lie along the foot of the letters (the scene's surface is 24 rows down, 6 px each).
+        PixelScene(cx - WavesW * 3, y + 150 - WavesSurf * 6, WavesW, WavesH, 6, p => PaintTitleWaves(p, time), 60);
+        y += 160 + 40;
+        for (int i = 0; i < tag.Count; i++)
+        {
+            Gfx.TextCenter(tag[i], cx, y + i * tlh + 2, FontKind.Note, tfs, Pal.C("rgba(0,0,0,0.45)"));
+            Gfx.TextCenter(tag[i], cx, y + i * tlh, FontKind.Note, tfs, Pal.Paper);
+        }
         y += tag.Count * tlh + 26;
         var row = hasSave ? new[] { "Continue", "Load game", "New game" } : new[] { "New game" };
         float w = row.Sum(BigW) + 13 * (row.Length - 1), x = cx - w / 2;
@@ -187,8 +195,9 @@ partial class Game
         if (newest > 0 && slotInfo[newest] is State last)
         {
             Gfx.TextCenter($"Continue: {SlotTitle(last)}, day {last.day} (slot {newest})", cx, y + 8, FontKind.Ui500, 18, Pal.WithAlpha(Pal.Paper, 0.85f));
-            y += 30;
+            y += 34;
         }
+        else y += 6;
         y += 14;
         float sw = SmallW("Settings") + 10 + SmallW("Quit");
         if (SmallButton("Settings", cx - sw / 2, y)) OpenTitleSettings();
@@ -233,7 +242,7 @@ partial class Game
         Gfx.Rect(px, py, pw, ph, Pal.C("#9fd0e0"), 4);
         Gfx.Rect(px, py + ph - 24, pw, 24, Pal.Sand, 0);
         if (s != null && slotTex[n].Id != 0)
-            DrawTexturePro(slotTex[n], new Rectangle(0, 0, 16, 18), Gfx.S(px + pw / 2 - 40, py + ph - 94, 80, 90), Vector2.Zero, 0, Color.White);
+            DrawTexturePro(slotTex[n], new Rectangle(0, 0, 16, 20), Gfx.S(px + pw / 2 - 40, py + ph - 99, 80, 100), Vector2.Zero, 0, Color.White);
         else Gfx.TextCenter(slotBad[n] ? "!" : "?", px + pw / 2, py + ph / 2 - 24, FontKind.Ui700, 40, Pal.C("rgba(16,36,58,0.35)"));
         float tx = px + pw + 18, ty = y + 14;
         Gfx.Text(s != null && s.slotName is { Length: > 0 } ? $"Slot {n}  ·  {s.look.name}" : $"Slot {n}", tx, ty + 4, FontKind.Ui600, 17, Muted);

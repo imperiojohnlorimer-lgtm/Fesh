@@ -282,6 +282,8 @@ partial class Game
     // The ground drawn under a tree, bush or the cave mouth.
     char Ground(char t, int x, int y) => t switch
     {
+        'b' when biome[y, x] == 7 && !LandDeck(x, y) => 'l',   // Marilaya's footbridge crosses the river: the water under it is the river's
+        'd' or 'b' when LandDeck(x, y) => NeighbourGround(x, y, 's'),   // a deck over land (a jetty's landward end, a bridge over a beach) stands on that ground, not on sea
         't' or 'h' or 'R' or 'y' when biome[y, x] == 7 => MlGroundUnder(x, y),
         't' => NeighbourGround(x, y, 'g'), 'f' => 'n', 'c' => 'D', 'C' => 'n',
         'h' => biome[y, x] switch { 2 => 'g', 3 => 'j', 4 => NeighbourGround(x, y, 's'), 6 => HabagatPalmGround(x, y), _ => NeighbourGround(x, y, 'j') },
@@ -345,6 +347,8 @@ partial class Game
             for (int x = 0; x < COLS; x++) ShapeTile(x, y);
         for (int y = 0; y < ROWS; y++)
             for (int x = 0; x < COLS; x++) PaintTile(x, y);
+        for (int y = 0; y < ROWS; y++)
+            for (int x = 0; x < COLS; x++) PaintBridge(x, y);
         FindShore();
     }
 
@@ -362,6 +366,9 @@ partial class Game
         Ring(1, (i, j) => groundCache[j, i] = Ground(worldMap[j, i], i, j));
         Ring(2, ShapeTile);
         Ring(3, PaintTile);
+        bridgeClip = (Math.Max(0, x - 3) * T, Math.Max(0, y - 3) * T, (Math.Min(COLS - 1, x + 3) + 1) * T, (Math.Min(ROWS - 1, y + 3) + 1) * T);
+        Ring(4, PaintBridge);   // a bridge four tiles away still throws its shadow into the cleared tiles
+        bridgeClip = null;
     }
 
     void PaintTile(int x, int y)
@@ -408,23 +415,7 @@ partial class Game
             g.Rect(X + 1, Y + 7, 3, 1, "#7fc0d6");
         }
         if (t == 'p') { g.Rect(X + 2, Y + 3, 2, 1, "#a88c58"); g.Rect(X + 6, Y + 7, 1, 1, "#a88c58"); }
-        if (t == 'd')
-        {
-            g.Rect(X, Y + 1, T, 8, "#9a6a3a");
-            for (int i = 0; i < T; i += 3) g.Rect(X + i, Y + 1, 1, 8, "#7a5230");
-            g.Rect(X, Y + 1, T, 1, "#b58250");
-            g.Rect(X, Y + 9, T, 1, "#1f5a7a");
-            g.Rect(X + 1, Y + 9, 1, 1, "#5b3a24"); g.Rect(X + 8, Y + 9, 1, 1, "#5b3a24");
-        }
-        else if (t == 'b')
-        {
-            g.Rect(X + 1, Y, 8, T, "#9a6a3a");
-            for (int i = 0; i < T; i += 3) g.Rect(X + 1, Y + i, 8, 1, "#7a5230");
-            g.Rect(X + 1, Y, 1, T, "#b58250");
-            g.Rect(X + 9, Y, 1, T, "#1f5a7a");
-            g.Rect(X, Y + 4, 1, 2, "#5b3a24");
-        }
-        else if (t == 'x')
+        if (t == 'x')
         {
             g.Rect(X + 1, Y + 2, 3, 6, "#7a5230");
             g.Rect(X + 6, Y + 4, 3, 2, "#7a5230");
@@ -477,6 +468,8 @@ partial class Game
         {
             var s = Data.Spots[i];
             if (!SpotHere(s)) continue;
+            // A drained pond has no water for ripples, bubbles, fish shadows or leaping fish (RestlessSea.cs draws what is left).
+            if (s.Id == "amihanpond" && PondClosed) continue;
             var (sx, sy) = SpotPos(s);
             bool frozen = s.Id == "icehole" && IceFrozen;
             if (Wears("sunglasses") && mode != "spear")
@@ -628,6 +621,19 @@ partial class Game
             float ph = (t * 0.9f + k * 0.37f + fx * 0.01f) % 1;
             pix.Rect(fx + MathF.Sin(ph * 9 + k * 2) * 2, fy - 7 - ph * 10, 1, 1, Pal.Rgba(255, 210, 110, 1 - ph));
         }
+        // Smoke curling off it, leaning the way the wind is blowing.
+        if (scene == "world" && pix.W == W)
+            for (int k = 0; k < 5; k++)
+            {
+                float ph = (t * 0.33f + k * 0.2f + fx * 0.013f) % 1;
+                float lean = 4 + Gust(fx, fy) * 14;
+                float sx = fx + 1 + MathF.Sin(ph * 6 + k * 1.7f) * 1.6f + lean * ph * ph, sy = fy - 9 - ph * 24;
+                float a = (ph < 0.15f ? ph / 0.15f : 1 - ph) * 0.2f * (1 - 0.5f * Darkness);
+                int r = 1 + (int)(ph * 3);
+                pix.Rect(sx - r, sy, r * 2 + 1, 1, Pal.Rgba(205, 208, 212, a));
+                pix.Rect(sx - r + 1, sy - 1, r * 2 - 1, 1, Pal.Rgba(205, 208, 212, a * 0.8f));
+                pix.Rect(sx - r + 1, sy + 1, r * 2 - 1, 1, Pal.Rgba(205, 208, 212, a * 0.8f));
+            }
     }
 
     // Tomas breathes, blinks, and turns his eyes toward you when you're close.
@@ -648,7 +654,7 @@ partial class Game
         if (hf != "up")
         {
             int up = bob + (step is 2 or 4 ? 1 : 0), fo = hf == "left" ? -1 : hf == "right" ? 1 : 0;
-            pix.Rect(x - 2 + fo, y - up - 9, 4, 2, "#e8e8e8");
+            pix.Rect(x - 2 + fo, y - up - 9 - LookData.Stature, 4, 2, "#e8e8e8");
         }
     }
 
@@ -685,7 +691,7 @@ partial class Game
         // In the saddle you lean into a gallop (not while you're holding or swinging anything).
         if (Riding) lean = !rod && !holding && swingT <= 0 && RidePose().Kind == "gallop" ? 1 : 0;
         int rise = Riding ? 0 : bob + (walk is 2 or 4 ? 1 : 0);
-        var hands = holding ? null : HandsPose(f, bx + (f is "left" or "right" ? lean * side : 0), by - rise, rod, pump);
+        var hands = holding ? null : HandsPose(f, bx + (f is "left" or "right" ? lean * side : 0), by - rise + (Riding ? LookData.Stature : 0), rod, pump);
         if (hands != null) arms = 4;
         if (hands?.ToolBehind == true) DrawToolPose(hands);
         if (Riding)
@@ -1132,8 +1138,8 @@ partial class Game
                 "cat" => ph < 0.35f ? 2 : 0,
                 _ => 0
             };
-        // At night an animal standing still curls up to sleep, with the odd z drifting up (not the night birds and tarsiers).
-        bool asleep = Night && !moving && a.Hearts <= 0 && a.Kind is not ("tarsier" or "hornbill" or "cat");
+        // Once it has bedded down for the night (UpdateAnimals) it lies curled up until morning, with the odd z drifting up.
+        bool asleep = a.Asleep && a.Hearts <= 0;
         if (asleep) pose = 3;
         AnimalArt.Draw(pix, a.Kind, a.X, a.Y, a.Flip, moving ? (int)(time * 8) % 2 : 0, pose);
         if (asleep)
@@ -1141,7 +1147,7 @@ partial class Game
             float zt = (time * 0.6f + a.HomeX * 0.07f) % 3f;
             if (zt < 1.6f)
             {
-                var (_, zh) = AnimalArt.Size(a.Kind);
+                var (_, zh) = AnimalArt.Size(a.Kind, 3);
                 var zc = Pal.Rgba(230, 236, 250, 0.7f * (1 - zt / 1.6f));
                 int zx = (int)a.X + 3 + (int)(zt * 3), zy = (int)a.Y - zh - (int)(zt * 6);
                 pix.Rect(zx, zy, 3, 1, zc); pix.Rect(zx + 1, zy + 1, 1, 1, zc); pix.Rect(zx, zy + 2, 3, 1, zc);
@@ -1173,19 +1179,96 @@ partial class Game
         if (!PipOpen) { pix.Rect(X + 2, Y + 11, 18, 6, "#b9a27a"); pix.Rect(X + 2, Y + 11, 18, 1, "#d2bf98"); pix.Rect(X + 9, Y + 12, 1, 5, "#a08a62"); }
     }
 
-    // A snowy rock arch over a dark opening, on Frostfang's north shore.
+    // Frostfang's cave: a rocky hill (not a doorway) with a ragged, arched opening going back into the dark, snow on top and in
+    // the cracks, icicles along the lip, boulders at its foot and cold air creeping out. Same footprint as before: the two
+    // tiles of rock you can't walk into, the opening on the south face.
     void DrawCaveMouth()
     {
-        int X = MouthX * T - 3, Y = MouthY * T - 14;
-        pix.Rect(X, Y + 33, 26, 2, "rgba(0,0,0,0.25)");
-        pix.Rect(X, Y + 6, 26, 28, "#5e6b74");
-        pix.Rect(X + 2, Y + 3, 22, 4, "#6f7d86");
-        pix.Rect(X + 2, Y + 8, 8, 6, "#8f9ea8"); pix.Rect(X + 15, Y + 10, 9, 7, "#8f9ea8");
-        pix.Rect(X + 1, Y + 1, 24, 3, "#e8f0f4"); pix.Rect(X + 4, Y, 14, 2, "#ffffff");
-        pix.Rect(X + 6, Y + 18, 14, 16, "#0b0908");
-        pix.Rect(X + 8, Y + 16, 10, 2, "#0b0908");
-        foreach (int ix in new[] { 9, 12, 16 }) pix.Rect(X + ix, Y + 18, 1, 3, "#dff4ff");
-        pix.Rect(X + 6, Y + 33, 14, 1, "#3b302a");
+        int cx = MouthX * T + 10, baseY = MouthY * T + 20;     // the middle of the foot of the hill
+        const int H = 27, halfMax = 15;
+        Color Outline = Pal.C("#27343d"), Dk = Pal.C("#475a67"), Md = Pal.C("#6c7f8c"), Lt = Pal.C("#94a7b3"), Hi = Pal.C("#c0d0d9");
+        Color SnowL = Pal.C("#f4f9fb"), SnowM = Pal.C("#dbe8ef"), SnowD = Pal.C("#b7ccda");
+        // The shadow it throws to the east on the snow.
+        for (int dy = -1; dy <= 2; dy++) pix.Rect(cx - halfMax + 3, baseY + dy, halfMax * 2 + 6 - Math.Abs(dy) * 2, 1, Pal.Rgba(60, 86, 110, 0.22f));
+        // The hill: each row as wide as a rounded profile says, ragged by a hash, with a shoulder or two.
+        for (int r = 0; r < H; r++)
+        {
+            int y = baseY - r;
+            float t = r / (float)H;
+            float prof = MathF.Sqrt(MathF.Max(0, 1 - MathF.Pow(t, 2.3f)));
+            float half = halfMax * prof + ((float)Pix.Hash(r, 3, 561) - 0.5f) * 1.2f + 0.9f * MathF.Sin(r * 0.5f + 2) * (1 - t);
+            if (half < 1) half = 1;
+            int x0 = (int)MathF.Round(cx - half), x1 = (int)MathF.Round(cx + half);
+            for (int x = x0; x <= x1; x++)
+            {
+                float nx = (x - cx) / MathF.Max(1, half);
+                // Which way the rock faces: up and to the left is lit; strata lines every few rows, a darker crack or two.
+                float L = -nx * 0.55f + t * 0.5f - 0.1f + ((float)Pix.Hash(x, y, 562) - 0.5f) * 0.2f + (BayerAt(x, y) - 0.5f) * 0.2f;
+                Color c = L > 0.62f ? Hi : L > 0.36f ? Lt : L > 0.05f ? Md : Dk;
+                if ((r + (int)(Pix.Hash(x / 4, 0, 563) * 4)) % 6 == 0 && Pix.Hash(x, y, 564) < 0.55) c = Pix.Mix(c, Outline, 0.35f);   // a ledge line
+                bool edge = x == x0 || x == x1 || r == H - 1 || (r > 0 && prof < 0.02f);
+                if (edge) c = Outline;
+                // Snow on the crown, scalloped along its lower edge, bluer in the hollows; a drift at the foot.
+                float snowLine = 0.62f + ((float)Pix.Hash(x, 5, 565) - 0.5f) * 0.18f + 0.06f * MathF.Sin(x * 0.8f);
+                if (t > snowLine && !edge) c = L > 0.35f ? SnowL : t > snowLine + 0.1f ? SnowM : SnowD;
+                else if (t > snowLine - 0.04f && !edge && Pix.Hash(x, y, 566) < 0.5) c = SnowM;
+                if (r < 3 && !edge) c = Pix.Mix(c, Color.White, 0.3f);
+                pix.Rect(x, y, 1, 1, c);
+            }
+        }
+        // The opening: a ragged arch, taller than wide, black at the back and a glimpse of ice floor near the lip.
+        int openH = 16, openHalf = 6;
+        for (int r = 0; r < openH; r++)
+        {
+            int y = baseY - r;
+            float t = r / (float)openH;
+            float half = openHalf * MathF.Pow(MathF.Max(0, 1 - MathF.Pow(t, 2.6f)), 0.5f) + ((float)Pix.Hash(r, 9, 567) - 0.5f) * 1.4f;
+            if (half < 0.5f) half = 0.5f;
+            int x0 = (int)MathF.Round(cx - half), x1 = (int)MathF.Round(cx + half);
+            for (int x = x0; x <= x1; x++)
+            {
+                float depth = (1 - t) * 0.5f + (1 - MathF.Abs(x - cx) / (half + 1)) * 0.5f;   // lighter near the floor and mouth
+                Color c = r < 2 ? Pal.C("#3a5164") : depth > 0.7f ? Pal.C("#16222b") : depth > 0.4f ? Pal.C("#0d151b") : Pal.C("#05080b");
+                if (r < 2 && Pix.Hash(x, y, 568) < 0.4) c = Pal.C("#5d7f96");   // ice on the floor
+                if (x == x0) c = Pal.C("#1b262e"); else if (x == x1) c = Pal.C("#06090c");
+                pix.Rect(x, y, 1, 1, c);
+            }
+            // The rim, lit on the left.
+            pix.Rect(x0 - 1, y, 1, 1, r > 4 ? Lt : Md); pix.Rect(x1 + 1, y, 1, 1, Dk);
+        }
+        pix.Rect(cx - openHalf, baseY - openH, openHalf * 2 + 1, 1, Outline);
+        // Icicles along the lip.
+        for (int i = -5; i <= 5; i++)
+        {
+            if (Pix.Hash(i, 2, 569) > 0.55) continue;
+            int len = 2 + (int)(Pix.Hash(i, 3, 569) * 4);
+            float archY = openH - (i * i / 4.5f);
+            for (int k = 0; k < len; k++)
+                pix.Rect(cx + i, baseY - archY + 1 + k, 1, 1, k == len - 1 ? Pal.C("#e8f8ff") : k % 2 == 0 ? Pal.C("#bfe4f2") : Pal.C("#a0cde0"));
+        }
+        // Boulders and drifts at the foot, and the trodden way in.
+        foreach (var (ox, w, h) in new[] { (-12, 6, 5), (11, 7, 6), (-9, 4, 3) })
+        {
+            for (int r = 0; r < h; r++)
+            {
+                float f = (r + 0.5f) / h, half = w / 2f * MathF.Sqrt(1 - MathF.Pow(1 - f, 2));
+                for (int x = (int)MathF.Round(cx + ox - half); x <= (int)MathF.Round(cx + ox + half); x++)
+                {
+                    bool edge = x == (int)MathF.Round(cx + ox - half) || x == (int)MathF.Round(cx + ox + half) || r == h - 1;
+                    pix.Rect(x, baseY - h + r + 3, 1, 1, edge ? Outline : r == 0 ? SnowL : r < 2 ? SnowM : x < cx + ox ? Lt : Md);
+                }
+            }
+        }
+        for (int i = 0; i < 16; i++)
+            pix.Rect(cx - 8 + i + (Pix.Hash(i, 4, 570) < 0.5 ? 0 : 1), baseY + 1 + (int)(Pix.Hash(i, 5, 570) * 3), 1 + (i % 3 == 0 ? 1 : 0), 1, Pal.Rgba(150, 170, 186, 0.45f));
+        // Cold air creeping out and rising from the dark: slow pale wisps.
+        for (int k = 0; k < 4; k++)
+        {
+            float ph = (time * 0.16f + k * 0.25f) % 1;
+            float wx = cx - 4 + k * 3 + MathF.Sin(ph * 5 + k) * 3 + ph * 4, wy = baseY - 2 - ph * 14;
+            var wc = Pal.Rgba(225, 238, 246, 0.26f * MathF.Sin(ph * MathF.PI));
+            pix.Rect(wx - 2, wy, 5 + (int)(ph * 4), 2, wc);
+        }
     }
 
     void DrawObjects(float t)
@@ -1362,8 +1445,8 @@ partial class Game
         int flakes = (int)(110 + 60 * rainAmt + 90 * stormAmt);
         for (int i = 0; i < flakes; i++)
         {
-            double sx = (Pix.Hash(i, 0, 91) * W + t * 6 * (0.5 + Pix.Hash(i, 1, 91)) + Math.Sin(t * 1.3 + i) * 4) % W;
-            double sy = (Pix.Hash(i, 2, 91) * H + t * (16 + Pix.Hash(i, 3, 91) * 14)) % H;
+            double sx = Wrap(Pix.Hash(i, 0, 91) * W + t * 6 * (0.5 + Pix.Hash(i, 1, 91)) + Math.Sin(t * 1.3 + i) * 4 - camX, W);
+            double sy = Wrap(Pix.Hash(i, 2, 91) * H + t * (16 + Pix.Hash(i, 3, 91) * 14) - camY, H);
             int wx = (int)sx + camX, wy = (int)sy + camY;
             if (BiomeAt(wx / T, wy / T) != 1) continue;
             pix.Fill((int)sx, (int)sy, i % 5 == 0 ? 2 : 1, i % 5 == 0 ? 2 : 1, flake);
@@ -1445,17 +1528,7 @@ partial class Game
                 pix.Rect(x, y, 1, 1, Pal.Rgba(255, 215, 106, a));
         }
         // Fireflies drift over Mirewood after dark, and a few over Saltmere's grass, each with a soft glow.
-        for (int i = 0; i < 40; i++)
-        {
-            double fx = Pix.Hash(i, 5, 93) * W + Math.Sin(t * 0.6 + i * 1.7) * 14;
-            double fy = Pix.Hash(i, 6, 93) * H + Math.Cos(t * 0.5 + i) * 10;
-            int ftx = ((int)fx + camX) / T, fty = ((int)fy + camY) / T;
-            byte fb = BiomeAt(ftx, fty);
-            if (fb != 3 && !(fb == 0 && i % 3 == 0 && TileAt(ftx, fty) is 'g' or 't')) continue;
-            float a = (float)(0.5 + 0.5 * Math.Sin(t * 3 + i * 2.1)) * k;
-            pix.Glow(fx + camX + 0.5, fy + camY + 0.5, 4, Pal.Rgba(200, 255, 120, 0.25f * a));
-            pix.Fill((int)fx, (int)fy, 1, 1, Pal.Rgba(230, 255, 140, a));
-        }
+        DrawNightFireflies(t, k);
     }
 
     void ApplyDark(Color c)
@@ -1499,6 +1572,7 @@ partial class Game
             DrawGusoFarm(t);
             DrawLoose(t);
             DrawMountGround();
+            DrawTreeShadows();
             DrawBuildingShadows();
             DrawBugs(t);
             DrawSpots(t);
@@ -1536,6 +1610,7 @@ partial class Game
         }
         else if (scene == "cave") RenderCave(t);
         else RenderRoom(t);
+        if (scene is "world" or "cave") ApplyVignette(scene == "cave" ? 0.4f : 0.2f);
         if (mode == "bite") DrawBang();
         pix.CamX = pix.CamY = 0;
         // The title's tour fades through dark between islands (UiMenu.cs).

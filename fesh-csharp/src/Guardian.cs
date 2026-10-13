@@ -29,12 +29,12 @@ partial class Game
     List<(float x, float y)> pillarSpots; // the Ancient Floor's pillars, for the wave (made on rising)
     bool guardianUndrawn;                 // the autotest renders a frame without its sprite (lit the same) to find it
     public const string GuardianName = "Platejaw";
-    const float GuardSpirit = 120, LungeRange = 70, RockFall = 1.15f, WaveStart = 58, WaveSpeed = 85, WaveEnd = 240, GuardLeash = 200;
-    const int LungeHurt = 18, SnapHurt = 12, RockHurt = 10, WaveHurt = 14;
+    const float GuardSpirit = 200, LungeRange = 72, RockFall = 1.0f, WaveStart = 58, WaveSpeed = 85, WaveEnd = 240, GuardLeash = 200;
+    const int LungeHurt = 32, SnapHurt = 20, RockHurt = 18, WaveHurt = 28;
     // South of the pool, far enough back that it never gets in the way of fishing from the south shore.
     const float RuneStoneX = 305, RuneStoneY = 226;
     // A falling rock hurts anyone whose feet are inside this oval round where it lands, the same oval its warning draws.
-    const float RockRX = 7, RockRY = 4.5f;
+    const float RockRX = 9, RockRY = 5.5f;
     // The pillars stand on an ellipse 11 tiles across and 7 down, so the wave is measured with y stretched by 11/7.
     const float WaveSquash = 11f / 7f;
 
@@ -187,8 +187,8 @@ partial class Game
                 if (g.EdgeT > 0.6f) { SnapRear(g); break; }
                 if (g.T < g.Wait) break;
                 g.Attacks++;
-                if (left < 0.4f && g.Attacks % 4 == 0) SurgeRear(g);
-                else if (left < 0.7f && g.Attacks % 3 == 0) Slam(g);
+                if (left < 0.55f && g.Attacks % 4 == 0) SurgeRear(g);
+                else if (left < 0.85f && g.Attacks % 3 == 0) Slam(g);
                 else Aim(g);
                 break;
             }
@@ -204,12 +204,12 @@ partial class Game
                     g.AimX = ax / al; g.AimY = ay / al;
                     g.Dir = ax < 0 ? -1 : 1;
                 }
-                if (g.T >= (left < 0.5f ? 0.8f : 0.95f)) { g.Phase = "lunge"; g.T = 0; g.Ran = 0; g.Hit = false; Sfx.Play("splash"); }
+                if (g.T >= (left < 0.5f ? 0.85f : 1.0f)) { g.Phase = "lunge"; g.T = 0; g.Ran = 0; g.Hit = false; Sfx.Play("splash"); }
                 break;
             }
             case "lunge":
             {
-                float step = (left < 0.5f ? 200 : 165) * dt, nx = g.X + g.AimX * step, ny = g.Y + g.AimY * step;
+                float step = (left < 0.5f ? 210 : 175) * dt, nx = g.X + g.AimX * step, ny = g.Y + g.AimY * step;
                 if (!GuardCanBe(nx, ny))
                 {
                     // Straight into a pillar or the cave wall: it's dazed for a good while.
@@ -217,7 +217,7 @@ partial class Game
                     Burst(nx, ny - 5, "#c9c2ae", 10);
                     Sfx.Play("hit");
                     Floater("Crash!", g.X, g.Y - 22, "#ffd76a");
-                    if (InPool(g.X, g.Y)) Slide(g); else Stranded(g, "stunned", 2.6f);
+                    if (InPool(g.X, g.Y)) Slide(g); else Stranded(g, "stunned", 1.75f);
                     break;
                 }
                 g.X = nx; g.Y = ny; g.Ran += step;
@@ -230,7 +230,7 @@ partial class Game
                     if (guardian == null) return;   // knocked out
                 }
                 if (g.Ran < LungeRange) break;
-                if (InPool(g.X, g.Y)) Slide(g); else Stranded(g, "beached", left < 0.5f ? 1.5f : 1.9f);
+                if (InPool(g.X, g.Y)) Slide(g); else Stranded(g, "beached", left < 0.5f ? 0.95f : 1.15f);
                 break;
             }
             case "beached":
@@ -253,7 +253,7 @@ partial class Game
                 g.X += (ex - g.X) * Math.Min(1, dt * 12);
                 g.Y += (ey - g.Y) * Math.Min(1, dt * 12);
                 g.Dir = player.X < g.X ? -1 : 1;
-                if (g.T < 0.5f) break;
+                if (g.T < 0.65f) break;
                 float ax = player.X - g.X, ay = player.Y - g.Y, al = MathF.Max(1, MathF.Sqrt(ax * ax + ay * ay));
                 g.AimX = ax / al; g.AimY = ay / al;
                 g.Phase = "snap"; g.T = 0;
@@ -301,7 +301,7 @@ partial class Game
         g.EdgeT = 0;
         g.Ang = MathF.Atan2(g.Y - AncientPoolY, g.X - AncientPoolX);
         // It picks its moments faster as it tires and gets angrier.
-        g.Wait = Rand(1.1f, 1.9f) * (0.65f + 0.35f * g.Spirit / GuardSpirit);
+        g.Wait = Rand(1.4f, 2.0f) * (g.Spirit < GuardSpirit * 0.5f ? 0.72f : 1f);
     }
 
     void Aim(Guardian g)
@@ -476,8 +476,22 @@ partial class Game
         }
         if (g.Hurt > 0) { Sfx.Play("nope"); return; }
         bool dazed = g.Phase == "stunned";
-        g.Spirit -= (3 + dmg * 0.5f) * (dazed ? 2.4f : 2f);
-        g.Hurt = 0.4f;
+        // Bare hands and a pickaxe can't get between its plates: only a real blade reaches the body (and a stronger one,
+        // a lot further: copper 4 a blow, iron 8, gold 12, crystal 18).
+        if (!Items.Weapons.Any(w => Has(w.id) > 0))
+        {
+            Sfx.Play("clang");
+            Burst(bx, by - 3, "#c9c2ae", 4);
+            Floater("Bounces off!", g.X, g.Y - 22, "#c9c2ae");
+            if (!state.Hinted("platejawBlade"))
+            {
+                state.hinted["platejawBlade"] = true;
+                Toast("Your hands and pickaxe only scrape its plates. A sword can reach between them: make one at a workbench.", 6);
+            }
+            return;
+        }
+        g.Spirit -= (dmg - 1) * (dazed ? 3f : 2f);
+        g.Hurt = 0.55f;
         Sfx.Play("hit");
         Burst(bx, by - 3, dazed ? "#ffd76a" : "#ffffff", dazed ? 9 : 5);
         if (dazed) Floater("Big hit!", g.X, g.Y - 24, "#ffd76a");

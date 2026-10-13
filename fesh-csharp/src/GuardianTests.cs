@@ -113,6 +113,7 @@ partial class Game
         }
         Check($"standing in its path, the lunge hurts ({state.hp:0} health)", MathF.Abs(state.hp - (100 - LungeHurt)) < 0.6f);
         Check($"then it lies stranded on the stone ({g.Phase}, at {g.X:0},{g.Y:0})", g.Phase == "beached" && !InPool(g.X, g.Y) && GuardCanBe(g.X, g.Y));
+        g.Wait = 99;   // a window of about a second would close on its own while the checks run
         var (inBox, outBox) = GuardianPixels(g.X - (g.Dir > 0 ? 28 : 9), g.Y - 13, 38, 15);
         Check($"it's drawn where it lies: {inBox} pixels change in its box, {outBox} outside", inBox > 200 && outBox < inBox / 2);
         pendingShot = "g04-beached"; yield return 2;
@@ -125,10 +126,23 @@ partial class Game
         sp0 = g.Spirit;
         Inp.Tap(KeyboardKey.E); yield return 3;
         float blow = sp0 - g.Spirit;
-        Check($"a blow on the stone wears it down ({sp0:0} -> {g.Spirit:0})", MathF.Abs(blow - (3 + 5 * 0.5f) * 2) < 0.01f);
+        Check($"a blow on the stone wears it down ({sp0:0} -> {g.Spirit:0})", MathF.Abs(blow - (5 - 1) * 2) < 0.01f);
         sp0 = g.Spirit; swingT = 0;
         Inp.Tap(KeyboardKey.E); yield return 2;
         Check("it shrugs off a second blow straight after", g.Spirit == sp0);
+        // No blade, no damage: fists and a pickaxe only scrape its plates, even stranded (1.25).
+        Take("iron_sword"); Give("iron_pickaxe");
+        g.Hurt = 0; swingT = 0; sp0 = g.Spirit; toastMsg = "";
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        Check($"bare hands and a pickaxe can't hurt it even on the stone ({sp0:0} -> {g.Spirit:0}, toast: {toastMsg})", g.Spirit == sp0 && toastMsg.Contains("sword"));
+        Give("copper_sword");
+        g.Hurt = 0; swingT = 0; sp0 = g.Spirit;
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        float copperBlow = sp0 - g.Spirit;
+        Check($"a copper sword does half of what iron does ({copperBlow:0.0} vs {blow:0.0})", MathF.Abs(copperBlow - 4) < 0.01f && copperBlow < blow);
+        Take("copper_sword"); Give("iron_sword");
+        g.Spirit = sp0; g.Hurt = 0; swingT = 0;
+        Check($"its spirit is a good deal more than an iron sword does in a blow or two ({GuardSpirit:0})", GuardSpirit >= blow * 20);
         g.Wait = 0.1f;
         for (int i = 0; i < 90 && g.Phase != "prowl"; i++) yield return 1;
         Check($"then it slides back into the water ({g.Phase})", g.Phase == "prowl" && InPool(g.X, g.Y));
@@ -149,7 +163,7 @@ partial class Game
         Prowl(g); g.Wait = 99; yield return 40;
         Aim(g);
         for (int i = 0; i < 120 && g.Phase is "aim" or "lunge"; i++) yield return 1;
-        Check($"lunging into a pillar dazes it ({g.Phase}, {g.X:0},{g.Y:0})", g.Phase == "stunned" && g.Wait > 2);
+        Check($"lunging into a pillar dazes it ({g.Phase}, {g.X:0},{g.Y:0})", g.Phase == "stunned" && g.Wait > 1.5f);
         pendingShot = "g05-crash"; yield return 2;
         g.Hurt = 0; g.T = 0; g.Wait = 99; swingT = 0;
         player.X = g.X - g.Dir * 8; player.Y = g.Y + 8; player.Face = "up";

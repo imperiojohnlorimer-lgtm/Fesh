@@ -50,7 +50,7 @@ partial class Game
         get
         {
             int tx = (int)MathF.Floor(player.X / T), ty = (int)MathF.Floor((player.Y - 1.5f) / T);
-            return scene == "world" && Wadeable(TileAt(tx, ty)) && !FlatOpen(tx, ty);
+            return scene == "world" && Wadeable(TileAt(tx, ty)) && !FlatOpen(tx, ty) && !DryMud(player.X, player.Y - 1.5f);
         }
     }
 

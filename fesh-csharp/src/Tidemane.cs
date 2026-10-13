@@ -387,7 +387,12 @@ partial class Game
 
     /* ---------- Riding ---------- */
     static bool Swimmable(char t) => t is '~' or 'w' or 'l' or 'o' or 'm' or 'T' or 'x';
-    char TileUnder(float x, float y) => TileAt((int)MathF.Floor(x / T), (int)MathF.Floor((y - 1.5f) / T));
+    // What is under a point; the mud of a drained pond (RestlessSea.cs) is ground, not water, so Tidemane gallops over it.
+    char TileUnder(float x, float y)
+    {
+        char t = TileAt((int)MathF.Floor(x / T), (int)MathF.Floor((y - 1.5f) / T));
+        return t == 'l' && DryMud(x, y - 1.5f) ? 'p' : t;
+    }
     bool Swimming => Riding && Swimmable(TileUnder(player.X, player.Y));
 
     // Any water away from the edge of the map.
@@ -1010,7 +1015,7 @@ partial class Game
     {
         void OnWater(int px, int py, Color c)
         {
-            if (px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py))) pix.Rect(px, py, 1, 1, c);
+            if (px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py)) && !DryMud(px, py)) pix.Rect(px, py, 1, 1, c);
         }
         int lap = (int)(time * 5);
         var foam = Pal.Rgba(232, 246, 250, 0.65f);
@@ -1075,7 +1080,7 @@ partial class Game
 
     void DrawEndOnSwimWater(int x, int y, bool away, bool moving)
     {
-        bool IsWater(int px, int py) => px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py));
+        bool IsWater(int px, int py) => px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py)) && !DryMud(px, py);
         void Foam(int px, int py, float alpha)
         {
             if (IsWater(px, py)) pix.Rect(px, py, 1, 1, Pal.Rgba(232, 246, 250, alpha));
@@ -1122,7 +1127,7 @@ partial class Game
             seat = ((int)MathF.Round(hopFromX + (seat.x - hopFromX) * k), (int)MathF.Round(hopFromY + (seat.y - hopFromY) * k - MathF.Sin(k * MathF.PI) * 5));
         }
         void Rider() => LookData.DrawPerson(pix, state.look, seat.x, seat.y, player.Face, 0, shadow: false, idle: false,
-            blink: time % 3.7f < 0.12f, arms: arms, swing: pump, lean: lean, hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
+            blink: time % 3.7f < 0.12f, arms: arms, swing: pump, lean: lean, hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true, seated: true);
         if (player.Face is "up" or "down")
         {
             DrawTidemaneEndOn(x, y, player.Face == "up", p, Rider, lift, legs: hopT <= 0 || hopDown);

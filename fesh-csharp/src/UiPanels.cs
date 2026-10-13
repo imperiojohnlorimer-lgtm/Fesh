@@ -237,7 +237,7 @@ partial class Game
     Look editLook;
     string previewFace = "down";
     Texture2D previewTex;
-    readonly Pix previewPix = new(16, 18);
+    readonly Pix previewPix = new(16, 20);
 
     void OpenCreator(string kind)
     {
@@ -329,10 +329,10 @@ partial class Game
         DrawRectangleGradientV((int)sky.X, (int)sky.Y, (int)sky.Width, (int)sky.Height, Pal.C("#3a8db0"), Pal.C("#1d4f78"));
         Gfx.Rect(px, py + ph - 70, pw, 70, Pal.C("#e8cf96"));
         Array.Fill(previewPix.Buf, default);
-        LookData.DrawPerson(previewPix, editLook, 8, 16, previewFace, 1 + (int)(time * 8) % 4, shadow: false);
-        if (previewTex.Id == 0) previewTex = Gfx.ToTexture(previewPix.Buf, 16, 18, TextureFilter.Point);
+        LookData.DrawPerson(previewPix, editLook, 8, 18, previewFace, 1 + (int)(time * 8) % 4, shadow: false);
+        if (previewTex.Id == 0) previewTex = Gfx.ToTexture(previewPix.Buf, 16, 20, TextureFilter.Point);
         UpdateTexture(previewTex, previewPix.Buf);
-        DrawTexturePro(previewTex, new Rectangle(0, 0, 16, 18), Gfx.S(px + pw / 2 - 16 * 7, py + ph - 70 - 17 * 14 + 14, 16 * 14, 18 * 14), Vector2.Zero, 0, Color.White);
+        DrawTexturePro(previewTex, new Rectangle(0, 0, 16, 20), Gfx.S(px + pw / 2 - 16 * 7, py + ph - 70 - 19 * 14 + 14, 16 * 14, 20 * 14), Vector2.Zero, 0, Color.White);
         if (Button("Turn", px + pw / 2 - 50, py + ph + 14, 100, 40, FontKind.Ui700, 18, Pal.Sand, Pal.Ink, 3, 2, 5))
             previewFace = previewFace switch { "down" => "right", "right" => "up", "up" => "left", _ => "down" };
 

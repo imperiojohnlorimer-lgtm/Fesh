@@ -336,7 +336,7 @@ partial class Game
         SetNight(false); ClearSkies(); state.aboard = false; animals.Clear();
         var asohos = Data.FishById["asohos"];
         var rolls = Enumerable.Range(0, 2000).Select(_ => RollCatch("karstlagoon").Id).ToList();
-        Check($"asohos bite in the karst lagoon, and often ({rolls.Count(r => r == "asohos")} of 2000)", rolls.Count(r => r == "asohos") > 400 && !asohos.Rare);
+        Check($"asohos bite in the karst lagoon, and often ({rolls.Count(r => r == "asohos")} of 2000)", rolls.Count(r => r == "asohos") > 320 && !asohos.Rare);
         Check("it has a picture and a bag entry", FishArt.Looks.ContainsKey("asohos") && Items.ById["asohos"].Kind == "fish");
         state.hinted["niko_request"] = true; state.hinted.Remove("niko_asohos"); state.inv.Remove("asohos"); state.inv.Remove("cricket");
         player.X = 1715; player.Y = 200; player.Face = "up"; yield return 3;

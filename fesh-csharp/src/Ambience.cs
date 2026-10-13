@@ -151,23 +151,26 @@ partial class Game
         float k = MathF.Max(dusk, dawn) * (1 - rainAmt);
         if (k <= 0.02f || scene != "world") return;
         var beam = dusk > dawn ? Pal.Rgba(255, 196, 120, 0.06f * k) : Pal.Rgba(255, 214, 190, 0.05f * k);
-        for (int b = 0; b < 4; b++)
-        {
-            float x0 = (float)(Pix.Hash(b, 1, 399) * (W + 160)) - 120 + MathF.Sin(t * 0.07f + b) * 20;
-            int bw = 10 + (int)(Pix.Hash(b, 2, 399) * 22);
-            for (int py = 0; py < H; py++)
+        // The beams are lines in the world (x = intercept + 0.55 y), a couple to every 260 px, so they stay put as you walk.
+        const int cell = 260;
+        int u0 = (int)MathF.Floor((camX - 0.55f * (camY + H) - 60) / cell), u1 = (int)MathF.Floor((camX + W - 0.55f * camY) / cell);
+        for (int c = u0; c <= u1; c++)
+            for (int b = 0; b < 2; b++)
             {
-                int sx = (int)(x0 + py * 0.55f);
-                pix.Fill(sx, py, bw, 1, beam);
+                if (Pix.Hash(c, b, 397) > 0.75) continue;
+                float u = (c + (float)Pix.Hash(c, b, 399) * 0.9f) * cell + MathF.Sin(t * 0.07f + c + b) * 16;
+                int bw = 10 + (int)(Pix.Hash(c, b, 398) * 22);
+                for (int py = 0; py < H; py++)
+                    pix.Fill((int)(u + 0.55f * (py + camY)) - camX, py, bw, 1, beam);
             }
-        }
     }
 
     /* ---------- Night ---------- */
     // Lit windows: houses keep a lamp burning in the evening and before dawn. Drawn in their day colour, they're noted
     // here and lit again over the dark (GlowWindows), with a little light spilling out (LightWindows).
     readonly List<(int x, int y, int w, int h)> litWindows = new();
-    bool LampsLit => state.clock >= 18 * 60 + 30 && state.clock < 23 * 60 + 30 || state.clock >= 4 * 60 + 30 && state.clock < 6 * 60 + 30;
+    // Lamps burn from 18:30 until the village goes to bed at 22:30, and again from the first stirrings at 05:00 (FolkAsleep).
+    bool LampsLit => state.clock >= 18 * 60 + 30 && state.clock < 22 * 60 + 30 || state.clock >= 5 * 60 && state.clock < 6 * 60 + 30;
 
     void Window(int x, int y, int w, int h, string day)
     {
@@ -199,31 +202,38 @@ partial class Game
     // while Bakunawa holds it). The strokes are planned on the bare water (PlanMoonPath, with each pixel's colour), kept
     // only where nothing has been drawn over them since (KeepMoonPath, before the dark), and lit after it (DrawMoonPath),
     // so the light never lands on a boat, a swimmer or a dry flat.
-    readonly List<(int x, int y, Color under)> moonPx = new();
+    readonly List<(int x, int y, Color under, float a)> moonPx = new();
     void PlanMoonPath(float t)
     {
         moonPx.Clear();
         if (Darkness <= 0 || rainAmt > 0.5f || eclipse != null || scene != "world") return;
         float full = 1 - MathF.Abs(MoonPhase - 4) / 4f;
         if (full < 0.15f) return;
-        int cx = W * 2 / 3;
-        for (int py = 0; py < H; py += 2)
-        {
-            float spread = 6 + py * 0.04f;
-            for (int n = 0; n < 3; n++)
+        // Moonlight glitters on the whole sea, not on a track that follows you: each tile's own sparkles come and go on
+        // their own beat, and a swell of light rolls slowly across the water so some stretches shimmer more than others.
+        var (vx0, vy0, vx1, vy1) = VisibleTiles();
+        for (int y = vy0; y <= vy1; y++)
+            for (int x = vx0; x <= vx1; x++)
             {
-                double hsh = Pix.Hash(py + camY, n + (int)(t * 2.5f), 470);
-                if (hsh > 0.55) continue;
-                int sx = cx + (int)((hsh / 0.55 - 0.5) * 2 * spread + MathF.Sin(t * 1.3f + py * 0.21f) * 2);
-                int len = 1 + (int)(Pix.Hash(sx + camX, py + camY, 471) * 3);
-                for (int i = 0; i < len; i++)
+                if (map[y, x] is not ('~' or 'w')) continue;
+                float swell = 0.35f + 0.65f * (0.5f + 0.5f * MathF.Sin(x * 0.09f - y * 0.05f - t * 0.25f));
+                for (int k = 0; k < 2; k++)
                 {
-                    int px = sx + i, wx = px + camX, wy = py + camY;
-                    if (px < 0 || px >= W || !Wet(ShapePx(wx, wy)) || TideDry(wx, wy)) continue;
-                    moonPx.Add((px, py, pix.Buf[py * W + px]));
+                    float cycle = 1.6f + (float)Pix.Hash(x, y, 472 + k) * 1.8f, off = (float)Pix.Hash(x, y, 474 + k) * 9;
+                    int n = (int)((t + off) / cycle);
+                    if (Pix.Hash(x, y, 476 + k + n % 40 * 2) > 0.34 * swell * (0.4 + full)) continue;
+                    float ph = (t + off) % cycle / 0.9f;
+                    if (ph > 1) continue;
+                    int gx = x * T + 1 + (int)(Pix.Hash(x, n + k, 478) * 8), gy = y * T + 1 + (int)(Pix.Hash(n, y + k, 479) * 8);
+                    float al = MathF.Sin(ph * MathF.PI);
+                    for (int i = 0; i < (al > 0.6f ? 2 : 1); i++)
+                    {
+                        int px = gx + i - camX, py = gy - camY;
+                        if (px < 0 || px >= W || py < 0 || py >= H || !Wet(ShapePx(gx + i, gy)) || TideDry(gx + i, gy)) continue;
+                        moonPx.Add((px, py, pix.Buf[py * W + px], al));
+                    }
                 }
             }
-        }
     }
 
     void KeepMoonPath() => moonPx.RemoveAll(m => { var c = pix.Buf[m.y * W + m.x]; return c.R != m.under.R || c.G != m.under.G || c.B != m.under.B; });
@@ -232,8 +242,8 @@ partial class Game
     {
         if (moonPx.Count == 0) return;
         float full = 1 - MathF.Abs(MoonPhase - 4) / 4f;
-        var c = Pal.Rgba(232, 238, 255, 0.42f * k * full * (1 - rainAmt));
-        foreach (var (x, y, _) in moonPx) pix.Fill(x, y, 1, 1, c);
+        float strength = 0.6f * k * (0.35f + 0.65f * full) * (1 - rainAmt);
+        foreach (var (x, y, _, a) in moonPx) pix.Fill(x, y, 1, 1, Pal.Rgba(232, 240, 255, strength * a));
     }
 
     // Every building's shadow, drawn on the ground before anything stands on it (so it never falls across someone
@@ -449,8 +459,8 @@ partial class Game
             float u = t * rate + (float)Pix.Hash(i, 2, 400) * 10;
             int cyc = (int)u;
             float age = u - cyc;
-            int px = (int)(Pix.Hash(i, cyc, 401) * W), py = (int)(Pix.Hash(cyc, i, 402) * H);
-            int wx = px + camX, wy = py + camY;
+            // Fixed in the world (a splash stays where the rain hit), not on the screen.
+            int wx = camX + (int)Wrap(Pix.Hash(i, cyc, 401) * W - camX, W), wy = camY + (int)Wrap(Pix.Hash(cyc, i, 402) * H - camY, H);
             if (BiomeAt(wx / T, wy / T) == 1) continue;
             char s = ShapePx(wx, wy);
             float a = (1 - age) * 0.5f * rainAmt;

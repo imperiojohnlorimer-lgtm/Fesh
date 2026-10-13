@@ -139,6 +139,7 @@ partial class Game
         if (previewTex.Id != 0) UnloadTexture(previewTex);
         foreach (var t in slotTex) if (t.Id != 0) UnloadTexture(t);
         AnimalArt.Shutdown();
+        ClearScenes();
         ItemArt.Shutdown();
         FishArt.Shutdown();
         Gfx.Shutdown();

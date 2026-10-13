@@ -132,6 +132,137 @@ partial class Game
             ExportImage(img, Path.Combine(testDir, "chores.png"));
             UnloadImage(img);
         }
+        // The gulls and a butterfly, zoomed: the wing through a beat, a glide, and both ways round.
+        {
+            var keep = pix;
+            var sheet = new Pix(120, 40);
+            pix = sheet;
+            Array.Fill(sheet.Buf, Pal.C("#6ab0cc"));
+            for (int i = 0; i < 7; i++) DrawGull(10 + i * 14, 12, 1, 1, i * 0.0357f);
+            for (int i = 0; i < 4; i++) DrawGull(10 + i * 14, 30, i < 2 ? 1 : -1, i % 2 == 0 ? 0 : 1, 0.05f + i * 0.04f);
+            pix = keep;
+            var img = GenImageColor(120, 40, Color.Black);
+            for (int y = 0; y < 40; y++) for (int x = 0; x < 120; x++) ImageDrawPixel(ref img, x, y, sheet.Buf[y * 120 + x]);
+            ImageResizeNN(ref img, 120 * 8, 40 * 8);
+            ExportImage(img, Path.Combine(testDir, "sky.png"));
+            UnloadImage(img);
+        }
+        // Every animal beside a person, awake and (the lower row) asleep, to judge their sizes.
+        {
+            var keep = pix;
+            var sheet = new Pix(280, 70);
+            pix = sheet;
+            Array.Fill(sheet.Buf, Pal.C("#5d9b45"));
+            LookData.DrawPerson(sheet, new Look { skin = 2, shirt = 1, hat = 0, hair = 1 }, 12, 30, "down", 0);
+            int ax = 40;
+            foreach (var id in new[] { "carabao", "pig", "sheep", "goat", "dog", "cat", "chicken", "hornbill", "parrot", "tarsier" })
+            {
+                var (aw, _) = AnimalArt.Size(id);
+                AnimalArt.Draw(sheet, id, ax + aw / 2, 30, false, 0);
+                AnimalArt.Draw(sheet, id, ax + aw / 2, 62, false, 0, 3);
+                ax += aw + 5;
+            }
+            pix = keep;
+            var img = GenImageColor(280, 70, Color.Black);
+            for (int y = 0; y < 70; y++) for (int x = 0; x < 280; x++) ImageDrawPixel(ref img, x, y, sheet.Buf[y * 280 + x]);
+            ImageResizeNN(ref img, 280 * 4, 70 * 4);
+            ExportImage(img, Path.Combine(testDir, "animals.png"));
+            UnloadImage(img);
+        }
+        // The nursery's pictures: the emergence through its stages, then the four stages and the four leaves.
+        {
+            var sheetA = new Pix(120 * 5, 88 * 2);
+            float[] es = { 0.1f, 0.3f, 0.42f, 0.5f, 0.56f, 0.62f, 0.7f, 0.8f, 0.92f, 1f };
+            for (int i = 0; i < es.Length; i++)
+            {
+                var one = new Pix(120, 88);
+                PaintEmergence(one, es[i]);
+                for (int y = 0; y < 88; y++) for (int x = 0; x < 120; x++) sheetA.Buf[(y + 88 * (i / 5)) * 600 + x + 120 * (i % 5)] = one.Buf[y * 120 + x];
+            }
+            var imgA = GenImageColor(600, 176, Color.Black);
+            for (int y = 0; y < 176; y++) for (int x = 0; x < 600; x++) ImageDrawPixel(ref imgA, x, y, sheetA.Buf[y * 600 + x]);
+            ImageResizeNN(ref imgA, 600 * 2, 176 * 2);
+            ExportImage(imgA, Path.Combine(testDir, "nursery-emerge.png"));
+            UnloadImage(imgA);
+            var sheetB = new Pix(59 * 4, 36 + 28);
+            for (int i = 0; i < 4; i++)
+            {
+                var a = new Pix(59, 36); PaintStage(a, i);
+                for (int y = 0; y < 36; y++) for (int x = 0; x < 59; x++) sheetB.Buf[y * 236 + x + 59 * i] = a.Buf[y * 59 + x];
+                var b = new Pix(59, 28); PaintFeedLeaf(b, i);
+                for (int y = 0; y < 28; y++) for (int x = 0; x < 59; x++) sheetB.Buf[(y + 36) * 236 + x + 59 * i] = b.Buf[y * 59 + x];
+            }
+            var imgB = GenImageColor(236, 64, Color.Black);
+            for (int y = 0; y < 64; y++) for (int x = 0; x < 236; x++) ImageDrawPixel(ref imgB, x, y, sheetB.Buf[y * 236 + x]);
+            ImageResizeNN(ref imgB, 236 * 4, 64 * 4);
+            ExportImage(imgB, Path.Combine(testDir, "nursery-stages.png"));
+            UnloadImage(imgB);
+        }
+        // The cave model at its stages.
+        {
+            float[] ts = { 0.05f, 0.25f, 0.45f, 0.6f, 0.75f, 0.85f, 0.95f, 1f };
+            var sheetC = new Pix(CmW * 4, CmH * 2);
+            for (int i = 0; i < ts.Length; i++)
+            {
+                var one = new Pix(CmW, CmH);
+                PaintCaveModel(one, ts[i]);
+                for (int y = 0; y < CmH; y++) for (int x = 0; x < CmW; x++) sheetC.Buf[(y + CmH * (i / 4)) * CmW * 4 + x + CmW * (i % 4)] = one.Buf[y * CmW + x];
+            }
+            var imgC = GenImageColor(CmW * 4, CmH * 2, Color.Black);
+            for (int y = 0; y < CmH * 2; y++) for (int x = 0; x < CmW * 4; x++) ImageDrawPixel(ref imgC, x, y, sheetC.Buf[y * CmW * 4 + x]);
+            ImageResizeNN(ref imgC, CmW * 4 * 2, CmH * 2 * 2);
+            ExportImage(imgC, Path.Combine(testDir, "cave-model.png"));
+            UnloadImage(imgC);
+        }
+        // Baga's plume at each level (and in the night): puffs boiling up, bending west.
+        {
+            var keepTime = time; var keepKeep = pix;
+            var sheetP = new Pix(160 * 4, 100);
+            for (int lv = 0; lv < 4; lv++)
+            {
+                var one = new Pix(160, 100);
+                one.CamX = (int)ConeX - 80; one.CamY = (int)(ConeBaseY - ConeH) - 80;
+                Array.Fill(one.Buf, Pal.C("#6fa0c0"));
+                pix = one; time = 31.4f + lv;
+                DrawPlume(ConeBaseY - ConeH, lv, lv == 3);
+                pix = keepKeep;
+                for (int y = 0; y < 100; y++) for (int x = 0; x < 160; x++) sheetP.Buf[y * 640 + x + 160 * lv] = one.Buf[y * 160 + x];
+            }
+            time = keepTime;
+            var imgP = GenImageColor(640, 100, Color.Black);
+            for (int y = 0; y < 100; y++) for (int x = 0; x < 640; x++) ImageDrawPixel(ref imgP, x, y, sheetP.Buf[y * 640 + x]);
+            ImageResizeNN(ref imgP, 640 * 2, 200);
+            ExportImage(imgP, Path.Combine(testDir, "plume.png"));
+            UnloadImage(imgP);
+        }
+        // The lahar watch: the camera before, as it comes, and at the mouth (live, in rain), and the map before and after.
+        {
+            var sheetL = new Pix(LcW * 4, LcH + LaharMapH * 0);
+            float[] ts = { -1f, 1.5f, 3.2f, 5.5f };
+            for (int i = 0; i < 4; i++)
+            {
+                var one = new Pix(LcW, LcH);
+                PaintLaharCam(one, new LaharWatch { Live = true, T = ts[i] });
+                for (int y = 0; y < LcH; y++) for (int x = 0; x < LcW; x++) sheetL.Buf[y * LcW * 4 + x + LcW * i] = one.Buf[y * LcW + x];
+            }
+            var imgL = GenImageColor(LcW * 4, LcH, Color.Black);
+            for (int y = 0; y < LcH; y++) for (int x = 0; x < LcW * 4; x++) ImageDrawPixel(ref imgL, x, y, sheetL.Buf[y * LcW * 4 + x]);
+            ImageResizeNN(ref imgL, LcW * 4 * 2, LcH * 2);
+            ExportImage(imgL, Path.Combine(testDir, "lahar-cam.png"));
+            UnloadImage(imgL);
+            var map = new Pix(LaharMapW * 2, LaharMapH);
+            for (int i = 0; i < 2; i++)
+            {
+                var one = new Pix(LaharMapW, LaharMapH);
+                PaintLaharMap(one, new LaharWatch { T = i == 0 ? -1 : 5 });
+                for (int y = 0; y < LaharMapH; y++) for (int x = 0; x < LaharMapW; x++) map.Buf[y * LaharMapW * 2 + x + LaharMapW * i] = one.Buf[y * LaharMapW + x];
+            }
+            var imgM = GenImageColor(LaharMapW * 2, LaharMapH, Color.Black);
+            for (int y = 0; y < LaharMapH; y++) for (int x = 0; x < LaharMapW * 2; x++) ImageDrawPixel(ref imgM, x, y, map.Buf[y * LaharMapW * 2 + x]);
+            ImageResizeNN(ref imgM, LaharMapW * 2 * 2, LaharMapH * 2);
+            ExportImage(imgM, Path.Combine(testDir, "lahar-map.png"));
+            UnloadImage(imgM);
+        }
         foreach (int f in GraphicsScript()) yield return f;
     }
 
@@ -189,8 +320,9 @@ partial class Game
         }
         var partial = (Color[])worldBase.Buf.Clone();
         RenderBase();
-        for (int i = 0; i < partial.Length; i++) if (partial[i].R != worldBase.Buf[i].R || partial[i].G != worldBase.Buf[i].G || partial[i].B != worldBase.Buf[i].B) diffs++;
-        Check($"repainting round a chopped tile matches a full bake ({diffs} pixels differ)", diffs == 0);
+        var firstDiffs = new List<string>();
+        for (int i = 0; i < partial.Length; i++) if (partial[i].R != worldBase.Buf[i].R || partial[i].G != worldBase.Buf[i].G || partial[i].B != worldBase.Buf[i].B) { diffs++; if (firstDiffs.Count < 6) firstDiffs.Add($"{i % PW},{i / PW}:{worldMap[i / PW / T, i % PW / T]}"); }
+        Check($"repainting round a chopped tile matches a full bake ({diffs} pixels differ: {string.Join(" ", firstDiffs)})", diffs == 0);
         Array.Copy(keepMap, worldMap, keepMap.Length);
         RenderBase();
 

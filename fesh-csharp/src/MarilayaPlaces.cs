@@ -58,7 +58,7 @@ partial class Game
     // the town square; and Aling Nita, who raises butterflies.
     static readonly (string id, string name, float lx, float ly)[] MlFolk =
     {
-        ("sela", "Aling Sela", 5.9f, 4.95f), ("jun", "Jun", 15.0f, 25.9f), ("ambo", "Mang Ambo", 25.6f, 4.0f), ("lorna", "Lorna", 9.3f, 23.9f),
+        ("sela", "Aling Sela", 6.65f, 4.95f), ("jun", "Jun", 15.0f, 25.9f), ("ambo", "Mang Ambo", 25.6f, 4.0f), ("lorna", "Lorna", 9.3f, 23.9f),
         ("iyo", "Mang Iyo", 4.2f, 11.3f), ("nita", "Aling Nita", 5.9f, 20.4f)
     };
     readonly Dictionary<string, Stroller> mlWalk = new();
@@ -76,7 +76,7 @@ partial class Game
     static void DrawSela(Pix p, int x, int y, string face, int step, int bob = 0)
     {
         LookData.DrawFigure(p, "#c68a5a", "#e8e8e8", "#3f6f9a", "#4a4038", true, 1, null, x, y, face, step, bob: bob);
-        if (face != "up") p.Rect(x + (face == "left" ? -3 : 1), y - 7 - bob, 2, 2, "#f2e6c8");
+        if (face != "up") p.Rect(x + (face == "left" ? -3 : 1), y - 7 - LookData.Stature - bob, 2, 2, "#f2e6c8");
     }
 
     void DrawMlPerson(string id, int x, int y, string face, int step, int bob)
@@ -91,7 +91,7 @@ partial class Game
             case "nita": LookData.DrawFigure(pix, "#c68a5a", "#3a2a1e", "#e88ab0", "#4a4038", true, 1, null, x, y, face, step, bob: bob); break;
         }
         // Mang Iyo holds his pair of kalutang bars.
-        if (id == "iyo" && face != "up") { pix.Rect(x - 5, y - 8, 1, 5, "#8a5a32"); pix.Rect(x + 4, y - 8, 1, 5, "#6b4424"); }
+        if (id == "iyo" && face != "up") { pix.Rect(x - 5, y - 8 - LookData.Stature, 1, 5, "#8a5a32"); pix.Rect(x + 4, y - 8 - LookData.Stature, 1, 5, "#6b4424"); }
     }
 
     void UpdateMarilayaFolk(float dt)
@@ -102,7 +102,8 @@ partial class Game
         {
             if (!MlFolkHere(f.id)) continue;
             var s = MlWalk(f.id);
-            if (Dist(s.X, s.Y, player.X, player.Y) < 400) Stroll(s, dt, (x, y) => FolkCanStand(x, y));
+            if (FolkAsleep) { s.X = s.HomeX; s.Y = s.HomeY; s.ToX = s.ToY = null; s.Moving = false; }
+            else if (Dist(s.X, s.Y, player.X, player.Y) < 400) Stroll(s, dt, (x, y) => FolkCanStand(x, y));
         }
     }
 

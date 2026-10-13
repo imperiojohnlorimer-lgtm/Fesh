@@ -449,10 +449,8 @@ partial class Game
                 float bx = px + i * 250, bw = 236, bh = 150;
                 bool hit = n.Seen.Contains(i);
                 Gfx.Box(bx, py, bw, bh, hit ? (NurseryLeaves[i].ok ? Pal.C("#e4f3e0") : Pal.C("#f8e6dc")) : Gfx.Hover(bx, py, bw, bh) ? Lighten(Pal.Sand, 0.15f) : Pal.Sand, Pal.Ink, 2, 8);
-                // The leaf.
-                var leaf = Pal.C(i switch { 0 => "#3f7a37", 1 => "#5a9a3a", 2 => "#2f6a2e", _ => "#7fbf5a" });
-                if (i == 3) for (int g = 0; g < 7; g++) Gfx.Line(bx + 60 + g * 18, py + 110, bx + 66 + g * 18, py + 40, 4, leaf);
-                else { Gfx.Circle(bx + bw / 2, py + 70, 34, leaf); Gfx.Line(bx + bw / 2 - 30, py + 70, bx + bw / 2 + 30, py + 70, 2, Pal.C("#c8e0a8")); }
+                int i2 = i;
+                PixelScene(bx + 2, py + 2, 58, 28, 4, p => PaintFeedLeaf(p, i2), 10 + i2);
                 Gfx.TextCenter(NurseryLeaves[i].name, bx + bw / 2, py + bh - 30, FontKind.Ui700, 18, Pal.Ink);
 #if DEBUG
                 Gfx.Seen[$"leaf:{i}"] = new Rectangle(bx, py, bw, bh);
@@ -471,7 +469,8 @@ partial class Game
                 float bx = px + i * 250, bw = 236, bh = 170;
                 bool seen = n.Seen.Contains(i);
                 Gfx.Box(bx, py, bw, bh, seen ? Pal.C("#e4f3e0") : Gfx.Hover(bx, py, bw, bh) ? Lighten(Pal.Sand, 0.15f) : Pal.Sand, Pal.Ink, 2, 8);
-                DrawLifeStage(i, bx + bw / 2, py + 72);
+                int st = i;
+                PixelScene(bx + 2, py + 2, 58, 33, 4, p => PaintStage(p, st), 20 + st);
                 Gfx.TextCenter(NurseryStages[i].name, bx + bw / 2, py + bh - 32, FontKind.Ui700, 18, Pal.Ink);
 #if DEBUG
                 Gfx.Seen[$"stage:{i}"] = new Rectangle(bx, py, bw, bh);
@@ -484,13 +483,10 @@ partial class Game
             return;
         }
         // A butterfly coming out of its pupa, then the wings opening.
-        n.Emerge = Math.Min(1, n.Emerge + Raylib.GetFrameTime() / 4);
-        float cx = x + MlPanelW / 2 - 200, cy = py + 160;
-        Gfx.Line(cx + 16, py + 20, cx + 16, cy + 10, 5, Pal.C("#6b8a3a"));
-        Gfx.Rect(cx - 8, cy - 60, 22, 60, Pal.C(n.Emerge < 0.4f ? "#7a9a4a" : "#c9c4a0"), 10);
-        Gfx.Line(cx - 8, cy - 34, cx + 16, cy - 38, 2, Pal.C("#e8e2cc"));
-        float open = Math.Clamp((n.Emerge - 0.4f) / 0.6f, 0, 1);
-        if (n.Emerge > 0.3f) DrawButterfly(cx, cy + 20, 10 + open * 40, open);
+        // The pupa splits and the butterfly comes out, unfolds and dries: twelve seconds, slow enough to watch.
+        n.Emerge = Math.Min(1, n.Emerge + Raylib.GetFrameTime() / 12);
+        float em = n.Emerge;
+        PixelScene(x + 24, py - 8, 120, 88, 4, p => PaintEmergence(p, em));
         if (n.Emerge >= 1 && !state.Hinted("mr:nursery"))
         {
             state.hinted["mr:nursery"] = true;

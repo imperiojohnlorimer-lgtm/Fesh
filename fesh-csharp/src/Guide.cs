@@ -53,6 +53,7 @@ partial class Game
         MarilayaGoals(list);
         SchoolGoals(list);
         ExploreGoals(list);
+        NoteSleepers(list);
         return list;
     }
 

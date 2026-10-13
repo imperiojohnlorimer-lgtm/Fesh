@@ -173,38 +173,11 @@ partial class Game
         bool holding = MlKeysLive && Bind.Down("act") || Gfx.Down && Gfx.Hover(px + pw + 24, y + MlPanelH - 24 - 60, 260, 60);
         if (holding && m.T < 1) { m.T = Math.Min(1, m.T + Raylib.GetFrameTime() / 9); if ((int)(time * 6) % 4 == 0) Sfx.Play("blip"); }
         float t = m.T;
-        // The cross-section: sky and rain, soil, the limestone with its cracks, and the cave they become.
-        Gfx.Rect(px, py, pw, ph, Pal.C("#bfe0ec"));
-        for (int i = 0; i < 16; i++)
-        {
-            float fx = px + 14 + i * 34, k = (time * 1.2f + i * 0.13f) % 1;
-            if (t < 0.45f || i % 3 == 0) Gfx.Line(fx, py + 6 + k * 46, fx - 3, py + 14 + k * 46, 2, Pal.C("#3a7ab8"));
-        }
-        Gfx.Rect(px, py + 60, pw, 8, Pal.C("#5d9b45"));
-        Gfx.Rect(px, py + 68, pw, 34, Pal.C("#6b4a2b"));
-        Gfx.Rect(px, py + 102, pw, ph - 102, Pal.C("#e2dcc6"));
-        for (int k = 0; k < 8; k++) Gfx.Rect(px, py + 118 + k * 36, pw, 2, Pal.C("#cfc9b4"));
-        for (int i = 0; i < 9; i++) DrawShell(px + 30 + i * 62, py + 150 + (i % 3) * 70, 6, false);
-        // The cracks: thin, then widening.
-        float widen = Math.Clamp((t - 0.2f) / 0.3f, 0, 1);
-        foreach (float fx in new[] { 0.3f, 0.5f, 0.7f })
-            Gfx.Line(px + pw * fx, py + 102, px + pw * (fx + 0.04f), py + 250, 2 + widen * 10, Pal.C("#7fb6cf"));
-        // The cave opening up.
-        float cave = Math.Clamp((t - 0.42f) / 0.3f, 0, 1);
-        if (cave > 0) Gfx.Rect(px + pw * (0.5f - 0.3f * cave), py + 230 - 50 * cave, pw * 0.6f * cave, 40 + 110 * cave, Pal.C("#2a2622"), 30 * cave);
-        // Stalactites and stalagmites growing.
-        float grow = Math.Clamp((t - 0.7f) / 0.25f, 0, 1);
-        if (grow > 0)
-            foreach (float fx in new[] { 0.3f, 0.4f, 0.52f, 0.62f, 0.72f })
-            {
-                float top = py + 182, bot = py + 330;
-                Gfx.Triangle(px + pw * fx - 6, top, px + pw * fx + 6, top, px + pw * fx, top + 30 * grow, Pal.C("#e8e2cc"));
-                Gfx.Triangle(px + pw * fx - 7, bot, px + pw * fx, bot - 22 * grow, px + pw * fx + 7, bot, Pal.C("#e8e2cc"));
-            }
-        if (cave > 0.5f) { float dk = time * 1.5f % 1; Gfx.Circle(px + pw * 0.4f, py + 214 + dk * 100, 3, Pal.C("#9fd0e6")); }
-        Gfx.Text("rain", px + 10, py + 34, FontKind.Ui600, 16, Pal.PaperInk);
-        Gfx.Text("soil", px + 10, py + 74, FontKind.Ui600, 16, Color.White);
-        Gfx.Text("limestone", px + 10, py + 108, FontKind.Ui600, 16, Pal.PaperInk);
+        // The cross-section: sky and rain, soil, the limestone with its cracks, and the cave they become (CaveModelArt.cs).
+        PixelScene(px, py, CmW, CmH, 4, p => PaintCaveModel(p, t));
+        Gfx.Text("rain", px + 10, py + 22, FontKind.Ui600, 16, Pal.PaperInk);
+        Gfx.Text("soil", px + 10, py + 92, FontKind.Ui600, 16, Color.White);
+        Gfx.Text("limestone", px + 10, py + 150, FontKind.Ui600, 16, Pal.PaperInk);
         // Time passing.
         Gfx.Rect(px, py + ph + 10, pw, 10, Pal.C("#d8c7a0"), 5);
         Gfx.Rect(px, py + ph + 10, pw * t, 10, Pal.C("#b5523b"), 5);
@@ -279,9 +252,30 @@ partial class Game
             for (int i = -9; i <= 9; i++)
                 if (i * i / 81f + j * j / 9f <= 1) pix.Rect(x + i, y + 10 + j, 1, 1, i * i / 81f + j * j / 9f > 0.6f ? "#4f8aa0" : "#6fb0c4");
         pix.Rect(x - 1, y + 6, 3, 3, "#ddd6c0");
-        float k = time * 0.8f % 1;
-        if (k < 0.7f) pix.Rect(x, y - 4 + k * 18, 1, 2, "#bfe6f2");
-        else pix.Rect(x - 2, y + 10, 5, 1, "#e8f6fb");
+        // The drop: it swells on the tip for a while, lets go, falls faster and faster, and rings out across the pool.
+        float cycle = 2.4f, ph = (time % cycle) / cycle;
+        if (ph < 0.62f)
+        {
+            float sz = ph / 0.62f;
+            pix.Rect(x, y - 4, 1, 1, "#d6f0f8");
+            if (sz > 0.45f) pix.Rect(x, y - 3, 1, 1, "#bfe6f2");
+            if (sz > 0.85f) { pix.Rect(x - 1, y - 3, 1, 1, Pal.Rgba(191, 230, 242, 0.55f)); pix.Rect(x, y - 2, 1, 1, "#9fd8e8"); }
+        }
+        else
+        {
+            float k = (ph - 0.62f) / 0.38f, fall = 14, dy = fall * k * k;
+            if (y - 3 + dy < y + 9) { pix.Rect(x, y - 3 + dy, 1, 2, "#bfe6f2"); pix.Rect(x, y - 4 + dy, 1, 1, Pal.Rgba(191, 230, 242, 0.4f)); }
+        }
+        // Rings spreading from where the last two drops landed, flattened to the pool's perspective, and fading.
+        for (int r = 0; r < 2; r++)
+        {
+            float age = ((time - r * cycle) % (cycle * 2)) / cycle * 1.0f;
+            float since = ((ph + 1 - 0.99f) % 1) * cycle + r * cycle;
+            if (since < 0 || since > 1.6f) continue;
+            float rad = 1 + since * 5;
+            for (int a = 0; a < 14; a++)
+                pix.Rect(x + MathF.Cos(a * 0.449f) * rad, y + 10 + MathF.Sin(a * 0.449f) * rad * 0.4f, 1, 1, Pal.Rgba(232, 246, 251, 0.7f * (1 - since / 1.6f)));
+        }
     }
 
     void DrawCaveColumn()

@@ -25,6 +25,32 @@ partial class Game
     // Tomas strolls only around his own camp: in bed, or down on the dock for the ending, he stays put.
     bool TomasAtCamp => Dist(tomasX, tomasY, TomasHomeX, TomasHomeY) < 40;
 
+    // The people of the other islands keep hours too: they're in bed from 22:30 (Tomas goes at 22:00) until 05:00, so
+    // by night the islands are quiet, their houses dark, and anyone you come across is asleep. Not while something has them up
+    // (a quake or an evacuation, the ash, the eclipse, a race).
+    bool FolkAsleep
+    {
+        get
+        {
+            if (state.clock >= 5 * 60 && state.clock < 22 * 60 + 30) return false;
+            return tremor == null && evac == null && !AshPhase && !BagaEvacuating && eclipse == null && race == null;
+        }
+    }
+
+    // Lola Pacing is up for a reef walk at a night low tide (Tides.cs), whatever the hour.
+    bool FolkAsleepId(string id) => FolkAsleep && !(id == "pacing" && ReefWalkOn);
+
+    static string AsleepLine(string name) => $"{name} is asleep. Come back after sunrise.";
+
+    // A goal that points at someone says so when they're in bed (the arrow still shows where their house is).
+    void NoteSleepers(List<Goal> list)
+    {
+        if (!FolkAsleep) return;
+        var names = Islanders.Select(n => n.name).Concat(HabagatFolk.Select(n => n.name)).Concat(MlFolk.Select(n => n.name)).ToHashSet();
+        foreach (var g in list)
+            if (g.HasPoint && g.Scene == "world" && names.Contains(g.Place) && !(ReefWalkOn && g.Place.Contains("Pacing"))) g.Text += $" {g.Place} is asleep at this hour: come back after sunrise.";
+    }
+
     Stroller IslanderWalk(string id)
     {
         if (islanderWalk.TryGetValue(id, out var s)) return s;
@@ -55,7 +81,8 @@ partial class Game
             // Away at the shelter, or Mila on her way to the jetty (Magayon.cs).
             if (n.id is "mila" or "ben" && (BagaFolkAtSchool || mgMilaWalk != null)) continue;
             var s = IslanderWalk(n.id);
-            if (Dist(s.X, s.Y, player.X, player.Y) < 400) Stroll(s, dt, (x, y) => FolkCanStand(x, y));
+            if (FolkAsleep) { s.X = s.HomeX; s.Y = s.HomeY; s.ToX = s.ToY = null; s.Moving = false; }
+            else if (Dist(s.X, s.Y, player.X, player.Y) < 400) Stroll(s, dt, (x, y) => FolkCanStand(x, y));
         }
         UpdateHabagatFolk(dt);
         UpdateMarilayaFolk(dt);

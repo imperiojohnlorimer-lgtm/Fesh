@@ -294,7 +294,7 @@ partial class Game
             if (!blinkHit)
             {
                 LookData.DrawPerson(pix, state.look, sx, sy, player.Face, 0, shadow: false, idle: false, blink: time % 3.7f < 0.12f,
-                    arms: holding ? 2 : fishing ? 3 : 0, swing: pump, head: glance);
+                    arms: holding ? 2 : fishing ? 3 : 0, swing: pump, head: glance, seated: true);
                 if (!endOn) R(-5, -1, 5, 2, LookData.Pants[state.look.pants % LookData.Pants.Length]);
             }
             if (!endOn && !fishing && !holding)

@@ -268,7 +268,8 @@ partial class Game
         foreach (var n in HabagatFolk)
         {
             var s = HabagatWalk(n.id);
-            if (Dist(s.X, s.Y, player.X, player.Y) < 400) Stroll(s, dt, (x, y) => FolkCanStand(x, y));
+            if (FolkAsleepId(n.id)) { s.X = s.HomeX; s.Y = s.HomeY; s.ToX = s.ToY = null; s.Moving = false; }
+            else if (Dist(s.X, s.Y, player.X, player.Y) < 400) Stroll(s, dt, (x, y) => FolkCanStand(x, y));
         }
     }
 
@@ -278,6 +279,7 @@ partial class Game
         foreach (var n in HabagatFolk)
         {
             var s = HabagatWalk(n.id);
+            if (FolkAsleepId(n.id) && Dist(player.X, player.Y, s.X, s.Y + 6) < 15) return new Target { Type = "info", Label = AsleepLine(n.name) };
             if (Dist(player.X, player.Y, s.X, s.Y + 6) < 15)
                 return new Target { Type = "habagatfolk", Id = n.id, Label = n.id switch
                 {
@@ -407,7 +409,7 @@ partial class Game
             if (!Near(n.x, n.y)) continue;
             if (n.house) list.Add((n.y - 3, () => DrawBahay(who.x, who.y - 5, who.shirt)));
             else list.Add((n.y - 6, () => DrawSungkaBoard(who.x + 10, who.y - 4)));
-            if (!live || eclipse != null) continue;
+            if (!live || eclipse != null || FolkAsleepId(n.id)) continue;
             var s = HabagatWalk(n.id);
             list.Add((s.Y, () => DrawHabagatPerson(who.id, s)));
             // On her reef walk Lola has two of her apo with her, one with a bucket (Tides.cs).
@@ -446,8 +448,8 @@ partial class Game
         {
             // A wide salakot against the sun.
             int up = bob + (s.Step is 2 or 4 ? 1 : 0);
-            pix.Rect(x - 5, y - 14 - up, 11, 2, "#ddbc78");
-            pix.Rect(x - 3, y - 16 - up, 7, 2, "#f0d596");
+            pix.Rect(x - 5, y - 14 - LookData.Stature - up, 11, 2, "#ddbc78");
+            pix.Rect(x - 3, y - 16 - LookData.Stature - up, 7, 2, "#f0d596");
         }
     }
 

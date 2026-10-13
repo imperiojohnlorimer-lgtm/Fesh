@@ -829,14 +829,7 @@ partial class Game
         }
         // The plume: wisps of steam, or grey ash when Baga's just puffed; it leans west with the winds higher up.
         bool ash = AshFalling || level >= 3 && (int)(time / 9) % 3 == 0;
-        int wisps = level == 0 ? 3 : level == 1 ? 4 : 6;
-        for (int i = 0; i < wisps; i++)
-        {
-            float rise = (time * (level >= 2 ? 5 : 3) + i * 9) % 36;
-            float a = (level == 0 ? 0.3f : 0.45f) * (1 - rise / 36);
-            var col = ash ? Pal.Rgba(120, 112, 104, a + 0.1f) : Pal.Rgba(214, 220, 214, a);
-            pix.Rect(ConeX - 4 - rise * 0.7f, top - 4 - rise, 8 + (int)(rise / 3), 3, col);
-        }
+        DrawPlume(top, level, ash);
     }
 
     void DrawUson(float top)
@@ -855,11 +848,11 @@ partial class Game
     }
 
     // At ground level: the lahar channel (dry, flowing in the rain, or with fresh mud in it) and the zone's marker stones.
-    void DrawBagaGround(float t)
+    void DrawBagaGround(float t, bool force = false, bool? mudNow = null)
     {
-        if (Math.Abs(ConeX - player.X) > W + 80 || Math.Abs(PdzY - player.Y) > H + 120) return;
+        if (!force && (Math.Abs(ConeX - player.X) > W + 80 || Math.Abs(PdzY - player.Y) > H + 120)) return;
         bool flowing = MgOrder && state.weather != "clear" && rainAmt > 0.3f;
-        bool mud = MgOrder && (state.Hinted("mg:rained") || flowing);
+        bool mud = mudNow ?? (MgOrder && (state.Hinted("mg:rained") || flowing));
         for (int i = 1; i < LaharChannel.Length; i++)
         {
             var (ax, ay) = LaharChannel[i - 1]; var (bx, by) = LaharChannel[i];
@@ -1020,14 +1013,14 @@ partial class Game
     static void DrawMila(Pix p, int x, int y, string face, int step, int bob = 0)
     {
         LookData.DrawFigure(p, "#a9714b", "#3a2a20", "#d9a86a", "#5a4a7a", true, 0, null, x, y, face, step, bob: bob);
-        p.Rect(x - 3, y - 13 - bob, 7, 2, "#c0392b"); p.Rect(x - 3, y - 12 - bob, 7, 1, "#f2c94a");
+        p.Rect(x - 3, y - 13 - LookData.Stature - bob, 7, 2, "#c0392b"); p.Rect(x - 3, y - 12 - LookData.Stature - bob, 7, 1, "#f2c94a");
     }
 
     // Ben: a teal field vest and a cap.
     static void DrawBen(Pix p, int x, int y, string face, int step, int bob = 0)
     {
         LookData.DrawFigure(p, "#c68a5a", "#2b1d14", "#2a8a8a", "#3f4a5a", false, 3, "#e8a83a", x, y, face, step, bob: bob);
-        p.Rect(x - 2, y - 7 - bob, 1, 3, "#f2c94a");
+        p.Rect(x - 2, y - 7 - LookData.Stature - bob, 1, 3, "#f2c94a");
     }
 
     // Ben's station: a raised hut with a tin roof, a solar panel, a radio mast and a little dish.

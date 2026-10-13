@@ -536,7 +536,7 @@ partial class Game
         Check($"every stage looked at ({mlNursery?.Note})", mlNursery?.Seen.Count == 4);
         pendingShot = "marilaya-23-butterflies"; yield return 2;
         foreach (int f in Click("Next")) yield return f;
-        yield return 300;
+        for (int i = 0; i < 400 && !state.Hinted("mr:nursery"); i++) yield return 3;   // twelve seconds of emerging
         Check("a butterfly comes out, and Aling Nita thanks you", state.Hinted("mr:nursery"));
         Check($"its panel fits ({lastMlPanelBottom:0})", lastMlPanelBottom <= Gfx.LH);
         foreach (int f in Click("Done")) yield return f;

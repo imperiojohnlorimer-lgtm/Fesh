@@ -1,6 +1,6 @@
 namespace Fesh;
 
-sealed class Animal { public string Kind, Key; public float X, Y, HomeX, HomeY, Vx, Vy, Timer, Pause, Hearts; public bool Flip; }
+sealed class Animal { public string Kind, Key; public float X, Y, HomeX, HomeY, Vx, Vy, Timer, Pause, Hearts; public bool Flip, Asleep; }
 sealed class Particle { public float X, Y, Vx, Vy, Life; public string Color; }
 
 partial class Game
@@ -255,17 +255,39 @@ partial class Game
     }
 
     // Animals wander near home: walk a little, stand around, walk again.
+    // When an animal beds down and gets up (minutes since midnight). Each has its own times, from where it lives, so a
+    // field of sheep doesn't all lie down on the same minute: bed between 20:30 and 23:00, up between 05:00 and 06:30.
+    static (float bed, float wake) AnimalHours(Animal a) =>
+        (20.5f * 60 + 150 * (float)Pix.Hash((int)a.HomeX, (int)a.HomeY, 411), 5 * 60 + 90 * (float)Pix.Hash((int)a.HomeY, (int)a.HomeX, 412));
+    // The night birds and the tarsier are up when it's dark; the cat keeps its own hours.
+    static bool SleepsAtNight(Animal a) => a.Kind is not ("tarsier" or "hornbill" or "cat");
+
+    bool AnimalBedtime(Animal a)
+    {
+        var (bed, wake) = AnimalHours(a);
+        return state.clock >= bed || state.clock < wake;
+    }
+
     void UpdateAnimals(float dt)
     {
         if (scene != "world") return;
         foreach (var a in animals)
         {
             a.Hearts = Math.Max(0, a.Hearts - dt);
+            bool bedtime = SleepsAtNight(a) && AnimalBedtime(a);
+            // Asleep, it stays put until morning (or until you wake it by petting it): no more wandering a few steps and
+            // lying down again.
+            if (a.Asleep)
+            {
+                if (bedtime && a.Hearts <= 0) { a.Vx = a.Vy = 0; continue; }
+                a.Asleep = false; a.Timer = Rand(0.5f, 4f);
+            }
             if (a.Pause > 0) { a.Pause -= dt; continue; }
             a.Timer -= dt;
             if (a.Timer <= 0)
             {
                 if (a.Vx != 0 || a.Vy != 0) { a.Vx = a.Vy = 0; a.Timer = Rand(1f, 3.5f); }
+                else if (bedtime) { a.Asleep = true; continue; }
                 else
                 {
                     float ang = Rand(0, MathF.Tau);
@@ -299,6 +321,7 @@ partial class Game
         var k = Items.Animals[a.Kind];
         FaceToward(a.X, a.Y);
         a.Pause = 2;
+        a.Asleep = false;   // petting wakes it
         a.Vx = a.Vy = 0;
         a.Hearts = 1.5f;
         a.Flip = player.X < a.X;

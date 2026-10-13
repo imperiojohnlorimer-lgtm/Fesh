@@ -78,6 +78,7 @@ partial class Game
         string worst = "";
         foreach (var r in Regions)
         {
+            atlasScrollTo = r.Id; yield return 2;
             ClickButton("atlas:" + r.Id); yield return 3; Inp.ScriptMouse = Offscreen; yield return 2;
             if (atlasRegion != r.Id) { fits = false; worst = r.Id + " didn't open"; break; }
             if (lastAtlasBottom > (Gfx.LH + 664) / 2 - 18) { fits = false; worst = $"{r.Id} ends at {lastAtlasBottom:0}"; }

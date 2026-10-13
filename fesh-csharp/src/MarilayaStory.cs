@@ -46,6 +46,7 @@ partial class Game
             {
                 if (!MlFolkHere(f.id)) continue;
                 var s = MlWalk(f.id);
+                if (FolkAsleep && Dist(x, y, s.X, s.Y + 6) < 15) return new Target { Type = "info", Label = AsleepLine(f.name) };
                 if (Dist(x, y, s.X, s.Y + 6) < 15)
                     return new Target { Type = "marilaya", Id = f.id, Label = f.id == "sela" && GatherDue ? "Gather the storytellers" : MlFolkLabel(f.id, f.name) };
             }

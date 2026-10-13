@@ -121,7 +121,7 @@ partial class Game
         {
             // The spear raised beside your head, ready to throw.
             int sdir = aimX < player.X ? -1 : 1;
-            var h = (x: ux + sdir * 3, y: uy - 9);
+            var h = (x: ux + sdir * 3, y: uy - 9 - LookData.Stature);
             return new HandPose { Hand = h, Tool = "spear", Dx = sdir * 0.3f, Dy = -1, Length = 7 };
         }
         if (rod) return RodPose(face, ux, uy, pump);
@@ -140,7 +140,7 @@ partial class Game
         var (ax, ay) = Project(face, elev);
         // From the front or back the swing runs down the middle, a pixel right of centre so it clears the face; raised,
         // the hands go up beside your head, not in front of your face.
-        var shoulder = side ? near : (ux + 1 + (int)MathF.Round(2 * Math.Clamp((elev - 15) / 60, 0, 1)), uy - 7);
+        var shoulder = side ? near : (ux + 1 + (int)MathF.Round(2 * Math.Clamp((elev - 15) / 60, 0, 1)), uy - 7 - LookData.Stature);
         var hand = (x: (int)MathF.Round(shoulder.Item1 + ax * reach), y: (int)MathF.Round(shoulder.Item2 + ay * reach));
         float toolElev = Snap(elev + bend);
         var (tx, ty) = Project(face, toolElev);
@@ -173,9 +173,9 @@ partial class Game
         bool side = face is "left" or "right";
         int dir = face == "left" ? -1 : 1;
         // The grip in front of you (as the old arms-3 pose had it)...
-        var rest = side ? (x: ux + (dir > 0 ? 2 : -3), y: uy - 6 + pump) : (x: ux + 2, y: uy - 6 + pump);
+        var rest = side ? (x: ux + (dir > 0 ? 2 : -3), y: uy - 6 - LookData.Stature + pump) : (x: ux + 2, y: uy - 6 - LookData.Stature + pump);
         // ...cocked back over your shoulder while you load a cast...
-        var cocked = side ? (x: ux - dir * (1 + (int)(charge * 1.5f)), y: uy - 9 - (int)(charge * 1.5f)) : (x: ux + 2, y: uy - 10 - (int)(charge * 1.5f));
+        var cocked = side ? (x: ux - dir * (1 + (int)(charge * 1.5f)), y: uy - 9 - LookData.Stature - (int)(charge * 1.5f)) : (x: ux + 2, y: uy - 10 - LookData.Stature - (int)(charge * 1.5f));
         (int x, int y) hand = rest;
         if (mode == "charging") hand = cocked;
         else if (mode == "casting" && fish != null && fish.T < 0.25f)
@@ -206,11 +206,11 @@ partial class Game
     // Food held out in front of you at chest height (the near hand from the side, the right hand from the front).
     HandPose FoodPose(string face, int ux, int uy, string food)
     {
-        var shoulder = face is "left" or "right" ? LookData.NearShoulder(ux, uy, face) : (x: ux + 1, y: uy - 7);
+        var shoulder = face is "left" or "right" ? LookData.NearShoulder(ux, uy, face) : (x: ux + 1, y: uy - 7 - LookData.Stature);
         var (ax, ay) = Project(face, -20);
         var hand = ((int)MathF.Round(shoulder.x + ax * 4), (int)MathF.Round(shoulder.y + ay * 4));
         // From behind it's in front of you, low enough that your back hides it (not peeking over a shoulder).
-        if (face == "up") hand = (ux + 1, uy - 3);
+        if (face == "up") hand = (ux + 1, uy - 3 - LookData.Stature);
         return new HandPose { Hand = hand, Tool = "food", Item = food, ToolBehind = face == "up", ArmsBehind = face == "up" };
     }
 

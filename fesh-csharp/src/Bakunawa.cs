@@ -268,7 +268,7 @@ partial class Game
         bool up = eclipse.Phase == "bang" && (eclipse.Beat / BeatLen + id.Length * 0.13f) % 1 < 0.4f;
         LookData.DrawFigure(pix, skin, hair, shirt, pants, longHair, hat, "#e04b3a", x, y, "up", 0, arms: up ? 2 : 0);
         // A pot (or a pan) held up in both hands.
-        int py = up ? y - 15 : y - 7;
+        int py = up ? y - 15 - LookData.Stature : y - 7 - LookData.Stature;
         pix.Rect(x - 2, py, 5, 2, id == "pacing" ? "#b5764a" : "#8a8f93");
         pix.Rect(x - 1, py - 1, 3, 1, "#b4b9bc");
         if (up && eclipse.Beat < 0.12f) { pix.Rect(x - 4, py - 2, 1, 1, "#ffe8a0"); pix.Rect(x + 4, py - 3, 1, 1, "#ffe8a0"); }

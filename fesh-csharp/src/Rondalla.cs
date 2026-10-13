@@ -67,9 +67,9 @@ partial class Game
                     bob: (int)(time * 1.5f + k) % 2, arms: 3, swing: strum, blink: (time + k) % 3.3f < 0.12f);
                 switch (p.inst)
                 {
-                    case "bandurria": pix.Rect(x - 2, y - 6, 4, 3, "#c98b3a"); pix.Rect(x - 1, y - 5, 1, 1, "#3b2a1d"); pix.Line(x + 2, y - 5, x + 5, y - 8, "#6b4a2b"); break;
-                    case "guitar": pix.Rect(x - 3, y - 6, 5, 4, "#b5764a"); pix.Rect(x - 1, y - 5, 1, 1, "#3b2a1d"); pix.Line(x + 2, y - 5, x + 6, y - 9, "#6b4a2b"); break;
-                    default: pix.Rect(x - 3, y - 9, 6, 7, "#8a5a32"); pix.Rect(x - 1, y - 6, 1, 1, "#3b2a1d"); pix.Line(x, y - 9, x, y - 15, "#5b3a24"); break;
+                    case "bandurria": pix.Rect(x - 2, y - 6 - LookData.Stature, 4, 3, "#c98b3a"); pix.Rect(x - 1, y - 5 - LookData.Stature, 1, 1, "#3b2a1d"); pix.Line(x + 2, y - 5 - LookData.Stature, x + 5, y - 8 - LookData.Stature, "#6b4a2b"); break;
+                    case "guitar": pix.Rect(x - 3, y - 6 - LookData.Stature, 5, 4, "#b5764a"); pix.Rect(x - 1, y - 5 - LookData.Stature, 1, 1, "#3b2a1d"); pix.Line(x + 2, y - 5 - LookData.Stature, x + 6, y - 9 - LookData.Stature, "#6b4a2b"); break;
+                    default: pix.Rect(x - 3, y - 9 - LookData.Stature, 6, 7, "#8a5a32"); pix.Rect(x - 1, y - 6 - LookData.Stature, 1, 1, "#3b2a1d"); pix.Line(x, y - 9 - LookData.Stature, x, y - 15 - LookData.Stature, "#5b3a24"); break;
                 }
                 // A note drifting up now and then.
                 double ph = (time * 0.6 + k * 0.37) % 1;

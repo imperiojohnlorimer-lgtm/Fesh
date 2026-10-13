@@ -230,7 +230,9 @@ partial class Game
     /* ---------- The guide's panel ---------- */
     string atlasRegion = "saltmere";
     float lastAtlasBottom;      // where the page's text ended (the autotest checks it fits)
-    float lastAtlasListBottom;  // where the list of places down the left ended (it closes up to fit)
+    float lastAtlasListBottom;  // where the list of places down the left ended (it scrolls inside its box)
+    float atlasScroll;          // how far the list is scrolled (px)
+    string atlasScrollTo;       // a place to bring into view on the next draw
     bool atlasZoom;             // the page's drawing is open big (click it; Back or Esc closes it)
 
     void OpenAtlas(string id = null)
@@ -241,6 +243,7 @@ partial class Game
         atlasZoom = false;
         dexFish = null;
         Learned("atlas");
+        atlasScrollTo = atlasRegion;
         Sfx.Play("ui");
         panel = "atlas";
         mode = "panel";
@@ -260,28 +263,75 @@ partial class Game
         if (PanelClose()) { ClosePanels(); return; }
         if (SmallButton("Fish album", PanelCloseX - 12 - SmallW("Fish album"), y + PanelPad - 6)) { OpenAlbum(); return; }
 
-        // The list of places down the left: the ones you've found by name, the rest as uncharted.
+        // The list of places down the left: the ones you've found by name, the rest as uncharted. Big buttons, and it
+        // scrolls (wheel, or click the track) when there are more than fit.
         float lx = x + pad, ly = y + pad + 44, lw = 220;
-        string group = "";
         static string Group(string id) => id is "saltmere" or "frost" or "dunes" or "mire" or "atoll" or "caverns" or "opensea" ? "The west"
             : id.StartsWith("amihan") || id == "sanctuary" ? "Amihan" : id.StartsWith("marilaya") ? "Marilaya" : "Habagat";
-        // The rows close up a little when the list would run past the panel (Marilaya's two pages, 1.23, made it too long).
+        const float step = 38, bh = 34, headH = 28;
+        float top = ly, viewH = y + h - pad - top;
         int groups = Regions.Select(r => Group(r.Id)).Distinct().Count();
-        float step = Math.Min(29, (h - 44 - pad * 2 - groups * 18) / Regions.Length), bh = step - 3, headH = step < 29 ? 18 : 20;
+        float contentH = Regions.Length * step + groups * headH;
+        float maxScroll = MathF.Max(0, contentH - viewH);
+        if (atlasScrollTo != null)
+        {
+            // Bring a place into view (opening the guide on it, or a test).
+            float at = 0; string gg = "";
+            foreach (var r in Regions)
+            {
+                if (Group(r.Id) != gg) { gg = Group(r.Id); at += headH; }
+                if (r.Id == atlasScrollTo) { if (at < atlasScroll) atlasScroll = at - headH; else if (at + step > atlasScroll + viewH) atlasScroll = at + step - viewH; break; }
+                at += step;
+            }
+            atlasScrollTo = null;
+        }
+        bool overList = Gfx.Hover(lx - 4, top, lw + 22, viewH);
+        if (overList && maxScroll > 0) atlasScroll -= GetMouseWheelMove() * 60;
+        atlasScroll = Math.Clamp(atlasScroll, 0, maxScroll);
+        float cy = top - atlasScroll;
+        var listClip = Gfx.S(lx - 3, top, lw + 6, viewH);
+        BeginScissorMode((int)listClip.X, (int)listClip.Y, (int)MathF.Ceiling(listClip.Width), (int)MathF.Ceiling(listClip.Height));
+        string group = "";
+        bool clicked = false;
         foreach (var r in Regions)
         {
             string g = Group(r.Id);
-            if (g != group) { group = g; Gfx.Text(g, lx, ly + 2, FontKind.Ui700, 14, Muted); ly += headH; }
+            if (g != group) { group = g; Gfx.Text(g, lx, cy + 4, FontKind.Ui700, 15, Muted); cy += headH; }
             bool open = AtlasOpen(r), on = r.Id == atlasRegion;
             string label = open ? r.Name : "Uncharted";
+            var fill = on ? Pal.Lantern : open ? Pal.Sand : Pal.C("#eadfc0");
+            // A row cut by the edge of the list is only drawn: clicking it would hit what's hidden.
+            bool whole = cy >= top - 0.5f && cy + bh <= top + viewH + 0.5f;
+            if (cy + bh > top && cy < top + viewH)
+            {
+                if (whole)
+                {
 #if DEBUG
-            Gfx.Seen["atlas:" + r.Id] = new Rectangle(lx, ly, lw, bh);
+                    Gfx.Seen["atlas:" + r.Id] = new Rectangle(lx, cy, lw, bh);
 #endif
-            if (Button(label, lx, ly, lw, bh, FontKind.Ui600, bh < 24 ? 14 : 15, on ? Pal.Lantern : open ? Pal.Sand : Pal.C("#eadfc0"), open ? Pal.Ink : Muted, 2, 2, 4, open && !on))
-            { atlasRegion = r.Id; atlasZoom = false; Sfx.Play("blip"); return; }
-            ly += step;
+                    if (Button(label, lx, cy, lw, bh, FontKind.Ui600, 16, fill, open ? Pal.Ink : Muted, 2, 2, 4, open && !on)) { atlasRegion = r.Id; atlasZoom = false; Sfx.Play("blip"); clicked = true; }
+                }
+                else
+                {
+                    Gfx.Rect(lx, cy, lw, bh, Pal.Ink, 4); Gfx.Rect(lx + 2, cy + 2, lw - 4, bh - 4, fill, 3);
+                    Gfx.TextCenter(label, lx + lw / 2, cy + 8, FontKind.Ui600, 16, open ? Pal.Ink : Muted);
+                }
+            }
+            cy += step;
+            if (clicked) break;
         }
-        lastAtlasListBottom = ly;
+        EndScissorMode();
+        if (clicked) return;
+        // The scroll bar: a track beside the list with a thumb; a click on the track moves a page.
+        if (maxScroll > 0)
+        {
+            float tx = lx + lw + 6, tw = 8, th = MathF.Max(36, viewH * viewH / contentH), thy = top + (viewH - th) * (atlasScroll / maxScroll);
+            Gfx.Rect(tx, top, tw, viewH, Pal.C("rgba(16,36,58,0.18)"), 4);
+            Gfx.Rect(tx, thy, tw, th, Pal.Ink, 4);
+            if (Gfx.Click(tx - 6, top, tw + 12, viewH) && !Gfx.Hover(tx, thy, tw, th))
+                atlasScroll = Math.Clamp(atlasScroll + (Gfx.Mouse.Y < thy ? -viewH * 0.8f : viewH * 0.8f), 0, maxScroll);
+        }
+        lastAtlasListBottom = top + viewH;
 
         // The page.
         var reg = RegionById[atlasRegion];

@@ -208,10 +208,9 @@ partial class Game
             var drop = Pal.C("rgba(200,220,235,0.55)");
             for (int i = 0; i < n; i++)
             {
-                double sx = (Pix.Hash(i, 7, 95) * (W + 40) + t * drift) % (W + 40);
-                if (sx < 0) sx += W + 40;
-                sx -= 20;
-                double sy = (Pix.Hash(i, 8, 95) * H + t * fall * (0.8 + Pix.Hash(i, 9, 95) * 0.4)) % H;
+                // The drops belong to the world: walking right carries them left across the view, as the ground goes by.
+                double sx = Wrap(Pix.Hash(i, 7, 95) * (W + 40) + t * drift - camX, W + 40) - 20;
+                double sy = Wrap(Pix.Hash(i, 8, 95) * H + t * fall * (0.8 + Pix.Hash(i, 9, 95) * 0.4) - camY, H);
                 if (BiomeAt(((int)sx + camX) / T, ((int)sy + camY) / T) == 1) continue;
                 for (int k = 0; k < len; k++) pix.Fill((int)sx - (heavy ? k / 2 : 0), (int)sy + k, 1, 1, drop);
             }

@@ -48,6 +48,9 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "1" ? VolcanoScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "review" ? VolcanoReviewScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "title" ? TitleTourScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_MUD_TEST") == "1" ? MudScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_TITLE_TEST") == "1" ? TitleShotScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_WORLD_TEST") == "1" ? WorldScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_HOTBAR_TEST") == "1" ? HotbarScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_CHAPTER_TEST") == "1" ? ChapterScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MOUNT_TEST") == "1" ? MountScript().GetEnumerator()
@@ -818,7 +821,7 @@ partial class Game
         yield return 2;
         Check($"a monster in front can be attacked (prompt: {prompt.Text})", target?.Type == "monster");
         Inp.Tap(KeyboardKey.E); yield return 2;
-        Check($"hitting it with a pickaxe does 2 damage ({slime.Hp}/5 left)", slime.Hp == 3);
+        Check($"hitting it with a pickaxe does 2 damage ({slime.Hp}/{MonsterKinds["slime"].Hp} left)", slime.Hp == MonsterKinds["slime"].Hp - 2);
         for (int i = 0; i < 900 && !slime.Dead; i++)
         {
             FaceToward(slime.X, slime.Y);
@@ -832,17 +835,38 @@ partial class Game
         for (int i = 0; i < 40; i++) { swingT = 0; Attack(new Monster { Kind = "slime", X = player.X + 8, Y = player.Y, Hp = 1 }); }
         Check($"slimes drop slime gel about 70% of the time ({Has("slime_gel") - gel0} of 40)", Has("slime_gel") - gel0 is >= 18 and <= 38);
 
-        // Getting hurt: contact damage, a flash, a moment of safety, and armour
+        // Getting hurt: a warning, then a lunge that hurts, a flash, a moment of safety, and armour
         state.hp = 100; iframes = 0;
-        var crab = new Monster { Kind = "crab", X = player.X + 2, Y = player.Y - 3, Hp = MonsterKinds["crab"].Hp, Timer = 2 };
+        var crab = new Monster { Kind = "crab", X = player.X + 20, Y = player.Y - 3, Hp = MonsterKinds["crab"].Hp, Timer = 2 };
         monsters.Add(crab);
         monsters.Add(new Monster { Kind = "bat", X = player.X - 30, Y = player.Y - 6, Hp = 3, Timer = 1 });
         monsters.Add(new Monster { Kind = "shade", X = player.X + 34, Y = player.Y + 8, Hp = 16, Timer = 1 });
         yield return 3;
-        Check($"a monster touching you hurts ({state.hp:0} health)", state.hp == 88 && iframes > 0);
+        Check($"a monster in reach winds up first, showing its line, and doesn't hurt yet ({crab.Phase}, {state.hp:0} health)", crab.Phase == "windup" && state.hp == 100);
         pendingShot = "26-cave-fight"; yield return 2;
+        for (int i = 0; i < 180 && state.hp == 100; i++) yield return 1;
+        float afterLunge = state.hp;
+        Check($"then its lunge hurts and gives a moment of safety ({afterLunge:0} health)", afterLunge < 100 && iframes > 0);
         yield return 10;
-        Check($"you can't be hit again straight away ({state.hp:0} health)", state.hp == 88);
+        Check($"you can't be hit again straight away ({state.hp:0} health)", state.hp == afterLunge);
+        monsters.Clear();
+        var lunger = new Monster { Kind = "slime", X = player.X + 25, Y = player.Y, Hp = 8, Timer = 2 };
+        monsters.Add(lunger); iframes = 0; state.hp = 100;
+        for (int i = 0; i < 30 && lunger.Phase != "windup"; i++) yield return 1;
+        float side = player.Y, dodge = CanStand(player.X, player.Y + 20) && CanStand(player.X + 14, player.Y + 20) ? 20 : -20;
+        // Sidestep once its line is locked and the lunge goes past.
+        for (int i = 0; i < 20 && lunger.Phase == "windup"; i++) { player.Y = side + dodge; yield return 1; }
+        for (int i = 0; i < 90 && lunger.Phase is "windup" or "dash"; i++) { player.Y = side + dodge; yield return 1; }
+        Check($"stepping out of a locked line, the lunge misses ({state.hp:0} health, dodged {dodge:0} px, standable {CanStand(player.X, side + dodge)})", state.hp == 100 && CanStand(player.X, side + dodge));
+        monsters.Clear(); player.Y = side;
+        {
+            // The monsters are quicker than you, and more of them deeper down.
+            Check($"every kind closes in faster than a slime hops idly, and the bat and shade outrun a walk ({MonsterKinds["bat"].Speed}, {MonsterKinds["shade"].Speed} vs 52)", MonsterKinds["bat"].Speed > 52 && MonsterKinds["shade"].Speed >= 52);
+            var counts = new List<int>();
+            foreach (int fl in new[] { 1, 5, 11 }) { caveFloor = fl; LoadScene("cave"); counts.Add(monsters.Count); }
+            Check($"a deeper floor holds more, and tougher, monsters ({string.Join(", ", counts)})", counts[0] >= 3 && counts[2] >= counts[0] + 3);
+            caveFloor = 5; LoadScene("cave"); AtLadder(); monsters.Clear(); iframes = 0;
+        }
         Give("shell_armor");
         state.hp = 100; HurtPlayer(12, crab);
         Check($"shell armour softens blows ({100 - state.hp:0.0} damage instead of 12)", state.hp > 91.5f && state.hp < 92.5f);
@@ -908,6 +932,7 @@ partial class Game
         // Running out of health: wake up outside, a little poorer
         state.coins = 100; state.hp = 5; iframes = 0;
         monsters.Add(new Monster { Kind = "shade", X = player.X, Y = player.Y - 3, Hp = 16, Timer = 2 });
+        for (int i = 0; i < 400 && scene == "cave" && mode != "fade"; i++) yield return 1;   // its windup, then its lunge
         yield return 90;
         Check($"fainting wakes you at the cave mouth ({state.hp:0} health, {state.coins} coins, toast: {toastMsg})",
             scene == "world" && Dist(player.X, player.Y, MouthDoorX, MouthDoorY + 2) < 4 && state.hp == 35 && state.coins == 90 && toastMsg.Contains("dark"));
@@ -2016,6 +2041,7 @@ partial class Game
         foreach (int frames in VolcanoScript()) yield return frames;
         foreach (int frames in ChapterScript()) yield return frames;
         foreach (int frames in MarilayaScript()) yield return frames;
+        foreach (int frames in WorldScript()) yield return frames;
         foreach (int frames in GraphicsScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";

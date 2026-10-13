@@ -104,6 +104,7 @@ partial class Game
             // At the shelter, or Mila on her way to the jetty, the folk from Baga aren't at home (Magayon.cs).
             if (n.id is "mila" or "ben" && (BagaFolkAtSchool || n.id == "mila" && mgMilaWalk != null)) continue;
             var s = IslanderWalk(n.id);
+            if (FolkAsleep && Dist(player.X, player.Y, s.X, s.Y + 6) < 15) return new Target { Type = "info", Label = AsleepLine(n.name) };
             if (Dist(player.X, player.Y, s.X, s.Y + 6) < 15)
                 return new Target
                 {
@@ -241,14 +242,14 @@ partial class Game
                 list.Add((n.y - 3, () => DrawSchool(n.x, n.y - 5)));
                 list.Add((SchoolY + 18, () => DrawSchoolBench(time)));
                 // While the ash falls she's inside the shelter with her class (Magayon.cs).
-                if (!AshFalling) list.Add((s.Y, () => DrawIsayFigure(pix, (int)MathF.Round(s.X), (int)MathF.Round(s.Y), s.Face, s.Step, s.Moving ? 0 : (int)(time % 3 / 2), (time + 3) % 4.3f < 0.12f)));
+                if (!AshFalling && !FolkAsleep) list.Add((s.Y, () => DrawIsayFigure(pix, (int)MathF.Round(s.X), (int)MathF.Round(s.Y), s.Face, s.Step, s.Moving ? 0 : (int)(time % 3 / 2), (time + 3) % 4.3f < 0.12f)));
                 continue;
             }
             // Baga's two (Magayon.cs): Ben's station and Manay Mila's house, and them unless they're at the shelter.
             if (n.id is "mila" or "ben")
             {
                 list.Add((n.y - 3, () => { if (n.id == "ben") DrawStation(n.x, n.y - 5); else DrawBahay(n.x, n.y - 5, n.shirt); }));
-                if (BagaFolkAtSchool || n.id == "mila" && mgMilaWalk != null) continue;
+                if (BagaFolkAtSchool || n.id == "mila" && mgMilaWalk != null || FolkAsleep) continue;
                 list.Add((s.Y, () =>
                 {
                     int bx = (int)MathF.Round(s.X), by = (int)MathF.Round(s.Y), bob = s.Moving ? 0 : (int)(time % 3 / 2);
@@ -258,7 +259,7 @@ partial class Game
             }
             list.Add((n.y - 3, () => DrawBahay(n.x, n.y - 5, n.shirt)));
             // On their way up to School Rise, Lira and Niko are drawn by the evacuation instead (RestlessSea.cs).
-            if (SeaEmergency && n.id is "lira" or "niko") continue;
+            if (SeaEmergency && n.id is "lira" or "niko" || FolkAsleep) continue;
             list.Add((s.Y, () =>
             {
                 var look = new Look { skin = 2, shirt = n.id == "niko" ? 2 : n.id == "tala" ? 3 : 1, hat = 0, hair = 1 };
@@ -272,9 +273,9 @@ partial class Game
                 else LookData.DrawPerson(pix, look, x, y, s.Face, s.Step, bob: bob);
                 // A woven salakot and a sash distinguish the village fishers; both ride the walk's bounce.
                 int up = bob + (s.Step is 2 or 4 ? 1 : 0);
-                pix.Rect(x - 5, y - 14 - up, 11, 2, "#ddbc78");
-                pix.Rect(x - 3, y - 16 - up, 7, 2, "#f0d596");
-                pix.Rect(x - 2, y - 7 - up, 4, 2, n.shirt);
+                pix.Rect(x - 5, y - 14 - LookData.Stature - up, 11, 2, "#ddbc78");
+                pix.Rect(x - 3, y - 16 - LookData.Stature - up, 7, 2, "#f0d596");
+                pix.Rect(x - 2, y - 7 - LookData.Stature - up, 4, 2, n.shirt);
                 if (chore != null) DrawChoreProp(chore, x, y, s.Face);
             }));
         }

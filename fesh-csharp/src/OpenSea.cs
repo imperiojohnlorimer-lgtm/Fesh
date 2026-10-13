@@ -156,11 +156,10 @@ partial class Game
                     if (k > 0.85f) pix.Rect(bx - 1, sc.Y, 3, 1, Pal.Rgba(240, 250, 252, a));
                     continue;
                 }
-                bool up = (int)(t * 5 + b * 1.7f) % 2 == 0;
-                pix.Rect(bx + 2, sc.Y + 2, 4, 1, Pal.Rgba(0, 0, 0, 0.1f * a));
-                pix.Rect(bx, by, 2, 1, gull);
-                pix.Rect(bx - 2, by + (up ? -1 : 1), 2, 1, gull);
-                pix.Rect(bx + 2, by + (up ? -1 : 1), 2, 1, gull);
+                pix.Rect(bx - 2, sc.Y + 2, 5, 1, Pal.Rgba(0, 0, 0, 0.1f * a));
+                // They wheel round the frenzy, so they face the way they're circling.
+                float ang2 = t * (0.8f + b * 0.21f) + b * 2.1f + sc.Seed;
+                DrawGull(bx, by, MathF.Sin(ang2) > 0 ? -1 : 1, 1, t + b * 0.7f, a);
             }
         }
     }

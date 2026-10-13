@@ -32,6 +32,7 @@ static class Sfx
         Add("build", 0.2f, b => { Tone(b, 190, 0.07f, "square", 0.05f, -70); Tone(b, 250, 0.06f, "square", 0.04f, -80, 0.1f); });
         Add("remove", 0.16f, b => Tone(b, 330, 0.14f, "triangle", 0.04f, -190));
         Add("nope", 0.1f, b => Tone(b, 200, 0.08f, "square", 0.025f));
+        Add("warn", 0.22f, b => { Tone(b, 440, 0.09f, "square", 0.03f, 220); Tone(b, 660, 0.09f, "square", 0.03f, 220, 0.1f); });
         Add("chop", 0.16f, b => { Noise(b, 0.08f, 0.16f); Tone(b, 140, 0.1f, "square", 0.04f, -50); });
         Add("mine", 0.16f, b => { Tone(b, 1400, 0.06f, "square", 0.03f, -300); Tone(b, 900, 0.1f, "triangle", 0.03f, 0, 0.03f); });
         Add("door", 0.3f, b => { Tone(b, 180, 0.25f, "triangle", 0.035f, 90); Noise(b, 0.1f, 0.05f); });
