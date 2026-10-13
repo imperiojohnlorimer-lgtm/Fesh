@@ -67,7 +67,13 @@ partial class Game
         y += 20;
         if (DerbyOn) Gfx.Text($"The derby is on! {(int)derbyT / 60}:{(int)derbyT % 60:00} left. Go fish!", x, y + 14, FontKind.Ui700, 22, Pal.C("#3f7d35"));
         else if (state.derbyDay == state.day) Gfx.Text("You've fished today's derby. Come back tomorrow!", x, y + 14, FontKind.Ui700, 22, Muted);
-        else if (BigButton("Start the derby", x, y, true)) StartDerby();
+        else if (BigButton("Start the derby", x, y, true)) { StartDerby(); return; }
+        // The fair version, for comparing with other people (Match.cs).
+        y += 84;
+        Gfx.Text("Want a fair fight?", x, y, FontKind.Ui700, 22, Pal.PaperInk);
+        var duel = Gfx.Wrap("The Derby Duel gives you and a rival the same rod, the same spot and the very same fish, so only skill decides. Win once a day against each of them and I'll pay you: " + DuelPrizeText("bess") + " for Old Bess, " + DuelPrizeText("marlo") + " for Marlo, " + DuelPrizeText("ivy") + " for Captain Ivy.", FontKind.Note, 18, w);
+        Lines(duel, x, y + 34, 25, FontKind.Note, 18, Muted);
+        if (SmallButton("Open Matches", x, y + 34 + duel.Count * 25 + 10)) { ClosePanels(); OpenMatches(); return; }
     }
 
     void DrawSellList(float x, float y, float w, float h)

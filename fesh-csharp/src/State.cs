@@ -106,6 +106,8 @@ sealed class State
     public int parola;                               // how much of the Parola lighthouse is mended (0 to 3; 3 is lit)
     public Dictionary<string, int> sightings = new(); // sanctuary animal -> times watched
     public float regattaBest;                        // your fastest regatta, in seconds (0: never finished)
+    public int sortBest;                             // your longest run of crabs sorted right (Release.cs); shown on the notice board
+    public float platejawBest;                       // how long the fight with Platejaw took when you won it, in seconds (0: not yet)
     public int regattaDay;                           // the day the regatta last paid a prize
     public int sungkaDay, sungkaWins;                // the day Lola Pacing last paid out for a win, and how many you've won
     public string gleanTide = "";                    // the low tide you last gleaned in ("day:am" or "day:pm")...
@@ -170,6 +172,8 @@ static class SaveFile
     static string LegacyPath => Override ?? Path.Combine(Dir, "save.json");
     // Under FESH_SAVE the settings get their own name too, so a test run can never touch the real settings.json.
     public static string SettingsPath => Path.Combine(Dir, Override != null ? $"{Stem}-settings.json" : "settings.json");
+    // The local leaderboard sits beside the settings (and under the same test prefix).
+    public static string BoardPath => Path.Combine(Dir, Override != null ? $"{Stem}-leaderboard.json" : "leaderboard.json");
     public static string FilePath => SlotPath(Slot);
 
     public static void MigrateLegacy()

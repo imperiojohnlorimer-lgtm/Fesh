@@ -48,6 +48,15 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "1" ? VolcanoScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "review" ? VolcanoReviewScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "title" ? TitleTourScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_MATCH_TEST") == "1" ? MatchScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_LAN_TEST") == "1" ? LanScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_DOCK_TEST") == "1" ? DockScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_DOCKNET_TEST") == "1" ? DockNetScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_DERBYNET_TEST") == "1" ? DerbyNetScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_REGATTANET_TEST") == "1" ? RegattaNetScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_REGATTA_TEST") is "1" or "lan" or "alone" ? RegattaScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_QUIZ_TEST") == "1" ? QuizScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_REEF_TEST") == "1" ? ReefScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_ZOOM_TEST") == "1" ? ZoomScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_CAVE_TEST") == "1" ? CaveFeatureScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MUD_TEST") == "1" ? MudScript().GetEnumerator()
@@ -69,9 +78,12 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_AMIHAN_TEST") == "1" ? AmihanScript().GetEnumerator() : Script();
     }
 
+    Action testEachFrame;          // something a test wants run on every game frame, not only when its script wakes
+
     partial void AutoTestTick()
     {
         if (script == null) return;
+        testEachFrame?.Invoke();
         if (waitFrames > 0) { waitFrames--; return; }
         bool more;
         try { more = script.MoveNext(); }
@@ -2046,6 +2058,14 @@ partial class Game
         foreach (int frames in WorldScript()) yield return frames;
         foreach (int frames in GraphicsScript()) yield return frames;
         foreach (int frames in ZoomScript()) yield return frames;
+        foreach (int frames in MatchScript()) yield return frames;
+        foreach (int frames in DockScript()) yield return frames;
+        foreach (int frames in DockNetScript()) yield return frames;
+        foreach (int frames in DerbyNetScript()) yield return frames;
+        foreach (int frames in RegattaNetScript()) yield return frames;
+        foreach (int frames in RegattaScript()) yield return frames;
+        foreach (int frames in QuizScript()) yield return frames;
+        foreach (int frames in ReefScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

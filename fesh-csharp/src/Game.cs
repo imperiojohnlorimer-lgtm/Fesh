@@ -9,7 +9,7 @@ sealed class Critter { public string Id; public float X, Y, Vx, Vy, T; }
 // One cast. Depth is 0 shallow, 1 middle, 2 deep. WaitT counts up while waiting (the ice hole's jig rhythm uses it).
 sealed class FishCast
 {
-    public string Spot, Bait; public float T, Sx, Sy, Tx, Ty, Bx, By, Timer, BiteT, WaitT, Power; public int Depth, Jigs; public bool BigShadow, Spill;
+    public string Spot, Bait; public float T, Sx, Sy, Tx, Ty, Bx, By, Timer, BiteT, WaitT, Power; public int Depth, Jigs, MatchN = -1; public bool BigShadow, Spill;   // MatchN: the cast's number in a match (Match.cs)
     // A cast you aimed yourself (Hotbar.cs): Spot is the named spot whose water it fell in, and only its everyday fish bite
     // (Wild); Dry, it fell on land; Empty, in water nothing lives in.
     public bool Wild, Dry, Empty;
@@ -54,7 +54,7 @@ partial class Game
     static readonly string[] ActiveModes = { "play", "build", "charging", "casting", "waiting", "bite", "reeling", "chest", "spear", "drill" };
 
     State state = new();
-    readonly Random rng = new();
+    Random rng = new();   // swapped for a match's own while one is on (Match.cs), and put back after
     float Rand(float a, float b) => a + (float)rng.NextDouble() * (b - a);
     static float Dist(float ax, float ay, float bx, float by) => MathF.Sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
 
@@ -141,6 +141,8 @@ partial class Game
             EndDrawing();
             Inp.EndFrame();
         }
+        // Closing the window mid-match puts the adventure back first, so it's the adventure that gets saved.
+        AbandonMatch();
         if (mode != "title") Save();
         UnloadTexture(worldTex);
         if (mapTex.Id != 0) UnloadTexture(mapTex);
@@ -240,6 +242,8 @@ partial class Game
     bool Save()
     {
         if (mode == "title" || mode == "create" && creatorFor == "new") return false;
+        // A match plays on a tournament state, never on your adventure: nothing is written until it's over (Match.cs).
+        if (MatchActive) return true;
         // Exactly where you are: rounding could put a hull's edge over a dock, or the feet of someone pushed against
         // the water onto the water tile, and then StartGame wouldn't accept the spot on loading.
         state.px = player.X;
@@ -266,6 +270,8 @@ partial class Game
         if (mode == "title") { TitleKeys(); return; }
         if (mode == "ending") { if (Inp.Pressed(KeyboardKey.Enter)) KeepFishing(); return; }
         if (mode == "pause") { if (BackPressed()) ClosePause(); return; }
+        if (mode == "matchresult") { MatchResultKeys(); return; }
+        if (MatchActive) { MatchKeys(); return; }
         if (Inp.PadPressed(GamepadButton.MiddleRight) && ActiveModes.Contains(mode)) { OpenPause(anyMode: true); return; }
         // On a gamepad, the bumpers pick the piece to build (they open the tackle box and map otherwise).
         if (mode == "build" && (Inp.PadPressed(GamepadButton.LeftTrigger1) || Inp.PadPressed(GamepadButton.RightTrigger1)))
@@ -300,6 +306,7 @@ partial class Game
             if (mode == "panel" && panel is ("dex" or "album" or "atlas") && (dexFish != null || dexExtra != null)) { dexFish = null; dexExtra = null; }
             else if (mode == "panel" && panel == "atlas" && atlasZoom) atlasZoom = false;
             else if (mode == "panel" && panel == "sungka") CloseSungka();
+            else if (mode == "panel" && panel == "sungkalan") SungkaLanBack();
             else if (mode == "panel" && panel == "tides") CloseTides();
             else if (mode == "panel" && panel == "lahar") CloseLaharWatch();
             else if (mode == "panel" && panel is "readings" or "gobag") { readings = null; gobag = null; ClosePanels(); }
@@ -661,6 +668,8 @@ partial class Game
 
     void ClosePanels()
     {
+        if (panel == "sungkalan") ShutSungkaLan();
+        if (panel == "matches") StopDockFind();
         // A crab still on the sorting tray goes the safe way (Release.cs); a lesson left halfway is just left.
         if (panel == "sort") FinishSort();
         if (panel == "quiz") { quiz = null; lessonPrizes = null; }
@@ -707,6 +716,8 @@ partial class Game
     // (Settings: on by default) pauses from those too, even mid-cast or mid-fight, and Resume goes straight back.
     void OpenPause(bool auto = false, bool anyMode = false)
     {
+        // In a match Esc asks whether to leave; the match itself never pauses.
+        if (MatchActive) { if (!auto && match.Phase is "countdown" or "run" or "dock" or "netwait" or "regatta" or "quiz" or "reef") match.LeaveAsk = true; return; }
         if (mode != "play" && !((auto || anyMode) && ActiveModes.Contains(mode))) return;
         if (!auto) Sfx.Play("ui");
         // A power cast being held is dropped: the key or button let go while you were away would throw it on resuming.
@@ -720,6 +731,7 @@ partial class Game
     // Before any input is handled, so nothing pressed while the window is in the background acts first.
     void CheckAutoPause()
     {
+        if (MatchActive) return;   // a match's clock runs on, so losing focus can't pause it
         if (Settings.Data.pauseUnfocused && !Inp.Focused && ActiveModes.Contains(mode)) OpenPause(auto: true);
         // Unplugging the gamepad you were playing with pauses too.
         bool padNow = Inp.PadIndex >= 0;
@@ -915,6 +927,8 @@ partial class Game
 
     void OnAction()
     {
+        // A match: nothing before the countdown is over or while the question of leaving is up.
+        if (MatchActive && (match.Phase is not ("run" or "dock") || match.LeaveAsk || match.BoardOpen || DockBusy)) return;
         switch (mode)
         {
             case "dialogue": Sfx.Play("blip"); AdvanceDialogue(); return;
@@ -959,6 +973,9 @@ partial class Game
                     case "tank": OpenTank((Build)target.Ref); break;
                     case "planter": PickPlanter((Build)target.Ref); break;
                     case "info": Sfx.Play("nope"); break;
+                    case "dockplayer": FaceToward(dockClient.Roster.First(p => p.Id == int.Parse(target.Id)).X, player.Y); dockChallengeTarget = int.Parse(target.Id); Sfx.Play("ui"); break;
+                    case "dockboard": FaceToward(DockBoardX, DockBoardY); match.BoardOpen = true; Sfx.Play("ui"); break;
+                    case "dockrival": { var an = DockAnglers.First(a => a.id == target.Id); FaceToward(an.x, an.y); dockAnglerMenu = an.id; Sfx.Play("ui"); break; }
                     case "rest": Rest(target.Id == "shelter"); break;
                     case "spot": if (target.Id == "icehole") Cast(target.Id); else StartCharge(target.Id); break;
                     case "drill": StartDrill(); break;
@@ -1028,14 +1045,17 @@ partial class Game
     /* ---------- Update loop ---------- */
     void Update(float dt)
     {
+        // A match keeps to one timeline: its clock, the bite waits and the fight all move by the same capped step.
+        if (MatchActive) dt = MathF.Min(dt, MatchMaxDt);
         time += dt;
         LookData.Now = time;
         if (toastTimer > 0) toastTimer -= dt;
         toastAlpha = Math.Clamp(toastAlpha + (toastTimer > 0 ? dt : -dt) / 0.25f, 0, 1);
+        if (MatchActive) UpdateMatch(dt);
+        UpdateDockNet(dt);
         UpdateFloaters(dt);
         UpdateTitleTour(dt);
-        UpdateGuide(dt);
-        TellBadgeNews();
+        if (!MatchActive) { UpdateGuide(dt); TellBadgeNews(); }
         HoldMount();
         if (mode is not ("pause" or "panel" or "title" or "create"))
         {
@@ -1056,6 +1076,8 @@ partial class Game
             UpdateRelease(dt);
         }
         if (mode == "panel" && panel == "sungka") UpdateSungka(dt);
+        if (mode == "panel" && panel == "sungkalan") UpdateSungkaLan(dt);
+        if (MatchActive && match.Phase == "sungka") UpdateSungkaLan(dt);
         if (mode == "panel" && panel == "quiz") UpdateQuiz(dt);
         if (mode == "panel" && panel == "sort") UpdateSort();
         if (mode == "panel" && panel == "album") UpdateAlbum();
@@ -1063,7 +1085,7 @@ partial class Game
         if (mode == "panel" && panel == "lahar") UpdateLaharWatch(dt);
         if (mode is not ("title" or "create" or "pause")) state.playSecs += dt;
         if (mode != "pause") idleT = mode == "play" && !player.Moving ? idleT + dt : 0;
-        if (ActiveModes.Contains(mode))
+        if (ActiveModes.Contains(mode) && !MatchActive)
         {
             TickClock(dt);
             // Only the shaking and the real evacuation hold these (Codex: the drill used to freeze them too, and hunger
@@ -1112,6 +1134,7 @@ partial class Game
 
         if (mode == "play" || mode == "build")
         {
+            if (MatchActive) { UpdateMatchPlay(dt); return; }
             float dx = 0, dy = 0;
             if (Bind.Down("left")) dx -= 1;
             if (Bind.Down("right")) dx += 1;
@@ -1245,6 +1268,9 @@ partial class Game
         // Nothing carries over from a game played earlier in this session (quitting to the title and loading another slot).
         fish = null; reel = null; panel = null; boss = null; dlg = null; eclipse = null; race = null; raceArmed = false; sungka = null;
         guardian = null; guardianDue = false; rocks.Clear();
+        ShutSungkaLan();
+        ShutDockNet();
+        stampDock = false;
         tremor = null; evac = null; cocos.Clear(); trackBeforeSea = null;
         ResetMagayon();
         bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear(); seaLife.Clear(); glowTrail.Clear();

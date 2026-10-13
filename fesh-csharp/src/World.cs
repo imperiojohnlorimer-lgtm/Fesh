@@ -259,6 +259,7 @@ partial class Game
         GenerateArchipelago();
         GenerateHabagat();
         GenerateMarilaya();
+        if (stampDock) StampDock();
         RenderBase();
         mapTexDirty = true;
     }
@@ -1290,6 +1291,9 @@ partial class Game
         AddMagayonObjects(list);
         if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
         AddMarilayaObjects(list);
+        AddMatchObjects(list);
+        AddDockObjects(list);
+        AddRegattaObjects(list);
         if (Has("boat") > 0 && !Aboard)
         {
             var (bx, by) = BoatPosition();

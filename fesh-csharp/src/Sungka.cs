@@ -78,33 +78,8 @@ partial class Game
 
     static int Opposite(int pit) => 14 - pit;
 
-    // Sows from a pit, with relay sowing and captures. Returns true if the mover gets another turn.
-    static bool SungkaSow(int[] b, int pit, bool lola, out int last)
-    {
-        int own = lola ? 15 : 7, theirs = lola ? 7 : 15;
-        int hand = b[pit];
-        b[pit] = 0;
-        last = pit;
-        for (int guard = 0; guard < 2000 && hand > 0; guard++)
-        {
-            last = (last + 1) % 16;
-            if (last == theirs) continue;
-            b[last]++;
-            hand--;
-            if (hand > 0) continue;
-            if (last == own) return true;
-            // A house that had shells before this one: pick them all up and keep going.
-            if (b[last] > 1) { hand = b[last]; b[last] = 0; continue; }
-            bool mine = lola ? last is >= 8 and <= 14 : last is >= 0 and <= 6;
-            if (mine && b[Opposite(last)] > 0)
-            {
-                b[own] += b[Opposite(last)] + 1;
-                b[Opposite(last)] = 0;
-                b[last] = 0;
-            }
-        }
-        return false;
-    }
+    // Sows from a pit, with relay sowing and captures (the rules are shared with the LAN game: SungkaCore.cs).
+    static bool SungkaSow(int[] b, int pit, bool lola, out int last) => SungkaRules.Sow(b, pit, lola, out last);
 
     static bool SideEmpty(int[] b, bool lola) => Enumerable.Range(lola ? 8 : 0, 7).All(i => b[i] == 0);
 
@@ -180,6 +155,28 @@ partial class Game
         if (SmallButton("Close", x + w - pad - SmallW("Close"), y + pad - 4)) { CloseSungka(); return; }
         Gfx.Text(Gfx.Ellipsize(sungkaNote, FontKind.Ui600, 19, w - pad * 2), x + pad, y + pad + 46, FontKind.Ui600, 19, sungkaOver ? Pal.C("#9a6a1a") : Muted);
 
+        int picked = DrawSungkaBoard(x, y, w, sungka, sungkaLast, i => !sungkaLolaTurn && !sungkaOver && sungka[i] > 0 && sungkaWait <= 0, "Lola", "You");
+        if (picked >= 0) SungkaMove(picked, false);
+
+        if (sungkaOver && BigButton("Play again", x + w - pad - BigW("Play again"), y + h - pad - 56, true)) { OpenSungka(); return; }
+        if (Gfx.PressedOutside(x, y, w, h)) CloseSungka();
+    }
+
+    // Lola takes her turn after a moment (Update calls this while the board is open).
+    void UpdateSungka(float dt)
+    {
+        if (sungka == null || sungkaOver) return;
+        if (sungkaWait > 0) { sungkaWait -= dt; return; }
+        if (sungkaLolaTurn && LolaPick() is int pick && pick >= 0) SungkaMove(pick, true);
+    }
+
+    // The plank and its pits, drawn from the point of view of whoever sits along the bottom (houses 0-6, their head at 7;
+    // the other side's houses 8-14 along the top, their head at 15). `b` is in that order. Returns the house clicked, or
+    // -1; `can` says which of the bottom row may be picked. Shared by Lola's board and the LAN game.
+    int DrawSungkaBoard(float x, float y, float w, int[] b, int last, Func<int, bool> can, string topName, string bottomName)
+    {
+        const float pad = 26;
+        int picked = -1;
         // The board: a long boat-shaped plank, Lola's head at the left, yours at the right.
         float bx = x + pad + 10, by = y + 130, bw = w - pad * 2 - 20, bh = 230;
         Gfx.Rect(bx, by, bw, bh, Pal.C("#8a5f36"), 40);
@@ -196,20 +193,20 @@ partial class Game
         void Pit(int i, float cx, float cy, float r, bool head)
         {
             bool mine = i is >= 0 and <= 6;
-            bool can = mine && !sungkaLolaTurn && !sungkaOver && sungka[i] > 0 && sungkaWait <= 0;
-            var fill = i == sungkaLast ? Pal.C("#5a3a20") : Pal.C("#4a2f1d");
-            if (can && Gfx.Hover(cx - r, cy - r, r * 2, r * 2)) fill = Pal.C("#6b4a2b");
+            bool ok = mine && can(i);
+            var fill = i == last ? Pal.C("#5a3a20") : Pal.C("#4a2f1d");
+            if (ok && Gfx.Hover(cx - r, cy - r, r * 2, r * 2)) fill = Pal.C("#6b4a2b");
             if (head) Gfx.Rect(cx - r * 0.8f, cy - r * 1.4f, r * 1.6f, r * 2.8f, fill, r * 0.8f);
             else Gfx.Circle(cx, cy, r, fill);
-            Shells(cx, cy, sungka[i], head ? r * 0.7f : r * 0.62f);
+            Shells(cx, cy, b[i], head ? r * 0.7f : r * 0.62f);
             // Counts go on the owner's side: above Lola's, below yours.
-            string n = sungka[i].ToString();
+            string n = b[i].ToString();
             float reach = head ? r * 1.4f : r;
             Gfx.TextCenter(n, cx, i >= 8 ? cy - reach - 22 : cy + reach + 4, FontKind.Ui700, 17, i == 7 ? Pal.C("#fff2c0") : Pal.Paper);
 #if DEBUG
             Gfx.Seen[$"sungka:{i}"] = new Rectangle(cx - r, cy - r, r * 2, r * 2);
 #endif
-            if (can && Gfx.Click(cx - r, cy - r, r * 2, r * 2)) { SungkaMove(i, false); }
+            if (ok && Gfx.Click(cx - r, cy - r, r * 2, r * 2)) picked = i;
         }
         float cy0 = by + bh * 0.3f, cy1 = by + bh * 0.7f;
         for (int k = 0; k < 7; k++)
@@ -220,18 +217,8 @@ partial class Game
         }
         Pit(15, bx + headW / 2 + 10, by + bh / 2, 34, true);
         Pit(7, bx + bw - headW / 2 - 10, by + bh / 2, 34, true);
-        Gfx.Text("Lola", bx + 20, by - 26, FontKind.Ui700, 18, Muted);
-        Gfx.Text("You", bx + bw - 60, by + bh + 8, FontKind.Ui700, 18, Muted);
-
-        if (sungkaOver && BigButton("Play again", x + w - pad - BigW("Play again"), y + h - pad - 56, true)) { OpenSungka(); return; }
-        if (Gfx.PressedOutside(x, y, w, h)) CloseSungka();
-    }
-
-    // Lola takes her turn after a moment (Update calls this while the board is open).
-    void UpdateSungka(float dt)
-    {
-        if (sungka == null || sungkaOver) return;
-        if (sungkaWait > 0) { sungkaWait -= dt; return; }
-        if (sungkaLolaTurn && LolaPick() is int pick && pick >= 0) SungkaMove(pick, true);
+        Gfx.Text(topName, bx + 20, by - 26, FontKind.Ui700, 18, Muted);
+        Gfx.Text(bottomName, bx + bw - 14 - Gfx.Measure(bottomName, FontKind.Ui700, 18), by + bh + 8, FontKind.Ui700, 18, Muted);
+        return picked;
     }
 }

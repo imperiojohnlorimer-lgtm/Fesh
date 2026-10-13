@@ -47,6 +47,7 @@ partial class Game
     /* ---------- Waking it ---------- */
     void GuardianRise(bool fromCatch)
     {
+        guardianFightT = 0;
         // The cave's own monsters want no part of it.
         foreach (var m in monsters) if (!m.Dead) Burst(m.X, m.Y - 4, MonsterKinds[m.Kind].Color, 6);
         monsters.Clear();
@@ -133,6 +134,8 @@ partial class Game
     }
 
     /* ---------- The fight ---------- */
+    float guardianFightT;                               // seconds of the fight so far (for the notice board's record)
+
     void UpdateGuardian(float dt)
     {
         if (guardianDue && mode == "play")
@@ -142,6 +145,7 @@ partial class Game
         }
         var g = guardian;
         if (g == null) return;
+        if (g.Phase != "sink") guardianFightT += dt;
         if (!OnAncientFloor) { guardian = null; rocks.Clear(); return; }
         if (mode != "play") return;
         g.T += dt;
@@ -510,6 +514,7 @@ partial class Game
         var (ex, ey) = PoolEdge(a);
         (g.ToX, g.ToY) = InPool(g.X, g.Y) ? (g.X, g.Y) : (ex - MathF.Cos(a) * 9, ey - MathF.Sin(a) * 9);
         state.hinted["platejaw"] = true;
+        if (state.platejawBest <= 0 || guardianFightT < state.platejawBest) state.platejawBest = guardianFightT;
         Give("platejaw_plate");
         GainXp(80);
         Sfx.Play("rare");

@@ -23,6 +23,17 @@ partial class Game
             }, () => OpenShop());
             return;
         }
+        // Once, Pip mentions the Derby Duel (Match.cs): the fair derby, which pays him back in coins.
+        if (!state.Hinted("pipDuel"))
+        {
+            state.hinted["pipDuel"] = true;
+            Talk(new()
+            {
+                P("Say, you like my derby? There's a fairer one now: the Derby Duel. Same old rod, same lagoon, and you and your rival get the very same fish."),
+                P("Beat Old Bess, Marlo or Captain Ivy and I'll pay you, once a day for each. It's in your Matches panel, next to the Fesh-dex.")
+            }, () => OpenShop());
+            return;
+        }
         // Once you've been to the atoll, Pip passes on a sailors' story (until you've found out for yourself).
         if (state.Hinted("visitedAtoll") && !StarwellFound && !state.Hinted("pipHoofprints"))
         {

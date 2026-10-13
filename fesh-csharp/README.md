@@ -601,6 +601,36 @@ come from the sun and moon pulling together or at right angles; on Earth that's 
 four days, as the game's moon goes round in eight. Pip's closed season and the other crabs' keep lines are the game's
 own.
 
+## Matches: Derby Duel, Daily Challenge and sungka over a LAN
+Short head-to-head runs with a clear winner, for playing against a friend or against yourself. Open **Matches** from the
+button beside the Fesh-dex (or the Esc menu). Nothing in a match touches your adventure: it plays on a fresh set of
+belongings, your save is never written until you're back, and everything works with no network.
+
+- **Derby Duel** (3 minutes): you and a rival fish Saltmere's lagoon with the Old rod and no bait, from the same spot, at
+  noon in fair weather. The nth cast of each of you meets the same fish at the same size and waits the same time for a
+  bite, so what decides it is your hands: how fast you hook, whether the hook is perfect (a tenth heavier) and whether
+  you hold on to the fight. The heaviest total catch wins; a tie goes to more perfect hooks; anything left is a draw. Your
+  rival is Old Bess (slow and patient), Marlo (steady) or Captain Ivy (quick and sure) and fishes the same casts on their
+  own clock, so their running total is on the board as you go. Esc asks whether to leave; the match goes on while you
+  decide, and leaving counts as a loss. A fish still on the line at the whistle doesn't count. Pip pays a prize for beating each rival, once a day for each (30, 60 or 100 coins and some bait), when you are back on the island.
+- **Daily Challenge** (3 minutes): one seeded run a day, the same fish in the same order for everyone who plays on that
+  date. Play it as often as you like; your best counts, and you can race a ghost of your best run.
+- **Sungka (LAN)**: sungka against another person on the same network. One of you chooses **Host a game**; the other
+  chooses **Find a game** (or types the host's address, shown on the host's screen) and **Join**. The host is the
+  referee: it checks every move (whose turn, your own house, shells in it) and tells both boards, which compare a
+  fingerprint after each move. Twenty seconds a move (a move is played for you if time runs out; three in a row is a
+  forfeit), five minutes a game (then what is left on each side goes to its owner), and leaving or going quiet for six
+  seconds loses. Both press Rematch for another game; the other player starts. Windows may ask whether Fesh can use the
+  network the first time: choose Private networks.
+- **Tournament Dock**: a little sand islet of its own in the open sea south of Saltmere, where matches begin (Matches > Tournament Dock). Visit it alone and talk to the three anglers (Old Bess, Marlo, Captain Ivy) for a Derby Duel, read the notice board (the leaderboards, and your regatta, crab-sorting and Platejaw records), and say a quick phrase with the number keys 1-8 (there is no typing). Host a dock and other people on your network can **Find a dock** and walk in: you see each other, and walking up to someone lets you challenge them to **sungka** or a **Derby Duel**, played through the dock. In a Derby Duel against a person each of you fishes the same seeded water on your own computer and the other's catches reach your scoreboard (their weights are worked out from the seed, so a made-up one is refused); the challenger's seed and start are used and a rematch needs both. What can't be checked is whether a reported catch was really reeled in: the boards are local and for fun. Nothing on the dock touches your adventure.
+- **More games at the dock**: talk to an angler (or challenge another player) and pick from a menu.
+  - **Regatta**: a best-of-three race round Dado's course at Daang Pulo, both boats on the water at once so you can see each other. You sail the plain banca in fair weather, whatever you own; gates are the buoys in order and the line home. A boat that moves faster than any boat can, or claims a finish its positions don't show, stops the race with no result. Your fastest heat goes on the board.
+  - **Sea School Duel**: eight questions from a fixed set (the monsoons, tides, tsunami and volcano safety, who looks after what, crabs, fish and water), the same eight for both sides. Most right wins, and the faster total time breaks a tie. You see how many the other side has answered, not whether they were right, until the end. Alone, an angler answers like their skill says.
+  - **Reef Run** (alone, against an angler): forty-five seconds of spearfishing over a reef. Fish shadows cross the water on the same paths every time for a given seed, a spear takes a moment to land (aim where the fish will be), and bigger fish are worth more. Mouse or move keys to aim, click or the action key to throw.
+- **Leaderboards**: on the Matches panel (two pages: More boards), kept on this computer only (`leaderboard.json` beside `settings.json`): your best
+  scores and recent matches for each mode. You're named from two short lists (Swift Bangus, Calm Eel...) and can pick another
+  name; there is no typing a name and no account.
+
 ## The island guide and the fish album
 New in **1.18.0**, both for learning about the real places and animals behind the game.
 

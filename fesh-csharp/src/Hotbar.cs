@@ -289,7 +289,7 @@ partial class Game
     }
 
     /* ---------- On screen ---------- */
-    bool HotbarShown => state?.hotbar != null && mode != "build" && ActiveModes.Contains(mode) && eclipse == null;
+    bool HotbarShown => state?.hotbar != null && !MatchActive && mode != "build" && ActiveModes.Contains(mode) && eclipse == null;
 
     // Six slots along the bottom: the one in your hands lit up, each with its key; hovering one names it.
     void DrawHotbar()

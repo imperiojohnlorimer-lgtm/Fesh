@@ -16,9 +16,10 @@ partial class Game
     {
         if (mode == "create") { DrawCreator(); return; }
         bool title = mode == "title";
-        if (!title) DrawHud();
-        if (!title) DrawGuideArrow();
-        if (!title) { DrawPinCompass(); DrawCacheCompass(); }
+        if (!title) { if (MatchActive) DrawMatchHud(); else DrawHud(); }
+        DrawDockTags();
+        if (!title && !MatchActive) DrawGuideArrow();
+        if (!title && !MatchActive) { DrawPinCompass(); DrawCacheCompass(); }
         if (!title) DrawFishingUi();
         if (!title && (BossFighting || BossOnLine || GuardianFighting)) DrawBossBar();
         if (!title && eclipse != null) DrawEclipseBar();
@@ -49,6 +50,7 @@ partial class Game
         if (mode == "panel" && panel == "lift") DrawLift();
         if (mode == "panel" && panel == "tackle") DrawTackle();
         if (mode == "panel" && panel == "sungka") DrawSungka();
+        if (mode == "panel" && panel == "sungkalan") DrawSungkaLan();
         if (mode == "panel" && panel == "voyage") DrawVoyage();
         if (mode == "panel" && panel == "journal") DrawJournal();
         if (mode == "panel" && panel == "tides") DrawTides();
@@ -70,6 +72,12 @@ partial class Game
         if (mode == "panel" && panel == "mlkalutang") DrawMlKalutang();
         if (mode == "panel" && panel == "mlnursery") DrawMlNursery();
         if (mode == "moon") DrawMoonCard();
+        if (mode == "panel" && panel == "matches") DrawMatches();
+        if (mode == "matchresult") DrawMatchResult();
+        if (InDock && match.BoardOpen) DrawDockNoticeBoard();
+        if (MatchActive && match.Phase == "sungka") DrawSungkaLan();
+        DrawDockOverlays();
+        if (MatchActive && match.LeaveAsk) DrawMatchLeave();
         if (mode == "pause") DrawMenu();
     }
 
@@ -211,6 +219,7 @@ partial class Game
         {
             ("Case board", () => TogglePanel("case"), false),
             ("Fesh-dex", () => TogglePanel("dex"), false),
+            ("Matches", () => TogglePanel("matches"), false),
             ("Map", () => TogglePanel("map"), false),
             ("Tackle", () => TogglePanel("tackle"), false),
             ("Bag", () => TogglePanel("bag"), false),
@@ -356,10 +365,11 @@ partial class Game
         const float fs = 22, lh = 27;
         float a = toastAlpha;
         // Clear of the status and goal cards on the left and the buttons along the top.
-        const float left = HudX + HudW + 14, right = Gfx.LW - 13;
+        // (In a match there are no cards on the left: the scoreboard is in the middle, so the toast goes under it.)
+        float left = MatchActive ? 13 : HudX + HudW + 14, right = Gfx.LW - 13;
         var lines = Gfx.Wrap(toastMsg, FontKind.Ui600, fs, right - left - 40);
         float w = lines.Max(l => Gfx.Measure(l, FontKind.Ui600, fs)) + 40, h = lines.Count * lh + 22;
-        float cx = (left + right) / 2, x = cx - w / 2, y = 62 - 6 * (1 - a);
+        float cx = (left + right) / 2, x = cx - w / 2, y = (MatchActive ? 126 : 62) - 6 * (1 - a);
         Gfx.Box(x, y, w, h, Pal.WithAlpha(Pal.Paper, a), Pal.WithAlpha(Pal.Ink, a), 2, 5);
         for (int i = 0; i < lines.Count; i++)
             Gfx.TextCenter(lines[i], cx, y + 11 + i * lh, FontKind.Ui600, fs, Pal.WithAlpha(Pal.PaperInk, a));

@@ -9,10 +9,7 @@ sealed class Race { public float T; public int Next; }
 partial class Game
 {
     // Gate centres, in pixels: [0] is the start and finish line. Each gate is a pair of buoys across the course.
-    static readonly (float x, float y)[] RaceGates =
-    {
-        (645, 535), (835, 565), (935, 645), (865, 735), (765, 705), (620, 698), (440, 725), (420, 590), (545, 600)
-    };
+    static readonly (float x, float y)[] RaceGates = RegattaRules.Gates;
     // About 1,330 px of water at the boat's best line: 14 s flat out with the plain sail, 11 s with the big one.
     const float GateR = 18, GoldTime = 20, SilverTime = 27, BronzeTime = 38, RaceLimit = 300;
     bool raceArmed;     // Dado has said go: crossing the start line starts the clock
@@ -114,6 +111,7 @@ partial class Game
             var (gx, gy) = RaceGates[i];
             if (gx < camX - 30 || gx > camX + W + 30 || gy < camY - 30 || gy > camY + H + 30) continue;
             bool next = race != null && (race.Next < RaceGates.Length ? race.Next : 0) == i || race == null && raceArmed && i == 0;
+            next |= i == RegattaNextGate;
             bool flash = next && (int)(t * 4) % 2 == 0;
             foreach (int side in new[] { -1, 1 })
             {

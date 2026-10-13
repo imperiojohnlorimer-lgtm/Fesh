@@ -416,10 +416,10 @@ partial class Game
     void DrawGameTab(float x, float y, float w, float bottom)
     {
         float bx = x, by = y + 4;
-        foreach (var label in new[] { "Resume", "Journal", "Save game", "Change your look", "Quit to title", "Quit game" })
+        foreach (var label in new[] { "Resume", "Journal", "Matches", "Save game", "Change your look", "Quit to title", "Quit game" })
         {
             // Changing your look, or the journal, waits until you're not in the middle of fishing (the menu can open mid-cast).
-            bool live = label is not ("Change your look" or "Journal") || pausedFrom == "play";
+            bool live = label is not ("Change your look" or "Journal" or "Matches") || pausedFrom == "play";
             if (Button(label, bx, by, 300, 52, FontKind.Ui700, 22, label == "Resume" ? Pal.Buoy : live ? Pal.Sand : Pal.C("#d8cbb0"), label == "Resume" ? White : live ? Pal.Ink : Muted, 4, 3, 6, live))
             {
                 switch (label)
@@ -427,6 +427,7 @@ partial class Game
                     case "Resume": ClosePause(); break;
                     // The way into the journal on a gamepad (Guide.cs).
                     case "Journal": ClosePause(); if (mode == "play") TogglePanel("journal"); break;
+                    case "Matches": ClosePause(); if (mode == "play") OpenMatches(); break;
                     case "Save game":
                         Sfx.Play("ui");
                         Toast(Save() ? $"Saved to slot {SaveFile.Slot}." : "Couldn't save the game! Check there's space on the disk.");

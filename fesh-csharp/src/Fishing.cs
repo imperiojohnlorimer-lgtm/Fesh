@@ -91,6 +91,8 @@ partial class Game
 
     Catchable RollCatch(string spot)
     {
+        // A match: the fish is the seed's, not the water's (Match.cs).
+        if (MatchActive) return MatchRoll();
         // A cast you aimed yourself into a spot's water only gets its everyday fish (and, now and then, a chest): the
         // creatures, odd catches and legends are at the spots themselves (Hotbar.cs). Null if nothing will bite.
         if (fish?.Wild == true)
@@ -334,8 +336,10 @@ partial class Game
             return;
         }
         state.casts++;
+        // In a match the nth cast waits and bites as the seed says, with no shadows or bait box to change it (Match.cs).
+        int matchN = MatchActive ? match.Casts++ : -1;
         var tip = RodTip();
-        bool baitBox = scene == "world" && state.builds.Any(b => b.id == "baitbox" && Dist(player.X, player.Y, b.x * T + 5, b.y * T + 6) < 40);
+        bool baitBox = !MatchActive && scene == "world" && state.builds.Any(b => b.id == "baitbox" && Dist(player.X, player.Y, b.x * T + 5, b.y * T + 6) < 40);
         string bait = NextBait();
         if (bait != null && !Items.Baits[bait].Reusable) Take(bait);
         if (bait != null && !state.Hinted("usedBait"))
@@ -344,17 +348,17 @@ partial class Game
             Toast($"Used 1 {Items.ById[bait].Name.ToLowerInvariant()}. {Has(bait)} left.", 2.4f);
         }
         bool onShadow = false, big = false;
-        for (int k = 0; k < 4; k++)
+        for (int k = 0; k < 4 && !MatchActive; k++)
             if (ShadowPos(s, k, time) is (float hx, float hy, bool hb) && Dist(lx, ly, hx, hy) < 8) { onShadow = true; big |= hb; }
-        if (s.Scene == "sea" && InSchool(lx, ly)) onShadow = true;
+        if (s.Scene == "sea" && InSchool(lx, ly) && !MatchActive) onShadow = true;
         bool spill = scene == "world" && InSpillover(lx, ly);
-        float wait = (baitBox ? Rand(0.5f, 1.2f) : Rand(1.6f, 3.6f)) * Rod.Bite * WeatherBite * (bait != null ? Items.Baits[bait].Bite : 1)
-            * (Perk(3) ? 0.9f : 1) * (Chummed(spotId) ? 0.5f : 1) * (onShadow ? 0.55f : 1) * (spotId == "icehole" ? 1.6f : 1)
+        float wait = (baitBox ? Rand(0.5f, 1.2f) : MatchActive ? MatchWait(matchN) : Rand(1.6f, 3.6f)) * Rod.Bite * WeatherBite * (bait != null ? Items.Baits[bait].Bite : 1)
+            * (Perk(3) ? 0.9f : 1) * (Chummed(spotId) && !MatchActive ? 0.5f : 1) * (onShadow ? 0.55f : 1) * (spotId == "icehole" ? 1.6f : 1)
             * (s.Biome == "saltmere" && s.Scene != "sea" && SetActive("saltmere") ? 0.85f : 1) * (spill ? 0.8f : 1);
         fish = new FishCast
         {
             Spot = spotId, Sx = tip.X, Sy = tip.Y, Tx = lx, Ty = ly, Bx = tip.X, By = tip.Y, Bait = bait, Power = power,
-            Depth = CastDepth(power), BigShadow = big, Timer = wait, Spill = spill
+            Depth = CastDepth(power), BigShadow = big, Timer = wait, Spill = spill, MatchN = matchN
         };
         if (spill && !state.Hinted("spillover"))
         {
@@ -431,6 +435,13 @@ partial class Game
 
     void StartReel(bool perfect = false)
     {
+        // In a match the fight draws from the cast's own generator (Match.cs).
+        if (MatchActive && fish.MatchN >= 0) { MatchSeedFight(); UnderFightRng(() => StartReelCore(perfect)); return; }
+        StartReelCore(perfect);
+    }
+
+    void StartReelCore(bool perfect)
+    {
         var roll = fish.Roll;
         if (roll.Chest) { StartChest(); return; }
         var f = Data.FishById.GetValueOrDefault(roll.Id);
@@ -484,6 +495,7 @@ partial class Game
 
     void GotAway(string msg)
     {
+        if (MatchActive && match.Phase == "run") match.Lost++;
         if (mode == "reeling" && fish?.Roll is { Boss: false, Exotic: false, Odd: false, Chest: false } seen) MarkSeen(seen.Id);
         if (fish?.Roll is { Exotic: true }) state.pity[fish.Spot] = 2;
         if (fish?.Roll is { Boss: true })
@@ -560,7 +572,7 @@ partial class Game
                 if (fish.BiteT <= 0) GotAway("Too slow. It got away.");
                 return;
             case "reeling":
-                if (reel != null) UpdateReel(dt);
+                if (reel != null) { if (MatchActive) StepMatchReel(dt); else UpdateReel(dt); }
                 return;
             case "chest": UpdateChest(dt); return;
             case "spear": UpdateSpear(dt); return;
@@ -723,6 +735,7 @@ partial class Game
 
     void LandCatch()
     {
+        if (MatchActive) { MatchLand(); return; }
         if (reel.Roll.Boss) { BossBreach(); return; }
         var roll = reel.Roll;
         string spot = fish.Spot;
