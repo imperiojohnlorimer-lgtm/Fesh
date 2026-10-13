@@ -140,30 +140,28 @@ static class LookData
         // Legs, with a darker leather shoe on each foot so the steps read.
         if (side)
         {
+            // Each leg is drawn from the hip down to its foot a row at a time, so the whole leg swings (not just the shoe):
+            // reaching forward at a stride, pushing off behind, and bent at the knee with the foot lifted as it passes.
+            // fx is where the foot lands (forward is +), kx how far the knee pokes forward, lift raises the foot.
+            void Leg(int fx, int kx, int lift, string c, string sc)
+            {
+                int top = -3 - up - st + lg, bot = -1 - lift, n = Math.Max(1, bot - top);
+                for (int r = 0; r < n; r++)
+                {
+                    float t = (float)r / n;
+                    float off = kx == 0 ? fx * t : t < 0.5f ? kx * (t / 0.5f) : kx + (fx - kx) * ((t - 0.5f) / 0.5f);
+                    S(-1 + (int)MathF.Round(off), top + r, 2, 1, c);
+                }
+                if (lift > 1) S(-1 + fx, bot, 2, 1, sc); else S(-1 + fx, bot, 3, 1, sc);
+            }
             switch (step)
             {
-                case 1: // near leg reaching forward, far leg pushing off behind
-                    S(-2, -3, 2, 2, farPants); S(-3, -1, 2, 1, farShoe);
-                    S(-1, -3, 2, 1, pants); S(0, -2, 2, 1, pants); S(1, -1, 2, 1, shoe);
-                    break;
-                case 3:
-                    S(-1, -3, 2, 1, farPants); S(0, -2, 2, 1, farPants); S(1, -1, 2, 1, farShoe);
-                    S(-2, -3, 2, 2, pants); S(-3, -1, 2, 1, shoe);
-                    break;
-                case 2: // near leg planted, far foot lifting behind it
-                    S(-2, -3, 2, 1, farPants); S(-3, -2, 2, 1, farShoe);
-                    S(-1, -3, 2, 2, pants); S(-1, -1, 3, 1, shoe);
-                    break;
-                case 4:
-                    S(-1, -3, 2, 2, farPants); S(-1, -1, 3, 1, farShoe);
-                    S(-2, -3, 2, 1, pants); S(-3, -2, 2, 1, shoe);
-                    break;
-                default:
-                    S(-2, -3, 1, 2, farPants); S(-2, -1, 1, 1, farShoe);
-                    S(-1, -3, 2, 2, pants); S(-1, -1, 3, 1, shoe);
-                    break;
+                case 1: Leg(-2, 0, 1, farPants, farShoe); Leg(2, 0, 0, pants, shoe); break;    // contact: near forward, far pushing off
+                case 2: Leg(-1, 1, 2, farPants, farShoe); Leg(0, 0, 0, pants, shoe); break;    // passing: near planted, far bent through
+                case 3: Leg(2, 0, 0, farPants, farShoe); Leg(-2, 0, 1, pants, shoe); break;    // contact: far forward, near pushing off
+                case 4: Leg(0, 0, 0, farPants, farShoe); Leg(-1, 1, 2, pants, shoe); break;    // passing: far planted, near bent through
+                default: Leg(-1, 0, 0, farPants, farShoe); Leg(0, 0, 0, pants, shoe); break;
             }
-            S(-2, -3 - up - st + lg, 3, up + st - lg, pants);   // the thigh, up to the hip
         }
         else
         {

@@ -87,6 +87,11 @@ partial class Game
                 Toast($"Floor {floor}." + (floor == 1 && !state.Hinted("caveFloors")
                     ? " Find the hole to go deeper; the ladder takes you back up. Each floor is different every time." : "")
                     + (floor is 5 or 10 ? " The lift at the entrance can bring you straight here from now on." : ""), 4.5f);
+            if (floor != AncientFloor && !state.Hinted("caveFeatures"))
+            {
+                state.hinted["caveFeatures"] = true;
+                ToastLater("Look for chests in the dead ends, cracked walls (chip them with a pickaxe), and glowing springs that heal.");
+            }
             state.hinted["caveFloors"] = true;
         });
     }
@@ -273,6 +278,8 @@ partial class Game
                 monsters.Add(new Monster { Kind = kind, X = mx * T + 5, Y = my * T + 7, Hp = MonsterHp(kind), Max = MonsterHp(kind), Timer = (float)r.NextDouble() });
             }
 
+        if (ancient) { caveFeatures.Clear(); crackTiles.Clear(); }
+        else PlaceCaveFeatures(r, dist, sx, sy);
         caveMap[sy, sx] = 'U';
         map = caveMap;
         RenderCaveBase();
@@ -322,6 +329,7 @@ partial class Game
                     g.Rect(X, Y, T, T, th.wall);
                     g.Rect(X + (int)(h1 * 7), Y + (int)(Pix.Hash(x, y, 22) * 7), 3, 2, th.face);
                     if (y + 1 < CaveH && caveMap[y + 1, x] != 'W') { g.Rect(X, Y + 6, T, 4, th.face); g.Rect(X, Y + 6, T, 1, th.speck); }
+                    if (crackTiles.Contains((x, y))) PaintCrack(g, X, Y, x, y);
                     continue;
                 }
                 if (t == 'P')
@@ -862,6 +870,7 @@ partial class Game
         var list = new List<(float y, Action draw)>();
         DrawGuardianWater(t);
         foreach (var n in nodes) if (!n.Mined) list.Add((n.Y * T + 9, () => DrawNode(n, t)));
+        AddCaveFeatureObjects(list, t);
         if (ancientFloor) list.Add((RuneStoneY, () => DrawRuneStone(t)));
         if (guardian != null) list.Add((guardian.Y, () => DrawGuardianBody(t)));
         foreach (var m in monsters) list.Add((m.Y, () => DrawMonster(m, t)));
@@ -873,6 +882,7 @@ partial class Game
         DrawFishing(t);
         DrawParticles();
         DrawCaveSparkles(t);
+        DrawCrackGlints(t);
 
         // Always dark underground: your own light, daylight down the ladder, and anything that glows.
         bool ancient = caveFloor == AncientFloor;
@@ -880,6 +890,7 @@ partial class Game
         LightHole(player.X, player.Y - 6, (Wears("headlamp") ? 100 : 64) + MathF.Sin(t * 8.3f) * 1.2f + MathF.Sin(t * 3.1f) * 0.8f, 0.95f);
         LightHole(ropeTile.x * T + 5, ropeTile.y * T, 46, 0.9f);
         if (fish != null) LightHole(fish.Bx, fish.By, 14, 0.5f);
+        LightCaveFeatures(t);
         foreach (var n in nodes)
             if (!n.Mined && n.Kind is "crystal" or "abyssite") LightHole(n.X * T + 5, n.Y * T, 18, 0.7f);
         if (ancient)
@@ -897,6 +908,7 @@ partial class Game
         foreach (var n in nodes)
             if (!n.Mined && n.Kind is "crystal" or "abyssite")
                 pix.Glow(n.X * T + 5, n.Y * T, 12, n.Kind == "crystal" ? Pal.Rgba(127, 232, 255, 0.25f) : Pal.Rgba(155, 107, 224, 0.28f));
+        GlowCaveFeatures(t);
         foreach (var m in monsters) if (m.Kind == "shade") pix.Glow(m.X, m.Y - 10, 10, Pal.Rgba(155, 107, 224, 0.2f));
         DrawGuardianWarnings(t);
         if (ancient)

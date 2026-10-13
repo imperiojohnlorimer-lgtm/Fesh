@@ -3,7 +3,7 @@ using Raylib_cs;
 namespace Fesh;
 
 // Shaking: how long, how hard, and how you did (moved into the open, then ducked, covered and held on).
-sealed class Quake { public float T, Len, Power, NextCoco; public bool Ducked; }
+sealed class Quake { public float T, Len, Power, NextCoco, Held; public bool Ducked; }   // Held: seconds you've spent ducked in the open
 // A coconut shaken loose from a palm: looks only (it never hurts you; being in the open is the lesson, not a penalty).
 sealed class Coco { public float X, Y, T, Fall; }
 // Someone heading up to School Rise: Lira, Niko, or one of Ma'am Isay's children (Kid 0-2), along the signposted route.
@@ -15,12 +15,18 @@ sealed class Mover
     public int Leg;
     public bool Going, Safe, Warned;
     public string Face = "down";
+    // On School Rise (StoryDuty.cs): checked in by you for the head count; a child who wanders down to look at the sea
+    // (DriftState 1 walking out, 2 coming back) and the spot he's drawn to.
+    public bool CheckedIn, Drifted, Moving;
+    public int DriftState;
+    public float DriftT;
+    public (float x, float y) DriftTo;
 }
 // The drill (Drill) or the real thing. Phase is "quake" (the shaking), "evacuate" (up to School Rise; the sea goes out
 // and comes back) and "wait" (everyone up, waiting for the all-clear).
 sealed class Evac
 {
-    public bool Drill, Ducked, Caught, Bell, Roared, Counted;
+    public bool Drill, Ducked, Caught, Bell, Roared, Counted, Kept;   // Kept: you called the wandering child back yourself
     public string Phase = "quake";
     public float T, ShoutT, UpAt = -1;   // UpAt: when you first stood on School Rise
     public int Shouted;
@@ -145,7 +151,9 @@ partial class Game
         // Shaking hard at first, easing off towards the end.
         float k = Math.Clamp(Math.Min(q.T / 0.6f, (q.Len - q.T) / 1.5f), 0, 1);
         quake = Math.Max(quake, q.Power * k);
-        if (Ducking && InTheOpen) q.Ducked = true;
+        // Ducked means you really did hold on: most of the shaking, in the open (a tap at the end is not that).
+        if (Ducking && InTheOpen) q.Held += dt;
+        q.Ducked = q.Held >= q.Len * 0.5f;
         if (q.T % 2.4f < dt) Sfx.Play("thunder");
     }
 
@@ -220,8 +228,15 @@ partial class Game
                 else if (Dist(player.X, player.Y, RiseX, RiseY) > 300) CancelDrill();
                 return;
             }
-            if (OnRise && !e.Counted && all) { e.Counted = true; Toast("Ma'am Isay counts heads: Lira, Niko, Mia, Jun, Bea... and you. Everyone's here. Now we wait.", 5); }
-            if (e.T >= SeaOverAt && OnRise && all) WaitForAllClear();
+            if (!e.Drill) UpdateRiseDuty(e, dt);
+            if (OnRise && !e.Counted && all)
+            {
+                e.Counted = true;
+                Toast(e.People.All(m => m.CheckedIn) ? "Ma'am Isay: \"Everyone's here. Now we wait for the all-clear, together.\""
+                    : "Ma'am Isay: \"Everyone's up! Help me count heads: stand by each person and press <act>. Then we wait here, together.\"", 6);
+            }
+            // (Nobody is still down at the shore looking at the sea.)
+            if (e.T >= SeaOverAt && OnRise && all && e.People.All(m => m.DriftState == 0)) WaitForAllClear();
             else if (e.T >= SeaOverAt && !OnRise && e.T % 6 < dt) Toast("Ma'am Isay: \"Come up to School Rise! We stay together up here.\"", 4);
         }
     }
@@ -316,6 +331,9 @@ partial class Game
         // Up before the sea came back over the low ground, on your own (Codex: staying dry somewhere else isn't that).
         state.hinted["rs:quick"] = !e.Caught && e.UpAt >= 0 && e.UpAt < SeaBackAt;
         state.hinted["rs:called"] = e.Shouted > 0;
+        state.hinted["rs:counted"] = e.People.All(m => m.CheckedIn);
+        state.hinted["rs:drifted"] = e.People.Any(m => m.Drifted);
+        state.hinted["rs:kept"] = e.Kept;
         state.coins += 150;
         GainXp(60);
         Save();
@@ -340,12 +358,15 @@ partial class Game
     {
         var good = new List<string>();
         var tips = new List<string>();
-        (state.Hinted("rs:ducked") ? good : tips).Add(state.Hinted("rs:ducked") ? "ducked, covered and held on in the open" : "next time, get into the open, then duck, cover and hold");
+        void Item(bool did, string yes, string no) => (did ? good : tips).Add(did ? yes : no);
+        Item(state.Hinted("rs:ducked"), "ducked, covered and held on in the open", "get into the open, then duck, cover and hold");
         if (state.Hinted("rs:quick")) good.Add("got up to School Rise before the sea came back");
-        else tips.Add(state.Hinted("rs:dry") ? "next time, go up to School Rise as soon as the shaking stops" : "next time, go straight up and stay up: never back down toward the sea");
-        (state.Hinted("rs:called") ? good : tips).Add(state.Hinted("rs:called") ? "called to the children on your way" : "next time, call to anyone you pass");
+        else tips.Add(state.Hinted("rs:dry") ? "go up to School Rise as soon as the shaking stops" : "go straight up and stay up: never back down toward the sea");
+        Item(state.Hinted("rs:called"), "called to the children on your way", "call to anyone you pass");
+        if (state.Hinted("rs:drifted")) Item(state.Hinted("rs:kept"), "called Jun back from the edge", "call back anyone who goes to look at the sea");
+        Item(state.Hinted("rs:counted"), "helped count heads", "help count heads up on the rise");
         string s = good.Count > 0 ? "You " + string.Join(", ", good) + "." : "";
-        if (tips.Count > 0) s += (s == "" ? "" : " ") + char.ToUpperInvariant(tips[0][0]) + tips[0][1..] + (tips.Count > 1 ? "; " + string.Join("; ", tips.Skip(1)) : "") + ".";
+        if (tips.Count > 0) s += (s == "" ? "Next time: " : " Next time: ") + string.Join("; ", tips) + ".";
         return s;
     }
 
@@ -381,6 +402,7 @@ partial class Game
         if (e?.Phase != "evacuate") return null;
         var near = e.People.Where(m => !m.Going && Dist(m.X, m.Y, player.X, player.Y) < ShoutR).ToList();
         if (near.Count > 0) return new Target { Type = "shout", Label = $"Call to {string.Join(" and ", near.Select(m => m.Name))}: \"Up to School Rise!\"" };
+        if (RiseDutyTarget() is { } duty) return duty;
         if (OnRise) return new Target { Type = "info", Label = e.Drill ? "Wait for the children on School Rise" : "Stay up here on School Rise, together" };
         return new Target { Type = "info", Label = "Up to School Rise! Follow the green signs" };
     }
@@ -665,18 +687,19 @@ partial class Game
         if (evac != null)
             foreach (var m in evac.People)
             {
-                if (m.Kid >= 0 && m.Safe) continue;   // back on the bench (DrawSchoolBench)
+                if (m.Kid >= 0 && m.Safe && m.DriftState == 0) continue;   // back on the bench (DrawSchoolBench)
                 var mm = m;
                 list.Add((m.Y, () => DrawMover(mm)));
             }
         list.Add((9999, DrawCocos));
+        if (Shaking && !InTheOpen) list.Add((9999, DrawShakeWarn));
     }
 
     void DrawMover(Mover m)
     {
         int x = (int)MathF.Round(m.X), y = (int)MathF.Round(m.Y);
         bool duck = Shaking;
-        int step = m.Going && !m.Safe ? 1 + (int)(m.WalkT * 8) % 4 : 0;
+        int step = (m.Going && !m.Safe) || m.Moving ? 1 + (int)(m.WalkT * 8) % 4 : 0;
         if (m.Kid >= 0)
         {
             DrawKid((px, py, pw, ph, c) => pix.Rect(px, py, pw, ph, c), x, y, m.Kid, duck || !m.Going ? 2 : step % 2 == 0 ? 0 : 1, time, stand: !duck);

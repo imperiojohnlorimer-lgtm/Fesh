@@ -48,6 +48,8 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "1" ? VolcanoScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "review" ? VolcanoReviewScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_VOLCANO_TEST") == "title" ? TitleTourScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_ZOOM_TEST") == "1" ? ZoomScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_CAVE_TEST") == "1" ? CaveFeatureScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MUD_TEST") == "1" ? MudScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_TITLE_TEST") == "1" ? TitleShotScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_WORLD_TEST") == "1" ? WorldScript().GetEnumerator()
@@ -394,7 +396,7 @@ partial class Game
         Inp.Tap(KeyboardKey.Six); yield return 3; Inp.Tap(KeyboardKey.E); yield return 3;
         Check("shack placed", state.builds.Any(b => b.id == "shack"));
         Inp.Tap(KeyboardKey.Two); yield return 2;
-        Inp.ScriptMouse = new System.Numerics.Vector2((118 - camX) * 4, (125 - camY) * 4); yield return 10;
+        Inp.ScriptMouse = new System.Numerics.Vector2((118 - camX) * ViewK, (125 - camY) * ViewK); yield return 10;
         pendingShot = "03-build"; yield return 2;
         Inp.ScriptMouse = Offscreen; yield return 2;
 
@@ -2043,6 +2045,7 @@ partial class Game
         foreach (int frames in MarilayaScript()) yield return frames;
         foreach (int frames in WorldScript()) yield return frames;
         foreach (int frames in GraphicsScript()) yield return frames;
+        foreach (int frames in ZoomScript()) yield return frames;
         state.caught = Data.Creatures.Select(c => c.Id).ToList();
         endStats = $"Creatures found: 5 of 5. Common fish caught: 3. Casts: {state.casts}. Things built: {state.builds.Count}.";
         mode = "ending"; yield return 10;

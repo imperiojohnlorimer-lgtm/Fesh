@@ -15,6 +15,7 @@ sealed class SettingsData
     public int dayLength = 24;                 // real minutes for a whole day and night; 0 stops the clock (only resting moves it)
     public bool clock24;                       // 14:30 instead of 2:30 PM
     public bool guide = true;                  // the goal card and the arrow to it (Guide.cs); the journal works either way
+    public int zoom = 4;                       // game pixels shown this many screen pixels wide: 5 closer, 4 normal, 3 wider, 2 widest (Game.ZoomLevels)
     public bool clearFont;                     // Atkinson Hyperlegible in place of the pixel and typewriter fonts (Gfx.Clear)
     public Dictionary<string, int[]> keys = new(); // action -> its two keys (KeyboardKey values, 0 = none); missing actions use the defaults
 }
@@ -39,6 +40,7 @@ static class Settings
         Data.music = float.IsFinite(Data.music) ? Math.Clamp(Data.music, 0, 1) : 0.8f;
         Data.sound = float.IsFinite(Data.sound) ? Math.Clamp(Data.sound, 0, 1) : 0.8f;
         if (!DayLengths.Contains(Data.dayLength)) Data.dayLength = 24;
+        if (Data.zoom is < 2 or > 5) Data.zoom = 4;
         Bind.Load(Data.keys);
         ApplyAudio();
     }

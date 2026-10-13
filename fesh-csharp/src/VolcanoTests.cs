@@ -399,13 +399,24 @@ partial class Game
         Inp.ScriptMouse = Offscreen;
         yield return 3;
         Check("a game saved mid-evacuation carries on with it", BagaEvacuating && OnBaga());
+        var cd = Countdown();
+        Check($"the evacuation shows how long until Niko's banca leaves ({cd?.label}, {cd?.left:0} s)", cd is { } c1 && c1.label.Contains("banca") && c1.left > 100 && c1.left <= 150 && c1.total == 150);
+        pendingShot = "v-countdown-evac"; yield return 2;
         mgEvacT = 148; yield return 3;
         for (int i = 0; i < 120 && !MgEvacuated; i++) yield return 2;
         for (int i = 0; i < 40 && mode != "play"; i++) { if (mode == "dialogue") Inp.Tap(KeyboardKey.E); yield return 2; }
         Check("doing nothing, Ben and Niko see you aboard, and nothing is credited to you",
             MgEvacuated && state.Hinted("mg:assisted") && state.Hinted("mg:bagGiven") && !state.Hinted("mg:bag") && !state.Hinted("mg:called") && !state.Hinted("mg:registered"));
-        // Before the ash, nobody waits for you either.
+        // Before the ash: a clock to it, and the haze coming in over the sea from the west.
+        var cd2 = Countdown();
+        Check($"before the ash there's a clock to it ({cd2?.label}, {cd2?.left:0} s)", cd2 is { } c2 && c2.label.Contains("Ash") && c2.total == 75 && c2.left > 0);
+        Color Px(int x) { UpdateCamera(); pix.CamX = camX; pix.CamY = camY; RenderWorld(time); return pix.Buf[(H / 2) * W + x]; }
+        mgPrepT = 1; var clearL = Px(3); var clearR = Px(W - 4);
+        mgPrepT = 70; var hazyL = Px(3); var hazyR = Px(W - 4);
+        Check($"the haze comes in from the west: the left edge greys ({clearL.R},{clearL.G},{clearL.B} -> {hazyL.R},{hazyL.G},{hazyL.B}), the right edge doesn't", Math.Abs(clearL.R - hazyL.R) + Math.Abs(clearL.G - hazyL.G) + Math.Abs(clearL.B - hazyL.B) > 25 && Math.Abs(clearR.R - hazyR.R) + Math.Abs(clearR.G - hazyR.G) + Math.Abs(clearR.B - hazyR.B) < 12);
+        pendingShot = "v-countdown-ash"; yield return 2;
         mgPrepT = 75.5f; yield return 6;
+        Check("once it arrives there's no clock", Countdown() == null);
         Check("the jobs before the ash get done by helpers, without credit", AshFalling && state.Hinted("mg:preHelped") && !state.Hinted("mg:r:water"));
         // A save during the ash comes back with the ash still falling.
         Save(); state = SaveFile.Read(SaveFile.Slot); StartGame(false); quietWildlife = true; standStill = true; yield return 3;

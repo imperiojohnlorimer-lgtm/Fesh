@@ -574,6 +574,7 @@ partial class Game
     void UpdateReel(float dt)
     {
         var r = reel;
+        r.Age += dt;
         bool hold = ReelHeld(), tap = reelTap;
         reelTap = false;
         if (UpdateFishAttack(r, dt, hold)) return;

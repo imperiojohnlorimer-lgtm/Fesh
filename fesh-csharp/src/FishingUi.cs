@@ -9,7 +9,7 @@ namespace Fesh;
 partial class Game
 {
     // A point in the world, in UI coordinates.
-    Vector2 ScreenOf(float wx, float wy) => new((wx - camX) * Gfx.LW / W, (wy - camY) * Gfx.LH / H);
+    Vector2 ScreenOf(float wx, float wy) => new((wx - camX) * ViewK, (wy - camY) * ViewK);
 
     static void Outlined(string s, float x, float y, FontKind k, float size, Color c)
     {
@@ -77,22 +77,23 @@ partial class Game
     void DrawReelUi()
     {
         var r = reel;
-        float rx = (r.Style == "runner" ? 280 : 284) * 4 - 16;
+        float zk = ViewK, rx = ReelBarX() * zk - 4 * zk;   // the bar's left edge on screen, and a unit of its height (the old layout's 4x pixels, scaled)
+        float Y(float old) => 26 * zk + (old - 104);   // from the bar's top, in screen pixels (the words keep their size)
         string tag = r.Style switch { "runner" => "Runner", "jumper" => "Jumper", "bottom" => "Bottom-hugger", _ => "" };
-        if (tag != "") Outlined(tag, rx - Gfx.Measure(tag, FontKind.Ui700, 18), 104, FontKind.Ui700, 18, Pal.C("#dfe9ee"));
+        if (tag != "") Outlined(tag, rx - Gfx.Measure(tag, FontKind.Ui700, 18), Y(104), FontKind.Ui700, 18, Pal.C("#dfe9ee"));
         if (r.Running > 0)
         {
             float k = (int)(time * 8) % 2 == 0 ? 1 : 0.7f;
-            Outlined("RUN!", rx - Gfx.Measure("RUN!", FontKind.Ui700, 34), 130, FontKind.Ui700, 34, Pal.WithAlpha(Pal.C("#ff6a5a"), k));
-            Outlined("Let go!", rx - Gfx.Measure("Let go!", FontKind.Ui700, 20), 170, FontKind.Ui700, 20, Pal.C("#ffffff"));
+            Outlined("RUN!", rx - Gfx.Measure("RUN!", FontKind.Ui700, 34), Y(130), FontKind.Ui700, 34, Pal.WithAlpha(Pal.C("#ff6a5a"), k));
+            Outlined("Let go!", rx - Gfx.Measure("Let go!", FontKind.Ui700, 20), Y(170), FontKind.Ui700, 20, Pal.C("#ffffff"));
         }
         if (r.Style == "runner")
-            Outlined("Tension", (280 + 27) * 4 - Gfx.Measure("Tension", FontKind.Ui600, 14) / 2 + 8, 26 * 4 + 120 * 4 + 6, FontKind.Ui600, 14, Pal.C("#dfe9ee"));
+            Outlined("Tension", (ReelBarX() + 27) * zk - Gfx.Measure("Tension", FontKind.Ui600, 14) / 2 + 2 * zk, (26 + 120) * zk + 6, FontKind.Ui600, 14, Pal.C("#dfe9ee"));
         if (r.Style == "bottom")
         {
             string s = r.Digging ? "Digging in!" : "Pump!";
             float bounce = (int)(time * 6) % 2 * 3;
-            Outlined(s, rx - Gfx.Measure(s, FontKind.Ui700, 26), 140 - bounce, FontKind.Ui700, 26, r.Digging ? Pal.C("#ff9a5a") : Pal.C("#bff4ff"));
+            Outlined(s, rx - Gfx.Measure(s, FontKind.Ui700, 26), Y(140) - bounce, FontKind.Ui700, 26, r.Digging ? Pal.C("#ff9a5a") : Pal.C("#bff4ff"));
         }
         if (r.Leap > 0)
         {
@@ -105,8 +106,9 @@ partial class Game
             Gfx.Rect(mx - 3, y - 8, 6, h + 16, r.LeapDone ? Pal.C("#9aa0a5") : White);
             Outlined("LEAP!", Gfx.LW / 2 - Gfx.Measure("LEAP!", FontKind.Ui700, 30) / 2, y - 46, FontKind.Ui700, 30, Pal.C("#f3c25b"));
         }
-        if (r.Perfect && r.Progress < 0.6f)
-            Outlined("Perfect hook", rx - Gfx.Measure("Perfect hook", FontKind.Ui600, 16), 82, FontKind.Ui600, 16, Pal.C("#f3c25b"));
+        // Shown for the first few seconds of the fight, then fading out (it used to come and go with the catch meter crossing 60%).
+        if (r.Perfect && r.Age < 3.2f)
+            Outlined("Perfect hook", rx - Gfx.Measure("Perfect hook", FontKind.Ui600, 16), Y(82), FontKind.Ui600, 16, Pal.WithAlpha(Pal.C("#f3c25b"), Math.Clamp((3.2f - r.Age) / 0.7f, 0, 1)));
     }
 
     // The arrows to press to haul up a sunken chest, and how long you have.

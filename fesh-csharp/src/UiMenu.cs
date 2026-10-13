@@ -384,7 +384,7 @@ partial class Game
     {
         bool title = mode == "title";
         if (!title) Backdrop();
-        const float cw = 960, ch = 610, pad = 28;
+        const float cw = 960, ch = 625, pad = 28;
         float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
         Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
         Gfx.Block(x, y, cw, ch);
@@ -512,6 +512,9 @@ partial class Game
         var lengths = Settings.DayLengths;
         int li = Array.IndexOf(lengths, d.dayLength);
         d.dayLength = lengths[Pick("Length of a day", lengths.Select(m => m > 0 ? $"{m} min" : "Stopped").ToArray(), li < 0 ? 1 : li)];
+        // How much of the world you see: the same pixels, drawn bigger or smaller (Game.ApplyZoom).
+        int zi = Array.IndexOf(ZoomLevels, d.zoom);
+        d.zoom = ZoomLevels[Pick("Zoom", new[] { "Closer", "Normal", "Wider", "Widest" }, zi < 0 ? 1 : zi)];
         d.clock24 = Pick("Clock", new[] { "12-hour", "24-hour" }, d.clock24 ? 1 : 0) == 1;
         // Clear is Atkinson Hyperlegible, for anyone who finds the pixel and typewriter letters hard to read (Gfx.Clear).
         d.clearFont = Pick("Font", new[] { "Pixel", "Clear (easier to read)" }, d.clearFont ? 1 : 0) == 1;

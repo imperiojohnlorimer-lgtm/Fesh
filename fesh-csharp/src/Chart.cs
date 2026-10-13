@@ -129,7 +129,7 @@ partial class Game
     void DrawPinCompass()
     {
         if (!HasPin || scene != "world" || mode is "title" or "create" or "ending" or "pause" or "panel") return;
-        const float k = 4;   // the world view is drawn 4x
+        float k = ViewK;   // the world view is drawn this many times over
         float sx = (state.pinX - camX) * k, sy = (state.pinY - camY) * k;
         float cx = (player.X - camX) * k, cy = (player.Y - 6 - camY) * k;
         int metres = (int)MathF.Round(Dist(player.X, player.Y, state.pinX, state.pinY) * 0.15f);

@@ -572,69 +572,29 @@ partial class Game
     }
 
     /* ---------- Drawing ---------- */
-    // Platejaw side on, facing right, 34 x 13 with the bottom row on its belly. Two frames: jaws shut and jaws open.
-    static readonly string[][] PlatejawFrames =
-    {
-        new[]
-        {
-            "......................hhhhh...........",
-            "...................hhhaaaaahhh........",
-            "............d....hhaaaaaaaaaaah.......",
-            "...........dd...haaasaaaaaaaaaah......",
-            "..........ddd..haaaasaaaaaaaaaaah.....",
-            "t........dddd.Aaaaaasaaaaaaa.ooaaa....",
-            "tt....BBBBBBBAaaaaasaaaaaaaoekaaaa....",
-            ".tt.BBBbbbbbbAAaaasaaaaaaaaaoaaaaaa...",
-            "..tBBbbbbbbbbbAAAAsAAAAAAAAAAAAAAAA...",
-            "..tBbbbbbbbbbbbAAAAsAAAAAAAAAAAAAAJJ..",
-            ".ttBllllllllllllAAAAsJJJJJJJJJJJJJ.J..",
-            "tt..lllllllllll..AAAAAAAAAAAAAAAAJJ...",
-            ".......pp..........ppAAAAAAAAAAAAJ....",
-            "......................................"
-        },
-        new[]
-        {
-            "......................hhhhh...........",
-            "...................hhhaaaaahhh........",
-            "............d....hhaaaaaaaaaaah.......",
-            "...........dd...haaasaaaaaaaaaah......",
-            "..........ddd..haaaasaaaaaaaaaaah.....",
-            "t........dddd.Aaaaaasaaaaaaa.ooaaa....",
-            "tt....BBBBBBBAaaaaasaaaaaaaoekaaaaJ...",
-            ".tt.BBBbbbbbbAAaaasaaaaaaaaaoaaaaJJ...",
-            "..tBBbbbbbbbbbAAAAsAAAAAmmmmmmmmmJ....",
-            "..tBbbbbbbbbbbbAAAAsAAAmmmmmmmmmm.....",
-            ".ttBllllllllllllAAAAsAAAmmmmmmmmmJ....",
-            "tt..lllllllllll..AAAAAJJJJJJJJJJJJ....",
-            ".......pp..........ppAAAAAAAAAAAAJJ...",
-            "......................AAAAAAAAAAAJ...."
-        }
-    };
-    const int PlatejawHeadCol = 27, PlatejawRows = 14;
+    // Platejaw (PlatejawArt.cs draws it: side on, facing right, 46 x 24, lit and animated from its pose). PlatejawHeadCol is the
+    // column at its head that sits on the position, PlatejawRows the rows of the whole picture.
+    const int PlatejawHeadCol = PjHead, PlatejawRows = PjH;
+    (float x, float y, bool visible) platejawEye;   // where its eye was drawn this frame (the glow in the dark goes there)
 
-    static readonly Dictionary<char, string> PlatejawColors = new()
+    // With the bottom of its belly at (x, y) under its head, facing dir. Only the top  rows show (the rest are under the
+    // surface), and the part that shows sits on y. jaw is how far open (0 to 1; the old open flag when it's below 0), swim
+    // how fast its tail beats (radians a second) and amp how hard.
+    void DrawPlatejaw(float x, float y, int dir, bool open, bool flash, int rows = PlatejawRows, float jaw = -1, float swim = 4, float amp = 1)
     {
-        ['A'] = "#4a4e57", ['a'] = "#6b707c", ['h'] = "#9aa0aa", ['s'] = "#2f3238",
-        ['B'] = "#34403f", ['b'] = "#4d5d5b", ['l'] = "#a7b0a6",
-        ['d'] = "#2c3534", ['t'] = "#2c3534", ['p'] = "#2c3534",
-        ['o'] = "#b3ab95", ['e'] = "#ffd76a", ['k'] = "#10243a",
-        ['J'] = "#e8e0c8", ['m'] = "#3a0f12"
-    };
-
-    // With the bottom of its belly at (x, y) under its head, facing dir. Only the top `rows` rows show (the rest are
-    // under the surface), and the part that shows sits on y.
-    void DrawPlatejaw(float x, float y, int dir, bool open, bool flash, int rows = PlatejawRows)
-    {
-        var f = PlatejawFrames[open ? 1 : 0];
-        int w = f[0].Length, top = (int)MathF.Round(y) - rows + 1, hx = (int)MathF.Round(x);
-        for (int r = 0; r < rows && r < f.Length; r++)
-            for (int c = 0; c < w; c++)
+        int jawQ = (int)MathF.Round(Math.Clamp(jaw < 0 ? (open ? 1 : 0) : jaw, 0, 1) * 4);
+        int phQ = (int)(((time * swim) / MathF.Tau % 1 + 1) % 1 * 16) & 15;
+        int ampQ = Math.Clamp((int)MathF.Round((amp - 0.4f) / 0.45f), 0, 3);
+        var px = PlatejawPixels(jawQ, phQ, ampQ, flash);
+        int hx = (int)MathF.Round(x), top = rows > PjBelly ? (int)MathF.Round(y) - PjBelly : (int)MathF.Round(y) - rows + 1;
+        for (int r = 0; r < rows && r < PjH; r++)
+            for (int c = 0; c < PjW; c++)
             {
-                char ch = f[r][c];
-                if (ch == '.') continue;
-                int px = dir > 0 ? hx + c - PlatejawHeadCol : hx - (c - PlatejawHeadCol);
-                pix.Rect(px, top + r, 1, 1, flash && ch is not ('e' or 'k') ? "#ffffff" : PlatejawColors[ch]);
+                var col = px[r * PjW + c];
+                if (col.A == 0) continue;
+                pix.Rect(dir > 0 ? hx + c - PjHead : hx - (c - PjHead) - 1, top + r, 1, 1, col);
             }
+        platejawEye = (hx + dir * 3.5f, top + 7.5f, rows >= 9);
     }
 
     // Under the surface: a long dark shape in the pool, with the top of its armoured head breaking the water.
@@ -658,7 +618,9 @@ partial class Game
                 "sink" => Math.Max(0, 5 - (int)((g.T - 0.6f) * 5)),
                 _ => 4
             };
-            if (rows > 0) DrawPlatejaw(g.X, g.Y - 1 + (g.Phase is "surgeRear" ? MathF.Round(MathF.Sin(t * 30)) : 0), g.Dir, g.Phase is "surgeRear", g.Hurt > 0.25f, rows);
+            if (rows > 0)
+                DrawPlatejaw(g.X, g.Y - 1 + (g.Phase is "surgeRear" ? MathF.Round(MathF.Sin(t * 30)) : 0), g.Dir, g.Phase is "surgeRear", g.Hurt > 0.25f, rows,
+                    jaw: g.Phase is "surgeRear" or "surge" ? 1 : 0.18f + 0.18f * MathF.Sin(t * 2.2f), swim: g.Phase is "surgeRear" or "surge" ? 12 : 4.5f, amp: g.Phase is "surgeRear" or "surge" ? 1.6f : 1f);
             // Ripples where it breaks the surface.
             float ph = (t * 1.4f) % 1;
             pix.Ring(g.X, g.Y, 3 + ph * 7, Pal.Rgba(190, 235, 245, 0.5f * (1 - ph)));
@@ -677,21 +639,17 @@ partial class Game
             float jx = g.Phase is "aim" or "snapRear" ? MathF.Sin(t * 50) * 0.6f : 0;
             bool open = g.Phase == "snap" || (int)(t * 6) % 2 == 0 || g.Phase == "snapRear";
             float reach = g.Phase == "snap" ? 6 : 0;
-            DrawPlatejaw(g.X + jx + g.AimX * reach, g.Y + g.AimY * reach, g.Dir, open, flash, 10);
+            DrawPlatejaw(g.X + jx + g.AimX * reach, g.Y + g.AimY * reach, g.Dir, open, flash, 10, swim: 7, amp: 1.2f);
             pix.Ring(g.X, g.Y, 6, Pal.Rgba(190, 235, 245, 0.6f));
             return;
         }
         // Out on the stone: lunging, stranded, dazed or sliding back.
         bool wet = InPool(g.X, g.Y);
-        float thrash = g.Phase is "beached" ? MathF.Round(MathF.Sin(t * 18)) : 0;
-        if (!wet) pix.Rect(g.Dir > 0 ? g.X - 24 : g.X - 6, g.Y + 1, 30, 1, "rgba(0,0,0,0.3)");
-        DrawPlatejaw(g.X, g.Y + (g.Phase == "lunge" ? -2 : 0), g.Dir, g.Phase == "lunge", flash, wet ? 9 : PlatejawRows);
-        if (g.Phase == "beached")
-        {
-            // Its tail slaps the stone.
-            int tx = (int)MathF.Round(g.X - g.Dir * 26);
-            pix.Rect(tx, g.Y - 6 + thrash * 2, 2, 3, "#2c3534");
-        }
+        if (!wet) pix.Rect(g.Dir > 0 ? g.X - 30 : g.X - 14, g.Y + 1, 44, 1, "rgba(0,0,0,0.3)");
+        float jawNow = g.Phase switch { "lunge" => 1f, "beached" => 0.5f + 0.5f * MathF.Sin(t * 9), "stunned" => 0.6f, _ => 0.25f };
+        float swimNow = g.Phase switch { "lunge" => 16f, "beached" => 18f, "stunned" => 2f, _ => 11f };
+        float ampNow = g.Phase switch { "lunge" => 2f, "beached" => 2.4f, "stunned" => 0.5f, _ => 1.5f };
+        DrawPlatejaw(g.X, g.Y + (g.Phase == "lunge" ? -2 : 0), g.Dir, g.Phase == "lunge", flash, wet ? 9 : PlatejawRows, jawNow, swimNow, ampNow);
         if (g.Phase == "stunned")
             for (int i = 0; i < 3; i++)
             {
@@ -708,7 +666,7 @@ partial class Game
         if (g == null || guardianUndrawn) return;
         // Its eyes, glowing in the dark.
         if (g.Phase is not ("prowl" or "slam" or "sink"))
-            pix.Glow(g.X + g.Dir * 1, g.Y - 7, 5, Pal.Rgba(255, 215, 106, 0.35f));
+            if (platejawEye.visible) pix.Glow(platejawEye.x, platejawEye.y, 5, Pal.Rgba(255, 215, 106, 0.35f));
         if (g.Phase == "aim")
         {
             // The lane it will lunge down: arrows marching out from its jaws, brighter once it has picked its line.

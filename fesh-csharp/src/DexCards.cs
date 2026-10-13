@@ -107,7 +107,7 @@ partial class Game
     {
         var (got, name, tag, tagCol, about, facts) = ExtraInfo(dexExtra);
         string id = dexExtra[(dexExtra.IndexOf(':') + 1)..];
-        const float w = DexCardW, h = 520, pad = DexCardPad, picW = DexPicW, picH = DexPicH;
+        const float w = DexCardW, h = DexCardH, pad = DexCardPad, picW = DexPicW, picH = DexPicH;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
         Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
         if (SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { dexExtra = null; return; }

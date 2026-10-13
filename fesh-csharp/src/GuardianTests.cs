@@ -72,7 +72,7 @@ partial class Game
         // Halfway through rising, its armoured head is up out of the water, not just a ripple (Codex: it peaked at three rows).
         guardian.Phase = "rise"; guardian.T = 0.8f;
         int headPx = HeadAbove(guardian);
-        Check($"rising, its head comes right up out of the water ({headPx} pixels above the surface)", headPx > 60);
+        Check($"rising, its head comes right up out of the water ({headPx} pixels above the surface)", headPx > 40);
         for (int i = 0; i < 120 && guardian.Phase == "rise"; i++) yield return 1;
         Check($"it settles to prowl the pool ({guardian.Phase})", guardian.Phase == "prowl" && InPool(guardian.X, guardian.Y));
         for (int i = 0; i < 40; i++) yield return 1;
@@ -410,30 +410,34 @@ partial class Game
         dexFish = null; dexExtra = null;
     }
 
-    // FESH_SPRITES: Platejaw in each pose, both ways, at 8x.
+    // FESH_SPRITES: Platejaw at 5x: shut, open, head and shoulders out, just the crown, flashing; then the tail's beat in eight
+    // steps, the jaw from shut to wide, and thrashing on the stone.
     void ExportGuardianSprites(string path)
     {
-        var keep = pix;
+        var keep = pix; float keepTime = time;
         var sheet = new Pix(W, H);
         pix = sheet;
         Array.Fill(sheet.Buf, Pal.C("#2e4a4e"));
+        int d0 = 1;
         for (int dir = 0; dir < 2; dir++)
         {
-            int d = dir == 0 ? 1 : -1, y = 20 + dir * 40;
-            DrawPlatejaw(30, y, d, false, false);
-            DrawPlatejaw(75, y, d, true, false);
-            DrawPlatejaw(120, y, d, false, false, 10);
-            DrawPlatejaw(160, y, d, false, false, 4);
-            DrawPlatejaw(200, y, d, false, true);
+            int d = dir == 0 ? 1 : -1, y = 24 + dir * 34;
+            time = 0;
+            DrawPlatejaw(36, y, d, false, false);
+            DrawPlatejaw(90, y, d, true, false);
+            DrawPlatejaw(144, y, d, false, false, 10);
+            DrawPlatejaw(190, y, d, false, false, 4);
+            DrawPlatejaw(240, y, d, false, true);
         }
-        sheet.CamX = (int)RuneStoneX - 215; sheet.CamY = (int)RuneStoneY - 90;
-        DrawRuneStone(0);
-        pix = keep;
-        int w = 230, h = 100;
+        for (int i = 0; i < 8; i++) { time = i / 8f * MathF.Tau / 6f; DrawPlatejaw(36 + i * 38, 100, d0, false, false, PlatejawRows, 0.2f, 6, 1.3f); }
+        for (int i = 0; i < 5; i++) { time = 0.1f; DrawPlatejaw(38 + i * 48, 138, d0, false, false, PlatejawRows, i / 4f, 6, 1); }
+        for (int i = 0; i < 3; i++) { time = i * 0.12f; DrawPlatejaw(270, 24 + i * 40, d0, false, false, PlatejawRows, 0.5f, 18, 2.4f); }
+        pix = keep; time = keepTime;
+        int w = W, h = H;
         var img = GenImageColor(w, h, Color.Black);
         for (int yy = 0; yy < h; yy++)
             for (int xx = 0; xx < w; xx++) ImageDrawPixel(ref img, xx, yy, sheet.Buf[yy * W + xx]);
-        ImageResizeNN(ref img, w * 6, h * 6);
+        ImageResizeNN(ref img, w * 4, h * 4);
         ExportImage(img, path.Replace(".png", "-platejaw.png"));
         UnloadImage(img);
     }

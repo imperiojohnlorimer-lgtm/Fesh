@@ -20,7 +20,7 @@ sealed class FishCast
 // Tidemane (Roll.Boss) changes style every StyleT seconds, and Pull scales how fast the catch meter fills.
 sealed class ReelState
 {
-    public float ZoneH, ZoneY, ZoneV, FishY, FishTarget, FishTimer, Progress, Diff, Tick;
+    public float ZoneH, ZoneY, ZoneV, FishY, FishTarget, FishTimer, Progress, Diff, Tick, Age;   // Age: seconds since the hook set
     public bool Exotic, Inside, Perfect, LeapDone, Digging; public Catchable Roll;
     public string Style = "dart"; public float Tension, RunT, Running, LeapT, Leap, LeapLen = 1, LeapMark, HoldT, StyleT, Pull = 1;
     public float AttackTimer = 2.5f, AttackWarning, DuckTime;
@@ -36,7 +36,14 @@ sealed class Actor { public float X, Y, WalkT; public string Face = "down"; publ
 partial class Game
 {
     // W x H is the view; the world is COLS x ROWS tiles of T pixels.
-    const int W = 320, H = 180, T = 10, COLS = 336, ROWS = 76;
+    const int T = 10, COLS = 336, ROWS = 76;
+    // The view is the logical screen divided by a whole number of screen pixels per game pixel (ViewK, the zoom setting:
+    // 5 closer, 4 normal, 3 wider, 2 widest), so every game pixel stays the same size on screen. ViewW/ViewH round up, so
+    // the view always covers the whole 1280x720 screen. ApplyZoom rebuilds everything sized by it.
+    static readonly int[] ZoomLevels = { 5, 4, 3, 2 };
+    static int ViewK = 4, ViewW = 320, ViewH = 180;
+    static int W => ViewW;
+    static int H => ViewH;
     const float FireX = 185, FireY = 86, TomasHomeX = 146, TomasHomeY = 82, Reach = 30;
     const int MaxBuilds = 150;
     static readonly HashSet<char> Buildable = new() { 's', 'g', 'n', 'e', 'D', 'j' };
@@ -78,7 +85,7 @@ partial class Game
     Ghost ghost;
     Dictionary<(int, int), Build> buildIndex = new();
     Texture2D worldTex;
-    Pix pix = new(W, H);
+    Pix pix = new(ViewW, ViewH);
     Pix basePix = new(COLS * T, ROWS * T);
     int camX, camY;
     readonly List<Critter> critters = new();
@@ -104,7 +111,7 @@ partial class Game
         Sfx.Init();
         Music.Init();
         Gfx.Init();
-        worldTex = Gfx.ToTexture(new Color[W * H], W, H, TextureFilter.Point);
+        ApplyZoom();
         state.FixClock();   // the title screen shows the island at 8 AM
         BuildMap();
         hasSave = SaveFile.Any();
@@ -113,6 +120,7 @@ partial class Game
         while (!quit && !WindowShouldClose())
         {
             float dt = Math.Min(0.05f, GetFrameTime());
+            if (Settings.Data.zoom != ViewK) ApplyZoom();
             // Menus, panels and the title take a gamepad pointer (see Inp).
             Inp.BeginFrame(dt, mode is "title" or "pause" or "panel" or "create" or "ending");
             Gfx.BeginFrame();
@@ -126,7 +134,7 @@ partial class Game
             UpdateTexture(worldTex, pix.Buf);
             BeginDrawing();
             ClearBackground(Pal.Page);
-            DrawTexturePro(worldTex, new Rectangle(0, 0, W, H), Gfx.S(0, 0, Gfx.LW, Gfx.LH), Vector2.Zero, 0, Color.White);
+            DrawTexturePro(worldTex, new Rectangle(0, 0, W, H), Gfx.S(0, 0, W * ViewK, H * ViewK), Vector2.Zero, 0, Color.White);
             DrawUi();
             DrawPadPointer();
             AutoTestAfterDraw();
@@ -182,6 +190,21 @@ partial class Game
             else if (crickets > 0.02f) { name = "crickets"; v = 0.42f * crickets * dry; }
         }
         Music.WantNature(name, v);
+    }
+
+    // Sets the world view to the zoom setting: every buffer sized by it is made again (the next frame draws it all).
+    void ApplyZoom()
+    {
+        int k = Settings.Data.zoom is >= 2 and <= 5 ? Settings.Data.zoom : 4;
+        Settings.Data.zoom = k;
+        ViewK = k;
+        ViewW = (int)Math.Ceiling(Gfx.LW / k);
+        ViewH = (int)Math.Ceiling(Gfx.LH / k);
+        pix = new Pix(ViewW, ViewH);
+        dark = new float[ViewW * ViewH];
+        vignette = null;
+        if (worldTex.Id != 0) UnloadTexture(worldTex);
+        worldTex = Gfx.ToTexture(new Color[ViewW * ViewH], ViewW, ViewH, TextureFilter.Point);
     }
 
     static Image IconImage(int size)
@@ -316,7 +339,7 @@ partial class Game
         return held && !waitRelease;
     }
 
-    (int tx, int ty) PointerTile() => ((int)MathF.Floor((Gfx.Mouse.X / 4 + camX) / T), (int)MathF.Floor((Gfx.Mouse.Y / 4 + camY) / T));
+    (int tx, int ty) PointerTile() => ((int)MathF.Floor((Gfx.Mouse.X / ViewK + camX) / T), (int)MathF.Floor((Gfx.Mouse.Y / ViewK + camY) / T));
 
     // Clicks on the world itself (not on a button or panel).
     void HandlePointer()
@@ -754,6 +777,7 @@ partial class Game
             if (Dist(x, y, ropeTile.x * T + 5, ropeTile.y * T + 8) < 14) return new Target { Type = "exit", Label = "Climb the ladder back to the surface" };
             if (holeTile.x >= 0 && Dist(x, y, holeTile.x * T + 5, holeTile.y * T + 5) < 16)
                 return new Target { Type = "descend", Label = caveFloor + 1 == AncientFloor ? "Climb down. Something ancient waits below" : $"Climb down to floor {caveFloor + 1}" };
+            if (CaveFeatureTarget(x, y, fx, fy) is Target caveFeat) return caveFeat;
             if (NodeAt(fx, fy) is Node n)
                 return new Target { Type = "node", Ref = n, Label = $"Mine the {Items.ById[Ore(n.Kind).Item].Name.ToLowerInvariant()}" };
             if (OnAncientFloor && Dist(x, y, RuneStoneX, RuneStoneY + 4) < 11) return RuneStoneTarget();
@@ -950,6 +974,8 @@ partial class Game
                     case "guardian": StrikeGuardian(); break;
                     case "runestone": UseRuneStone(); break;
                     case "shout": Shout(); break;
+                    case "recall": RecallKid((Mover)target.Ref); break;
+                    case "checkin": CheckIn((Mover)target.Ref); break;
                     case "seapost": LookAtPost(); break;
                     case "seasign": PutUpSign(target.Tx); break;
                     case "duck": break;
@@ -977,6 +1003,9 @@ partial class Game
                     case "tree": HitTree(target.Tx, target.Ty); break;
                     case "bush": PickBush(target.Tx, target.Ty); break;
                     case "node": MineNode((Node)target.Ref); break;
+                    case "cavecrack": ChipCrack((CaveFeature)target.Ref); break;
+                    case "cavechest": OpenCaveChest((CaveFeature)target.Ref); break;
+                    case "cavespring": DrinkSpring((CaveFeature)target.Ref); break;
                     case "rockfall": BreakRocks(); break;
                     case "hatch": TryHatch(); break;
                     case "photo":

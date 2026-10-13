@@ -677,7 +677,7 @@ partial class Game
     void DrawGuideArrow()
     {
         if (!GuideShown || guideWay == null) return;
-        const float k = 4;   // the world view is drawn 4x
+        float k = ViewK;   // the world view is drawn this many times over
         float sx = (guideWay.X - camX) * k, sy = (guideWay.Y - camY) * k;
         float cx = (player.X - camX) * k, cy = (player.Y - 6 - camY) * k;
         if (MarkerAt(sx, sy) is { } at)

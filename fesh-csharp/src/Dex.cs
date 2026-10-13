@@ -19,7 +19,9 @@ partial class Game
         && (f.Weather == null || (f.Weather == "storm" ? Stormy : f.Weather == "rain" ? state.weather != "clear" : state.weather == "clear"))
         && (!f.FullMoon || FullMoon)
         && (f.Need == null || state.Hinted(f.Need))
-        && (f.Season == null || f.Season == Season);
+        && (f.Season == null || f.Season == Season)
+        // A legend only bites once, and only on its own bait (1.29): without it the green dot said "biting" for a fish that never would.
+        && (!f.Legend || state.commons.GetValueOrDefault(f.Id) == 0 && (f.Bait == null || Has(f.Bait) > 0));
 
     bool Seen(string id) => state.seen.Contains(id) && state.commons.GetValueOrDefault(id) == 0;
 

@@ -56,8 +56,8 @@ partial class Game
 
     void AimAtPointer()
     {
-        aimX = Gfx.Mouse.X / 4 + camX;
-        aimY = Gfx.Mouse.Y / 4 + camY;
+        aimX = Gfx.Mouse.X / ViewK + camX;
+        aimY = Gfx.Mouse.Y / ViewK + camY;
     }
 
     void ThrowSpear()

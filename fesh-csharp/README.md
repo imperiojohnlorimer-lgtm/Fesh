@@ -121,7 +121,7 @@ a cast or a fight, and Resume picks up exactly where you were. Turn that off in 
 
 The menu (Esc, Start, or the button at the top right) has three tabs. **Game:** resume, save now, change your look,
 quit to the title or quit; plus the day, the moon, today's and tomorrow's forecast and time played. **Settings:** music
-and sound volume, music and sound on or off, fullscreen, screen shake, pausing in the background, the length of a day,
+and sound volume, music and sound on or off, fullscreen, screen shake, pausing in the background, the length of a day, the **zoom** (Closer, Normal, Wider or Widest: the same pixels, drawn bigger or smaller to show less or more of the world),
 a 12- or 24-hour clock, and the **font**: Pixel, or **Clear** (Atkinson Hyperlegible, made by the Braille Institute for
 readers with low vision) for anyone who finds the pixel and typewriter letters hard to read. **Controls:** two keys for every action (click one and press the new key), and the gamepad
 layout. The title screen has Continue (your most recent save), Load game, New game and Settings. Load game shows each
@@ -479,7 +479,10 @@ bangus pond has drained, and a new case opens on the Case board (its third tab, 
 On a later day the ground shakes hard. Duck, cover and hold in the open; then go straight up to School Rise along the
 signs, calling to anyone you pass. Lira and Niko head up straight away; the children go when you call, or when Ma'am
 Isay rings the school bell. From the rise you watch the sea run out past the reef, roar, and come back over the low
-ground, twice. Nobody gets hurt: anyone caught down on the beach is pulled up the slope. Once everyone's counted, an
+ground, twice. While it shakes, a card ticks off the three steps (into the open, drop and cover, hold on) and a red ring
+warns you when you're beside a palm or a house. Up on the rise, check everyone in for the head count (face each person and
+press E), and when the sea runs out, Jun wanders down to look at the stranded fish: call him back (Lira will if you
+don't, and the report says which). Nobody gets hurt: anyone caught down on the beach is pulled up the slope. Once everyone's counted, an
 hour passes and the town's disaster office gives the all-clear on the radio. The case closes with a card, 150 coins
 and a short report on what you did; Niko has a crab pot for you the next day.
 
@@ -503,9 +506,9 @@ takes Baga to Level 2: pack a go-bag at his crate while it's calm. The next day'
 but a glow and rockfalls at the crater. Signs don't all rise together. Level 3, and the disaster office orders
 everyone off Baga, early, while the sea is calm.
 
-Call to Manay Mila, sign the evacuation list at the jetty and board Niko's banca to Amihan Village (nothing has to be
-finished first: if you dawdle, Ben and Niko see you aboard). The school is the shelter: before the ash comes, cover the
-water jars, take the downpipe off the rain barrel and close the shutters; when the ash falls, stay inside, hand out
+Call to Manay Mila, sign the evacuation list at the jetty and board Niko's banca to Amihan Village (a clock shows the longest it will wait; nothing has to be
+finished first, and if you dawdle, Ben and Niko see you aboard). The school is the shelter: before the ash comes, cover the
+water jars, take the downpipe off the rain barrel and close the shutters (a second clock shows the longest before the ash, and a grey haze comes in from the west as it nears); when the ash falls, stay inside, hand out
 sealed water and register everyone. Then wait for rain: rain on fresh ash makes **lahars**. When it has rained, use the
 display in the school to close the channel and the river mouth on the map and radio the warning, and watch the lahar
 rush down the channel and spill past its banks. The case closes with a card, 150 coins and a report on what you did;

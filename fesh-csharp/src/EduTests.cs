@@ -100,7 +100,7 @@ partial class Game
         pendingShot = "300-tide-flats"; yield return 2;
         // The flat really is drawn dry: a pixel of it near the beach (away from you) is sand, not sea.
         var dryPx = flats.Where(f => Dist(f.Item1 * T, f.Item2 * T, player.X, player.Y) < 80).SelectMany(f => Enumerable.Range(0, T * T).Select(i => (x: f.Item1 * T + i % T, y: f.Item2 * T + i / T)))
-            .Where(q => TideDry(q.x, q.y) && !(Math.Abs(q.x - player.X) < 6 && q.y > player.Y - 18 && q.y < player.Y + 3) && q.x - camX is >= 0 and < W && q.y - camY is >= 0 and < H).ToList();
+            .Where(q => TideDry(q.x, q.y) && !(Math.Abs(q.x - player.X) < 6 && q.y > player.Y - 18 && q.y < player.Y + 3) && q.x - camX >= 0 && q.x - camX < W && q.y - camY >= 0 && q.y - camY < H).ToList();
         int sandy = dryPx.Count(q => { var c = pix.Buf[(q.y - camY) * W + q.x - camX]; return c.R > c.B; });
         Check($"the dried flat is drawn as sand, with a few pools ({sandy} of {dryPx.Count} px sandy)", dryPx.Count > 50 && sandy > dryPx.Count * 0.6f && sandy < dryPx.Count);
         Check("finds turn up out on a dried flat", GleanGround(walk.fx, walk.fy));

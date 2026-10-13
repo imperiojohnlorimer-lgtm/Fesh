@@ -1082,6 +1082,7 @@ partial class Game
     // Falling ash over Amihan Village, drawn over everything outdoors: grey flakes drifting down, and a grey haze.
     void DrawAshfall(float dt)
     {
+        DrawAshHaze();
         if (!AshFalling || scene != "world") { if (ashFlakes.Count > 0) ashFlakes.Clear(); return; }
         pix.Fill(0, 0, W, H, Pal.Rgba(122, 116, 106, 0.4f));
         while (ashFlakes.Count < 160) ashFlakes.Add((FxRand(0, W), FxRand(0, H), FxRand(-8, 3), FxRand(0, 1)));

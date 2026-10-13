@@ -197,6 +197,7 @@ partial class Game
         Gfx.Block(x, y, w, HudH);
         // The goal you're following goes under it (Guide.cs), then a meter's reading over both.
         DrawGuideCard();
+        DrawStoryDuty();
         if (meterTip is var (tipText, tipX0, tipY0)) MeterLabel(tipText, tipX0, tipY0);
         meterTip = null;
 
@@ -518,6 +519,7 @@ partial class Game
     }
 
     /* ---------- Fesh-dex ---------- */
+    string lastDexParts = "";    // what set the notebook's height (the autotest prints it)
     float lastCreaturesBottom;   // where the creatures page ended (the autotest checks it fits the screen)
     static readonly Dictionary<string, string> BiomeColor = new() { ["saltmere"] = "#5d9b45", ["frost"] = "#8fc3d6", ["dunes"] = "#e0a85a", ["mire"] = "#3f7d3a", ["atoll"] = "#2bb3a3", ["amihan"] = "#d59c4c", ["habagat"] = "#c9b9e0", ["marilaya"] = "#d46a7e" };
     int logPage;   // one page per biome, then legends, odd catches and records
@@ -542,6 +544,7 @@ partial class Game
         if (f.Legend) bits.Add("legendary");
         else if (f.Rare) bits.Add("rare");
         if (f.Troll) bits.Add("trolling");
+        if (f.Legend && f.Bait != null && Items.ById.TryGetValue(f.Bait, out var baitDef)) bits.Add("needs " + baitDef.Name.ToLowerInvariant());
         if (f.Time != "any") bits.Add(f.Time);
         if (f.FullMoon) bits.Add("full moon");
         if (f.Season != null) bits.Add(f.Season);
@@ -612,8 +615,9 @@ partial class Game
         const float nx = 50, nw = 1180, padT = 21, padR = 24, padB = 27, padL = 64, gap = 18;
         float innerW = nw - padL - padR;
         bool log = dexTab == "log";
-        var lead = Gfx.Wrap(log ? "Every fish across the islands, with your heaviest catch of each. A gold star counts trophy-sized catches."
-            : "The Saltmere mystery: every strange creature you catch, what you know about the ones still out there, and the story so far.", FontKind.Note, 20, innerW);
+        const string leadLog = "Every fish across the islands, with your heaviest catch of each. A gold star counts trophy-sized catches.",
+            leadCreatures = "The Saltmere mystery: the creatures you have caught, the ones still out there, and the story so far.";
+        var lead = Gfx.Wrap(log ? leadLog : leadCreatures, FontKind.Note, 20, innerW);
 
         // Creatures tab layout
         float cardW = (innerW - gap * 4) / 5, artW = cardW - 20, artH = artW * 0.6f;
@@ -639,10 +643,20 @@ partial class Game
         int oddRows = (Data.Odd.Length + 1) / 2, sightRows = Math.Max(SeaKinds.Count, BakawanKinds.Count);
         float legendsH = 48 + legendRows.Sum(r => LegendRowH(r.note)), oddH = 46 + oddRows * 26, sightH = 46 + 24 + sightRows * 26;
         float extrasH = oddH + 10 + 70 + 10 + sightH;
-        float logH = logPage < Data.Biomes.Length ? Math.Max(60, cols.Max(c => c.Sum(i => heights[i] + cardGap))) : Math.Max(legendsH, extrasH);
 
-        float contentH = log ? 50 + 34 + logH : cardH + 20 + ChapterStripH;
-        float h = padT + 46 + 10 + lead.Count * 28 + 16 + contentH + padB + 6;
+        // The notebook is one size on every tab, page and filter (1.29): as tall as the tallest of them, so it never jumps.
+        // Each island's page is measured with every fish listed; the legends page as it is now (its hints grow a line or two as you find things, and always fit).
+        float tallestLog = 0;
+        for (int p = 0; p < Data.Biomes.Length; p++)
+        {
+            var hs = LogGroups(p, "all").Select(g => (int)(headH + g.fish.Count * rowH + 8)).ToList();
+            if (hs.Count > 0) tallestLog = Math.Max(tallestLog, TwoColumns(hs) is var tc ? tc.Max(c => c.Sum(i => hs[i] + cardGap)) : 0);
+        }
+        tallestLog = Math.Max(tallestLog, Math.Max(legendsH, extrasH));
+        float contentH = Math.Max(cardH + 20 + ChapterStripH, 50 + 34 + tallestLog);
+        lastDexParts = $"creatures {cardH + 20 + ChapterStripH:0} islands+legends {50 + 34 + tallestLog:0} (legends {legendsH:0}, extras {extrasH:0})";
+        int leadLines = Math.Max(lead.Count, Gfx.Wrap(log ? leadCreatures : leadLog, FontKind.Note, 20, innerW).Count);
+        float h = padT + 46 + 10 + leadLines * 28 + 16 + contentH + padB + 6;
         float ny = Math.Max(14, (Gfx.LH - h) / 2);
         Gfx.Box(nx, ny, nw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
         for (float ly = ny + 37; ly < ny + h - 4; ly += 37) Gfx.Rect(nx + 3, ly, nw - 6, 1, Pal.C("rgba(29,79,120,0.13)"));

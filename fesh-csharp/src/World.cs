@@ -11,7 +11,7 @@ partial class Game
     // Trees, cacti, palms, boulders ('R') and berry bushes ('y'), all solid tiles drawn as sprites.
     readonly List<(int x, int y, char kind)> trees = new();
     readonly Dictionary<(int, int), char> stumps = new();
-    readonly float[] dark = new float[W * H];
+    float[] dark = new float[ViewW * ViewH];
     bool mapTexDirty = true;
 
     static readonly (int x, int y)[] SaltTrees = { (21, 6), (23, 8), (12, 11), (19, 12), (23, 11), (8, 9), (13, 3) };
@@ -1397,13 +1397,16 @@ partial class Game
         pix.Rect(x + 5, y + 1, 1, 1, "#10243a");
     }
 
-    // Drawn in screen space (the camera is zeroed by the caller). The green zone, the fish, the catch meter,
-    // and for runners a tension gauge that turns red as the line nears snapping.
+    // Drawn in screen space (the camera is zeroed by the caller), against the right edge of the view at any zoom: the bar
+    // is painted at the zoom's own scale and ReelBarX tells the words where it is. The green zone, the fish, the
+    // catch meter, and for runners a tension gauge that turns red as the line nears snapping.
+    int ReelBarX() => (reel?.Style == "runner" ? 280 : 284) + (W - 320);
+
     void DrawReel()
     {
         if (reel == null) return;
         bool tension = reel.Style == "runner";
-        int x0 = tension ? 280 : 284, w = tension ? 37 : 33;
+        int x0 = ReelBarX(), w = tension ? 37 : 33;
         const int y0 = 26, bh = 120;
         pix.Rect(x0 - 3, y0 - 5, w, bh + 10, "#10243a");
         pix.Rect(x0 - 2, y0 - 4, w - 2, bh + 8, "#6b4a2b");

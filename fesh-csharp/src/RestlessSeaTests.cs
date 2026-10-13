@@ -334,8 +334,100 @@ partial class Game
         Check($"the report doesn't say you went straight up ({SeaReport()})", !SeaReport().Contains("before the sea came back") && SeaReport().Contains("as soon as"));
         catchOpenedAt = -10; CloseSeaCard(); yield return 2;
 
+        /* ---------- Up on the rise: the head count, and a child who wants to see the fish (1.29) ---------- */
+        Note("Rise duty");
+        SetNight(false); state.hinted.Remove("rs:done"); state.gifts["rs_drill"] = state.day - 1;
+        player.X = 1580; player.Y = 205; yield return 3;
+        Check("set up the emergency again", evac is { Drill: false });
+        // While the ground shakes, a palm beside you gets a red ring round you; in the open it doesn't.
+        player.X = palm.x * T + 5; player.Y = palm.y * T + 18; if (!CanStand(player.X, player.Y)) player.Y += 4; yield return 3;
+        // What the ring adds: the same place drawn while it shakes and with the shaking switched off (no screen shake either way).
+        bool shakeSetting = Settings.Data.shake; Settings.Data.shake = false;
+        Color[] Frame(string phase)
+        {
+            evac.Phase = phase; quake = 0; UpdateCamera(); pix.CamX = camX; pix.CamY = camY; RenderWorld(time);
+            return (Color[])pix.Buf.Clone();
+        }
+        int RingPixels()
+        {
+            var on = Frame("quake"); var off = Frame("evacuate"); evac.Phase = "quake";
+            int n = 0;
+            for (int j = (int)(player.Y - camY) - 18; j <= (int)(player.Y - camY) + 8; j++)
+                for (int i = (int)(player.X - camX) - 16; i <= (int)(player.X - camX) + 16; i++)
+                    if (i >= 0 && j >= 0 && i < W && j < H && Math.Abs(on[j * W + i].R - off[j * W + i].R) > 25) n++;
+            return n;
+        }
+        int ringNear = RingPixels();
+        player.X = 1715; player.Y = 205; yield return 3;
+        int ringOpen = RingPixels();
+        Settings.Data.shake = shakeSetting;
+        Check($"the shaking draws a red warning ring beside a palm ({ringNear} px) and none in the open ({ringOpen})", InTheOpen && ringNear > 8 && ringOpen < ringNear / 4);
+        pendingShot = "s11-shake-steps"; yield return 2;
+        Inp.Hold(KeyboardKey.E, true); yield return 20;
+        Check($"holding it down in the open counts the time you held on ({CurrentQuake?.Held:0.0} s)", CurrentQuake is { Held: > 0.2f });
+        for (int i = 0; i < 600 && evac.Phase == "quake"; i++) yield return 1;
+        Inp.Hold(KeyboardKey.E, false); yield return 2;
+        Check("the strong earthquake gives way to the evacuation", evac.Phase == "evacuate");
+        // The children are called, everyone walks up.
+        player.X = 1588; player.Y = 205; yield return 3;
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        player.X = RiseX + 6; player.Y = RiseY + 8; player.Face = "left";
+        for (int i = 0; i < 1800 && !evac.People.All(m => m.Safe); i++) yield return 1;
+        Check("everyone's up on School Rise", evac.People.All(m => m.Safe));
+        pendingShot = "s12-roster"; yield return 2;
+        // Check Lira in by standing by her.
+        var lira2 = evac.People.First(m => m.Id == "lira");
+        player.X = lira2.X + 8; player.Y = lira2.Y + 2; yield return 3;
+        Check($"beside Lira, E checks her in ({target?.Type}: {target?.Label})", target?.Type == "checkin" && target.Label.Contains("Lira"));
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        Check("she's ticked off the head count", lira2.CheckedIn && !evac.People.All(m => m.CheckedIn));
+        Check($"she isn't offered again ({target?.Label})", target?.Type != "checkin" || !target.Label.Contains("Lira"));
+        // Jun wanders toward the water while it's out.
+        var jun = evac.People.First(m => m.Kid == DriftKid);
+        for (int i = 0; i < 1800 && jun.DriftState == 0 && evac.T < DriftAt + 5; i++) yield return 1;
+        Check($"once the sea is out, Jun wanders down toward it ({evac.T:0.0} s, state {jun.DriftState})", jun.DriftState == 1 && evac.T >= DriftAt && !evac.Caught);
+        Check("he's never where a wave can reach", SeaFieldAt(jun.DriftTo.x, jun.DriftTo.y) is short.MaxValue or < -90);
+        player.X = RiseX; player.Y = RiseY + 6; yield return 40;
+        Check($"a long way down the route and he's drawn there ({jun.X:0}, {jun.Y:0})", Dist(jun.X, jun.Y, SchoolX - 18 + 5 + 9, SchoolY + 17) > 8);
+        pendingShot = "s13-jun-wanders"; yield return 2;
+        player.X = jun.X + 20; player.Y = jun.Y; yield return 3;
+        Check($"E offers to call him back ({target?.Type})", target?.Type == "recall" && target.Label.Contains("Jun"));
+        Inp.Tap(KeyboardKey.E); yield return 3;
+        Check("you called him back yourself", evac.Kept && jun.DriftState == 2);
+        for (int i = 0; i < 600 && jun.DriftState != 0; i++) yield return 1;
+        Check("and he walks back to the bench", jun.DriftState == 0 && Dist(jun.X, jun.Y, BenchSeat(DriftKid).x, BenchSeat(DriftKid).y) < 1);
+        // The rest of the head count.
+        foreach (var m in evac.People.Where(m => !m.CheckedIn).ToList())
+        {
+            player.X = m.X; player.Y = m.Y + 5; yield return 3;
+            Inp.Tap(KeyboardKey.E); yield return 3;
+        }
+        Check($"everyone checked in by you ({evac.People.Count(m => m.CheckedIn)} of {evac.People.Count})", evac.People.All(m => m.CheckedIn) && toastMsg.Contains("Head count done"));
+        player.X = RiseX; player.Y = RiseY + 6;
+        for (int i = 0; i < 3000 && mode != "seacard"; i++) { if (mode == "dialogue") Inp.Tap(KeyboardKey.E); yield return 2; }
+        Check($"the report praises what you did ({SeaReport()})", SeaReport().Contains("helped count heads") && SeaReport().Contains("called Jun back"));
+        Check($"the card still fits the screen ({lastGoldBottom:0})", lastGoldBottom <= Gfx.LH - 4);
+        pendingShot = "s14-report"; yield return 2;
+        catchOpenedAt = -10; CloseSeaCard(); yield return 2;
+
+        // Doing nothing: Lira calls Jun back for you, Isay counts heads, and the report says what to do next time.
+        SetNight(false); state.hinted.Remove("rs:done"); state.gifts["rs_drill"] = state.day - 1;
+        player.X = 1580; player.Y = 205; yield return 3;
+        evac.T = QuakeLen - 0.05f; evac.Quake.T = evac.Quake.Len - 0.05f;
+        player.X = 1715; player.Y = 205;
+        for (int i = 0; i < 2400 && jun.DriftState == 0 && evac.T < 40; i++) yield return 1;
+        jun = evac.People.First(m => m.Kid == DriftKid);
+        for (int i = 0; i < 2400 && !jun.Drifted && evac.T < 40; i++) yield return 1;
+        for (int i = 0; i < 2400 && jun.DriftState != 2 && evac.T < 50; i++) yield return 1;
+        Check($"nobody went to him, so Lira calls Jun back herself ({jun.DriftState})", jun.Drifted && !evac.Kept);
+        player.X = RiseX; player.Y = RiseY + 6;
+        for (int i = 0; i < 3000 && mode != "seacard"; i++) { if (mode == "dialogue") Inp.Tap(KeyboardKey.E); yield return 2; }
+        Check($"the report doesn't praise what you didn't do ({SeaReport()})", !SeaReport().Contains("helped count heads") && !SeaReport().Contains("called Jun back") && SeaReport().Contains("help count heads") && SeaReport().Contains("call back anyone"));
+        Check($"and the card with all that fits ({lastGoldBottom:0})", lastGoldBottom <= Gfx.LH - 4);
+        catchOpenedAt = -10; CloseSeaCard(); yield return 2;
+
         /* ---------- A save mid-evacuation ---------- */
-        state.hinted.Remove("rs:done"); state.gifts["rs_drill"] = state.day - 1;
+        SetNight(false); state.hinted.Remove("rs:done"); state.gifts["rs_drill"] = state.day - 1;
         player.X = 1580; player.Y = 205; yield return 3;
         Check("it can start again", evac != null);
         Save();
