@@ -79,7 +79,13 @@ partial class Game
         float sx0 = player.X;
         Inp.Hold(KeyboardKey.D, true); yield return 20; Inp.Hold(KeyboardKey.D, false);
         Check("you cannot sail before the start", MathF.Abs(player.X - sx0) < 0.01f);
+        // 1.30.1: the frame the race begins is not a free sailing frame (a key held through the countdown must not move the boat before time 0).
+        var slotMine = RegattaRules.Slot(regSession.MySeat); bool freeFrame = false, sawStart = false;
+        Inp.Hold(KeyboardKey.D, true);
         for (int i = 0; i < 400 && regSession.HeatPhase != "race"; i++) yield return 1;
+        if (regSession.HeatPhase == "race" && regSession.HeatT <= 0.0001f) { sawStart = true; if (MathF.Abs(player.X - slotMine.x) > 0.01f) freeFrame = true; }
+        Inp.Hold(KeyboardKey.D, false);
+        Check($"the boat has not moved on the frame the race begins ({player.X - slotMine.x:0.00} px; saw it: {sawStart})", sawStart && !freeFrame);
         Check("then the heat starts", regSession.HeatPhase == "race");
         // A real key moves the boat during the race.
         sx0 = player.X;

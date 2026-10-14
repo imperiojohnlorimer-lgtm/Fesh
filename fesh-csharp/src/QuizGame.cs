@@ -116,6 +116,7 @@ partial class Game
 
     void ShutQuiz()
     {
+        if (quizSession != null && quizSession.State == "over" && !quizRecorded) FinishQuiz();      // (the last click ended it while drawing; the next update never came)
         if (quizSession != null && quizSession.State == "play" && !quizRecorded) { quizSession.Leave(); FinishQuiz(); }
         quizSession?.Leave();
         quizSession = null; quizBot = null;

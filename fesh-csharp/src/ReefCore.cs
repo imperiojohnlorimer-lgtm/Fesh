@@ -56,7 +56,8 @@ static class ReefRules
         return hit;
     }
 
-    // What an angler speared: each fish with their chance, at a moment while it was in the water.
+    // What an angler speared: each fish with their chance, at a moment while it was in the water. Nothing counts after the
+    // whistle plus a spear's flight, the latest a spear of yours can land (the angler gets no longer than you do).
     public static (float t, int id, int pts)[] Angler(int seed, string rival)
     {
         float p = rival switch { "bess" => 0.34f, "marlo" => 0.5f, _ => 0.66f };
@@ -66,13 +67,13 @@ static class ReefRules
         foreach (var f in plan)
         {
             double roll = rng.NextDouble(), when = rng.NextDouble();
-            if (roll < p) list.Add((f.T0 + f.Dur * (0.2f + 0.6f * (float)when), f.Id, Points[f.Size]));
+            if (roll < p && f.T0 + f.Dur * (0.2f + 0.6f * (float)when) <= Duration + FlightSecs) list.Add((f.T0 + f.Dur * (0.2f + 0.6f * (float)when), f.Id, Points[f.Size]));
         }
         return list.OrderBy(x => x.Item1).ToArray();
     }
 
     public static int AnglerScoreAt(int seed, string rival, float t) => Angler(seed, rival).Where(x => x.t <= t).Sum(x => x.pts);
 
-    // More points win; the same points: fewer throws; else a draw. Positive: the first side.
-    public static int Decide(int ptsA, int throwsA, int ptsB, int throwsB) => ptsA != ptsB ? (ptsA > ptsB ? 1 : -1) : throwsA == throwsB ? 0 : throwsA < throwsB ? 1 : -1;
+    // More points win; the same points is a draw (the anglers have no throw count to compare). Positive: the first side.
+    public static int Decide(int ptsA, int ptsB) => ptsA == ptsB ? 0 : ptsA > ptsB ? 1 : -1;
 }

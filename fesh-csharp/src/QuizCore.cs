@@ -126,7 +126,7 @@ readonly record struct QuizAnswer(int Choice, int Ms, bool Right);
 // the slower side something).
 sealed class QuizSession
 {
-    public const float SilentLimit = 6, HeartbeatSecs = 1, StallSecs = 30, ClockSlack = 8, CountSecs = 3;
+    public const float SilentLimit = 6, HeartbeatSecs = 1, StallSecs = 30, ClockSlack = 2, CountSecs = 3;
     public readonly bool Host;
     public ILink Link;
     public readonly string MyName;
@@ -140,9 +140,15 @@ sealed class QuizSession
     bool rematchMe, rematchThem, hasResult, iLeft;
     float hb, sinceTheirs;
     int theirSum;
+    readonly Func<long> wall;                           // milliseconds on a clock that nothing slows (a test passes its own)
+    long startTick;
+    // How long this game has run: my game clock, or the wall clock if that is longer (a frozen window, a dragged title bar and
+    // a clamped frame all slow the game clock but not the other player's answering).
+    float Elapsed => MathF.Max(PlayClock, (wall() - startTick) / 1000f);
 
-    public QuizSession(string myName, ILink link, bool host)
+    public QuizSession(string myName, ILink link, bool host, Func<long> wall = null)
     {
+        this.wall = wall ?? (() => Environment.TickCount64); startTick = this.wall();
         Host = host; MyName = SungkaSession.Clean(myName); Link = link;
         if (!host) Send(new NetMsg { t = "qhello", v = SungkaSession.Protocol, name = MyName });
     }
@@ -238,7 +244,9 @@ sealed class QuizSession
                 // In order, one each; a place among the four (or none); a time between the fastest a person can read and
                 // answer and the whole fifteen seconds, and not more time in all than their own clock could have held.
                 if (k != Theirs.Count || k >= QuizRules.Count || choice is < -1 or > 3 || ms < (choice == -1 ? QuizRules.AnswerMs : QuizRules.MinMs) || ms > QuizRules.AnswerMs) { Invalid("an impossible answer"); return; }
-                if (theirSum + ms > (PlayClock + ClockSlack) * 1000) { Invalid("an impossible time"); return; }
+                // Nothing can be read in the countdown, so the time claimed so far can only be what my own clock has run since it ended, plus
+                // a little for the link and for a frame or two that ran long on either side.
+                if (theirSum + ms > (MathF.Max(0, Elapsed - CountSecs) + ClockSlack) * 1000) { Invalid("an impossible time"); return; }
                 theirSum += ms; sinceTheirs = 0;
                 Theirs.Add(new QuizAnswer(choice, ms, QuizRules.IsRight(Seed, k, choice)));
                 CheckDone();
@@ -257,7 +265,7 @@ sealed class QuizSession
 
     void ResetGame()
     {
-        Mine.Clear(); Theirs.Clear(); theirSum = 0; PlayClock = 0; sinceTheirs = 0;
+        Mine.Clear(); Theirs.Clear(); theirSum = 0; PlayClock = 0; sinceTheirs = 0; startTick = wall();
         rematchMe = rematchThem = hasResult = false; EndWhy = ""; Notice = "";
     }
 
@@ -285,15 +293,17 @@ sealed class QuizSession
     {
         if (State == "play" && why is "invalid" or "version") { State = "over"; EndWhy = "invalid"; hasResult = false; Notice = "The game was stopped."; }
         else if (State == "play") { State = "over"; EndWhy = "left"; hasResult = true; Notice = $"{RivalName} left the game."; }
+        else if (State == "joining") { State = "over"; EndWhy = "left"; hasResult = false; Notice = "The other player left before the game began."; }
         PeerGone = true;
         Link?.Close();
         Bump();
     }
 
+    // The line has gone quiet or dropped. Each side sees the other vanish, so neither can know who it was: nobody wins.
     void PeerLost()
     {
-        if (State == "play") { State = "over"; EndWhy = "left"; hasResult = true; Notice = $"{RivalName} stopped answering. You win."; }
-        else if (State == "joining") { State = "closed"; Notice = "The other player didn't answer."; }
+        if (State == "play") { State = "over"; EndWhy = "lost"; hasResult = false; Notice = "The connection was lost. The game has no result."; }
+        else if (State == "joining") { State = "over"; EndWhy = "lost"; hasResult = false; Notice = "The other player didn't answer."; }
         PeerGone = true;
         Link?.Close();
         Bump();

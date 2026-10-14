@@ -56,10 +56,10 @@ partial class Game
         Check("both sides finish with the same eight answers each", h.State == "over" && g.State == "over" && h.Mine.Count == 8 && h.Theirs.Count == 8 && g.Theirs.Count == 8 && h.Mine.SequenceEqual(g.Theirs) && h.Theirs.SequenceEqual(g.Mine));
         Check("right beats quick: the host wins and the guest loses, on both screens", h.Result == "win" && g.Result == "loss" && h.MyRight == 8 && h.TheirRight == 0 && g.EndWhy == "finished");
         // The same count: the quicker wins.
-        var (h2, g2) = QuizPair(); QuizTicks(h2, g2, 3.5f);
+        var (h2, g2) = QuizPair(); QuizTicks(h2, g2, 5.5f);
         for (int k = 0; k < 8; k++) { h2.Answer(k, QuizRules.RightPlace(h2.Seed, k), k < 4 ? 3000 : 3000); g2.Answer(k, QuizRules.RightPlace(h2.Seed, k), 2500); QuizTicks(h2, g2, 3f); }
         Check("equal right: the lower total time wins", h2.State == "over" && h2.Result == "loss" && g2.Result == "win");
-        var (h3, g3) = QuizPair(); QuizTicks(h3, g3, 15.5f);
+        var (h3, g3) = QuizPair(); QuizTicks(h3, g3, 18.5f);
         for (int k = 0; k < 8; k++) { h3.Answer(k, -1, 1); g3.Answer(k, -1, 1); QuizTicks(h3, g3, 15.5f); }
         Check("two sides who answer nothing draw (an unanswered question costs the whole fifteen seconds)", h3.State == "over" && h3.Result == "draw" && h3.Mine.All(a => a.Ms == 15000 && a.Choice == -1));
         Check("an answer for the wrong question, or after the end, is not accepted", !h2.Answer(0, 0, 1000) && !g2.Answer(8, 0, 1000));
@@ -72,7 +72,7 @@ partial class Game
         g.Leave(); QuizTicks(h, g, 0.3f);
         Check("leaving mid-game gives the other the win", h.State == "over" && h.Result == "win" && h.EndWhy == "left" && g.Result == "loss");
         var (h4, g4) = QuizPair(); QuizTicks(h4, g4, 3.5f);
-        for (int k = 0; k < 8; k++) { h4.Answer(k, 0, 1000); h4.Tick(0.1f); }
+        for (int k = 0; k < 8; k++) { h4.Answer(k, 0, 1000); QuizTicks(h4, g4, 1.1f); }
         for (int i = 0; i < 400; i++) { h4.Tick(0.1f); if (i % 8 == 0) g4.Tick(0.1f); }
         Check("someone who finishes while the other has stopped answering wins after the stall time", h4.State == "over" && (h4.EndWhy is "stalled" or "left") && h4.Result == "win");
 
@@ -113,6 +113,61 @@ partial class Game
             Check("another version of the game is turned away", host3.State == "closed");
         }
 
+        Note("Quiz: Codex's review of 1.30");
+        {
+            // All eight answers sent at once, right after the start, before anyone could have read them.
+            var (a2, b2) = MemoryLink.Pair();
+            var host2 = new QuizSession("H", a2, true);
+            b2.Send(new NetMsg { t = "qhello", v = SungkaSession.Protocol, name = "Forger" });
+            host2.Tick(0.1f);
+            for (int k = 0; k < 8; k++) b2.Send(new NetMsg { t = "qans", id = host2.MatchId, n = new[] { k, QuizRules.RightPlace(host2.Seed, k), 350 } });
+            host2.Tick(0.1f);
+            Check("eight answers at 350 ms each, sent at once right after the start, are refused", host2.State == "over" && host2.EndWhy == "invalid" && host2.Result == "");
+            // The first three seconds are the countdown: nothing can have been answered in them.
+            var (a3, b3) = MemoryLink.Pair();
+            var host3 = new QuizSession("H", a3, true);
+            b3.Send(new NetMsg { t = "qhello", v = SungkaSession.Protocol, name = "Forger" });
+            host3.Tick(0.1f);
+            for (float t = 0; t < 2.0f; t += 0.1f) host3.Tick(0.1f);
+            b3.Send(new NetMsg { t = "qans", id = host3.MatchId, n = new[] { 0, 1, 2400 } });
+            host3.Tick(0.1f);
+            Check("an answer that took longer than the game has been running since the countdown ended is refused", host3.State == "over" && host3.EndWhy == "invalid");
+            // A person answering at a human pace is accepted, even a little ahead of the receiver's clock.
+            var (a4, b4) = MemoryLink.Pair();
+            var host4 = new QuizSession("H", a4, true); var guest4 = new QuizSession("G", b4, false);
+            for (int i = 0; i < 4; i++) { host4.Tick(0.01f); guest4.Tick(0.01f); }
+            QuizTicks(host4, guest4, 4.5f);
+            for (int k = 0; k < 8; k++) { guest4.Answer(k, 0, 1400 + 250 * k); QuizTicks(host4, guest4, 2f + 0.25f * k); }
+            Check("a real pace is accepted: eight answers from 1.4 s up", host4.Theirs.Count == 8 && host4.EndWhy != "invalid");
+            // The receiver's window freezes for three seconds (its game clock is clamped and stops) while the other player goes
+            // on answering in real time: that must not read as answers faster than a person could give them.
+            long fakeWall = 0;
+            var (a8, b8) = MemoryLink.Pair();
+            var host8 = new QuizSession("H", a8, true, () => fakeWall); var guest8 = new QuizSession("G", b8, false);
+            for (int i = 0; i < 4; i++) { host8.Tick(0.01f); guest8.Tick(0.01f); }
+            for (int i = 0; i < 60; i++) { host8.Tick(0.1f); guest8.Tick(0.1f); fakeWall += 100; }     // six seconds in, both clocks agree
+            guest8.Answer(0, 0, 3000); host8.Tick(0.1f); fakeWall += 100;
+            fakeWall += 3000;                                                                          // the freeze: no Tick, real time passes
+            guest8.Answer(1, 0, 3000); host8.Tick(0.1f);
+            Check("a receiver that froze for three seconds still accepts the answers it missed (wall clock, not the game clock)", host8.Theirs.Count == 2 && host8.EndWhy != "invalid");
+            // A line that goes quiet: nobody wins.
+            var (a5, b5) = MemoryLink.Pair();
+            var qh = new QuizSession("H", a5, true); var qg = new QuizSession("G", b5, false);
+            for (int i = 0; i < 4; i++) { qh.Tick(0.01f); qg.Tick(0.01f); }
+            QuizTicks(qh, qg, 4f);
+            b5.Quiet = QuizSession.SilentLimit + 1; qg.Tick(0.01f);
+            Check("a quiet line ends the game with no winner for the quiet side (it used to record a win)", qg.State == "over" && qg.Result == "" && qg.EndWhy == "lost");
+            qh.Tick(0.01f);
+            Check("and no second win for the other side", qh.State == "over" && qh.Result == "");
+            // A goodbye (or silence) before the game began.
+            var (a6, b6) = MemoryLink.Pair(); var guest6 = new QuizSession("G", b6, false);
+            a6.Send(new NetMsg { t = "bye", why = "left" }); guest6.Tick(0.01f);
+            Check("a guest told 'bye' before the game starts is not left waiting: the game is over with no result", guest6.State != "joining" && guest6.Result == "" && guest6.Notice != "");
+            var (a7, b7) = MemoryLink.Pair(); var host7 = new QuizSession("H", a7, true);
+            b7.Send(new NetMsg { t = "bye", why = "left" }); host7.Tick(0.01f);
+            Check("and so is a host told 'bye' before anyone has joined", host7.State != "joining" && host7.Result == "");
+        }
+
         Note("Quiz: the anglers");
         var means = new Dictionary<string, float>();
         foreach (var rv in new[] { "bess", "marlo", "ivy" })
@@ -120,12 +175,13 @@ partial class Game
             float tot = 0, ms = 0; int games = 40;
             for (int gi = 0; gi < games; gi++)
             {
+                System.Threading.Thread.Sleep(16);        // (a game's seed comes from the clock: give each its own)
                 var (a, b) = MemoryLink.Pair();
                 var hs = new QuizSession("Me", a, true); var bot = new QuizBot(rv == "bess" ? "Old Bess" : rv, rv, b);
                 for (int i = 0; i < 6; i++) { hs.Tick(0.01f); bot.Tick(0.01f); }
-                // I answer everything at once at 3.5 s; then the bot's whole game plays out.
+                // I answer everything quickly (600 ms a question) from 4 s; then the bot's whole game plays out.
                 for (float t = 0; t < 4; t += 0.1f) { hs.Tick(0.1f); bot.Tick(0.1f); }
-                for (int k = 0; k < 8; k++) hs.Answer(k, QuizRules.RightPlace(hs.Seed, k), 600);
+                for (int k = 0; k < 8; k++) { hs.Answer(k, QuizRules.RightPlace(hs.Seed, k), 600); for (float t = 0; t < 0.7f; t += 0.1f) { hs.Tick(0.1f); bot.Tick(0.1f); } }
                 for (float t = 0; t < 120 && hs.State == "play"; t += 0.1f) { hs.Tick(0.1f); bot.Tick(0.1f); }
                 tot += hs.TheirRight; ms += hs.Theirs.Sum(x => x.Ms) / 1000f;
                 if (hs.State != "over" || hs.Theirs.Count != 8) { Check($"a game against {rv} ends", false); break; }
@@ -271,6 +327,23 @@ partial class Game
         Check("Leave goes straight to the island", !MatchActive && quizSession == null);
         testEachFrame = null; qVs = null;
         visitor.Close();
+
+        Note("Quiz: a finished result is kept even if the screen is cleaned up before the next update");
+        File.Delete(SaveFile.BoardPath); Leaderboards.Reset();
+        {
+            var (ua, ub) = MemoryLink.Pair();
+            quizSession = new QuizSession("Me", ua, true); quizBot = null; quizCh = 0; quizPeerName = "Pal"; quizRecorded = false;
+            var pal = new QuizSession("Pal", ub, false);
+            for (int i = 0; i < 4; i++) { quizSession.Tick(0.01f); pal.Tick(0.01f); }
+            QuizTicks(quizSession, pal, 4.5f);
+            for (int k = 0; k < 7; k++) { quizSession.Answer(k, QuizRules.RightPlace(quizSession.Seed, k), 1500); pal.Answer(k, 0, 1500); QuizTicks(quizSession, pal, 2f); }
+            pal.Answer(7, 0, 1500); QuizTicks(quizSession, pal, 0.3f);
+            quizSession.Answer(7, QuizRules.RightPlace(quizSession.Seed, 7), 1500);          // the last click, made while drawing
+            bool overNow = quizSession.State == "over";
+            ShutQuiz();
+            Check("the last answer ends the game at once, and cleaning up straight after still puts it on the board", overNow && quizSession == null && Leaderboards.Board().entries.Count(e => e.mode == "quiz" && e.rival == "Pal") == 1);
+        }
+        yield return 1;
     }
 }
 #endif

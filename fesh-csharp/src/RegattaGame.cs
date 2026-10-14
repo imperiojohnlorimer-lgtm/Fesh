@@ -167,7 +167,7 @@ partial class Game
                 }
                 break;
             case "race":
-                SailRegattaBoat(dt);
+                if (s.HeatT > 0) SailRegattaBoat(dt);        // (the frame the race begins is time 0: the boat stays on the line)
                 s.Position(player.X, player.Y);
                 break;
             case "result":
@@ -232,6 +232,7 @@ partial class Game
 
     void ShutRegatta()
     {
+        if (regSession != null && regSession.State == "over" && !regRecorded) FinishRegatta();      // (a result reached but not yet written down)
         if (regSession != null && regSession.State == "play" && !regRecorded) { regSession.Leave(); FinishRegatta(); }
         regSession?.Leave();
         regSession = null; regBot = null;

@@ -110,7 +110,7 @@ partial class Game
         var r = reef;
         if (r.Phase == "done") return;
         r.Phase = "done";
-        int d = ReefRules.Decide(r.Points, 0, r.AnglerPts, 0);
+        int d = ReefRules.Decide(r.Points, r.AnglerPts);
         r.Result = d > 0 ? "win" : d < 0 ? "loss" : "draw";
         RecordReef(r.Result);
         Sfx.Play(r.Result == "win" ? "rare" : r.Result == "loss" ? "fail" : "coin");

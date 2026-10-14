@@ -34,7 +34,8 @@ partial class Game
         var ang = ReefRules.Angler(77, "marlo");
         Check("an angler's score only goes up as the run goes on, and every fish they take was in the water", ang.Zip(ang.Skip(1)).All(z => z.First.t <= z.Second.t) && ang.All(a => ReefRules.PosAt(plan.Count == 0 ? null : ReefRules.Plan(77)[a.id], a.t) != null)
             && ReefRules.AnglerScoreAt(77, "marlo", 10) <= ReefRules.AnglerScoreAt(77, "marlo", 30) && ReefRules.AnglerScoreAt(77, "marlo", 1000) == ang.Sum(a => a.pts));
-        Check("more points wins, then fewer throws, else a draw", ReefRules.Decide(10, 30, 9, 5) > 0 && ReefRules.Decide(9, 5, 10, 30) < 0 && ReefRules.Decide(9, 5, 9, 8) > 0 && ReefRules.Decide(9, 8, 9, 8) == 0);
+        Check("more points wins; the same points is a draw, however many throws it took", ReefRules.Decide(10, 9) > 0 && ReefRules.Decide(9, 10) < 0 && ReefRules.Decide(9, 9) == 0);
+        Check("an angler never scores after the last spear of the run could have landed (1.30.1)", Enumerable.Range(0, 400).All(sd => new[] { "bess", "marlo", "ivy" }.All(rv => ReefRules.Angler(sd, rv).All(a => a.t <= ReefRules.Duration + ReefRules.FlightSecs + 0.0001f))));
 
         yield return 1;
         Note("Reef Run: against an angler, in the game");
@@ -90,7 +91,7 @@ partial class Game
         pendingShot = "reef-run"; yield return 2;
         reef.T = ReefRules.Duration - 0.05f;
         for (int i = 0; i < 60 && reef.Phase != "done"; i++) yield return 1;
-        Check("at the whistle the run is over and the result is worked out", reef.Phase == "done" && reef.Result is "win" or "loss" or "draw" && reef.Result == (ReefRules.Decide(reef.Points, 0, reef.AnglerPts, 0) > 0 ? "win" : ReefRules.Decide(reef.Points, 0, reef.AnglerPts, 0) < 0 ? "loss" : "draw"));
+        Check("at the whistle the run is over and the result is worked out", reef.Phase == "done" && reef.Result is "win" or "loss" or "draw" && reef.Result == (ReefRules.Decide(reef.Points, reef.AnglerPts) > 0 ? "win" : ReefRules.Decide(reef.Points, reef.AnglerPts) < 0 ? "loss" : "draw"));
         pendingShot = "reef-result"; yield return 3;
         Check("it is on the board once, with its points, against Marlo", Leaderboards.Board().entries.Count(e => e.mode == "spear" && e.rival == "Marlo" && e.score == reef.Points) == 1);
         Check("the card offers another run, the dock and leaving", Gfx.Seen.ContainsKey("Again") && Gfx.Seen.ContainsKey("Back to the dock") && Gfx.Seen.ContainsKey("Leave"));

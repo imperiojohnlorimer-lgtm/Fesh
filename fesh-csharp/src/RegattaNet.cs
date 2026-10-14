@@ -31,12 +31,13 @@ sealed class RegattaTracker
     public float FinishT = -1;                        // seconds into the heat when the finish line was crossed
     public bool Cheat;                                // a position no boat could have sailed
     public float X, Y, T;
+    public float Dist;                                // how far it has sailed in all: no boat beats MaxSpeed times the time so far
     bool has;
     public readonly List<float> GateTimes = new();
 
     public void Reset(float x, float y)
     {
-        Next = 1; FinishT = -1; Cheat = false; X = x; Y = y; T = 0; has = true; GateTimes.Clear();
+        Next = 1; FinishT = -1; Cheat = false; X = x; Y = y; T = 0; Dist = 0; has = true; GateTimes.Clear();
     }
 
     public int Gates => RegattaRules.Gates.Length;
@@ -49,6 +50,9 @@ sealed class RegattaTracker
         if (dt < -0.001f || !float.IsFinite(x) || !float.IsFinite(y)) { Cheat = true; return; }
         float dx = x - X, dy = y - Y, d = MathF.Sqrt(dx * dx + dy * dy);
         if (d > RegattaRules.MaxSpeed * MathF.Max(dt, 0) + 10) { Cheat = true; return; }
+        // And over the whole heat, so positions stamped with one moment (or a few) can't add up to a course.
+        Dist += d;
+        if (Dist > RegattaRules.MaxSpeed * MathF.Max(t, 0) + 10) { Cheat = true; return; }
         // Did the straight line between the last two positions pass through the gate it is heading for?
         var (gx, gy) = RegattaRules.Gates[Next < Gates ? Next : 0];
         float k = 0;
@@ -78,13 +82,17 @@ sealed class RegattaSession
     public float Count, HeatT, ResultT;
     public int MyWins, TheirWins;
     public readonly List<(float mine, float theirs)> Results = new();    // seconds per finished heat; -1 did not finish
-    public readonly RegattaTracker Mine = new(), Theirs = new();
+    public readonly RegattaTracker Mine = new(), Theirs = new(), Sent = new();
     public bool PeerGone;
     public float TheirX, TheirY; public bool TheirSeen;
     public int MySeat => Host ? 0 : 1;
     bool myReady, theirReady, finSent, hasResult, iLeft, rematchMe, rematchThem;
     float myFin = -2, theirFin = -2;                     // -2 not yet, -1 did not finish, else seconds
-    float hb, theirClaim = float.NaN;
+    float hb, sinceTheirPos;
+    int theirClaimMs = NoClaim;
+    const int NoClaim = int.MinValue;
+    bool forcedFinal;
+    readonly List<NetMsg> earlyPos = new();               // their samples that came while my countdown was still running
 
     public RegattaSession(string myName, ILink link, bool host)
     {
@@ -126,9 +134,9 @@ sealed class RegattaSession
 
     void StartHeat(int heat)
     {
-        Heat = heat; HeatPhase = "lineup"; myReady = theirReady = false; finSent = false; myFin = theirFin = -2; theirClaim = float.NaN;
+        Heat = heat; HeatPhase = "lineup"; myReady = theirReady = false; finSent = false; myFin = theirFin = -2; theirClaimMs = NoClaim; forcedFinal = false; sinceTheirPos = 0; earlyPos.Clear();
         HeatT = 0; Count = 0; TheirSeen = false;
-        var s = RegattaRules.Slot(MySeat); Mine.Reset(s.x, s.y);
+        var s = RegattaRules.Slot(MySeat); Mine.Reset(s.x, s.y); Sent.Reset(s.x, s.y);
         var o = RegattaRules.Slot(1 - MySeat); Theirs.Reset(o.x, o.y); TheirX = o.x; TheirY = o.y;
         if (Host && heat > 0) Send(new NetMsg { t = "rheat", id = MatchId, n = new[] { heat } });
         Bump();
@@ -151,22 +159,30 @@ sealed class RegattaSession
         Bump();
     }
 
-    // Called every frame in a race with where my boat is: it's tracked, and sent to the other side eight times a second.
+    // Called every frame in a race with where my boat is: it's tracked for my own screen, and eight times a second a sample goes
+    // to the other side. The finish is judged on those samples, exactly as the numbers go out (`Sent`, the same tracker the
+    // other side runs on them), so both screens work out the very same finish time and so the same winner.
     public void Position(float x, float y)
     {
         if (State != "play" || HeatPhase != "race") return;
         Mine.Feed(x, y, HeatT);
-        if (Mine.FinishT >= 0 && !finSent)
+        if (finSent) return;
+        // A sample every PosEvery, and one more the moment my own tracker sees the line crossed, so a finish between two samples
+        // is not lost to the clock running out first.
+        bool final = Mine.FinishT >= 0 && !forcedFinal;
+        if (HeatT - lastPosSent < RegattaRules.PosEvery && !final) return;
+        if (final) forcedFinal = true;
+        lastPosSent = HeatT;
+        int qx = (int)MathF.Round(x * 4), qy = (int)MathF.Round(y * 4), qt = (int)MathF.Round(HeatT * 1000);
+        Send(new NetMsg { t = "rpos", id = MatchId, n = new[] { Heat, qx, qy, qt } });
+        Sent.Feed(qx / 4f, qy / 4f, qt / 1000f);
+        if (Sent.FinishT >= 0)
         {
-            finSent = true; myFin = Mine.FinishT;
-            Send(new NetMsg { t = "rpos", id = MatchId, n = new[] { Heat, (int)MathF.Round(x * 4), (int)MathF.Round(y * 4), (int)MathF.Round(HeatT * 1000) } });
-            Send(new NetMsg { t = "rfin", id = MatchId, n = new[] { Heat, (int)MathF.Round(myFin * 1000) } });
+            finSent = true;
+            int finMs = (int)MathF.Round(Sent.FinishT * 1000);
+            myFin = finMs / 1000f;                       // the very number sent
+            Send(new NetMsg { t = "rfin", id = MatchId, n = new[] { Heat, finMs } });
             CheckHeat();
-        }
-        else if (!finSent && HeatT - lastPosSent >= RegattaRules.PosEvery)
-        {
-            lastPosSent = HeatT;
-            Send(new NetMsg { t = "rpos", id = MatchId, n = new[] { Heat, (int)MathF.Round(x * 4), (int)MathF.Round(y * 4), (int)MathF.Round(HeatT * 1000) } });
         }
     }
     float lastPosSent = -1;
@@ -193,13 +209,22 @@ sealed class RegattaSession
         {
             case "count":
                 Count -= dt;
-                if (Count <= 0) { HeatPhase = "race"; HeatT = 0; lastPosSent = -1; Mine.Reset(RegattaRules.Slot(MySeat).x, RegattaRules.Slot(MySeat).y); Theirs.Reset(RegattaRules.Slot(1 - MySeat).x, RegattaRules.Slot(1 - MySeat).y); Bump(); }
+                if (Count <= 0) { HeatPhase = "race"; HeatT = 0; lastPosSent = -1; sinceTheirPos = 0; forcedFinal = false; Mine.Reset(RegattaRules.Slot(MySeat).x, RegattaRules.Slot(MySeat).y); Sent.Reset(RegattaRules.Slot(MySeat).x, RegattaRules.Slot(MySeat).y); Theirs.Reset(RegattaRules.Slot(1 - MySeat).x, RegattaRules.Slot(1 - MySeat).y);
+                    // Their samples that arrived during my countdown (their race can begin a moment, or after a hitch a good while, before mine).
+                    var early = earlyPos.ToArray(); earlyPos.Clear();
+                    foreach (var em in early) { Handle(em); if (State != "play") break; }
+                    Bump();
+                }
                 break;
             case "race":
                 HeatT += dt;
                 if (HeatT >= RegattaRules.HeatLimit && myFin == -2) { myFin = -1; finSent = true; Send(new NetMsg { t = "rfin", id = MatchId, n = new[] { Heat, -1 } }); CheckHeat(); }
-                // The other side has had its whole time and a few seconds more and still says nothing.
-                else if (HeatT >= RegattaRules.HeatLimit + 8 && theirFin == -2) { theirFin = -1; CheckHeat(); }
+                // The other side has had its whole time and a few seconds more and still says nothing: their own clock has reached the
+                // limit (a slow machine's clock runs behind mine, so mine alone proves nothing), or they have stopped sending, or the
+                // heat has run twice as long as any heat can.
+                else if (theirFin == -2 && (HeatT >= RegattaRules.HeatLimit * 2 || HeatT >= RegattaRules.HeatLimit + 8 && (Theirs.T >= RegattaRules.HeatLimit || sinceTheirPos > 8)))
+                { theirFin = -1; CheckHeat(); }
+                sinceTheirPos += dt;
                 break;
             case "result":
                 ResultT -= dt;
@@ -234,8 +259,15 @@ sealed class RegattaSession
             }
             case "rheat" when !Host && State == "play" && m.id == MatchId && HeatPhase == "result":
                 if (m.n == null || m.n.Length != 1 || m.n[0] != Heat + 1) { Invalid("a heat out of order"); return; }
+                // No heat after the match is decided: two wins, or the last of the three.
+                if (MyWins >= 2 || TheirWins >= 2 || Heat >= RegattaRules.Heats - 1) { Invalid("a heat after the match was decided"); return; }
                 StartHeat(m.n[0]);
                 break;
+            // The host has moved on to the next heat while I am still in this one (it gave up waiting for me): nobody can be
+            // left stranded between the two, so the race ends with no result.
+            case "rheat" when !Host && State == "play" && m.id == MatchId && HeatPhase != "result":
+                Invalid("the next heat started before this one was over");
+                return;
             case "rready" when Host && State == "play" && m.id == MatchId && HeatPhase == "lineup":
                 if (m.n == null || m.n.Length != 1 || m.n[0] != Heat) return;
                 theirReady = true;
@@ -246,6 +278,10 @@ sealed class RegattaSession
                 HeatPhase = "count"; Count = RegattaRules.CountSecs;
                 Bump();
                 break;
+            case "rpos" when State == "play" && m.id == MatchId && HeatPhase == "count":
+                // (their race began before mine: keep what they sent, to be read once mine has started)
+                if (m.n != null && m.n.Length == 4 && m.n[0] == Heat && earlyPos.Count < 512) earlyPos.Add(m);
+                break;
             case "rpos" when State == "play" && m.id == MatchId && HeatPhase == "race":
             {
                 if (m.n == null || m.n.Length != 4 || m.n[0] != Heat) return;
@@ -255,14 +291,18 @@ sealed class RegattaSession
                 Theirs.Feed(m.n[1] / 4f, m.n[2] / 4f, t);
                 if (Theirs.Cheat) { Invalid("an impossible position"); return; }
                 TheirX = Theirs.X; TheirY = Theirs.Y; TheirSeen = true;
-                if (!float.IsNaN(theirClaim)) VerifyClaim();
+                sinceTheirPos = 0;
+                if (theirClaimMs != NoClaim) VerifyClaim();
                 break;
             }
             case "rfin" when State == "play" && m.id == MatchId && HeatPhase is "race" or "result" && theirFin == -2:
             {
                 if (m.n == null || m.n.Length != 2 || m.n[0] != Heat) return;
                 if (m.n[1] == -1) { theirFin = -1; CheckHeat(); break; }
-                theirClaim = m.n[1] / 1000f;
+                // A finish is somewhere in the heat's own time: nothing negative, and nothing after the limit (a boat still out there
+                // then has not finished; the honest side sends -1). Also keeps the comparison below clear of overflow.
+                if (m.n[1] < 0 || m.n[1] > (int)(RegattaRules.HeatLimit * 1000)) { Invalid("a finish time outside the heat"); return; }
+                theirClaimMs = m.n[1];
                 VerifyClaim();
                 break;
             }
@@ -276,21 +316,24 @@ sealed class RegattaSession
         }
     }
 
-    // Their claimed finish has to be the finish their own positions showed (within a moment).
+    // Their claimed finish has to be the finish their own positions showed (within a moment). The heat is then judged on the
+    // claim itself, the very millisecond count they sent and I sent them, so both screens compare the same two numbers and
+    // can't each decide they were the quicker (judging each from its own samples did).
     void VerifyClaim()
     {
         if (Theirs.FinishT < 0) return;          // (the positions up to the line may still be on their way)
-        if (MathF.Abs(Theirs.FinishT - theirClaim) > 1.5f) { Invalid("a finish time the positions don't show"); return; }
-        theirFin = Theirs.FinishT; theirClaim = float.NaN;
+        if (Math.Abs(theirClaimMs - (int)MathF.Round(Theirs.FinishT * 1000)) > ClaimToleranceMs) { Invalid("a finish time the positions don't show"); return; }
+        theirFin = theirClaimMs / 1000f; theirClaimMs = NoClaim;
         CheckHeat();
     }
+    const int ClaimToleranceMs = 1;       // the same samples give the same time to the millisecond; one is for rounding
 
     // Both finishes known: the heat is decided.
     void CheckHeat()
     {
         if (HeatPhase != "race" || myFin == -2 || theirFin == -2) return;
         Results.Add((myFin, theirFin));
-        bool iWin = myFin >= 0 && (theirFin < 0 || myFin < theirFin - 0.001f), theyWin = theirFin >= 0 && (myFin < 0 || theirFin < myFin - 0.001f);
+        bool iWin = myFin >= 0 && (theirFin < 0 || myFin < theirFin), theyWin = theirFin >= 0 && (myFin < 0 || theirFin < myFin);
         if (iWin) MyWins++; else if (theyWin) TheirWins++;
         HeatPhase = "result"; ResultT = RegattaRules.BreakSecs;
         Bump();
@@ -315,15 +358,17 @@ sealed class RegattaSession
     {
         if (State == "play" && why is "invalid" or "version") { State = "over"; EndWhy = "invalid"; hasResult = false; Notice = "The race was stopped."; }
         else if (State == "play") { State = "over"; EndWhy = "left"; hasResult = true; Notice = $"{RivalName} left the race."; }
+        else if (State == "joining") { State = "over"; EndWhy = "left"; hasResult = false; Notice = "The other player left before the race began."; }
         PeerGone = true;
         Link?.Close();
         Bump();
     }
 
+    // The line has gone quiet or dropped. Each side sees the other vanish, so neither can know who it was: nobody wins.
     void PeerLost()
     {
-        if (State == "play") { State = "over"; EndWhy = "left"; hasResult = true; Notice = $"{RivalName} stopped answering. You win."; }
-        else if (State == "joining") { State = "closed"; Notice = "The other player didn't answer."; }
+        if (State == "play") { State = "over"; EndWhy = "lost"; hasResult = false; Notice = "The connection was lost. The race has no result."; }
+        else if (State == "joining") { State = "over"; EndWhy = "lost"; hasResult = false; Notice = "The other player didn't answer."; }
         PeerGone = true;
         Link?.Close();
         Bump();
