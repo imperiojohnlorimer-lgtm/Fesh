@@ -24,7 +24,7 @@ internal static class TouchHud
     public static volatile bool Editing;
     public static volatile bool WheelAllowed; // a menu or panel is up: a vertical drag scrolls it
     public static int W = 1280, H = 720;
-    public const string Build = "build 7";
+    public const string Build = "1.31.0";
 
     static readonly string[] Live = { "play", "build", "charging", "casting", "waiting", "bite", "reeling", "chest", "spear", "drill" };
 
