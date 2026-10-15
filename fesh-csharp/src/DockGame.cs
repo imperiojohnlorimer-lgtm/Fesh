@@ -15,6 +15,7 @@ partial class Game
     LanConnect dockConnect;
     string dockView = "menu";                          // the Matches panel's dock tab: menu or finding
     string dockMsg = "", dockAddr = "";
+    string dockHostAddr = "";                          // this computer's address and port, shown on the dock for the guests to type
     bool dockEntering;                                 // joined a dock, waiting for its welcome before walking in
     (int ch, int from, int mode, double until)? dockInvite;   // a challenge waiting for your answer
     int dockChallengeTarget = -1;                      // the player whose challenge menu is open
@@ -35,6 +36,7 @@ partial class Game
         ShutDockNet();
         try { dockListener = new LanHost(LanName, "dock", lanDiscoveryPort, lanFirstPort); }
         catch (Exception) { dockListener = null; dockMsg = "Couldn't open a port to host on. Another program may be using it."; return; }
+        dockHostAddr = $"{Lan.LocalAddress()}:{dockListener.Port}";
         dockHost = new DockHostCore();
         var (hl, cl) = MemoryLink.Pair();
         dockHost.AddLink(hl);

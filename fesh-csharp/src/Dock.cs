@@ -251,11 +251,20 @@ partial class Game
         var lines = new List<string> { "Walk about and talk to the anglers (<act>) for a Derby Duel, or read the notice board." };
         var wrapped = lines.SelectMany(l => Gfx.Wrap(Bind.Fix(l), FontKind.Ui500, 16, w - 28)).ToList();
         float rosterH = dockClient != null ? 30 + Math.Min(8, dockClient.Roster.Count) * 20 : 0;
-        float h = 52 + wrapped.Count * 22 + 34 + rosterH;
+        bool hosting = dockListener != null && dockHostAddr.Length > 0;
+        float addrH = hosting ? 50 : 0;
+        float h = 52 + wrapped.Count * 22 + 34 + rosterH + addrH;
         Gfx.Box(x, y, w, h, NavyStrong, Pal.Ink, 2, 8, 3);
         Gfx.Text("Tournament Dock", x + 14, y + 10, FontKind.Ui700, 24, White);
         for (int i = 0; i < wrapped.Count; i++) Gfx.Text(wrapped[i], x + 14, y + 44 + i * 22, FontKind.Ui500, 16, Pal.C("#bcd3e0"));
-        if (dockClient != null) DrawDockRoster(x + 14, y + 44 + wrapped.Count * 22 + 8, w - 28);
+        float ry = y + 44 + wrapped.Count * 22 + 8;
+        if (hosting)
+        {
+            Gfx.Text("Others find this dock with Find a dock, or type:", x + 14, ry, FontKind.Ui500, 15, Pal.C("#bcd3e0"));
+            Gfx.Text(dockHostAddr, x + 14, ry + 20, FontKind.Ui700, 22, Pal.Lantern);
+            ry += addrH;
+        }
+        if (dockClient != null) DrawDockRoster(x + 14, ry, w - 28);
         Gfx.Text(Bind.Fix("Keys 1-8: say hello. Esc: leave the dock."), x + 14, y + h - 28, FontKind.Ui500, 15, Pal.C("#e9d79a"));
         // The phrases, along the bottom of the screen.
         float bw = 118, bx = (Gfx.LW - (bw * 4 + 8 * 3)) / 2, by = Gfx.LH - 150;
