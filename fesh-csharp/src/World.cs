@@ -15,7 +15,7 @@ partial class Game
     bool mapTexDirty = true;
 
     static readonly (int x, int y)[] SaltTrees = { (21, 6), (23, 8), (12, 11), (19, 12), (23, 11), (8, 9), (13, 3) };
-    static readonly (int x, int y)[] SaltBushes = { (9, 10), (12, 4), (22, 10) };
+    static readonly (int x, int y)[] SaltBushes = { (9, 10), (12, 4), (15, 12) };   // the third used to stand at (22, 10), where Pip's stall hid half of it
     // The mouth of Frostfang Caverns covers these four tiles; you enter standing just below it.
     const int MouthX = 56, MouthY = 2;
     const float MouthDoorX = 570, MouthDoorY = 46;
