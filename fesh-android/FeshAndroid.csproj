@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Fesh for Android: the same game source as fesh-csharp (linked, not copied), with Shim/ standing in for Raylib-cs. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Fesh</RootNamespace>
+    <AssemblyName>Fesh.Android</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ApplicationId>com.fesh.game</ApplicationId>
+    <ApplicationVersion>7</ApplicationVersion>
+    <Version>1.30.2</Version>
+    <ApplicationDisplayVersion>1.30.2</ApplicationDisplayVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>$(NoWarn);CA1416;CS0168;CS0219;CS0162;CS0649;CS0414;CS0169</NoWarn>
+  </PropertyGroup>
+
+  <!-- Android's implicit namespaces clash with the game's names (Environment, Path...). The Android files import what they use. -->
+  <ItemGroup>
+    <Using Remove="Android.App" />
+    <Using Remove="Android.Content" />
+    <Using Remove="Android.OS" />
+    <Using Remove="Android.Runtime" />
+    <Using Remove="Android.Views" />
+    <Using Remove="Android.Widget" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\fesh-csharp\src\**\*.cs" Exclude="..\fesh-csharp\src\Program.cs" LinkBase="game" />
+    <Compile Include="Shim\**\*.cs" />
+    <Compile Include="App\**\*.cs" />
+    <EmbeddedResource Include="..\fesh-csharp\Assets\Fonts\*.ttf" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StbTrueTypeSharp" Version="1.26.12" />
+  </ItemGroup>
+
+</Project>

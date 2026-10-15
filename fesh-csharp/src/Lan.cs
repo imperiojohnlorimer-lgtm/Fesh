@@ -420,7 +420,7 @@ static class Lan
         {
             string best = null;
             var nics = NetworkInterface.GetAllNetworkInterfaces().Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-                .OrderBy(n => IsVirtual(n) ? 1 : 0).ThenBy(n => n.GetIPProperties().GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any)) ? 0 : 1);
+                .OrderBy(n => IsVirtual(n) || IsMobileData(n) ? 1 : 0).ThenBy(n => n.GetIPProperties().GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any)) ? 0 : 1);
             foreach (var nic in nics)
             {
                 foreach (var ua in nic.GetIPProperties().UnicastAddresses)
@@ -435,6 +435,14 @@ static class Lan
             return best ?? "127.0.0.1";
         }
         catch (Exception) { return "127.0.0.1"; }
+    }
+
+    // A phone's mobile-data link has a way out but is not the network the other player is on (a phone that is the hotspot has no gateway on
+    // its own hotspot side), so it comes after the Wi-Fi and hotspot adapters. Windows never names an adapter like these.
+    static bool IsMobileData(NetworkInterface n)
+    {
+        string s = n.Name.ToLowerInvariant();
+        return s.StartsWith("rmnet") || s.StartsWith("ccmni") || s.StartsWith("pdp") || s.StartsWith("wwan") || s.StartsWith("ppp") || s.StartsWith("clat") || s.StartsWith("v4-") || s.StartsWith("tun") || s.StartsWith("dummy");
     }
 
     static bool IsVirtual(NetworkInterface n)

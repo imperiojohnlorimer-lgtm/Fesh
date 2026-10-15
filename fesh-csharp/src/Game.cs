@@ -97,7 +97,9 @@ partial class Game
         Settings.Load();
         // Not in a test run: one started without FESH_SAVE would move the real save before it refuses to go on.
         if (Environment.GetEnvironmentVariable("FESH_AUTOTEST") is not { Length: > 0 }) SaveFile.MigrateLegacy();
-        SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint);
+        // Raylib stops the whole loop while the window is minimized; a test run lives minimized, so it keeps running.
+        bool testRun = Environment.GetEnvironmentVariable("FESH_AUTOTEST") is { Length: > 0 };
+        SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint | (testRun ? ConfigFlags.AlwaysRunWindow : 0));
         SetTraceLogLevel(TraceLogLevel.Error);
         InitWindow(1280, 720, "Fesh");
         FitWindowToMonitor();

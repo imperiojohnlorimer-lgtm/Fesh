@@ -147,7 +147,12 @@ partial class Game
         "<move> walk  ·  <act> talk, fish and use  ·  1-6 pick from your hotbar  ·  <use> use what you're holding",
         "<ride> ride or board  ·  <bag> bag  ·  <build> build  ·  <map> map  ·  <journal> journal  ·  <dex> Fesh-dex  ·  Esc menu"
     };
-    static readonly string TitleVersion = "Version " + (System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version is Version v ? $"{v.Major}.{v.Minor}.{v.Build}" : "?");
+    static readonly string[] TitleControlsTouch =
+    {
+        "Left thumb walks  ·  E talks, fishes and uses  ·  tap the hotbar to pick what you hold",
+        "Bag, map, build and the rest are the buttons at the top  ·  Back opens the menu"
+    };
+    static readonly string TitleVersion = "Version " + ((System.Reflection.Assembly.GetEntryAssembly() ?? typeof(Game).Assembly).GetName().Version is Version v ? $"{v.Major}.{v.Minor}.{v.Build}" : "?");
 
     void DrawTitle()
     {
@@ -203,8 +208,9 @@ partial class Game
         if (SmallButton("Settings", cx - sw / 2, y)) OpenTitleSettings();
         if (SmallButton("Quit", cx - sw / 2 + SmallW("Settings") + 10, y)) quit = true;
         // The controls, in two lines so they fit whatever the keys are bound to (and the pad's buttons on a gamepad).
-        for (int i = 0; i < TitleControls.Length; i++)
-            Gfx.TextCenter(Gfx.Ellipsize(Bind.Fix(TitleControls[i]), FontKind.Ui500, 18, Gfx.LW - 40), cx, Gfx.LH - 70 + i * 26, FontKind.Ui500, 18, Pal.WithAlpha(Pal.Paper, 0.85f));
+        var titleControls = Platform.Touch ? TitleControlsTouch : TitleControls;
+        for (int i = 0; i < titleControls.Length; i++)
+            Gfx.TextCenter(Gfx.Ellipsize(Bind.Fix(titleControls[i]), FontKind.Ui500, 18, Gfx.LW - 40), cx, Gfx.LH - 70 + i * 26, FontKind.Ui500, 18, Pal.WithAlpha(Pal.Paper, 0.85f));
         Gfx.Text(TitleVersion, Gfx.LW - 16 - Gfx.Measure(TitleVersion, FontKind.Ui500, 15), 14, FontKind.Ui500, 15, Pal.WithAlpha(Pal.Paper, 0.6f));
     }
 
@@ -392,7 +398,8 @@ partial class Game
         string head = title ? "Settings" : "Paused";
         Gfx.Text(head, x + pad, cy, FontKind.Ui700, 40, Pal.PaperInk);
         float tx = x + pad + Gfx.Measure(head, FontKind.Ui700, 40) + 28;
-        var tabs = title ? new[] { ("settings", "Settings"), ("controls", "Controls") } : new[] { ("game", "Game"), ("settings", "Settings"), ("controls", "Controls") };
+        string controlsName = Platform.Touch ? "Touch" : "Controls";
+        var tabs = title ? new[] { ("settings", "Settings"), ("controls", controlsName) } : new[] { ("game", "Game"), ("settings", "Settings"), ("controls", controlsName) };
         foreach (var (id, label) in tabs)
         {
             float w = SmallW(label);
@@ -505,10 +512,13 @@ partial class Game
         }
         d.musicOn = Pair("Music", d.musicOn, false) == 0;
         d.muted = Pair($"All sound ({Bind.Name("mute")})", !d.muted, true) == 1;
-        bool full = IsWindowState(ConfigFlags.BorderlessWindowMode);
-        if ((Pair($"Fullscreen ({Bind.Name("fullscreen")})", full, false) == 0) != full) ToggleFullscreen();
-        d.shake = Pair("Screen shake", d.shake, true) == 0;
-        d.pauseUnfocused = Pair("Pause in the background", d.pauseUnfocused, false) == 0;
+        if (!Platform.Touch)   // a phone is always full screen and always stops when you leave the app
+        {
+            bool full = IsWindowState(ConfigFlags.BorderlessWindowMode);
+            if ((Pair($"Fullscreen ({Bind.Name("fullscreen")})", full, false) == 0) != full) ToggleFullscreen();
+        }
+        d.shake = Pair("Screen shake", d.shake, !Platform.Touch) == 0;
+        if (!Platform.Touch) d.pauseUnfocused = Pair("Pause in the background", d.pauseUnfocused, false) == 0;
         d.guide = Pair("Goal and arrow", d.guide, true) == 0;
         var lengths = Settings.DayLengths;
         int li = Array.IndexOf(lengths, d.dayLength);
@@ -551,6 +561,7 @@ partial class Game
     // Keyboard (rebindable) or gamepad (a fixed layout) controls.
     void DrawControlsTab(float x, float y, float w)
     {
+        if (Platform.Touch) { DrawTouchTab(x, y, w); return; }
         float sx = x;
         foreach (var (pad, label) in new[] { (false, "Keyboard"), (true, "Gamepad") })
         {
