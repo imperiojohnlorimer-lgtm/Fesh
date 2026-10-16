@@ -42,7 +42,9 @@ partial class Game
         ("asinan", 265, 643), ("daangpulo", 645, 630), ("parola", LighthouseX - 90, LighthouseY + 14),
         ("ml-town", SelaX - 20, SelaY + 24), ("ml-springs", MlPlace("springs").x + 30, MlPlace("springs").y - 40),
         ("ml-tindig", TindigX, TindigY + 30), ("ml-tindig-n", TindigX - 20, TindigY - 70), ("ml-hills", MlPlace("cliff").x - 20, MlPlace("cliff").y + 14),
-        ("ml-river", MlPlace("town").x + 40, MlPlace("town").y + 60)
+        ("ml-river", MlPlace("town").x + 40, MlPlace("town").y + 60),
+        // 1.31: the Blender landmarks that no other stop shows.
+        ("ml-cave", MlPlace("cave").x, MlPlace("cave").y + 24), ("sanctuary", 2202, 704), ("starwell", StarwellX, StarwellY + 40)
     };
 
     IEnumerable<int> ScenicScript()
@@ -167,6 +169,26 @@ partial class Game
             for (int y = 0; y < 70; y++) for (int x = 0; x < 280; x++) ImageDrawPixel(ref img, x, y, sheet.Buf[y * 280 + x]);
             ImageResizeNN(ref img, 280 * 4, 70 * 4);
             ExportImage(img, Path.Combine(testDir, "animals.png"));
+            UnloadImage(img);
+        }
+        // Each animal's walk, its four frames left to right (1.31), one animal a row.
+        {
+            var keep = pix;
+            var sheet = new Pix(140, 170);
+            pix = sheet;
+            Array.Fill(sheet.Buf, Pal.C("#5d9b45"));
+            int ry = 18;
+            foreach (var id in new[] { "carabao", "pig", "sheep", "goat", "dog", "cat", "chicken", "hornbill", "parrot", "tarsier" })
+            {
+                var (aw, ah) = AnimalArt.Size(id);
+                for (int f = 0; f <= 4; f++) AnimalArt.Draw(sheet, id, 4 + aw / 2 + f * (aw + 3), ry, false, f);
+                ry += ah + 3;
+            }
+            pix = keep;
+            var img = GenImageColor(140, 170, Color.Black);
+            for (int y = 0; y < 170; y++) for (int x = 0; x < 140; x++) ImageDrawPixel(ref img, x, y, sheet.Buf[y * 140 + x]);
+            ImageResizeNN(ref img, 140 * 5, 170 * 5);
+            ExportImage(img, Path.Combine(testDir, "animal-walk.png"));
             UnloadImage(img);
         }
         // The nursery's pictures: the emergence through its stages, then the four stages and the four leaves.

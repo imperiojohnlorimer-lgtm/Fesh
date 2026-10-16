@@ -302,7 +302,8 @@ partial class Game
 partial class Game
 {
     // How much taller than the first drawings the trees stand (their collision tile is unchanged).
-    internal static float TreeScale(char kind) => kind switch { 't' => 1.5f, 'h' => 1.45f, 'f' => 1.4f, 'c' => 1.5f, _ => 1f };
+    // A fifth bigger again with the bigger houses (an oak is now about 55 px, four times you).
+    internal static float TreeScale(char kind) => kind switch { 't' => 1.8f, 'h' => 1.75f, 'f' => 1.7f, 'c' => 1.65f, _ => 1f };
 }
 
 partial class Game

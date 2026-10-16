@@ -34,7 +34,9 @@ partial class Game
             ("board", AlertBoardX, AlertBoardY + 8), ("crate", CrateX, CrateY + 8), ("table", EvacTableX, EvacTableY + 8), ("jetty end", BoardPointX, BoardPointY) };
         var shut = spots.Where(p => !Open(p.Item2, p.Item3)).Select(p => p.Item1).ToList();
         Check($"Manay Mila, Ben, the abaca frame, the pili spot, the board, the crate, the table and the jetty end can be reached, outside the danger zone ({string.Join(", ", shut)})", shut.Count == 0);
-        Check("the cone and its crater are inside the permanent danger zone, and its marker stones stand on land", InPdz(ConeX, ConeBaseY - 10) && InPdz(ConeX, ConeBaseY - ConeH + 10) && MarkerStones().Count() >= 10);
+        // The crater's place on the ground: the old flat drawing put it at the summit's row; the 3D cone stands over the
+        // middle of its footprint, 14 rows behind the foot.
+        Check("the cone and its crater are inside the permanent danger zone, and its marker stones stand on land", InPdz(ConeX, ConeBaseY - 10) && InPdz(ConeX, OldArt ? ConeBaseY - ConeH + 10 : ConeBaseY - 14) && MarkerStones().Count() >= 10);
         Check("the lahar channel's mouth is on the beach, and the jetty route is clear of it", Walkable(TileUnder(LaharMouthX, LaharMouthY)) && ChannelDist(BoardPointX, BoardPointY + 40) > 40 && ChannelDist(BenX, BenY) > 20);
         Check("the shelter's jars, rain barrel and door are on open ground in Amihan Village",
             JarSpots.All(j => CanStand(j.x + 6, j.y + 3)) && CanStand(BarrelX - 6, BarrelY + 4) && CanStand(SchoolDoorX, SchoolDoorY + 5) && CanStand(LandingX, LandingY));

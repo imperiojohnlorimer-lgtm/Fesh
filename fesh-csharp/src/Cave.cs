@@ -362,13 +362,17 @@ partial class Game
                         g.Rect(X + 2, Y + 3, 1, 2, rune); g.Rect(X + 8, Y + 3, 1, 2, rune);
                     }
                 }
-                if (t == 'H')
+                if (t == 'H' && !OldArt)
+                    BlitArtTo(g, LandmarkArt2.Hole, LandmarkArt2.HolePalette, LandmarkArt2.HoleAnchorX, LandmarkArt2.HoleAnchorY, X + 5, Y + 5);
+                else if (t == 'H')
                 {
                     g.Rect(X + 1, Y + 2, 8, 7, "#050404"); g.Rect(X + 2, Y + 1, 6, 9, "#050404");
                     g.Rect(X + 3, Y + 2, 1, 6, "#6b4a2b"); g.Rect(X + 6, Y + 2, 1, 6, "#6b4a2b");
                     for (int i = 3; i < 8; i += 2) g.Rect(X + 3, Y + i, 4, 1, "#8a6440");
                 }
-                if (t == 'U')
+                if (t == 'U' && !OldArt)
+                    BlitArtTo(g, LandmarkArt2.Ladder, LandmarkArt2.LadderPalette, LandmarkArt2.LadderAnchorX, LandmarkArt2.LadderAnchorY, X + 5, Y + 10);
+                else if (t == 'U')
                 {
                     // The ladder back up, reaching into the rock above.
                     g.Rect(X + 2, Y - 10, 1, 20, "#8a6440"); g.Rect(X + 7, Y - 10, 1, 20, "#8a6440");
@@ -424,6 +428,22 @@ partial class Game
         if (chopTile == (n.X, n.Y) && shakeT > 0) X += (int)MathF.Round(MathF.Sin(time * 70) * 1.5f);
         var ore = Ore(n.Kind);
         pix.Rect(X + 1, Y + 8, 8, 2, "rgba(0,0,0,0.3)");
+        if (!OldArt)
+        {
+            // A Blender boulder (tools/blender/landmarks2.py), one of three by tile, its flecks in the ore's colour; crystal
+            // and abyssite grow a cluster on top.
+            int v = (int)(Pix.Hash(n.X, n.Y, 801) * 3) % 3;
+            var (g, pal) = v == 0 ? (LandmarkArt2.OreRock0, LandmarkArt2.OreRock0Palette) : v == 1 ? (LandmarkArt2.OreRock1, LandmarkArt2.OreRock1Palette) : (LandmarkArt2.OreRock2, LandmarkArt2.OreRock2Palette);
+            BlitArt(g, pal, LandmarkArt2.OreRock0AnchorX, LandmarkArt2.OreRock0AnchorY, X + 5, Y + 9, Tones3(ore.Color), mirror: Pix.Hash(n.X, n.Y, 802) < 0.5);
+            if (n.Kind is "crystal" or "abyssite")
+            {
+                BlitArt(LandmarkArt2.Crystal, LandmarkArt2.CrystalPalette, LandmarkArt2.CrystalAnchorX, LandmarkArt2.CrystalAnchorY, X + 5, Y + 3,
+                    Tones3(n.Kind == "crystal" ? "#9fe8ff" : "#9b6be0"));
+                if ((t * 0.8 + n.X * 0.3) % 1 < 0.1) pix.Rect(X + 5, Y - 4, 1, 1, "#ffffff");
+            }
+            if (n.Kind == "gold" && (t * 0.6 + n.Y * 0.3) % 1 < 0.08) pix.Rect(X + 6, Y + 3, 1, 1, "#ffffff");
+            return;
+        }
         pix.Rect(X + 1, Y + 2, 8, 7, "#5e5550");
         pix.Rect(X + 2, Y + 1, 6, 7, "#766b64");
         pix.Rect(X + 3, Y + 1, 3, 2, "#8f847c");
@@ -441,6 +461,15 @@ partial class Game
     {
         int X = tx * T, Y = ty * T;
         pix.Rect(X, Y + 8, 10, 2, "rgba(0,0,0,0.3)");
+        if (!OldArt)
+        {
+            // The Blender column (tools/blender/landmarks2.py), its rune bands breathing with light.
+            float gl = 0.5f + 0.5f * MathF.Sin(t * 1.5f + tx);
+            var stone = Pal.C("#5a7476");
+            var runes = new[] { Pix.Mix(stone, Pal.C("#2fb8a8"), 0.35f + 0.5f * gl), Pix.Mix(stone, Pal.C("#5fe8d8"), 0.4f + 0.55f * gl), Pix.Mix(stone, Pal.C("#c0fff6"), 0.45f + 0.55f * gl) };
+            BlitArt(LandmarkArt2.Pillar, LandmarkArt2.PillarPalette, LandmarkArt2.PillarAnchorX, LandmarkArt2.PillarAnchorY, X + 5, Y + 9, runes);
+            return;
+        }
         pix.Rect(X + 2, Y - 14, 6, 23, "#4f6a6c");
         pix.Rect(X + 2, Y - 14, 2, 23, "#6a8a8c");
         pix.Rect(X + 1, Y - 16, 8, 3, "#5f7c7e"); pix.Rect(X + 1, Y + 6, 8, 3, "#5f7c7e");

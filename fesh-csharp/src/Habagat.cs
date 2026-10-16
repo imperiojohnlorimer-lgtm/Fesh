@@ -112,8 +112,9 @@ partial class Game
     static List<Box> habagatSolids;
     static List<Box> MakeHabagatSolids()
     {
-        var list = new List<Box> { new(SaltBedX, SaltBedY, SaltBedW, SaltBedH), new(LighthouseX - 8, LighthouseY - 9, 16, 9) };
-        list.AddRange(HabagatFolk.Where(n => n.house).Select(n => new Box(n.x - 16, n.y - 22, 32, 19)));
+        var list = new List<Box> { new(SaltBedX, SaltBedY, SaltBedW, SaltBedH), OldArt ? new(LighthouseX - 8, LighthouseY - 9, 16, 9)
+            : new(LighthouseX - LighthouseArt.FootHalfWidth, LighthouseY - LighthouseArt.FootDepth, 2 * LighthouseArt.FootHalfWidth, LighthouseArt.FootDepth) };
+        list.AddRange(HabagatFolk.Where(n => n.house).Select(n => new Box(n.x - 16 * HouseS, n.y - 22, 32 * HouseS, 19)));
         for (int i = 0; i < Islets.Length; i++) list.Add(IsletRock(i));
         list.Add(WatchHut);
         return list;
@@ -475,9 +476,55 @@ partial class Game
     }
 
     // A white tower with a red lantern room, and the lamp itself lit after dark once it's mended.
-    void DrawLighthouse()
+    // The tower comes from a Blender model (tools/blender/lighthouse.py renders LighthouseArt.cs); FESH_OLDART=1 draws
+    // the old hand-placed one instead, to compare. The lantern glass is coloured here, by the lamp.
+    static bool OldArt = Environment.GetEnvironmentVariable("FESH_OLDART") == "1";
+    // How far above LighthouseY the lamp burns (the beam starts there).
+    static float LampRise => OldArt ? 44 : LighthouseArt.LampRise;
+    static readonly string[] GlassUnlit = { "#56606a", "#6f7b86", "#93a1ac" }, GlassLit = { "#cdb978", "#f3e2a0", "#fff3c8" },
+        GlassGlow = { "#f2c35a", "#ffe28a", "#fff6d2" };
+
+    void DrawLighthouse() => DrawLighthouseAt((int)LighthouseX, (int)LighthouseY, state.parola, Night);
+
+    void DrawLighthouseAt(int x, int y, int stage, bool night)
     {
-        int x = (int)LighthouseX, y = (int)LighthouseY;
+        if (OldArt) { DrawOldArt(x, y, stage, night); return; }
+        bool lit = stage >= 3;
+        var glass = !lit ? GlassUnlit : night ? GlassGlow : GlassLit;
+        pix.Rect(x - 15, y - 1, 31, 2, "rgba(0,0,0,0.22)");
+        var grid = LighthouseArt.Grid;
+        for (int j = 0; j < grid.Length; j++)
+            for (int i = 0; i < grid[j].Length; i++)
+            {
+                char ch = grid[j][i];
+                if (ch == '.') continue;
+                int gx = x + i - LighthouseArt.AnchorX, gy = y + j - LighthouseArt.AnchorY;
+                int g = "XYZ".IndexOf(ch);
+                string col = g < 0 ? LighthouseArt.Palette[ch - 'a'] : !lit && BrokenPane(i, j) ? "#2a2a2a" : glass[g];
+                pix.Rect(gx, gy, 1, 1, col);
+            }
+        // A ladder of a stair the keeper is mending.
+        if (stage < 1) for (int i = 0; i < 3; i++) pix.Rect(x + 14, y - 9 - i * 4, 4, 1, "#7a5230");
+    }
+
+    // Until it's mended, two cracked panes: short dark dashes in the glass, as the old drawing had.
+    static (int x, int y)? glassCorner;
+    static bool BrokenPane(int i, int j)
+    {
+        if (glassCorner == null)
+        {
+            int x0 = int.MaxValue, y0 = int.MaxValue;
+            for (int r = 0; r < LighthouseArt.Grid.Length; r++)
+                for (int c = 0; c < LighthouseArt.Grid[r].Length; c++)
+                    if ("XYZ".IndexOf(LighthouseArt.Grid[r][c]) >= 0) { x0 = Math.Min(x0, c); y0 = Math.Min(y0, r); }
+            glassCorner = (x0, y0);
+        }
+        int dx = i - glassCorner.Value.x, dy = j - glassCorner.Value.y;
+        return (dy == 2 && dx is 0 or 1) || (dy == 1 && dx is 4 or 5);
+    }
+
+    void DrawOldArt(int x, int y, int stage, bool night)
+    {
         pix.Rect(x - 10, y - 1, 21, 2, "rgba(0,0,0,0.22)");
         pix.Rect(x - 8, y - 6, 16, 6, "#8a8f93"); pix.Rect(x - 8, y - 6, 16, 1, "#b4b9bc");
         for (int row = 0; row < 34; row++)
@@ -488,14 +535,14 @@ partial class Game
         }
         int top = y - 40;
         pix.Rect(x - 5, top - 1, 10, 2, "#3b3b3b");
-        bool lit = state.parola >= 3, glow = lit && Night;
+        bool lit = stage >= 3, glow = lit && night;
         pix.Rect(x - 3, top - 6, 6, 5, glow ? "#ffe28a" : lit ? "#f3e2a0" : "#5e6468");
         pix.Rect(x - 1, top - 6, 2, 5, "#3b3b3b");
         pix.Rect(x - 4, top - 8, 8, 2, "#b5423a"); pix.Rect(x - 2, top - 10, 4, 2, "#b5423a"); pix.Rect(x, top - 12, 1, 2, "#3b3b3b");
         if (!lit) { pix.Rect(x - 3, top - 4, 2, 1, "#2a2a2a"); pix.Rect(x + 1, top - 5, 2, 1, "#2a2a2a"); }
         // The door, and a ladder of a stair the keeper is mending.
         pix.Rect(x - 2, y - 11, 4, 5, "#5b3a24");
-        if (state.parola < 1) for (int i = 0; i < 3; i++) pix.Rect(x + 9, y - 3 - i * 3, 3, 1, "#7a5230");
+        if (stage < 1) for (int i = 0; i < 3; i++) pix.Rect(x + 9, y - 3 - i * 3, 3, 1, "#7a5230");
     }
 
     // A wooden sungka board on a mat, its houses full of shells.

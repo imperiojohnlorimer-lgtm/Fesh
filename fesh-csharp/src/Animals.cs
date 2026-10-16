@@ -149,31 +149,72 @@ static class AnimalArt
         "...KKKK" + "KKKKKKK" + "KKKKKKK" + "K......"
     };
 
-    // Smaller animals in proportion to the carabao and to you: columns and rows cut out of the first drawings (the deleted
-    // ones are the middle of the body and a repeated row, so the heads, ears and paws stay as drawn).
+    // Sizes from the real animals (1.31), at about 10 px a metre since you're 16 px and about 1.6 m tall, with the small ones
+    // kept just big enough to read: a carabao 1.5 m at the shoulder and nearly 3 m long; a pig, a sheep and a goat round
+    // 0.8-1 m high and 1.2-1.5 m long; a dog 0.6 m; a cat and a chicken about 0.4 m; a hornbill and a parrot perched birds;
+    // a tarsier the size of a hand. The bigger ones are the first drawings grown (a column or row copied), the small ones
+    // drawn again at their size.
     static AnimalArt()
     {
         Trim("dog", new[] { 4, 5 }, new[] { 3 });
-        Trim("cat", new[] { 3, 4, 5 }, new[] { 3, 7 });
         Trim("chicken", new[] { 2, 3 }, new[] { 5 });
-        Trim("hornbill", new[] { 1, 3, 8 }, new int[0]);
-        Trim("parrot", new[] { 0, 2, 3, 7 }, new[] { 6, 9 });
-        // 1.27: the farm animals were the old small size beside the new carabao. Widen the body and lengthen the legs (copying a
-        // column or row of the drawing), keeping the heads as drawn.
         Grow("sheep", new[] { 3, 5 }, new[] { 3, 5, 6 });
         Grow("pig", new[] { 5, 6 }, new[] { 5, 6 });
-        Grow("goat", new[] { 5 }, new[] { 6, 6, 6 });
-        // The tarsier is tiny (a hand-sized animal): a small, big-eyed drawing, not a monkey.
+        Grow("goat", new[] { 5 }, new[] { 6, 6 });
+        // A cat: half the dog, tail up behind, ears pricked.
+        Sprites["cat"] = new(new[]
+        {
+            "......K.K",
+            "K.....GGG",
+            ".K...GGeG",
+            "..GGGGGGp",
+            "..GgggGG.",
+            "..K.K.KK."
+        }, Sprites["cat"].Colors);
+        // A rufous hornbill: black body, white tail, a great orange-red bill and casque.
+        Sprites["hornbill"] = new(new[]
+        {
+            "......OOO.",
+            ".....RReYY",
+            "..KKKRRYY.",
+            ".KKkkKR...",
+            "WWKKKK....",
+            "W...L.L..."
+        }, Sprites["hornbill"].Colors);
+        // A parrot: green, a red breast and blue wing tips, a hooked yellow bill.
+        Sprites["parrot"] = new(new[]
+        {
+            "....GG.",
+            "...GGeY",
+            "...GGGy",
+            "..RRGG.",
+            "..RRgG.",
+            ".BB.K..",
+            "BB....."
+        }, Sprites["parrot"].Colors);
+        // The tarsier is tiny (a hand-sized animal): mostly eyes.
         Sprites["tarsier"] = new(new[]
         {
-            ".B...B.",
-            ".BBBBB.",
-            "BYeBeYB",
-            "BYYBYYB",
-            ".BBbBB.",
-            "..bbb.B",
-            ".B.B.BB"
+            "B...B",
+            "BBBBB",
+            "YeBeY",
+            ".BbB.",
+            ".B.BB"
         }, new() { ['B'] = "#8a6749", ['b'] = "#bb9872", ['Y'] = "#e5c56b", ['e'] = "#201b1c" });
+    }
+
+    // Light on every animal from the upper left (1.31): a pixel with open air above it or to its left catches the light, one
+    // with open air below it is in shade, so the flat drawings read as round bodies. Eyes and noses keep their colour.
+    // westward is the column step toward the screen's left (+1 when the drawing is mirrored).
+    static Color Lit(string[] rows, int r, int c, string hex, int westward)
+    {
+        var col = Pal.C(hex);
+        bool Open(int rr, int cc) => rr < 0 || cc < 0 || rr >= rows.Length || cc >= rows[rr].Length || rows[rr][cc] == '.';
+        char ch = rows[r][c];
+        if (ch is 'e' or 'n' or 'y' or 'K' or 'k') return col;
+        if (Open(r + 1, c)) return Pix.Mix(col, new Color(30, 24, 40, 255), 0.22f);
+        if (Open(r - 1, c) || Open(r, c + westward)) return Pix.Mix(col, new Color(255, 248, 228, 255), 0.2f);
+        return col;
     }
 
     // Copies each listed column (and then each listed row) once more, right after itself (a row listed twice is copied twice).
@@ -210,7 +251,14 @@ static class AnimalArt
         if (big && pose is 1 or 2) pose = 0;
         var rows = RowsFor(id, pose);
         int w = rows[0].Length, h = rows.Length;
-        int left = (int)MathF.Round(x) - w / 2, top = (int)MathF.Round(y) - h + 1 - (pose == 3 && big ? 0 : frame);
+        // Frame 0 stands; 1 to 4 is a walk: a step (the legs apart, alternate feet a pixel forward and back), the body
+        // passing over them a pixel higher, the other step, and passing again.
+        int bob = frame is 2 or 4 && pose != 3 ? 1 : 0, stride = pose == 3 ? 0 : frame == 1 ? 1 : frame == 3 ? -1 : 0;
+        int left = (int)MathF.Round(x) - w / 2, top = (int)MathF.Round(y) - h + 1 - (pose == 3 && big ? 0 : bob);
+        // Which leg each foot pixel on the bottom row belongs to, counting the runs of feet from the left.
+        int[] legOf = new int[w];
+        for (int c = 0, n = -1; c < w; c++)
+            if (rows[h - 1][c] != '.') { if (c == 0 || rows[h - 1][c - 1] == '.') n++; legOf[c] = n; }
         int headCol = w <= 8 ? 4 : w - 6;
         p.Rect(left + 1, (int)MathF.Round(y) + 1, w - 2, 1, "rgba(0,0,0,0.2)");
         // Pose 3 is lying down asleep: the legs tucked under (the bottom two rows go) and the body lowered onto them, the
@@ -222,7 +270,9 @@ static class AnimalArt
                 char ch = rows[r][c];
                 if (ch == '.') continue;
                 int dr = !big && (pose is 1 or 3) && c >= headCol && r <= 3 ? 1 : pose == 2 && c <= 1 && r <= 3 ? -1 : 0;
-                p.Rect(left + (flip ? w - 1 - c : c), top + r + dr, 1, 1, s.Colors[ch]);
+                // On a step the feet swing: every other leg forward, the rest back.
+                int dc = stride != 0 && r == h - 1 && pose != 3 ? (legOf[c] % 2 == 0 ? stride : -stride) : 0;
+                p.Rect(left + (flip ? w - 1 - c - dc : c + dc), top + r + dr, 1, 1, Lit(rows, r, c, s.Colors[ch], flip ? 1 : -1));
             }
     }
 

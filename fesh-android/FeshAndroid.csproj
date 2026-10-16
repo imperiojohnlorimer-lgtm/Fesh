@@ -12,9 +12,9 @@
     <AssemblyName>Fesh.Android</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
     <ApplicationId>com.fesh.game</ApplicationId>
-    <ApplicationVersion>11</ApplicationVersion>
-    <Version>1.31.1</Version>
-    <ApplicationDisplayVersion>1.31.1</ApplicationDisplayVersion>
+    <ApplicationVersion>12</ApplicationVersion>
+    <Version>1.32.0</Version>
+    <ApplicationDisplayVersion>1.32.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <RuntimeIdentifiers>android-arm64</RuntimeIdentifiers>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>

@@ -170,6 +170,15 @@ partial class Game
     {
         int x = 2202, y = 682;
         pix.Rect(x - 10, y - 1, 21, 2, "rgba(0,0,0,0.2)");
+        if (!OldArt)
+        {
+            // The Blender hut (tools/blender/landmarks2.py), the size of the houses; the flag flies from its pole.
+            BlitArt(LandmarkArt2.WatchHut, LandmarkArt2.WatchHutPalette, LandmarkArt2.WatchHutAnchorX, LandmarkArt2.WatchHutAnchorY, x, y);
+            int fx = x + (int)MathF.Round(10 * LandmarkArt2.WatchHutZoom) + 1, fy = y - LandmarkArt2.WatchHutFlagTop;
+            bool wave = (int)(time * 4) % 2 == 0;
+            pix.Rect(fx, fy, 7, 2, "#2f7fa3"); pix.Rect(fx, fy + 2, wave ? 6 : 7, 2, "#f2efe6");
+            return;
+        }
         pix.Rect(x - 9, y - 12, 18, 11, "#c9a06a");
         for (int i = -8; i < 9; i += 3) pix.Rect(x + i, y - 11, 1, 10, "#e0c088");
         pix.Rect(x - 3, y - 8, 6, 7, "#4a3a2a");
@@ -210,7 +219,8 @@ partial class Game
             if (bx < camX - 8 || bx > camX + W + 8 || by < camY - 8 || by > camY + H + 8) continue;
             int bob = (int)MathF.Round(MathF.Sin(t * 2 + i) * 0.8f);
             pix.Ring(bx, by + 2, 3 + MathF.Sin(t * 2 + i) * 0.4f, Pal.Rgba(230, 246, 250, 0.4f));
-            pix.Rect(bx - 2, by - 2 + bob, 4, 3, "#f3c25b"); pix.Rect(bx - 1, by - 4 + bob, 2, 2, "#e04b3a"); pix.Rect(bx - 2, by - 2 + bob, 1, 1, "#ffe8a0");
+            if (!OldArt) BlitArt(LandmarkArt2.Buoy, LandmarkArt2.BuoyPalette, LandmarkArt2.BuoyAnchorX, LandmarkArt2.BuoyAnchorY, (int)bx, (int)by + bob);
+            else { pix.Rect(bx - 2, by - 2 + bob, 4, 3, "#f3c25b"); pix.Rect(bx - 1, by - 4 + bob, 2, 2, "#e04b3a"); pix.Rect(bx - 2, by - 2 + bob, 1, 1, "#ffe8a0"); }
         }
     }
 
@@ -225,6 +235,48 @@ partial class Game
         }
     }
 
+    // The turtle, dugong and whale shark from their Blender models (tools/blender/sealife.py), seen from above as shapes
+    // under the water (drawn see-through), swimming in six frames; FESH_OLDART=1 draws the old ones.
+    static readonly Dictionary<string, Color[]> seaPal = new();
+    static Color[] SeaPalette(string kind, string[] hex, float alpha)
+    {
+        string key = kind + alpha;
+        if (!seaPal.TryGetValue(key, out var p))
+            seaPal[key] = p = hex.Select(h => { var c = Pal.C(h); c.A = (byte)(255 * alpha); return c; }).ToArray();
+        return p;
+    }
+
+    void DrawSeaAnimal(SeaCreature c, int x, int y, int d, float t, bool surfacing, float up)
+    {
+        var (frames, hex, ax, ay, head) = c.Kind switch
+        {
+            "pawikan" => (SeaLifeArt.Pawikan, SeaLifeArt.PawikanPalette, SeaLifeArt.PawikanAnchorX, SeaLifeArt.PawikanAnchorY, 7),
+            "dugong" => (SeaLifeArt.Dugong, SeaLifeArt.DugongPalette, SeaLifeArt.DugongAnchorX, SeaLifeArt.DugongAnchorY, 12),
+            _ => (SeaLifeArt.Butanding, SeaLifeArt.ButandingPalette, SeaLifeArt.ButandingAnchorX, SeaLifeArt.ButandingAnchorY, 0),
+        };
+        // Deeper for the whale shark, nearer the surface for the turtle; a little clearer as it comes up to breathe.
+        float alpha = (c.Kind == "butanding" ? 0.72f : 0.8f) + (surfacing ? 0.12f : 0);
+        var pal = SeaPalette(c.Kind, hex, alpha);
+        var grid = frames[(int)(t * (c.Kind == "pawikan" ? 4 : 5) + c.Phase * 7) % SeaLifeArt.Frames];
+        for (int j = 0; j < grid.Length; j++)
+            for (int i = 0; i < grid[j].Length; i++)
+            {
+                char ch = grid[j][i];
+                if (ch == '.') continue;
+                int dx = i - ax;
+                pix.Rect(x + (d > 0 ? dx : -dx), y + j - ay, 1, 1, pal[ch - 'a']);
+            }
+        if (c.Kind == "butanding")
+        {
+            // Its tall fin cutting the surface, and the water breaking along its back.
+            int fin = surfacing ? 0 : 1, fx = x - 6 * d;
+            pix.Rect(fx, y - 7 + fin, 2, 3, Pal.C("#4a6a88")); pix.Rect(fx + (d > 0 ? 1 : 0), y - 9 + fin, 1, 2, Pal.C("#4a6a88"));
+            pix.Rect(x - 8, y - 5, 9, 1, Pal.Rgba(235, 248, 252, 0.45f));
+        }
+        else if (surfacing)
+            pix.Ring(x + head * d, y, 2 + up * 5, Pal.Rgba(235, 248, 252, 0.6f * (1 - up / 0.6f)));
+    }
+
     // Beneath the surface, a darker shape; now and then a head (or a fin) breaks it with a ring of ripples.
     void DrawSeaLife(float t)
     {
@@ -235,6 +287,11 @@ partial class Game
             float up = (t * 0.35f + c.Phase) % 3;
             bool surfacing = up < 0.6f;
             void R(int ox, int oy, int w, int h, Color col) => pix.Rect(d > 0 ? x + ox : x - ox - w + 1, y + oy, w, h, col);
+            if (!OldArt && c.Kind is "pawikan" or "dugong" or "butanding")
+            {
+                DrawSeaAnimal(c, x, y, d, t, surfacing, up);
+                continue;
+            }
             switch (c.Kind)
             {
                 case "pawikan":

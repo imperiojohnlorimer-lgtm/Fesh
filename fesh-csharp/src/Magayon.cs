@@ -39,7 +39,9 @@ partial class Game
     /* ---------- Where things are ---------- */
     // Baga Island, world pixels. The cone stands south of the north shore's houses; the fictional permanent danger zone is
     // an ellipse round it, marked with stones.
-    const float ConeX = 2330, ConeBaseY = 500, ConeH = 70, ConeHalf = 64;
+    const float ConeX = 2330, ConeBaseY = 500, ConeHalf = 64;
+    // How tall the cone stands above its foot: the Blender model's summit, or the old drawing's 70.
+    static float ConeH => OldArt ? 70 : VolcanoArt.Summit;
     const float PdzX = 2330, PdzY = 478, PdzRX = 90, PdzRY = 58;
     const float MilaX = 2270, MilaY = 392, BenX = 2350, BenY = 398;
     const float AbacaX = 2226, AbacaY = 400, PiliX = 2252, PiliY = 416;
@@ -49,7 +51,9 @@ partial class Game
     // The channel down the cone's north-east flank to the beach, from behind the cone to its mouth.
     static readonly (float x, float y)[] LaharChannel = { (2344, 440), (2362, 427), (2378, 411), (2390, 397), (2398, 384) };
     // Amihan Village: the school is the shelter the disaster office checked for this.
-    const float SchoolDoorX = 1665.5f, SchoolDoorY = 132;
+    const float SchoolDoorY = 132;
+    // The school's door, 10.5 px east of its middle on the old drawing, further on the bigger Blender one.
+    static float SchoolDoorX => SchoolX + 10.5f * HouseS;
     static readonly (float x, float y)[] JarSpots = { (1615, 139), (1627, 139) };
     const float BarrelX = 1690, BarrelY = 134;
     const float LandingX = 1540, LandingY = 216;
@@ -763,17 +767,32 @@ partial class Game
     }
 
     /* ---------- Drawing: Baga ---------- */
-    float ConeHalfAt(float r) => 5 + (ConeHalf - 5) * MathF.Pow(Math.Clamp(r / ConeH, 0, 1), 1.7f);
+    float ConeHalfAt(float r) => 5 + (ConeHalf - 5) * MathF.Pow(Math.Clamp(r / ConeH, 0, 1), OldArt ? 1.7f : 2f);
 
     // A Mayon-like cone: concave slopes, steeper near the top, bare grey rock above and green below, gullies running down,
     // and what Baga is doing right now (steam, a glow, lava, a flow, ash).
     void DrawBagaCone()
     {
-        const float top = ConeBaseY - ConeH;
+        float top = ConeBaseY - ConeH;
         int level = BagaLevel;
         float[] gullies = { -0.62f, -0.27f, 0.12f, 0.46f, 0.78f };
         // A soft shadow where the cone meets the ground.
         pix.Rect(ConeX - ConeHalf - 2, ConeBaseY - 1, (int)(ConeHalf * 2 + 5), 2, "rgba(0,0,0,0.22)");
+        if (!OldArt)
+        {
+            DrawVolcanoModel(level);
+            if (level >= 3)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    float k = (time * 0.35f + i * 0.33f) % 1, rr = 4 + k * ConeH * 0.55f, hf = ConeHalfAt(rr);
+                    pix.Rect(ConeX + hf * -0.27f + 2 + i, top + rr, 2, 1, Darkness > 0.3f ? "#ffd27a" : "#8a8580");
+                }
+                DrawUson(top);
+            }
+            DrawPlume(top, level, AshFalling || level >= 3 && (int)(time / 9) % 3 == 0);
+            return;
+        }
         for (int r = 0; r < ConeH; r++)
         {
             float f = r / ConeH, half = ConeHalfAt(r);
@@ -830,6 +849,36 @@ partial class Game
         // The plume: wisps of steam, or grey ash when Baga's just puffed; it leans west with the winds higher up.
         bool ash = AshFalling || level >= 3 && (int)(time / 9) % 3 == 0;
         DrawPlume(top, level, ash);
+    }
+
+    // The cone from the Blender model (tools/blender/volcano.py renders VolcanoArt.cs). Its south-west gully is left for
+    // here: rock while Baga sleeps, and from Level 3 lava, crusted by day and glowing at night, with hot pulses running down.
+    static readonly string[] GullyRock = { "#36332f", "#4a4642", "#5a5550" };
+    void DrawVolcanoModel(int level)
+    {
+        var grid = VolcanoArt.Grid;
+        int ox = (int)ConeX - VolcanoArt.AnchorX, oy = (int)ConeBaseY - VolcanoArt.AnchorY;
+        bool night = Darkness > 0.3f;
+        int pulse = (int)(time * 6);
+        for (int j = 0; j < grid.Length; j++)
+        {
+            string row = grid[j];
+            for (int i = 0; i < row.Length; i++)
+            {
+                char ch = row[i];
+                if (ch == '.') continue;
+                int g = ch switch { 'X' => 0, 'Y' => 1, 'Z' => 2, _ => -1 };
+                string c;
+                if (g < 0) c = VolcanoArt.Palette[ch - 'a'];
+                else if (level < 3) c = GullyRock[g];
+                else
+                {
+                    bool hot = (j * 7 + pulse) % 11 < 4;
+                    c = night ? (hot ? "#ffb347" : g == 0 ? "#c8452a" : "#e0582a") : (hot ? "#c8502a" : g == 2 ? "#4a3530" : "#3a2a26");
+                }
+                pix.Rect(ox + i, oy + j, 1, 1, c);
+            }
+        }
     }
 
     void DrawUson(float top)
@@ -1027,7 +1076,16 @@ partial class Game
     void DrawStation(float sx, float sy)
     {
         int x = (int)sx, y = (int)sy;
-        pix.Rect(x - 16, y + 3, 32, 2, "rgba(0,0,0,0.2)");
+        pix.Rect(x - 16 * HouseS, y + 3, (int)(32 * HouseS), 2, "rgba(0,0,0,0.2)");
+        if (!OldArt)
+        {
+            // The Blender model (tools/blender/buildings.py); the window glass and the mast's blinking light are drawn here.
+            float s = BuildingArt.Scale;
+            BlitArt(BuildingArt.Station, BuildingArt.StationPalette, BuildingArt.StationAnchorX, BuildingArt.StationAnchorY, x, y + 5);
+            HouseWindow(x, y + 5, x - 12, y - 15, 6, 5, "#485d56"); HouseWindow(x, y + 5, x + 6, y - 15, 6, 5, "#485d56");
+            if ((time * 1.2f) % 1 < 0.5f) pix.Rect(x - MathF.Round(12 * s), y + 5 - MathF.Round(48 * s), 1, 1, "#ff4a3a");
+            return;
+        }
         pix.Rect(x - 13, y - 5, 2, 9, "#65452e"); pix.Rect(x + 11, y - 5, 2, 9, "#65452e");
         pix.Rect(x - 15, y - 19, 30, 15, "#d8d4c8");
         pix.Rect(x - 15, y - 19, 30, 1, "#efece4");

@@ -260,7 +260,7 @@ partial class Game
     static (float bed, float wake) AnimalHours(Animal a) =>
         (20.5f * 60 + 150 * (float)Pix.Hash((int)a.HomeX, (int)a.HomeY, 411), 5 * 60 + 90 * (float)Pix.Hash((int)a.HomeY, (int)a.HomeX, 412));
     // The night birds and the tarsier are up when it's dark; the cat keeps its own hours.
-    static bool SleepsAtNight(Animal a) => a.Kind is not ("tarsier" or "hornbill" or "cat");
+    static bool SleepsAtNight(Animal a) => a.Kind is not ("tarsier" or "hornbill" or "cat" or "parrot");
 
     bool AnimalBedtime(Animal a)
     {
@@ -338,5 +338,5 @@ partial class Game
         else Toast(k.Pet + (k.Gift != null ? " It has nothing more for you today." : ""), 3);
     }
 
-    static string AnimalLabel(Animal a) => a.Kind == "dog" ? "Pet Biscuit" : $"{(a.Kind is "tarsier" or "hornbill" ? "Observe" : "Pet")} the {Items.Animals[a.Kind].Name}";
+    static string AnimalLabel(Animal a) => a.Kind == "dog" ? "Pet Biscuit" : $"{(a.Kind is "tarsier" or "hornbill" or "parrot" ? "Observe" : "Pet")} the {Items.Animals[a.Kind].Name}";
 }

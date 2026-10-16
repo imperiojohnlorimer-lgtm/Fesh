@@ -13,7 +13,7 @@ partial class Game
     // Tomas's hut, his campfire, the wreck, Tomas himself, Pip's stall, the carving at the Starwell and the fallen rocks. Only outdoors.
     List<Box> StaticSolids() => scene != "world" ? new() : new()
     {
-        new(150, 56, 20, 13),
+        new(160 - 10 * HouseS, 56, 20 * HouseS, 13),
         new(FireX - 4, FireY - 3, 9, 5),
         new(12, 144, 28, 14),
         TomasSolid ? new(tomasX - 3, tomasY - 3, 7, 3) : new(-100, -100, 0, 0),

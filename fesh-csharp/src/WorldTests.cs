@@ -23,8 +23,8 @@ partial class Game
             int Height(char kind)
             {
                 var sheet = new Pix(80, 100);
-                pix = sheet; pix.CamX = 20 * T - 40; pix.CamY = 10 * T - 80;
-                DrawTree(20, 10, kind, live: false);
+                pix = sheet; pix.CamX = 60 * T - 40; pix.CamY = 30 * T - 80;   // away from Pip's stall, where trees stay small
+                DrawTree(60, 30, kind, live: false);
                 int top = -1, bottom = -1;
                 for (int y = 0; y < 100; y++)
                     for (int x = 0; x < 80; x++)
@@ -67,6 +67,26 @@ partial class Game
         var (sw, sh) = AnimalArt.Size("sheep");
         Check($"a carabao is bigger than you (and than a sheep) ({cw}x{ch} against 14 tall, sheep {sw}x{sh})", ch >= 14 && cw >= 24 && ch > sh * 1.4f && cw > sw * 1.6f);
         Check($"the dog is no bigger than the sheep ({dw}x{dh})", dw <= sw && dh <= sh + 1);
+
+        /* ---------- Animals: parrots on the atoll, and walking (1.31) ---------- */
+        {
+            var parrots = Items.AnimalSpawns.Where(sp => sp.kind == "parrot").ToList();
+            Check($"parrots live on the atoll, on ground they can stand on ({parrots.Count})",
+                parrots.Count >= 2 && parrots.All(sp => BiomeAt((int)(sp.x / T), (int)(sp.y / T)) == 4 && CanStand(sp.x, sp.y)));
+            var parrot = new Animal { Kind = "parrot", Key = "p", X = parrots[0].x, Y = parrots[0].y };
+            Check($"you observe a parrot rather than pet it ({AnimalLabel(parrot)})", AnimalLabel(parrot) == "Observe the parrot");
+            // The four walking frames all differ from standing, and the steps from the passes.
+            Color[] Frame(string id, int f)
+            {
+                var sheet = new Pix(40, 30);
+                AnimalArt.Draw(sheet, id, 20, 25, false, f);
+                return (Color[])sheet.Buf.Clone();
+            }
+            bool Same(Color[] a, Color[] b) => a.Zip(b).All(p => p.First.Equals(p.Second));
+            var walkers = new[] { "carabao", "pig", "sheep", "goat", "dog", "cat", "chicken" };
+            var still = walkers.Where(id => Enumerable.Range(1, 4).Any(f => Same(Frame(id, 0), Frame(id, f))) || Same(Frame(id, 1), Frame(id, 3))).ToList();
+            Check($"every animal's walk moves its feet and body, frame to frame ({string.Join(", ", still)})", still.Count == 0);
+        }
 
         /* ---------- Animals: a night's sleep ---------- */
         {
@@ -216,7 +236,9 @@ partial class Game
             Check($"cacti stand taller than a person and differ ({cacti.Min()}-{cacti.Max()} px, {cacti.Distinct().Count()} heights)", cacti.Average() >= 20 && cacti.Distinct().Count() >= 4);
             Check($"bushes are bigger and differ ({bushes.Min()}-{bushes.Max()} px, {bushes.Distinct().Count()} heights)", bushes.Average() >= 11 && bushes.Distinct().Count() >= 3);
             var (shw, shh) = AnimalArt.Size("sheep"); var (pgw, pgh) = AnimalArt.Size("pig"); var (gtw, gth) = AnimalArt.Size("goat"); var (tw, th) = AnimalArt.Size("tarsier");
-            Check($"the sheep, pig and goat were scaled up beside the carabao ({shw}x{shh}, {pgw}x{pgh}, {gtw}x{gth}), the tarsier down ({tw}x{th})", shw >= 15 && shh >= 10 && pgw >= 15 && pgh >= 9 && gtw >= 14 && gth >= 11 && tw <= 8 && th <= 8);
+            // 1.31: sizes from the real animals at about 10 px a metre (you: 16 px, 1.6 m). A goat stands about a metre high.
+            var (ctw, cth) = AnimalArt.Size("cat"); var (chw, chh) = AnimalArt.Size("chicken");
+            Check($"farm animals are their real size beside you ({shw}x{shh}, {pgw}x{pgh}, {gtw}x{gth}), the cat, chicken and tarsier small ({ctw}x{cth}, {chw}x{chh}, {tw}x{th})", shw >= 13 && shh >= 9 && pgw >= 13 && pgh >= 8 && gtw >= 12 && gth >= 9 && gth <= 12 && cth <= 7 && chh <= 7 && tw <= 6 && th <= 6);
         }
         {
             // Bridges: boards belong to the run, so a long bridge isn't one tile repeated.

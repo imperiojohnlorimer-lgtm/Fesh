@@ -404,7 +404,9 @@ static class Items
         ["chicken"] = new("chicken", "chicken", 18, "The chicken clucks and lets you pat it.", "egg", "The chicken has laid an egg for you. (+1 egg)"),
         ["sheep"] = new("sheep", "sheep", 12, "The sheep leans into your hand. Its fleece is wonderfully warm.", "wool", "You gently gather some loose wool. (+1 wool)"),
         ["cat"] = new("cat", "cat", 20, "The cat allows exactly one pat.", null, null),
-        ["pig"] = new("pig", "pig", 12, "The pig snorts happily.", "truffle", "The pig snuffles in the dirt and digs up a truffle. (+1 truffle)")
+        ["pig"] = new("pig", "pig", 12, "The pig snorts happily.", "truffle", "The pig snuffles in the dirt and digs up a truffle. (+1 truffle)"),
+        // 1.31: the atoll's parrots were only ever a strange thing on your hook; now a few hop about its palms.
+        ["parrot"] = new("parrot", "parrot", 22, "You keep still. The parrot cocks its head and squawks something that sounds almost like a word.", null, null)
     };
 
     // Where animals live, in world pixels. They wander around this point.
@@ -417,7 +419,8 @@ static class Items
         ("goat", 150, 655), ("goat", 300, 640),
         ("carabao", 1605, 267), ("carabao", 1705, 247),
         ("tarsier", 1875, 577), ("tarsier", 1965, 587),
-        ("hornbill", 2075, 107), ("hornbill", 1935, 607)
+        ("hornbill", 2075, 107), ("hornbill", 1935, 607),
+        ("parrot", 1005, 335), ("parrot", 995, 205), ("parrot", 1045, 335)
     };
 }
 

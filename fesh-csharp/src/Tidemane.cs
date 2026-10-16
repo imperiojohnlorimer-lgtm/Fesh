@@ -1351,6 +1351,23 @@ partial class Game
         if (!state.Hinted("carving") && (time * 0.7f) % 1 < 0.15f) pix.Rect(X + 1, Y - 14, 1, 1, "#ffffff");
     }
 
+    // Pale coral stones set round the Starwell's rim (tools/blender/landmarks2.py), leaving the west side open, the way
+    // into the glade: where each sits, which of the three it is, and whether it's mirrored. Looks only; nothing blocks.
+    static (float x, float y, int kind, bool mirror)[] starwellStones;
+    static (float x, float y, int kind, bool mirror)[] StarwellStones()
+    {
+        if (starwellStones != null) return starwellStones;
+        var list = new List<(float, float, int, bool)>();
+        for (int i = 0; i < 14; i++)
+        {
+            float a = i / 14f * MathF.Tau + 0.2f;
+            if (MathF.Cos(a) < -0.8f) continue;   // the west, where you come in
+            float rr = (WellRim + 0.15f) * T + (float)Pix.Hash(i, 1, 77) * 3;   // on the sand just outside the water
+            list.Add((StarwellX + MathF.Cos(a) * rr, StarwellY + MathF.Sin(a) * rr + 2, (int)(Pix.Hash(i, 2, 77) * 3) % 3, Pix.Hash(i, 3, 77) < 0.5));
+        }
+        return starwellStones = list.ToArray();
+    }
+
     // The Starwell's surface: stars reflected in it, and a soft glow at night.
     void DrawStarwell(float t)
     {

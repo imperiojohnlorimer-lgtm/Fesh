@@ -33,7 +33,7 @@ partial class Game
     List<Box> MakeMlSolids()
     {
         var list = new List<Box> { new(SelaX - 16, SelaY - 22, 32, 19), new(DatumX - 3, DatumY - 3, 7, 3) };
-        list.AddRange(MlHouses.Select(h => new Box(h.x - 16, h.y - 22, 32, 19)));
+        list.AddRange(MlHouses.Select(h => new Box(h.x - 16 * HouseS, h.y - 22, 32 * HouseS, 19)));
         var (gx, gy) = MlPlace("garden");
         list.Add(new Box(gx - NurseryW / 2, gy - NurseryH, NurseryW, NurseryH - 2));
         var (sx, sy) = MlPlace("springs");
@@ -245,6 +245,7 @@ partial class Game
         var (cx, cy) = CairnAt;
         int x = (int)cx, y = (int)cy;
         pix.Rect(x - 4, y - 1, 9, 2, "rgba(0,0,0,0.18)");
+        if (!OldArt) { BlitArt(LandmarkArt.Cairn, LandmarkArt.CairnPalette, LandmarkArt.CairnAnchorX, LandmarkArt.CairnAnchorY, x, y); return; }
         pix.Rect(x - 3, y - 4, 7, 3, "#8f8a80"); pix.Rect(x - 2, y - 6, 5, 2, "#a8a398"); pix.Rect(x - 1, y - 8, 3, 2, "#c9c4b8");
     }
 
@@ -313,6 +314,15 @@ partial class Game
         var (dx, dy) = DryerAt;
         int x = (int)dx, y = (int)dy;
         pix.Rect(x - 13, y - 1, 26, 2, "rgba(0,0,0,0.18)");
+        if (!OldArt)
+        {
+            // The Blender shed (tools/blender/landmarks.py); the warm glow and the fish on the trays are drawn here.
+            float z = LandmarkArt.DryerZoom;
+            BlitArt(LandmarkArt.Dryer, LandmarkArt.DryerPalette, LandmarkArt.DryerAnchorX, LandmarkArt.DryerAnchorY, x, y);
+            if (state.Hinted("mr:springs")) pix.Rect(x - 4 * z, y - 3 * z, (int)(8 * z), 1, (int)(time * 2) % 2 == 0 ? "#e6a843" : "#d0892a");
+            if (DryerLoad > 0) for (int i = 0; i < Math.Min(DryerLoad, 3); i++) pix.Rect(x + (-3 + i * 3) * z, y - 9 * z, 2, 1, "#c9a06a");
+            return;
+        }
         pix.Rect(x - 12, y - 14, 24, 13, "#b98b52");
         for (int i = -10; i < 12; i += 4) pix.Rect(x + i, y - 13, 1, 11, "#dfbc78");
         for (int i = 0; i < 6; i++) pix.Rect(x - 14 + i, y - 20 + i, 28 - i * 2, 1, i % 2 == 0 ? "#80643e" : "#ceb36b");
@@ -331,6 +341,15 @@ partial class Game
         var (fx, fy) = MlPlace("cliff");
         int x = (int)fx - 36, y = (int)fy - 42, w = 72, hgt = 42;
         pix.Rect(x, y + hgt, w, 2, "rgba(0,0,0,0.18)");
+        if (!OldArt)
+        {
+            BlitArt(LandmarkArt.Cliff, LandmarkArt.CliffPalette, LandmarkArt.CliffAnchorX, LandmarkArt.CliffAnchorY, (int)fx, (int)fy);
+            // The loose shell in front, and the small sign: look, sketch, leave it.
+            pix.Rect((int)fx + 10, (int)fy + 4, 3, 2, "#f8f2e6"); pix.Rect((int)fx + 11, (int)fy + 4, 1, 1, "#d8a890");
+            pix.Rect((int)fx + 38, (int)fy - 4, 7, 5, "#d8c7a0"); pix.Rect((int)fx + 41, (int)fy + 1, 1, 3, "#65452e");
+            pix.Rect((int)fx + 39, (int)fy - 3, 5, 1, "#8a6a48");
+            return;
+        }
         for (int r = 0; r < hgt; r++)
         {
             // A ragged top edge, so it reads as a hillside cut, not a block.
@@ -360,6 +379,15 @@ partial class Game
     {
         var (cx, cy) = MlPlace("cave");
         int x = (int)cx, y = (int)cy;
+        if (!OldArt)
+        {
+            // The Blender hill (tools/blender/landmarks2.py); the drip and the lamp's light are drawn here.
+            pix.Rect(x - 8, y - 2, 17, 2, "rgba(0,0,0,0.2)");
+            BlitArt(LandmarkArt2.LimeCave, LandmarkArt2.LimeCavePalette, LandmarkArt2.LimeCaveAnchorX, LandmarkArt2.LimeCaveAnchorY, x, y);
+            if ((int)(time * 2) % 3 == 0) pix.Rect(x + 1, y - 12 + (int)(time * 12 % 8), 1, 1, "#9fd0e6");
+            pix.Rect(x + 8, y - 15, 3, 3, "#f3c25b"); pix.Rect(x + 9, y - 14, 1, 1, "#fff2b0");
+            return;
+        }
         for (int r = 0; r < 26; r++)
         {
             int half = 9 + r * 11 / 13;
@@ -610,10 +638,14 @@ partial class Game
     void DrawTidePost()
     {
         int x = (int)tidePostX, y = (int)tidePostY;
-        pix.Rect(x - 4, y - 2, 9, 3, "#5a5652");
-        pix.Rect(x - 3, y - 3, 7, 1, "#6f6a64");
-        for (int i = 0; i < 18; i++) pix.Rect(x, y - 3 - i, 2, 1, i / 2 % 2 == 0 ? "#f2efe6" : "#c0392b");
-        pix.Rect(x - 1, y - 21, 4, 1, "#3c342a");
+        if (!OldArt) BlitArt(LandmarkArt.TidePost, LandmarkArt.TidePostPalette, LandmarkArt.TidePostAnchorX, LandmarkArt.TidePostAnchorY, x, y);
+        else
+        {
+            pix.Rect(x - 4, y - 2, 9, 3, "#5a5652");
+            pix.Rect(x - 3, y - 3, 7, 1, "#6f6a64");
+            for (int i = 0; i < 18; i++) pix.Rect(x, y - 3 - i, 2, 1, i / 2 % 2 == 0 ? "#f2efe6" : "#c0392b");
+            pix.Rect(x - 1, y - 21, 4, 1, "#3c342a");
+        }
         // The water against it: higher up the bands the higher the tide.
         int wl = (int)MathF.Round((SeaLevel + 1) * 7);
         if (wl > 0) pix.Rect(x - 2, y - 2 - wl, 6, 1, Pal.Rgba(220, 240, 248, 0.8f));

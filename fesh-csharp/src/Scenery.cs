@@ -735,12 +735,16 @@ partial class Game
         if (live && chopTile == (tx, ty) && shakeT > 0) X += (int)MathF.Round(MathF.Sin(time * 70) * 1.5f);
         int bx = X + 5, by = Y + 9, sw = kind is 't' or 'f' or 'h' ? Sway(tx, ty) : 0;
         // Trees are properly tall now: a big oak stands three to four times as high as you do, a palm nearly as much.
-        float s = (0.9f + 0.2f * (float)Pix.Hash(tx, ty, 61)) * TreeScale(kind);
+        // Each one between 0.8 and 1.2 of the usual size, so a stand of them isn't a row of copies.
+        float s = (0.8f + 0.4f * (float)Pix.Hash(tx, ty, 61)) * TreeScale(kind);
         // Higher up Marilaya's hills the trees grow smaller, so the slope shows between them.
         if (tx >= MlStart) s *= 1 - 0.3f * Math.Clamp((MlHeight(MlLx(X + 5), MlLy(Y + 5)) - 0.28f) / 0.35f, 0, 1);
+        // Saltmere's trees round Pip's stall stay small enough not to hide its awning (the bigger trees of 1.31 covered it).
+        if (Dist(X + 5, Y + 9, PipX, PipY) < 60) s = MathF.Min(s, 1.05f);
         int m = Pix.Hash(tx, ty, 62) < 0.5 ? 1 : -1;
         var (height, half) = kind switch { 't' => (30, 12), 'f' => (31, 9), 'h' => (30, 12), 'c' => (21, 7), _ => (0, 0) };
-        height = (int)(height * TreeScale(kind)); half = (int)(half * TreeScale(kind));
+        // By this tree's own size (s), so a big one still fades when you're behind its crown.
+        height = (int)(height * s * 1.15f); half = (int)(half * s * 1.5f);
         bool Hides(float x, float y) => y < by - 1 && y > by - height && MathF.Abs(x - bx) < half;
         bool fade = live && height > 0 && scene == "world" && (Hides(player.X, player.Y) || !TomasInBed && Hides(tomasX, tomasY));
         switch (kind)
@@ -980,6 +984,7 @@ partial class Game
     // (a low wide mound, a tall one, a tuft of lobes), with the berries sitting in the shade where they show.
     void DrawBush(int tx, int ty, int bx, int by)
     {
+        if (!OldArt) { DrawLeafyBush(tx, ty, bx, by); return; }
         float s = (0.95f + 0.18f * (float)Pix.Hash(tx, ty, 63)) * 1.35f;
         int shape = (int)(Pix.Hash(tx, ty, 64) * 3) % 3, m = Pix.Hash(tx, ty, 65) < 0.5 ? 1 : -1;
         pix.Rect(bx - 8 * s, by - 1, (int)(16 * s), 2, TreeShadow);
@@ -1006,6 +1011,64 @@ partial class Game
                 pix.Rect(bx + ox, by + oy, 1, 1, calamansi ? "#9ccc3a" : "#e04b3a");
                 if (i % 2 == 0) pix.Rect(bx + ox, by + oy - 1, 1, 1, calamansi ? "#e0f08a" : "#ff9a8a");
             }
+    }
+
+    // Bushes drawn the way the oaks are (1.31), so they sit with the trees: overlapping lobes with leafy bumps round the
+    // outside, deep shade underneath, a lit crown and sunlit scallops on the upper left, and the berries (or Habagat's
+    // calamansi) tucked into the shade. About knee to waist high beside you, in four shapes by tile, mirrored at random.
+    void DrawLeafyBush(int tx, int ty, int bx, int by)
+    {
+        float s = (0.92f + 0.22f * (float)Pix.Hash(tx, ty, 63)) * 1.25f;
+        int shape = (int)(Pix.Hash(tx, ty, 64) * 4) % 4, m = Pix.Hash(tx, ty, 65) < 0.5 ? 1 : -1;
+        pix.Rect(bx - 8 * s, by - 1, (int)(16 * s), 2, TreeShadow);
+        pix.Rect(bx - 6 * s + 2, by + 1, (int)(12 * s), 1, TreeShadowSoft);
+        int sw = Sway(tx, ty) / 2;
+        (float ox, float oy, float r)[] lobes = shape switch
+        {
+            // A low wide mound.
+            0 => new[] { (-4.5f * m * s, -2.6f * s, 3.0f * s), (4 * m * s, -2.8f * s, 3.2f * s), (0, -4.6f * s, 3.8f * s), (-1 * m * s, -2.2f * s, 3.4f * s) },
+            // A tall rounded one.
+            1 => new[] { (0, -3.4f * s, 3.4f * s), (-1.4f * m * s, -7 * s, 3.0f * s), (2 * m * s, -5.6f * s, 2.9f * s), (-3 * m * s, -2.2f * s, 2.6f * s), (3 * m * s, -2.2f * s, 2.4f * s) },
+            // Three lobes in a row, the middle one high.
+            2 => new[] { (-4.6f * m * s, -2.4f * s, 2.7f * s), (0, -3.6f * s, 3.4f * s), (4.6f * m * s, -2.4f * s, 2.7f * s), (-1.6f * m * s, -6 * s, 2.7f * s), (2.2f * m * s, -5.4f * s, 2.4f * s) },
+            // A lopsided clump leaning one way.
+            _ => new[] { (-2.6f * m * s, -2.8f * s, 3.4f * s), (2.4f * m * s, -2.4f * s, 2.8f * s), (-0.8f * m * s, -5.8f * s, 3.0f * s), (3.6f * m * s, -5 * s, 2.2f * s) }
+        };
+        float Wob(float oy) => sw * Math.Clamp(0.4f - oy / (10 * s), 0.2f, 1);
+        // The silhouette, with a few leafy bumps on each lobe's outward side.
+        foreach (var l in lobes)
+        {
+            float lx = bx + l.ox + Wob(l.oy), ly = by + l.oy;
+            Disc(lx, ly + 0.8f, l.r + 1, OakLeaf[0]);
+            float outward = MathF.Atan2(l.oy + 2 * s, l.ox + 0.01f);
+            for (int i = 0; i < 3; i++)
+            {
+                float a = outward + ((float)Pix.Hash(tx, ty * 7 + i, 230 + (int)(l.ox * 3)) - 0.5f) * 2.6f, d = l.r + 0.2f;
+                Disc(lx + MathF.Cos(a) * d, ly + 0.8f + MathF.Sin(a) * d, 1.5f, OakLeaf[0]);
+                Disc(lx + MathF.Cos(a) * (d - 0.3f), ly + 0.4f + MathF.Sin(a) * (d - 0.3f), 1.0f, OakLeaf[1]);
+            }
+        }
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy), by + l.oy + 0.5f, l.r, OakLeaf[1]);
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy) - 0.6f, by + l.oy - 0.7f, l.r - 1.0f, OakLeaf[2]);
+        foreach (var l in lobes) Disc(bx + l.ox + Wob(l.oy) - 1.2f, by + l.oy - 1.8f, l.r * 0.58f, OakLeaf[3]);
+        foreach (var l in lobes)
+        {
+            float lx = bx + l.ox + Wob(l.oy) - 1.2f, ly = by + l.oy - 1.8f;
+            for (int i = 0; i < 2; i++)
+            {
+                float a = MathF.PI * (1.15f + 0.25f * i) + ((float)Pix.Hash(tx, ty, 240 + i + (int)(l.ox * 2)) - 0.5f) * 0.3f, d = l.r * 0.4f;
+                Disc(lx + MathF.Cos(a) * d, ly + MathF.Sin(a) * d * 0.9f, MathF.Max(1.0f, l.r * 0.2f), OakLeaf[4]);
+            }
+        }
+        // Berries, or little green calamansi on Habagat's bushes, in the shaded middle and lower part.
+        bool calamansi = BiomeAt(tx, ty) == 6;
+        if (state.picked.GetValueOrDefault($"{tx},{ty}") == state.day) return;
+        for (int i = 0; i < 8; i++)
+        {
+            int ox = (int)((Pix.Hash(tx, ty, 66 + i) - 0.5) * 11 * s), oy = (int)(-Pix.Hash(tx, ty, 80 + i) * 4.5 * s - 1.4 * s);
+            pix.Rect(bx + ox, by + oy, 2, 2, calamansi ? "#7fae2e" : "#b8302a");
+            pix.Rect(bx + ox, by + oy, 1, 1, calamansi ? "#c8e46a" : "#ff7a6a");
+        }
     }
 
     // Boulders: no two alike. Each tile's hash picks one of six builds (a dome, a wide slab, a tall standing stone, a pair, a

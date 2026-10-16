@@ -13,7 +13,10 @@ partial class Game
     Eclipse eclipse;
     const float BeatLen = 0.75f, BeatWindow = 0.17f;
     const int NoiseNeeded = 14;
-    const float SerpentX = 1200, SerpentY = 545;     // where Bakunawa rises, in the channel just off Parola's north shore (clear of the pier)
+    const float SerpentY = 545;
+    // Where Bakunawa rises, in the channel off Parola's north shore, its tail clear of the pier (the Blender serpent is
+    // much longer than the old one, so it rises further east).
+    static float SerpentX => OldArt ? 1200 : 1265;
 
     // What Tatay Celso needs for each stage of the mending: the stairs, the lamp housing, then the lens.
     static readonly (string what, (string id, int n)[] needs)[] ParolaStages =
@@ -185,12 +188,51 @@ partial class Game
     /* ---------- Drawing ---------- */
     // Bakunawa: a serpent of dark blue-green coils breaking the water, fins along its back, and a dragon's head holding
     // the moon in its jaws (until it spits it out).
+    // The serpent is a Blender model (tools/blender/bakunawa.py renders BakunawaArt.cs) in eight frames of its humps
+    // rolling forward; FESH_OLDART=1 draws the old hand-made one. Each pixel knows its height above the water, so rising
+    // and sinking push the whole serpent down by up to SerpentSink rows and drop whatever is under the surface.
+    const int SerpentSink = 96;
+    static (Raylib_cs.Color[] col, byte[] h)[] serpentFrames;
+
+    static (Raylib_cs.Color[] col, byte[] h) SerpentFrame(int f)
+    {
+        if (serpentFrames == null)
+        {
+            var pal = BakunawaArt.Palette.Select(Pal.C).ToArray();
+            int n = BakunawaArt.Width * BakunawaArt.Height;
+            serpentFrames = new (Raylib_cs.Color[], byte[])[BakunawaArt.Frames];
+            for (int i = 0; i < BakunawaArt.Frames; i++)
+            {
+                using var src = new MemoryStream(Convert.FromBase64String(BakunawaArt.Data[i]));
+                using var z = new System.IO.Compression.ZLibStream(src, System.IO.Compression.CompressionMode.Decompress);
+                var raw = new byte[n * 2];
+                int got = 0;
+                while (got < raw.Length) { int r = z.Read(raw, got, raw.Length - got); if (r <= 0) break; got += r; }
+                var col = new Raylib_cs.Color[n];
+                for (int p = 0; p < n; p++) col[p] = raw[p] == 255 ? default : pal[raw[p]];
+                serpentFrames[i] = (col, raw[n..]);
+            }
+        }
+        return serpentFrames[f];
+    }
+
+    // Where the moon sits in the serpent's jaws right now (world coordinates), and how far it has sunk.
+    int SerpentFrameNow(float t) => (int)(t * 5) % BakunawaArt.Frames;
+    float SerpentDepth => eclipse == null ? SerpentSink : (1 - eclipse.Rise) * SerpentSink;
+    (float x, float y) SerpentMouth(float t)
+    {
+        if (OldArt) return (SerpentX + 1, SerpentY - 22 + (1 - (eclipse?.Rise ?? 0)) * 16);
+        var m = BakunawaArt.Mouth[SerpentFrameNow(t)];
+        return (SerpentX + m.x, SerpentY + m.y + SerpentDepth);
+    }
+
     void DrawEclipse(float t)
     {
         var e = eclipse;
         if (e == null) return;
         float k = e.Rise;
         if (k <= 0 && e.Phase != "rise") return;
+        if (!OldArt) { DrawSerpent(e, t); return; }
         int sink = (int)MathF.Round((1 - k) * 16);
         int x = (int)SerpentX, y = (int)SerpentY + sink;
         void Coil(float cx, float r, float ph)
@@ -231,6 +273,46 @@ partial class Game
             float mx = x + m * 30, my = hy - m * 120;
             pix.Glow(mx, my, 16, Pal.Rgba(255, 246, 208, 0.5f * (1 - m * 0.5f)));
             pix.Rect(mx - 3, my - 3, 7, 7, "#fff6d0");
+        }
+    }
+
+    void DrawSerpent(Eclipse e, float t)
+    {
+        int f = SerpentFrameNow(t);
+        var (col, h) = SerpentFrame(f);
+        int d = (int)MathF.Round(SerpentDepth);
+        int ox = (int)SerpentX - BakunawaArt.AnchorX, oy = (int)SerpentY - BakunawaArt.AnchorY + d;
+        int w = BakunawaArt.Width;
+        for (int j = 0; j < BakunawaArt.Height; j++)
+            for (int i = 0; i < w; i++)
+            {
+                int p = j * w + i;
+                if (col[p].A == 0 || h[p] <= d) continue;
+                pix.Rect(ox + i, oy + j, 1, 1, col[p]);
+            }
+        // Foam where the body breaks the surface, and round the neck.
+        var foam = Pal.Rgba(235, 248, 252, 0.6f * Math.Min(1, e.Rise * 1.5f));
+        foreach (var (sx, sy) in BakunawaArt.Splash[f].Append((22, 0)))
+        {
+            float r = 3 + MathF.Sin(t * 3 + sx * 0.1f) * 0.6f;
+            pix.Ring(SerpentX + sx, SerpentY + sy + 1, r, foam);
+            pix.Ring(SerpentX + sx, SerpentY + sy + 1, r + 3, Pal.Rgba(235, 248, 252, 0.25f * Math.Min(1, e.Rise * 1.5f)));
+        }
+        var (mx, my) = SerpentMouth(t);
+        if (e.Phase is "rise" or "bang" && -BakunawaArt.Mouth[f].y > d - 4)
+        {
+            // The moon, glowing in its jaws.
+            pix.Glow(mx, my, 18, Pal.Rgba(255, 246, 208, 0.45f));
+            pix.Rect(mx - 4, my - 3, 9, 7, "#fff6d0"); pix.Rect(mx - 3, my - 4, 7, 9, "#fff6d0");
+            pix.Rect(mx - 1, my - 2, 2, 2, "#e8dcae"); pix.Rect(mx + 2, my + 1, 1, 1, "#e8dcae");
+        }
+        else if (e.Phase == "spit")
+        {
+            // The moon flies up and away.
+            float m = Math.Min(1, e.T / 1.5f);
+            float fx = mx + m * 40, fy = my - m * 140;
+            pix.Glow(fx, fy, 18, Pal.Rgba(255, 246, 208, 0.5f * (1 - m * 0.5f)));
+            pix.Rect(fx - 4, fy - 4, 9, 9, "#fff6d0");
         }
     }
 
@@ -278,22 +360,24 @@ partial class Game
     void LightEclipse()
     {
         if (eclipse == null) return;
-        float sink = (1 - eclipse.Rise) * 16;
-        LightHole(SerpentX, SerpentY - 18 + sink, 76, 0.8f);
+        if (OldArt) { LightHole(SerpentX, SerpentY - 18 + (1 - eclipse.Rise) * 16, 76, 0.8f); return; }
+        var (mx, my) = SerpentMouth(time);
+        LightHole(SerpentX - 50, SerpentY - 25 + SerpentDepth, 175, 1f);
+        LightHole(mx, my, 40, 0.9f);
     }
 
     void GlowEclipse(float k)
     {
         if (eclipse?.Phase is not ("rise" or "bang")) return;
-        float sink = (1 - eclipse.Rise) * 16;
-        pix.Glow(SerpentX + 1, SerpentY - 22 + sink, 20, Pal.Rgba(255, 246, 208, 0.45f * k));
+        var (mx, my) = SerpentMouth(time);
+        pix.Glow(mx, my, OldArt ? 20 : 26, Pal.Rgba(255, 246, 208, 0.45f * k));
     }
 
     // The lighthouse beam sweeping round after dark.
     void LightParola(float t)
     {
         if (state.parola < 3 || Math.Abs(LighthouseX - player.X) > 420 || Math.Abs(LighthouseY - player.Y) > 300) return;
-        float lx = LighthouseX, ly = LighthouseY - 44, a = t * 0.7f;
+        float lx = LighthouseX, ly = LighthouseY - LampRise, a = t * 0.7f;
         LightHole(lx, ly, 18, 0.95f);
         for (int i = 1; i <= 8; i++)
             LightHole(lx + MathF.Cos(a) * i * 22, ly + MathF.Sin(a) * i * 13, 8 + i * 2.5f, 0.75f - i * 0.06f);
@@ -303,7 +387,7 @@ partial class Game
     void GlowParola(float t, float k)
     {
         if (state.parola < 3 || Math.Abs(LighthouseX - player.X) > 420 || Math.Abs(LighthouseY - player.Y) > 300) return;
-        float lx = LighthouseX, ly = LighthouseY - 44, a = t * 0.7f;
+        float lx = LighthouseX, ly = LighthouseY - LampRise, a = t * 0.7f;
         pix.Glow(lx, ly, 14, Pal.Rgba(255, 226, 138, 0.45f * k));
         for (int i = 1; i <= 9; i++)
             pix.Glow(lx + MathF.Cos(a) * i * 20, ly + MathF.Sin(a) * i * 12, 4 + i * 1.6f, Pal.Rgba(255, 238, 180, (0.2f - i * 0.016f) * k));

@@ -464,5 +464,24 @@ partial class Game
         pix = keep;
         mountGlints.Clear();
     }
+
+    // FESH_POSTER_ART=folder: the gold cards' portraits (bosses, legends, the story scenes) at 4x, one PNG each.
+    void ExportPosterArt(string dir)
+    {
+        Directory.CreateDirectory(dir);
+        const int pw = 1520, ph = 880;
+        foreach (var id in new[] { "tidemane", "platejaw", "bakunawa", "marlin", "leviathan", "abyssal", "coelacanth", "tsunami", "magayon", "marilaya" })
+        {
+            var card = GenImageColor(pw, ph, Color.Black);
+            var g = new VCanvas(pw, ph) { ShadowScale = 4 };
+            g.Scale(4);
+            CreatureArt.Scene(g, pw / 4f, ph / 4f, id, false);
+            var px = g.ToColors();
+            for (int yy = 0; yy < ph; yy++)
+                for (int xx = 0; xx < pw; xx++) ImageDrawPixel(ref card, xx, yy, px[yy * pw + xx]);
+            ExportImage(card, Path.Combine(dir, id + ".png"));
+            UnloadImage(card);
+        }
+    }
 }
 #endif

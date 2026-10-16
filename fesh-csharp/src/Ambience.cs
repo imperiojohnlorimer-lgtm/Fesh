@@ -251,7 +251,7 @@ partial class Game
     void DrawBuildingShadows()
     {
         bool Near(float x, float y) => x > camX - 60 && x < camX + W + 60 && y > camY - 40 && y < camY + H + 60;
-        void Bahay(float x, float y) { if (Near(x, y)) BuildingShadow((int)x - 17, (int)y + 3, 34, 18); }
+        void Bahay(float x, float y) { if (Near(x, y)) BuildingShadow((int)(x - 17 * HouseS), (int)y + 3, (int)(34 * HouseS), (int)(18 * HouseS)); }
         foreach (var n in Islanders) if (n.id is not ("isay" or "ben")) Bahay(n.x, n.y - 5);
         foreach (var n in HabagatFolk) if (n.house) Bahay(n.x, n.y - 5);
         if (InMarilayaBox(player.X, player.Y))
@@ -259,9 +259,9 @@ partial class Game
             Bahay(SelaX, SelaY - 5);
             foreach (var (hx, hy, _) in MlHouses) Bahay(hx, hy - 5);
         }
-        if (Near(160, 68)) BuildingShadow(150, 68, 21, 14);
+        if (Near(160, 68)) BuildingShadow((int)(160 - 10 * HouseS), 68, (int)(21 * HouseS), (int)(14 * HouseS));
         foreach (var b in state.builds)
-            if (b.id is "shack" or "kubo" && Near(b.x * T, b.y * T)) BuildingShadow(b.x * T, b.y * T + 9, 20, b.id == "kubo" ? 16 : 14);
+            if (b.id is "shack" or "kubo" && Near(b.x * T, b.y * T)) BuildingShadow((int)(b.x * T + 10 - 10 * HouseS), b.y * T + 9, (int)(20 * HouseS), (int)((b.id == "kubo" ? 16 : 14) * HouseS));
     }
 
     /* ---------- Buildings ---------- */

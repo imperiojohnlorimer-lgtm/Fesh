@@ -18,6 +18,7 @@ partial class Game
     {
         // FESH_SPRITES=file.png draws the people and boats in every pose to a zoomed sheet and quits (no saves touched).
         if (Environment.GetEnvironmentVariable("FESH_SPRITES") is { Length: > 0 } sheet) { ExportSprites(sheet); quit = true; return; }
+        if (Environment.GetEnvironmentVariable("FESH_POSTER_ART") is { Length: > 0 } pad) { ExportPosterArt(pad); quit = true; return; }
         testDir = Environment.GetEnvironmentVariable("FESH_AUTOTEST");
         if (string.IsNullOrEmpty(testDir)) return;
         Directory.CreateDirectory(testDir);
@@ -41,7 +42,9 @@ partial class Game
         standStill = true;
         // People's own blinking would make pixel checks on faces depend on the moment (the scenery shots keep it).
         LookData.AutoBlink = Environment.GetEnvironmentVariable("FESH_SCENIC") == "1";
-        script = Environment.GetEnvironmentVariable("FESH_SCENIC") == "1" ? ScenicScript().GetEnumerator()
+        script = Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster2" ? Poster2Script().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster" ? PosterScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_SCENIC") == "1" ? ScenicScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_SCENIC") == "checks" ? GraphicsScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MARILAYA_TEST") == "1" ? MarilayaScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MARILAYA_TEST") == "review" ? MarilayaReviewScript().GetEnumerator()
@@ -118,6 +121,7 @@ partial class Game
         ExportSeaSprites(path);
         ExportToolSprites(path);
         ExportDirectionSprites(path);
+        ExportLighthouseSprites(path);
         var keep = pix;
         var sheet = new Pix(W, H);
         pix = sheet;
@@ -404,7 +408,8 @@ partial class Game
         Check("lantern and campfire placed", state.builds.Any(b => b.id == "lantern") && state.builds.Any(b => b.id == "campfire"));
 
         // Shack in open ground, then mouse hover ghost
-        player.X = 140; player.Y = 135; player.Face = "up";
+        // (x 125: since 1.31.1 a berry bush stands at tile 15,12, which a shack from x 140 would have overlapped.)
+        player.X = 125; player.Y = 135; player.Face = "up";
         Inp.Tap(KeyboardKey.Six); yield return 3; Inp.Tap(KeyboardKey.E); yield return 3;
         Check("shack placed", state.builds.Any(b => b.id == "shack"));
         Inp.Tap(KeyboardKey.Two); yield return 2;
@@ -749,7 +754,8 @@ partial class Game
         int bedWool = Has("wool");
         state.builds.RemoveAll(b => b.id == "shack");
         state.builds.Add(new Build { id = "shack", x = 14, y = 12 }); ReindexBuilds();
-        player.X = 140; player.Y = 135; player.Face = "up";
+        // (x 125: since 1.31.1 a berry bush stands at tile 15,12, which a shack from x 140 would have overlapped.)
+        player.X = 125; player.Y = 135; player.Face = "up";
         Inp.Tap(KeyboardKey.B); yield return 3; Inp.Tap(KeyboardKey.X); yield return 2; Inp.Tap(KeyboardKey.E); yield return 3;
         Check($"taking down the shack refunds its furniture (wool {bedWool} -> {Has("wool")})", !state.rooms.ContainsKey("house:14,12") && Has("wool") == bedWool + 4);
         Inp.Tap(KeyboardKey.Escape); yield return 3;

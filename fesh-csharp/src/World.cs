@@ -580,6 +580,13 @@ partial class Game
     void DrawHut()
     {
         pix.Rect(150, 68, 21, 3, "rgba(0,0,0,0.2)");
+        if (!OldArt)
+        {
+            BlitArt(BuildingArt.Hut, BuildingArt.HutPalette, BuildingArt.HutAnchorX, BuildingArt.HutAnchorY, 160, 69);
+            HouseWindow(160, 69, 164, 60, 3, 3, "#bfe0ea");
+            DrawHutSmoke(160 + 5 * BuildingArt.Scale, 69 - 24 * BuildingArt.Scale);
+            return;
+        }
         pix.Rect(151, 57, 18, 12, "#9a6a3a");
         pix.Rect(166, 57, 3, 12, "rgba(40,20,10,0.25)");
         foreach (int y in new[] { 60, 63, 66 }) pix.Rect(151, y, 18, 1, "#7a5230");
@@ -597,10 +604,15 @@ partial class Game
         pix.Rect(151, 58, 18, 1, "rgba(40,20,10,0.3)");
         // A stone chimney with smoke curling away on the wind.
         pix.Rect(164, 47, 3, 6, "#7d8288"); pix.Rect(164, 47, 3, 1, "#9aa0a5");
+        DrawHutSmoke(165, 45);
+    }
+
+    void DrawHutSmoke(float cx, float cy)
+    {
         for (int k = 0; k < 4; k++)
         {
             float ph = (time * 0.35f + k * 0.25f) % 1;
-            float sx = 165 + ph * 6 + MathF.Sin(ph * 6 + k) * 1.5f, sy = 45 - ph * 14;
+            float sx = cx + ph * 6 + MathF.Sin(ph * 6 + k) * 1.5f, sy = cy - ph * 14;
             int r = ph < 0.3f ? 1 : 2;
             pix.Rect(sx - r / 2, sy, r + 1, r, Pal.Rgba(225, 228, 232, 0.55f * (1 - ph)));
         }
@@ -788,6 +800,13 @@ partial class Game
     void DrawWreck()
     {
         pix.Rect(12, 155, 30, 3, "rgba(0,0,0,0.18)");
+        if (!OldArt)
+        {
+            BlitArt(LandmarkArt.Wreck, LandmarkArt.WreckPalette, LandmarkArt.WreckAnchorX, LandmarkArt.WreckAnchorY, 27, 156);
+            pix.Rect(14, 156, 26, 1, "#cfe8ee");   // the wash along its side
+            DrawHatch();
+            return;
+        }
         for (int i = 0; i < 9; i++) pix.Rect(14 + i, 150 - i / 3, 26 - i * 2, 1, i % 2 == 1 ? "#4a2f1d" : "#5b3a24");
         pix.Rect(14, 150, 26, 6, "#5b3a24");
         pix.Rect(14, 152, 26, 1, "#7a5230");
@@ -849,6 +868,13 @@ partial class Game
     void DrawShack(int X, int Y)
     {
         pix.Rect(X, Y + 9, 20, 1, "rgba(0,0,0,0.2)");
+        if (!OldArt)
+        {
+            // The Blender model (tools/blender/buildings.py); the windows are painted here, lit after dark.
+            BlitArt(BuildingArt.Shack, BuildingArt.ShackPalette, BuildingArt.ShackAnchorX, BuildingArt.ShackAnchorY, X + 10, Y + 9);
+            HouseWindow(X + 10, Y + 9, X + 3, Y + 1, 3, 3, "#bfe0ea"); HouseWindow(X + 10, Y + 9, X + 14, Y + 1, 3, 3, "#bfe0ea");
+            return;
+        }
         pix.Rect(X + 1, Y - 3, 18, 12, "#a8794a");
         pix.Rect(X + 16, Y - 3, 3, 12, "rgba(40,20,10,0.22)");
         foreach (int o in new[] { 0, 3, 6 }) pix.Rect(X + 1, Y + o, 18, 1, "#8a5f36");
@@ -867,6 +893,12 @@ partial class Game
     void DrawKubo(int X, int Y)
     {
         pix.Rect(X, Y + 9, 20, 1, "rgba(0,0,0,0.2)");
+        if (!OldArt)
+        {
+            BlitArt(BuildingArt.Kubo, BuildingArt.KuboPalette, BuildingArt.KuboAnchorX, BuildingArt.KuboAnchorY, X + 10, Y + 10);
+            HouseWindow(X + 10, Y + 10, X + 3, Y - 4, 3, 3, "#3a3024"); HouseWindow(X + 10, Y + 10, X + 14, Y - 4, 3, 3, "#3a3024");
+            return;
+        }
         foreach (int sx in new[] { 2, 7, 12, 17 }) { pix.Rect(X + sx, Y + 3, 1, 7, "#6b4a2b"); pix.Rect(X + sx, Y + 3, 1, 1, "#8a6440"); }
         pix.Rect(X + 1, Y + 2, 18, 2, "#a8844e");
         pix.Rect(X + 2, Y - 6, 16, 8, "#d9bf86");
@@ -1142,7 +1174,8 @@ partial class Game
         // Once it has bedded down for the night (UpdateAnimals) it lies curled up until morning, with the odd z drifting up.
         bool asleep = a.Asleep && a.Hearts <= 0;
         if (asleep) pose = 3;
-        AnimalArt.Draw(pix, a.Kind, a.X, a.Y, a.Flip, moving ? (int)(time * 8) % 2 : 0, pose);
+        // Walking runs four frames (step, pass, step, pass); faster for the small quick ones.
+        AnimalArt.Draw(pix, a.Kind, a.X, a.Y, a.Flip, moving ? 1 + (int)(time * (a.Kind is "chicken" or "cat" or "dog" ? 12 : 8)) % 4 : 0, pose);
         if (asleep)
         {
             float zt = (time * 0.6f + a.HomeX * 0.07f) % 3f;
@@ -1168,6 +1201,13 @@ partial class Game
     {
         int X = (int)PipX - 11, Y = (int)PipY - 15;
         pix.Rect(X + 1, Y + 24, 22, 2, "rgba(0,0,0,0.22)");
+        if (!OldArt)
+        {
+            // The Blender stall (tools/blender/landmarks.py), with the canvas over the goods after hours.
+            if (PipOpen) BlitArt(LandmarkArt.Stall, LandmarkArt.StallPalette, LandmarkArt.StallAnchorX, LandmarkArt.StallAnchorY, (int)PipX, (int)PipY + 9);
+            else BlitArt(LandmarkArt.StallCovered, LandmarkArt.StallCoveredPalette, LandmarkArt.StallCoveredAnchorX, LandmarkArt.StallCoveredAnchorY, (int)PipX, (int)PipY + 9);
+            return;
+        }
         pix.Rect(X + 1, Y + 2, 2, 23, "#6b4a2b"); pix.Rect(X + 19, Y + 2, 2, 23, "#6b4a2b");
         for (int i = 0; i < 6; i++) pix.Rect(X + i * 4, Y, 4, 5, i % 2 == 0 ? "#e04b3a" : "#f2efe6");
         for (int i = 0; i < 6; i++) pix.Rect(X + i * 4 + 1, Y + 5, 2, 1, i % 2 == 0 ? "#b5523b" : "#d6d1c4");
@@ -1186,6 +1226,14 @@ partial class Game
     void DrawCaveMouth()
     {
         int cx = MouthX * T + 10, baseY = MouthY * T + 20;     // the middle of the foot of the hill
+        if (!OldArt)
+        {
+            // The Blender hill (tools/blender/landmarks.py), a quarter bigger; the cold air is still drawn here.
+            for (int dy = -1; dy <= 2; dy++) pix.Rect(cx - 18, baseY + dy, 42 - Math.Abs(dy) * 2, 1, Pal.Rgba(60, 86, 110, 0.22f));
+            BlitArt(LandmarkArt.CaveMouth, LandmarkArt.CaveMouthPalette, LandmarkArt.CaveMouthAnchorX, LandmarkArt.CaveMouthAnchorY, cx, baseY);
+            DrawCaveAir(cx, baseY);
+            return;
+        }
         const int H = 27, halfMax = 15;
         Color Outline = Pal.C("#27343d"), Dk = Pal.C("#475a67"), Md = Pal.C("#6c7f8c"), Lt = Pal.C("#94a7b3"), Hi = Pal.C("#c0d0d9");
         Color SnowL = Pal.C("#f4f9fb"), SnowM = Pal.C("#dbe8ef"), SnowD = Pal.C("#b7ccda");
@@ -1262,13 +1310,22 @@ partial class Game
         }
         for (int i = 0; i < 16; i++)
             pix.Rect(cx - 8 + i + (Pix.Hash(i, 4, 570) < 0.5 ? 0 : 1), baseY + 1 + (int)(Pix.Hash(i, 5, 570) * 3), 1 + (i % 3 == 0 ? 1 : 0), 1, Pal.Rgba(150, 170, 186, 0.45f));
-        // Cold air creeping out and rising from the dark: slow pale wisps.
+        DrawCaveAir(cx, baseY);
+    }
+
+    // Cold air creeping out of the cave and rising from the dark: slow pale wisps.
+    void DrawCaveAir(int cx, int baseY)
+    {
         for (int k = 0; k < 4; k++)
         {
             float ph = (time * 0.16f + k * 0.25f) % 1;
             float wx = cx - 4 + k * 3 + MathF.Sin(ph * 5 + k) * 3 + ph * 4, wy = baseY - 2 - ph * 14;
-            var wc = Pal.Rgba(225, 238, 246, 0.26f * MathF.Sin(ph * MathF.PI));
-            pix.Rect(wx - 2, wy, 5 + (int)(ph * 4), 2, wc);
+            // A soft puff, not a bar: a faint core with fainter, shorter rows above and below it.
+            float a = 0.16f * MathF.Sin(ph * MathF.PI);
+            int len = 4 + (int)(ph * 4);
+            pix.Rect(wx - 2, wy, len, 1, Pal.Rgba(225, 238, 246, a));
+            pix.Rect(wx - 1, wy - 1, len - 2, 1, Pal.Rgba(225, 238, 246, a * 0.6f));
+            pix.Rect(wx, wy + 1, len - 3, 1, Pal.Rgba(225, 238, 246, a * 0.5f));
         }
     }
 
@@ -1281,7 +1338,7 @@ partial class Game
             if (Visible(tx * T, ty * T)) list.Add((ty * T + 9, () => DrawTree(tx, ty, kind)));
         foreach (var b in state.builds)
             if (b.id != "path" && Visible(b.x * T, b.y * T)) list.Add((b.y * T + 9, () => DrawBuild(b, t)));
-        foreach (var c in critters) list.Add((c.Y, () => AnimalArt.Draw(pix, c.Id, c.X, c.Y, c.Vx < 0, (int)(c.T * 10) % 2)));
+        foreach (var c in critters) list.Add((c.Y, () => AnimalArt.Draw(pix, c.Id, c.X, c.Y, c.Vx < 0, 1 + (int)(c.T * 10) % 4)));
         foreach (var a in animals)
             if (Visible(a.X, a.Y)) list.Add((a.Y, () => DrawAnimal(a)));
         if (Visible(MouthX * T, MouthY * T)) list.Add(((MouthY + 2) * T, DrawCaveMouth));
@@ -1301,6 +1358,11 @@ partial class Game
         }
         if (Visible(160, 60)) { list.Add((69, DrawHut)); list.Add((FireY + 2, () => DrawFire(t))); }
         if (Visible(CarvingX, CarvingY)) list.Add((CarvingY, DrawCarving));
+        if (!OldArt && Visible(StarwellX, StarwellY))
+            foreach (var (sx, sy, k, m) in StarwellStones())
+                list.Add((sy, () => BlitArt(k == 0 ? LandmarkArt2.RimStone0 : k == 1 ? LandmarkArt2.RimStone1 : LandmarkArt2.RimStone2,
+                    k == 0 ? LandmarkArt2.RimStone0Palette : k == 1 ? LandmarkArt2.RimStone1Palette : LandmarkArt2.RimStone2Palette,
+                    LandmarkArt2.RimStone0AnchorX, LandmarkArt2.RimStone0AnchorY, (int)sx, (int)sy, mirror: m)));
         if (state.tamed && !state.riding && (call != null || Visible(state.mountX, state.mountY))) list.Add((call is { Phase: not "whistle" } ? call.Y : state.mountY, DrawMountIdle));
         if (boss != null) list.Add((boss.Y, () => DrawBoss(t)));
         if (!TomasInBed) list.Add((tomasY, DrawTomas));
@@ -1344,7 +1406,19 @@ partial class Game
             {
                 pix.Rect(bx - 2 + MathF.Round(MathF.Sin(t * 20)), by - 1, 1, 1, "#ffffff");
                 pix.Rect(bx + 2 + MathF.Round(MathF.Cos(t * 17)), by - 2, 1, 1, "#ffffff");
-                if (reel?.Leap > 0)
+                if (reel?.Leap > 0 && !OldArt && reel.Roll?.Id == TowFish)
+                {
+                    // Ironbill clears the water in a long arc (tools/blender/landmarks2.py): nose up as it rises, level at the
+                    // top, nose down into the splash.
+                    float k = 1 - reel.Leap / reel.LeapLen, jx = bx + (k - 0.5f) * 30, jy = by - MathF.Sin(k * MathF.PI) * 22;
+                    var (g, pal, ax, ay) = k < 0.36f ? (LandmarkArt2.MarlinUp, LandmarkArt2.MarlinUpPalette, LandmarkArt2.MarlinUpAnchorX, LandmarkArt2.MarlinUpAnchorY)
+                        : k < 0.64f ? (LandmarkArt2.MarlinTop, LandmarkArt2.MarlinTopPalette, LandmarkArt2.MarlinTopAnchorX, LandmarkArt2.MarlinTopAnchorY)
+                        : (LandmarkArt2.MarlinDown, LandmarkArt2.MarlinDownPalette, LandmarkArt2.MarlinDownAnchorX, LandmarkArt2.MarlinDownAnchorY);
+                    BlitArt(g, pal, ax, ay, (int)jx, (int)jy);
+                    if (k < 0.15f || k > 0.85f)
+                        for (int s = 0; s < 6; s++) pix.Rect(bx + (k < 0.5f ? -15 : 15) + (s - 3) * 2, by - (s % 3), 1, 1, "#eef9fb");
+                }
+                else if (reel?.Leap > 0)
                 {
                     // The fish leaps clear of the water at the end of the line.
                     float k = 1 - reel.Leap / reel.LeapLen, jx = bx + (k - 0.5f) * 8, jy = by - MathF.Sin(k * MathF.PI) * 10;
@@ -1549,7 +1623,7 @@ partial class Game
         int sw = SCols * T, sh = SRows * T;
         // Under Bakunawa the view frames you and the serpent out in the channel together.
         float fx = player.X, fy = player.Y - 8;
-        if (eclipse != null && scene == "world") { fx = (player.X + SerpentX) / 2; fy = (player.Y - 8 + SerpentY - 12) / 2; }
+        if (eclipse != null && scene == "world") { fx = (player.X + SerpentX) / 2; fy = (player.Y - 8 + SerpentY - (OldArt ? 12 : 60)) / 2; }
         camX = sw <= W ? -(W - sw) / 2 : Math.Clamp((int)MathF.Round(fx) - W / 2, 0, sw - W);
         camY = sh <= H ? -(H - sh) / 2 : Math.Clamp((int)MathF.Round(fy) - H / 2, 0, sh - H);
         // Big impacts (Tidemane landing, charging into a palm, stomping) shake the view, unless that is turned off in Settings.

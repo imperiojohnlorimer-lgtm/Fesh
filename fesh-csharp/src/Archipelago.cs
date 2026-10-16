@@ -67,6 +67,9 @@ partial class Game
                 // Baga's cone stands on bare ground (Magayon.cs), and the lahar channel is kept clear.
                 float cdx = (x * T + 5 - ConeX) / 74f, cdy = (y * T + 5 - (ConeBaseY - 22)) / 40f;
                 if (cdx * cdx + cdy * cdy < 1 || ChannelDist(x * T + 5, y * T + 5) < 10) continue;
+                // Nothing grows where Luntian's karst towers stand, or just behind them, where a palm's fronds would poke out
+                // round the rock as if it grew inside it.
+                if (Karsts.Any(k => Math.Abs(x * T + 5 - k.x) < 26 && y * T + 5 - k.y > -64 && y * T + 5 - k.y < 14)) continue;
                 double roll = Pix.Hash(x, y, 183);
                 char kind = roll < .12 ? 'h' : roll < .16 ? 'R' : '\0';
                 if (kind == '\0') continue;
@@ -200,7 +203,7 @@ partial class Game
         }
     }
 
-    IEnumerable<Box> IslandSolids() => Islanders.Select(n => n.id == "isay" ? new Box(n.x - 23, n.y - 24, 46, 21) : new Box(n.x - 16, n.y - 22, 32, 19))
+    IEnumerable<Box> IslandSolids() => Islanders.Select(n => n.id == "isay" ? new Box(n.x - 23 * HouseS, n.y - 24, 46 * HouseS, 21) : new Box(n.x - 16 * HouseS, n.y - 22, 32 * HouseS, 19))
         .Append(SchoolBenchBox)
         .Concat(new[] { new Box(2073, 97, 24, 10), new Box(1983, 131, 24, 10), new Box(ConeX - 52, ConeBaseY - 28, 104, 28),
             new Box(AlertBoardX - 7, AlertBoardY - 2, 15, 3), new Box(EvacTableX - 7, EvacTableY - 3, 15, 3), new Box(CrateX - 6, CrateY - 3, 13, 3) })
@@ -208,8 +211,7 @@ partial class Game
 
     void AddArchipelagoObjects(List<(float y, Action draw)> list)
     {
-        list.Add((107, () => DrawKarst(2085, 107, 41)));
-        list.Add((141, () => DrawKarst(1995, 141, 32)));
+        foreach (var k in Karsts) list.Add((k.y, () => DrawKarst(k.x, k.y, k.h)));
         list.Add((ConeBaseY, DrawBagaCone));
         if (RondallaOut) AddRondalla(list);
         if (FestivalHere) AddFestival(list);
@@ -283,10 +285,20 @@ partial class Game
 
     // A limestone tower like the real karsts of El Nido: a rounded top under a cap of forest, steep fluted sides lit from
     // the west, shrubs clinging to the ledges, and fallen blocks at its foot.
+    // Luntian's two limestone towers: where each stands (its foot) and how tall the old drawing made it.
+    static readonly (float x, float y, int h)[] Karsts = { (2085, 107, 41), (1995, 141, 32) };
+
     void DrawKarst(float x, float y, int height)
     {
         int X = (int)x, Y = (int)y, top = Y - height;
         pix.Rect(X - 13, Y - 1, 28, 3, "rgba(18,46,40,0.22)");
+        if (!OldArt)
+        {
+            // The Blender towers (tools/blender/karst.py), a third taller than the old drawings, on the same footprint.
+            if (height >= 40) BlitArt(KarstArt.Tall, KarstArt.TallPalette, KarstArt.TallAnchorX, KarstArt.TallAnchorY, X, Y);
+            else BlitArt(KarstArt.Short, KarstArt.ShortPalette, KarstArt.ShortAnchorX, KarstArt.ShortAnchorY, X, Y);
+            return;
+        }
         for (int row = 0; row < height; row++)
         {
             float k = row / (float)height;
@@ -319,10 +331,57 @@ partial class Game
         pix.Rect(X - 9, Y - 3, 3, 2, "#4f8a3c"); pix.Rect(X - 8, Y - 4, 1, 1, "#6aa84f");
     }
 
+    // Draws a grid rendered from a Blender model (tools/blender): letters index the palette, '.' is clear, and X, Y, Z
+    // (a special material's shade, base and light) take `special`. The grid's anchor lands on (x, y).
+    void BlitArt(string[] grid, string[] palette, int ax, int ay, int x, int y, Color[] special = null, bool mirror = false) =>
+        BlitArtTo(pix, grid, palette, ax, ay, x, y, special, mirror);
+
+    // The same into any picture (the cave's baked floor), mirrored about the anchor's column if asked.
+    static void BlitArtTo(Pix p, string[] grid, string[] palette, int ax, int ay, int x, int y, Color[] special = null, bool mirror = false)
+    {
+        int oy = y - ay;
+        for (int j = 0; j < grid.Length; j++)
+        {
+            string row = grid[j];
+            for (int i = 0; i < row.Length; i++)
+            {
+                char ch = row[i];
+                if (ch == '.') continue;
+                int g = ch switch { 'X' => 0, 'Y' => 1, 'Z' => 2, _ => -1 };
+                int px = mirror ? x - (i - ax) : x + (i - ax);
+                if (g >= 0) { if (special != null) p.Rect(px, oy + j, 1, 1, special[g]); }
+                else p.Rect(px, oy + j, 1, 1, palette[ch - 'a']);
+            }
+        }
+    }
+
+    // A special material's three tones (shade, base, light) from one colour.
+    static Color[] Tones3(string hex) => new[] { Pix.Mix(Pal.C(hex), Pal.C("#140f12"), 0.35f), Pal.C(hex), Pix.Mix(Pal.C(hex), Pal.C("#ffffff"), 0.3f) };
+
+    // The Blender houses are drawn BuildingArt.Scale times the size of the old drawings, about the middle of their front
+    // wall on the ground; HouseS is that scale (1 with the old art), for their collision boxes and shadows.
+    static float HouseS => OldArt ? 1 : BuildingArt.Scale;
+
+    // A window laid out on the old drawing at (x, y, w, h), moved and sized with the house round its anchor (ax, ay).
+    void HouseWindow(int ax, int ay, int x, int y, int w, int h, string day)
+    {
+        float s = BuildingArt.Scale;
+        Window(ax + (int)MathF.Round((x - ax) * s), ay + (int)MathF.Round((y - ay) * s), (int)MathF.Round(w * s), (int)MathF.Round(h * s), day);
+    }
+
     void DrawBahay(float x, float y, string trim)
     {
         // Raised timber walls, woven panels and a broad thatched roof, lit from the west, casting its shadow east.
         pix.Rect(x - 17, y + 3, 34, 2, "rgba(0,0,0,0.2)");
+        if (!OldArt)
+        {
+            // The Blender model (tools/blender/buildings.py), its foot band in the resident's colour.
+            var tones = new[] { Pix.Mix(Pal.C(trim), Pal.C("#1a1410"), 0.3f), Pal.C(trim), Pix.Mix(Pal.C(trim), Pal.C("#fff4dc"), 0.25f) };
+            BlitArt(BuildingArt.Bahay, BuildingArt.BahayPalette, BuildingArt.BahayAnchorX, BuildingArt.BahayAnchorY, (int)x, (int)y + 5, tones);
+            HouseWindow((int)x, (int)y + 5, (int)x - 13, (int)y - 12, 7, 6, "#485d56"); HouseWindow((int)x, (int)y + 5, (int)x + 7, (int)y - 12, 6, 6, "#485d56");
+            pix.Rect(x + 12, y + 1, 3, 2, "#a0522d"); pix.Rect(x + 12, y - 1, 3, 2, "#4f8a3c"); pix.Rect(x + 13, y - 2, 1, 1, "#6aa84f");
+            return;
+        }
         pix.Rect(x - 14, y - 5, 2, 10, "#65452e"); pix.Rect(x + 12, y - 5, 2, 10, "#65452e");
         pix.Rect(x - 16, y - 19, 32, 19, "#b98b52");
         for (int i = -14; i < 16; i += 4) pix.Rect(x + i, y - 18, 1, 16, "#dfbc78");

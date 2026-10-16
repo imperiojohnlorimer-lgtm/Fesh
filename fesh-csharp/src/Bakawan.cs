@@ -148,6 +148,10 @@ partial class Game
         return ph < 0.2f ? 1 - ph / 0.2f : 0;
     }
 
+    // How high the crown sits over the roots, and how much bigger it is than the old drawing's (the Blender tree is bigger).
+    static float CrownRise => OldArt ? 18 : LandmarkArt.PagatpatCrownRise;
+    static float CrownZoom => OldArt ? 1 : LandmarkArt.PagatpatZoom;
+
     // Each flash lights the crowns a little (before the dark is laid over the world).
     void LightFireflies(float t)
     {
@@ -155,7 +159,7 @@ partial class Game
         float flash = FireflyFlash(t);
         if (flash <= 0) return;
         foreach (var (x, y) in FireflyTrees)
-            if (MathF.Abs(x - player.X) < W && MathF.Abs(y - player.Y) < H) LightHole(x, y - 18, 16, 0.35f * flash);
+            if (MathF.Abs(x - player.X) < W && MathF.Abs(y - player.Y) < H) LightHole(x, y - CrownRise, 16 * CrownZoom, 0.35f * flash);
     }
 
     // The fireflies themselves, drawn over the dark: most flash in step, and a few stragglers blink on their own.
@@ -170,7 +174,7 @@ partial class Game
             for (int j = 0; j < 30; j++)
             {
                 float a = (float)Pix.Hash(i, j, 411) * MathF.Tau, r = MathF.Sqrt((float)Pix.Hash(i, j, 412));
-                float fx = x + MathF.Cos(a) * r * 12, fy = y - 18 + MathF.Sin(a) * r * 8;
+                float fx = x + MathF.Cos(a) * r * 12 * CrownZoom, fy = y - CrownRise + MathF.Sin(a) * r * 8 * CrownZoom;
                 bool straggler = j % 8 == 0;
                 float on = straggler ? (MathF.Sin(t * 3.1f + j * 1.7f) > 0.75f ? 0.8f : 0) : flash;
                 on *= k;
@@ -190,6 +194,13 @@ partial class Game
         pix.Rect(bx - 8, by - 1, 17, 2, Pal.Rgba(18, 46, 40, 0.24f));
         float keep = pix.Alpha;
         if (fade) pix.Alpha = 0.4f;
+        if (!OldArt)
+        {
+            // The Blender tree (tools/blender/landmarks.py), a third bigger; its crown is where the fireflies gather.
+            try { BlitArt(LandmarkArt.Pagatpat, LandmarkArt.PagatpatPalette, LandmarkArt.PagatpatAnchorX, LandmarkArt.PagatpatAnchorY, bx, by); }
+            finally { pix.Alpha = keep; }
+            return;
+        }
         try
         {
             // Pencil roots poking up out of the mud all round it, and a few arching roots off the trunk.

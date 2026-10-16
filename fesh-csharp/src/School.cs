@@ -961,7 +961,24 @@ partial class Game
     // A bamboo schoolhouse with a blackboard, a flag, and the children on a bench out front in school hours.
     void DrawSchool(float x, float y)
     {
-        pix.Rect(x - 24, y + 3, 48, 2, "rgba(0,0,0,0.2)");
+        pix.Rect(x - 24 * HouseS, y + 3, (int)(48 * HouseS), 2, "rgba(0,0,0,0.2)");
+        if (!OldArt)
+        {
+            // The Blender model (tools/blender/buildings.py), the size of the bigger houses; the chalk fish, the window glass
+            // and the flag are drawn here, moved with it.
+            float s = BuildingArt.Scale;
+            int ax = (int)x, ay = (int)y + 5;
+            BlitArt(BuildingArt.School, BuildingArt.SchoolPalette, BuildingArt.SchoolAnchorX, BuildingArt.SchoolAnchorY, ax, ay);
+            void At(float dx, float dy, int w, int h, string c) => pix.Rect(ax + MathF.Round(dx * s), ay + MathF.Round((dy - 5) * s), w, h, c);
+            At(-11, -11, 8, 2, "#e8f0e8"); At(-12.5f, -12.5f, 1, 1, "#e8f0e8"); At(-12.5f, -8.5f, 1, 1, "#e8f0e8");
+            At(-4, -12, 1, 1, "#e8f0e8"); At(-2, -11, 5, 1, "#e8f0e8");
+            HouseWindow(ax, ay, (int)x + 16, (int)y - 13, 5, 5, "#485d56");
+            float fx = x + 33 * s, top = y - 30 * s;
+            pix.Rect(fx, top, 1, (int)(y + 4 - top), "#c8c8c0");
+            pix.Rect(fx + 1, top, 9, 3, "#2f4fa8"); pix.Rect(fx + 1, top + 3, 9, 3, "#d8323a");
+            pix.Rect(fx + 1, top, 3, 6, "#f2f2f2"); pix.Rect(fx + 2, top + 2, 1, 1, "#f2c94a");
+            return;
+        }
         pix.Rect(x - 21, y - 5, 2, 10, "#65452e"); pix.Rect(x + 19, y - 5, 2, 10, "#65452e");
         pix.Rect(x - 23, y - 19, 46, 19, "#c39a5c");
         for (int i = -21; i < 23; i += 3) pix.Rect(x + i, y - 18, 1, 16, "#e2c486");
