@@ -18,8 +18,12 @@ static class Sfx
     {
         InitAudioDevice();
         if (!IsAudioDeviceReady()) return;
+        // A test run is silent (FESH_TEST_SOUND=1 to hear it). The master volume sits under every setting, so Settings.Reset can't undo it.
+        if (Environment.GetEnvironmentVariable("FESH_AUTOTEST") is { Length: > 0 } && Environment.GetEnvironmentVariable("FESH_TEST_SOUND") != "1") SetMasterVolume(0f);
         Add("cast", 0.2f, b => Tone(b, 650, 0.16f, "triangle", 0.04f, -420));
         Add("splash", 0.3f, b => Noise(b, 0.28f, 0.14f));
+        // The Mire leviathan gulping air at the surface (MireBoss.cs): a deep hollow gloop, a splash, a bubble popping.
+        Add("gulp", 0.6f, b => { Tone(b, 150, 0.32f, "sine", 0.32f, -85); Noise(b, 0.2f, 0.08f); Tone(b, 420, 0.08f, "sine", 0.12f, 260, 0.36f); });
         Add("bite", 0.25f, b => { Tone(b, 880, 0.08f, "square", 0.05f); Tone(b, 1175, 0.1f, "square", 0.05f, 0, 0.09f); });
         for (int i = 0; i < 4; i++) { float f = 260 + i * 30; reels.Add(Make(0.05f, b => Tone(b, f, 0.03f, "square", 0.012f))); }
         Add("catch", 0.45f, b => { var fs = new[] { 523f, 659, 784, 1047 }; for (int i = 0; i < 4; i++) Tone(b, fs[i], 0.14f, "square", 0.04f, 0, i * 0.08f); });

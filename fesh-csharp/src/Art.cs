@@ -964,7 +964,7 @@ static class CreatureArt
     }
 
     // Draws the underwater portrait at logical size w x h onto a canvas that is already scaled to device pixels.
-    public static void Scene(VCanvas g, float w, float h, string id, bool sil)
+    public static void Scene(VCanvas g, float w, float h, string id, bool sil, bool creature = true)
     {
         if (id == "tsunami") { TsunamiScene(g, w, h); return; }
         if (id == "magayon") { MagayonScene(g, w, h); return; }
@@ -992,6 +992,6 @@ static class CreatureArt
         foreach (var (fx, fy, r) in new[] { (0.2f, 0.3f, 2f), (0.24f, 0.18f, 1.4f), (0.78f, 0.4f, 1.8f), (0.74f, 0.25f, 1.2f) })
             Circ(g, w * fx, h * fy, r * w / 180);
         float s = Math.Min(w / 100, h / 66);
-        Creature(g, id, w / 2, h / 2 + (deep ? -2 : 0), s, sil);
+        if (creature) Creature(g, id, w / 2, h / 2 + (deep ? -2 : 0), s, sil);
     }
 }

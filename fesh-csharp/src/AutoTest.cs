@@ -65,6 +65,10 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_MUD_TEST") == "1" ? MudScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_TITLE_TEST") == "1" ? TitleShotScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_IRONBILL_TEST") == "1" ? IronbillScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_MIRE_TEST") == "1" ? MireScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_RAY_TEST") == "1" ? RayScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_TARPON_TEST") == "1" ? TarponScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_PORTRAIT_TEST") == "1" ? PortraitScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_ISLAND_TEST") == "1" ? IslandScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_WORLD_TEST") == "1" ? WorldScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_HOTBAR_TEST") == "1" ? HotbarScript().GetEnumerator()
@@ -120,6 +124,9 @@ partial class Game
         ExportMountSprites(path);
         if (Environment.GetEnvironmentVariable("FESH_SPRITES_ONLY") == "tidemane") return;
         ExportGuardianSprites(path);
+        ExportMireSprites(path);
+        ExportRaySprites(path);
+        ExportTarponSprites(path);
         ExportSeaSprites(path);
         ExportToolSprites(path);
         ExportDirectionSprites(path);

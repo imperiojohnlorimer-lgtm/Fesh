@@ -347,11 +347,26 @@ static class Gfx
             float k = pw / w;
             var g = new VCanvas(pw, ph) { ShadowScale = k };
             g.Scale(k);
-            CreatureArt.Scene(g, w, h, id, sil);
+            // A creature you fight has its sprite drawn over the scene instead of the vector drawing (BossPortraits.cs).
+            CreatureArt.Scene(g, w, h, id, sil, creature: Game.BossSprite(id) == null);
             tex = ToTexture(g.ToColors(), pw, ph);
             art[key] = tex;
         }
         DrawTexturePro(tex, new Rectangle(0, 0, tex.Width, tex.Height), S(x, y, w, h), Vector2.Zero, 0, Color.White);
+        if (Game.BossSprite(id) is var (spx, sw, sh))
+        {
+            // Pixel art, kept crisp: as big as fits (most of the width, never past the height), in the middle.
+            string skey = $"sprite:{id}:{sil}";
+            if (!art.TryGetValue(skey, out var stex))
+            {
+                var px = sil ? spx.Select(c => c.A > 0 ? new Color(8, 18, 32, 230) : c).ToArray() : spx;
+                stex = ToTexture(px, sw, sh, TextureFilter.Point);
+                art[skey] = stex;
+            }
+            float scale = MathF.Min(w * 0.86f / sw, h * 0.8f / sh);
+            float dw = sw * scale, dh = sh * scale;
+            DrawTexturePro(stex, new Rectangle(0, 0, sw, sh), S(x + (w - dw) / 2, y + (h - dh) / 2, dw, dh), Vector2.Zero, 0, Color.White);
+        }
         if (sil) TextCenter("?", x + w / 2, y + h / 2 - h * 0.15f, FontKind.Ui700, h * 0.3f, Pal.C("rgba(241,230,200,0.55)"));
     }
 

@@ -236,6 +236,7 @@ public static unsafe class Raylib
     public static void InitAudioDevice() => AudioBackend.Init();
     public static void CloseAudioDevice() => AudioBackend.Close();
     public static bool IsAudioDeviceReady() => AudioBackend.Ready;
+    public static void SetMasterVolume(float volume) { }   // only the desktop test runs use it
     public static Wave LoadWaveFromMemory(string fileType, byte[] fileData) => AudioBackend.LoadWav(fileData);
     public static void UnloadWave(Wave wave) => AudioBackend.UnloadWave(wave);
     public static Sound LoadSoundFromWave(Wave wave) => AudioBackend.LoadSound(wave);

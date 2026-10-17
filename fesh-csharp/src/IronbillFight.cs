@@ -68,7 +68,13 @@ partial class Game
         {
             b.ChargeT = ChargeLen; b.ChargeHit = r.DuckTime < 0.2f;
             b.Cx0 = fish.Bx; b.Cy0 = fish.By;
-            b.Cx1 = player.X + (player.X - fish.Bx) * 0.9f; b.Cy1 = player.Y - 2 + (player.Y - fish.By) * 0.9f;
+            // Past the boat, but only as far as there is sea: a shore on the far side cuts the run short.
+            for (float reach = 0.9f; ; reach -= 0.15f)
+            {
+                b.Cx1 = player.X + (player.X - fish.Bx) * Math.Max(0, reach); b.Cy1 = player.Y - 2 + (player.Y - fish.By) * Math.Max(0, reach);
+                if (ChargeLaneClear(b.Cx0, b.Cy0, b.Cx1, b.Cy1)) break;
+                if (reach <= 0) { b.Cx1 = b.Cx0; b.Cy1 = b.Cy0; break; }   // no clear run at all: it rams from where it is
+            }
             Sfx.Play("splash");
         }
         b.PrevWarn = r.AttackWarning;
@@ -109,10 +115,23 @@ partial class Game
         }
     }
 
+    // The straight run from (x0, y0) to (x1, y1), a few pixels wide, is all deep sea (the fish is drawn bigger than a point,
+    // and a diagonal run can clip a tile's corner between samples).
+    bool ChargeLaneClear(float x0, float y0, float x1, float y1)
+    {
+        int n = Math.Max(1, (int)MathF.Ceiling(Dist(x0, y0, x1, y1)));
+        for (int i = 0; i <= n; i++)
+        {
+            float x = x0 + (x1 - x0) * i / n, y = y0 + (y1 - y0) * i / n;
+            if (!TowWater(x, y) || !TowWater(x - 2, y - 2) || !TowWater(x + 2, y - 2) || !TowWater(x - 2, y + 2) || !TowWater(x + 2, y + 2)) return false;
+        }
+        return true;
+    }
+
     // Where Ironbill is heading on screen as it circles (UpdateTow's ellipse, anticlockwise in towAng).
     float IronbillHeading()
     {
-        float hx = -MathF.Sin(towAng) * 46, hy = MathF.Cos(towAng) * 30;
+        float hx = -MathF.Sin(towAng) * 46 * towDir, hy = MathF.Cos(towAng) * 30 * towDir;
         return MathF.Atan2(hy, hx);
     }
 

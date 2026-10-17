@@ -10,7 +10,7 @@ sealed record Clue(string Title, string Text, string Finding);
 // Style is how it fights: "dart" (darts about), "runner" (makes runs that snap a tight line), "jumper" (leaps you time a
 // press for) or "bottom" (sulks deep; pump it up with short taps). Depth ("shallow", "any", "deep") is where it feeds:
 // a short cast lands in the shallows, a long one in deep water. Weather ("rain", "storm", "clear") and FullMoon limit
-// when it bites. Legend fish bite only once, and only on their Bait (if they name one). Troll fish only strike a lure
+// when it bites. Legend fish bite only once (the ones with boss fights come back: Refightable), and only on their Bait (if they name one). Troll fish only strike a lure
 // trolled behind the boat (OpenSea.cs). Need is a story flag (a key in state.hinted) that has to be set before it bites:
 // the Parola squid only come once its lamp is lit.
 sealed record CommonFish(string Id, string Name, float Difficulty, int Weight = 4, bool Rare = false, string Time = "any",
@@ -350,18 +350,18 @@ static class Data
             "Hooked in the oasis on a clear day, on a cricket.", "The oasis, on a clear, bright day. It likes something that chirps."),
         ["mire_leviathan"] = new("leviathan",
             "A giant arapaima armoured in scales like old green coins. When it rises to breathe, the whole swamp goes quiet.",
-            "Hooked in the mangrove swamp at night, on worms.", "The mangrove swamp after dark. It roots in the mud for worms."),
+            "Hooked in the mangrove swamp at night, on worms.", "The mangrove swamp after dark. It gulps air; try a worm."),
         ["starfall_ray"] = new("starray",
             "A manta whose back glitters with points of light, as if the night sky fell into the sea. It only rises when the moon is full.",
-            "Hooked at the deep drop-off under a full moon, on a glow shrimp.", "The deep drop-off on a full-moon night. It follows things that glow."),
+            "Played at the deep drop-off under a full moon, on a glow shrimp, then let go to glide back into the deep.", "The deep drop-off on a full-moon night. It follows things that glow."),
         ["ironbill"] = new("marlin",
             "A black marlin as long as your boat, its bill notched from old fights with sharks. When it rises, the whole frenzy scatters.",
             "Hooked trolling through a feeding frenzy on the open sea, then fought while it towed your boat across the waves.",
-            "The open sea by day. It only chases a lure trolled through a feeding frenzy."),
+            "Any open sea by day: west of Amihan, in Amihan's waters, off Habagat or round Marilaya. It only chases a lure trolled through a feeding frenzy."),
         ["haring_buan"] = new("tarpon",
             "The king of the tarpon: a silver giant whose scales are as wide as your palm. Parola's old keepers said it only rises under a moon "
             + "that Bakunawa has given back, and that every scale is a little piece of moonlight.",
-            "Hooked off the Parola pier under a full moon, on a live tamban, after the moon came back.",
+            "Played off the Parola pier under the returned full moon, on a live tamban, then eased off the hook beside the pier.",
             "The Parola pier on a full-moon night, once the moon is safe. It chases a live sardine.")
     };
 

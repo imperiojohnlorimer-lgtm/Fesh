@@ -170,7 +170,7 @@ partial class Game
     // the line in.
     bool trolling, towing;
     string trollLure;
-    float trollT, trollShallowT, towAng;
+    float trollT, trollShallowT, towAng, towDir = 1, towScale = 1;   // towDir: which way round the boat the marlin circles (1, or -1 after turning back from a shore)
     (float x, float y) lure, trollDir = (1, 0);
     const string TowFish = "ironbill";
 
@@ -239,7 +239,7 @@ partial class Game
         fish = new FishCast { Spot = spot, Sx = tip.X, Sy = tip.Y, Tx = lure.x, Ty = lure.y, Bx = lure.x, By = lure.y, Bait = trollLure, Power = 1, Depth = 1, T = 1 };
         fish.Roll = RollTroll(spot, frenzy);
         fish.BiteT = BiteWindow;
-        towAng = MathF.Atan2((lure.y - player.Y + 4) / 30, (lure.x - player.X) / 46);
+        towAng = MathF.Atan2((lure.y - player.Y + 4) / 30, (lure.x - player.X) / 46); towDir = 1; towScale = 1;
         mode = "bite";
         Sfx.Play("bite");
         Burst(lure.x, lure.y, "#ffffff", 8);
@@ -261,6 +261,36 @@ partial class Game
         return new Catchable { Id = pick.Id, Name = pick.Name, Difficulty = pick.Difficulty, Rare = pick.Rare };
     }
 
+    // Deep water for the fish itself (its picture is drawn there), not just for the hull.
+    bool TowWater(float x, float y) => TileUnder(x, y) == '~' && !InSanctuary(x, y);
+
+    // Where Ironbill is on its circle round the boat. Near a shore the circle would pass over land, so the fish turns
+    // back (circling the other way) to the nearest angle where both it and the water to it are deep sea, on a tighter
+    // circle if it has to be. The radius shrinks at once when land is close and grows back gradually.
+    (float x, float y) TowPoint(float dt)
+    {
+        (float x, float y) At(float a, float s) => (player.X + MathF.Cos(a) * 46 * s, player.Y - 4 + MathF.Sin(a) * 30 * s);
+        bool Open(float a, float s) { var (x, y) = At(a, s); return TowWater(x, y) && TowWater((x + player.X) / 2, (y + player.Y) / 2); }
+        // Nearby angles first (up to 30 degrees either way, on a wide then a tight circle), then anywhere round.
+        foreach (var (need, reach) in new[] { (0.7f, 12), (0.45f, 12), (0.7f, 72), (0.45f, 72) })
+            for (int i = 0; i < reach; i++)
+            {
+                // 0, then 5 degrees either side, 10 either side... all the way round.
+                float off = i == 0 ? 0 : (i + 1) / 2 * (MathF.PI / 36) * (i % 2 == 0 ? 1 : -1), a = towAng + off;
+                if (!Open(a, need)) continue;
+                towAng = a;
+                if (off * towDir < 0) towDir = -towDir;
+                float best = need;
+                foreach (float s in new[] { 1f, 0.85f })
+                    if (s > best && Open(a, s)) { best = s; break; }
+                float rate = dt * (best < towScale ? 2.5f : 0.9f);
+                towScale = MathF.Abs(best - towScale) <= rate ? best : towScale + MathF.Sign(best - towScale) * rate;
+                if (!Open(a, towScale)) towScale = best;
+                return At(a, towScale);
+            }
+        return (player.X, player.Y - 4);
+    }
+
     // Ironbill tows the boat: it circles out ahead and hauls the boat after it (hard while it runs or leaps), so fish,
     // line and boat all travel. Against a shore it swings away.
     void UpdateTow(float dt)
@@ -270,8 +300,8 @@ partial class Game
         // While it charges (IronbillFight.cs) it's on its way across, not towing; while it eyes you up it holds still.
         if (ironbill is { ChargeT: > 0 }) return;
         bool run = reel.Running > 0 || reel.Leap > 0 || ironbill is { Walk: > 0 };
-        if (reel.AttackWarning <= 0) towAng += dt * (ironbill is { Walk: > 0 } ? 1.4f : run ? 0.75f : 0.3f);
-        float fx = player.X + MathF.Cos(towAng) * 46, fy = player.Y - 4 + MathF.Sin(towAng) * 30;
+        if (reel.AttackWarning <= 0) towAng += dt * (ironbill is { Walk: > 0 } ? 1.4f : run ? 0.75f : 0.3f) * towDir;
+        var (fx, fy) = TowPoint(dt);
         fish.Bx = fish.Tx = fx; fish.By = fish.Ty = fy;
         float dx = fx - player.X, dy = fy - player.Y, d = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));
         float sp = (run ? 40 : 14) * dt, mx = dx / d * sp, my = dy / d * sp;

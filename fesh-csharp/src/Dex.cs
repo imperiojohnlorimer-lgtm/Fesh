@@ -20,8 +20,9 @@ partial class Game
         && (!f.FullMoon || FullMoon)
         && (f.Need == null || state.Hinted(f.Need))
         && (f.Season == null || f.Season == Season)
-        // A legend only bites once, and only on its own bait (1.29): without it the green dot said "biting" for a fish that never would.
-        && (!f.Legend || state.commons.GetValueOrDefault(f.Id) == 0 && (f.Bait == null || Has(f.Bait) > 0));
+        // A legend only bites once (unless it has a boss fight: Refightable), and only on its own bait (1.29): without it the green
+        // dot said "biting" for a fish that never would.
+        && (!f.Legend || (state.commons.GetValueOrDefault(f.Id) == 0 || Refightable(f)) && (f.Bait == null || Has(f.Bait) > 0));
 
     bool Seen(string id) => state.seen.Contains(id) && state.commons.GetValueOrDefault(id) == 0;
 
@@ -115,6 +116,8 @@ partial class Game
         Gfx.Text(name, x + pad, y + pad - 2 + (34 - nameSize) / 2, FontKind.Ui700, nameSize, f.Legend && known ? Pal.C("#9a6a1a") : Pal.PaperInk);
         var tags = new List<string>();
         if (f.Legend) tags.Add("Legendary"); else if (f.Rare) tags.Add("Rare");
+        if (Refightable(f)) tags.Add("Boss fight");
+        if (LetGoLegend(f.Id) && known) tags.Add("Let go");
         if (f.Attack > 0) tags.Add("Fights back");
         if (f.Troll) tags.Add("Trolling only");
         if (!known && seen) tags.Add("Seen, not caught");
@@ -123,7 +126,7 @@ partial class Game
         foreach (var t in tags)
         {
             float cw = Gfx.Measure(t, FontKind.Ui700, 15) + 16;
-            Gfx.Rect(chipX, ty, cw, 24, t == "Legendary" ? Pal.C("#10243a") : t == "Fights back" ? Pal.C("#b5423a") : Pal.C("#3f6a8a"), 4);
+            Gfx.Rect(chipX, ty, cw, 24, t == "Legendary" ? Pal.C("#10243a") : t is "Fights back" or "Boss fight" ? Pal.C("#b5423a") : t == "Let go" ? Pal.C("#3f8a5a") : Pal.C("#3f6a8a"), 4);
             Gfx.Text(t, chipX + 8, ty + 3, FontKind.Ui700, 15, t == "Legendary" ? Pal.Lantern : Pal.Paper);
             chipX += cw + 8;
         }
@@ -160,14 +163,15 @@ partial class Game
                 facts.Add(("Family", album.Family));
                 facts.Add(("Eats", album.Diet));
             }
-            facts.Add(("Fights", f.Style switch { "runner" => "makes runs: let go while it runs", "jumper" => "leaps: press as the marker crosses the gold", "bottom" => "hugs the bottom: pump it up with short taps", _ => "darts about" }
+            facts.Add(("Fights", BossFightText(f.Id) ?? f.Style switch { "runner" => "makes runs: let go while it runs", "jumper" => "leaps: press as the marker crosses the gold", "bottom" => "hugs the bottom: pump it up with short taps", _ => "darts about" }
                 + (f.Depth != "any" ? $"; feeds in {f.Depth} water" : "")));
             var baits = LikedBaits(f);
             facts.Add(("Likes", baits.Count > 0 ? string.Join(", ", baits) : "nothing in particular"));
             string rec = state.records.TryGetValue(f.Id, out float kg) ? Kg(kg) : "-";
             int tr = state.trophies.GetValueOrDefault(f.Id);
             facts.Add(("Caught", $"{n} · heaviest {rec} · trophy from about {Kg(f.Kg * 1.5f)}{(tr > 0 ? $" ({tr} so far)" : "")}"));
-            facts.Add(("Pip pays", ClosedFish.Contains(f.Id) ? $"{PriceOf(f.Id)} coins, but not in the amihan: Pip's closed season while they spawn" : $"{PriceOf(f.Id)} coins"));
+            facts.Add(LetGoLegend(f.Id) ? ("Kept?", "No: you let it go once it's in. The record is yours.")
+                : ("Pip pays", ClosedFish.Contains(f.Id) ? $"{PriceOf(f.Id)} coins, but not in the amihan: Pip's closed season while they spawn" : $"{PriceOf(f.Id)} coins"));
         }
         // Ma'am Isay's class (School.cs).
         if ((known || seen) && state.Hinted("metIsay") && !f.Legend)
@@ -226,7 +230,17 @@ partial class Game
         if (f.Season != null) bits.Add($"in the {f.Season} season");
         if (f.Need == "parolaLit") bits.Add("once the Parola lamp is lit");
         if (f.Need == "moonReturned") bits.Add("once the moon is safe");
-        if (f.Legend) bits.Add("only once");
+        if (f.Legend) bits.Add(Refightable(f) ? "and again after you've fought it" : "only once");
         return string.Join(", ", bits);
     }
+
+    // How a boss fish fights, for its card (the ordinary line for its style would undersell it). Null for the rest.
+    string BossFightText(string id) => id switch
+    {
+        TowFish => Bind.Fix("a boss fight: it tows your boat and breaches (press on the gold), charges once it's furious (let go of <act> to brace) and tail-walks at the end (ease off the reel)"),
+        MireFish => Bind.Fix("a boss fight: pump it up; press <act> as it gulps air, pull it away from the mangrove roots with <left>/<right>, and press on the gold when it leaps"),
+        RayFish => Bind.Fix("a boss fight: let go when it runs; follow its feeding sweep with <left>/<right>, let go through a somersault, and hold <down> to bow to a breach"),
+        TarponFish => Bind.Fix("a boss fight: press on the gold when he leaps; hold <up> as he rolls to breathe, mash <act> at the pilings and hold <act> through a head-shake"),
+        _ => null
+    };
 }

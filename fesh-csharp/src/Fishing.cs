@@ -32,7 +32,15 @@ partial class Game
         && (!f.FullMoon || FullMoon)
         && (f.Need == null || state.Hinted(f.Need))
         && (f.Season == null || f.Season == Season)
-        && (!f.Legend || ((state.commons.GetValueOrDefault(f.Id) == 0 || f.Id == TowFish) && (f.Bait == null || f.Bait == bait)));
+        && (!f.Legend || ((state.commons.GetValueOrDefault(f.Id) == 0 || Refightable(f)) && (f.Bait == null || f.Bait == bait)));
+
+
+    // The legends with boss fights come back to be fought again (Ironbill, the Mire leviathan, the Starfall ray, Haring
+    // Buan-buan); the others bite once. Tidemane is tamed, so it never comes back to the line. One rule for the bite, the
+    // Fish log's "biting now" dot and its words.
+    static bool Refightable(CommonFish f) => f.Id is TowFish or MireFish or RayFish or TarponFish;
+    // The two that are let go when they're in (a manta and the king tarpon): the record, never the bag.
+    static bool LetGoLegend(string id) => id is RayFish or TarponFish;
 
     static readonly HashSet<string> FreshSpots = new() { "lagoon", "oasis", "swamp", "icehole", "amihanpond", "bakawanpool" };
     static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff", "starwell", "karstlagoon", "bagareef", "opensea", "amihansea",
@@ -74,7 +82,11 @@ partial class Game
     {
         int luck = Luck(spot, bait);
         var list = new List<(CommonFish, double)>();
-        foreach (var f in Data.Common[spot])
+        // Trolling fish (Ironbill) belong to every open sea, not only the one west of Amihan where the Fish log lists them.
+        var pool = trolled && spot is "amihansea" or "habagatsea" or "marilayasea"
+            ? Data.Common[spot].Concat(Data.Common["opensea"].Where(f => f.Troll))
+            : Data.Common[spot];
+        foreach (var f in pool)
         {
             if (!Bites(f, bait) || f.Troll && !trolled) continue;
             double w = f.Weight;
@@ -470,6 +482,24 @@ partial class Game
             Toast("Something enormous takes the coconut and the line screams off the reel! It fights every way a fish can.", 5);
             return;
         }
+        if (roll.Id == TarponFish && !MatchActive)
+        {
+            // Haring Buan-buan: breaths, the pilings and head-shakes under the lighthouse, between its leaps (TarponBoss.cs).
+            StartTarpon();
+            return;
+        }
+        if (roll.Id == RayFish && !MatchActive)
+        {
+            // The Starfall ray: feeding sweeps, somersaults and breaches over the drop-off (RayBoss.cs).
+            StartRay();
+            return;
+        }
+        if (roll.Id == MireFish && !MatchActive)
+        {
+            // The Mire leviathan: a long fight in the swamp pool, with breaths, runs for the roots and leaps (MireBoss.cs).
+            StartMire();
+            return;
+        }
         if (roll.Id == TowFish)
         {
             // Ironbill: a long fight while it tows the boat (UpdateTow).
@@ -591,6 +621,9 @@ partial class Game
         bool hold = ReelHeld(), tap = reelTap;
         reelTap = false;
         if (UpdateFishAttack(r, dt, hold)) return;
+        if (r.Roll.Id == MireFish && !MatchActive && UpdateMireReel(r, dt, hold, tap)) return;
+        if (r.Roll.Id == RayFish && !MatchActive && UpdateRayReel(r, dt, hold, tap)) return;
+        if (r.Roll.Id == TarponFish && !MatchActive && UpdateTarponReel(r, dt, hold, tap)) return;
         if (r.Roll.Boss)
         {
             // Tidemane switches how it fights every few seconds (never in the middle of a run or a leap).
@@ -729,6 +762,8 @@ partial class Game
         // The coelacanth is landed, and the thing that hunts it rises (Guardian.cs), until you've driven it off.
         // The target is still the pool from before the card, so a press next frame would cast instead (Codex): clear it.
         if (legendId == "ancient_coelacanth" && OnAncientFloor && !GuardianBeaten) { guardianDue = true; target = null; return; }
+        if (legendId == RayFish) { LetRayGo(); return; }
+        if (legendId == TarponFish) { LetTarponGo(); return; }
         heldItem = legendId;
         heldT = 2f;
         Toast($"The {Data.FishById[legendId].Name} is in your bag. It would look magnificent in an aquarium.", 4);
@@ -770,6 +805,9 @@ partial class Game
         float kg = AddCatch(f, bonus, perfect, back != null ? MathF.Max(1.3f, back.kg / f.Kg * 1.2f) : 0);
         float landedM = lastM;
         int n = state.commons[f.Id];
+        // The Starfall ray goes back: the record and the card are yours, the manta isn't (RayBoss.cs).
+        if (f.Id == RayFish) FreeRay();
+        if (f.Id == TarponFish) FreeTarpon();   // and so does the king of the tarpon (TarponBoss.cs)
         if (f.Legend)
         {
             legendId = f.Id;

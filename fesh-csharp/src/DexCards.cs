@@ -56,6 +56,7 @@ partial class Game
             {
                 facts.Add(("How", Data.Platejaw.Where));
                 facts.Add(("After", "A broken piece of its armour, made into plate armour at a workbench, halves what monsters can do to you."));
+                facts.Add(("Again", "Knock on the carved stone by the pool to call it up and fight it again."));
             }
             else if (GuardianMet) facts.Add(("Where", "The Ancient pool, floor 12 of Frostfang Caverns. Knock on the carved stone to call it up."));
             return (won, GuardianMet ? $"{GuardianName}, the pool's guardian" : "???", "Legend", Pal.C("#10243a"),
@@ -68,6 +69,7 @@ partial class Game
             {
                 facts.Add(("Where", "Over Parola, on a full-moon night"));
                 facts.Add(("After", "It left a shining scale on the pier: the Moonscale charm. The king of the tarpon rises now."));
+                facts.Add(("Again", "It rises again on later full-moon nights over Parola. Drive it off again and the islanders reward you."));
             }
             // Nameless until the eclipse, as on the page (Codex: the card used to name it).
             return (got, got ? "Bakunawa, the moon-eater" : "???", "Legend", Pal.C("#10243a"),

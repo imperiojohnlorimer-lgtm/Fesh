@@ -21,7 +21,7 @@ partial class Game
         if (!title && !MatchActive) DrawGuideArrow();
         if (!title && !MatchActive) { DrawPinCompass(); DrawCacheCompass(); }
         if (!title) DrawFishingUi();
-        if (!title && (BossFighting || BossOnLine || GuardianFighting || IronbillOnLine && !OldArt)) DrawBossBar();
+        if (!title && (BossFighting || BossOnLine || GuardianFighting || IronbillOnLine && !OldArt || MireOnLine || RayOnLine || TarponOnLine)) DrawBossBar();
         if (!title) DrawIronbillBanner();
         if (!title && eclipse != null) DrawEclipseBar();
         if (!title && race != null) DrawRaceChip();
@@ -552,7 +552,7 @@ partial class Game
     {
         var bits = new List<string>();
         if (f.Attack > 0) bits.Add("fights back!");
-        if (f.Legend) bits.Add("legendary");
+        if (f.Legend) bits.Add(Refightable(f) ? "legendary boss" : "legendary");
         else if (f.Rare) bits.Add("rare");
         if (f.Troll) bits.Add("trolling");
         if (f.Legend && f.Bait != null && Items.ById.TryGetValue(f.Bait, out var baitDef)) bits.Add("needs " + baitDef.Name.ToLowerInvariant());
@@ -873,9 +873,9 @@ partial class Game
         Add("tidemane", state.tamed, "tidemane", $"{Data.MountName}, your mount", Pal.C("#1d6f68"), state.tamed ? "Tamed on Starfall Atoll. It's yours to ride." : Data.Tidemane.Hint);
         // Platejaw keeps its name once you've seen it (the toast names it as it rises); the rest of its card waits for the win.
         Add("platejaw", GuardianMet, "platejaw_plate", $"{GuardianName}, the pool's guardian", Pal.C("#7a5a2a"),
-            GuardianBeaten ? "Driven off in the Ancient pool." : GuardianMet ? "Still hunting in the Ancient pool. Knock on the carved stone." : Data.Platejaw.Hint);
+            GuardianBeaten ? "Driven off in the Ancient pool. Knock on the stone to fight it again." : GuardianMet ? "Still hunting in the Ancient pool. Knock on the carved stone." : Data.Platejaw.Hint);
         Add("bakunawa", MoonReturned, "moon_charm", "Bakunawa, the moon-eater", Pal.C("#2f6a6a"),
-            MoonReturned ? "It gave the moon back over Parola." : "Some full-moon nights, the moon goes out on the Habagat sea.");
+            MoonReturned ? "It gave the moon back over Parola. It rises again some full-moon nights." : "Some full-moon nights, the moon goes out on the Habagat sea.");
         return rows;
     }
 
@@ -1024,19 +1024,26 @@ partial class Game
     // The title card as Ironbill takes the lure: its name slammed across the top of the screen, then fading.
     void DrawIronbillBanner()
     {
+        if (mire is { Banner: > 0 } mb && MireOnLine) { DrawBossBanner(mb.Title, mb.Sub, mb.Banner, Pal.C("#7fb069"), Pal.C("#e7f2d8")); return; }
+        if (ray is { Banner: > 0 } rb && RayOnLine) { DrawBossBanner(rb.Title, Bind.Fix(rb.Sub), rb.Banner, Pal.C("#8ea6d6"), Pal.C("#e6eeff")); return; }
+        if (tarpon is { Banner: > 0 } tb && TarponOnLine) { DrawBossBanner(tb.Title, Bind.Fix(tb.Sub), tb.Banner, Pal.C("#c7d6e6"), Pal.C("#f2f7ff")); return; }
         if (ironbill is not { Banner: > 0 } b || OldArt) return;
-        float age = 3.2f - b.Banner, inK = Math.Clamp(age / 0.25f, 0, 1), outK = Math.Clamp(b.Banner / 0.6f, 0, 1), a = inK * outK;
+        DrawBossBanner(b.Title, b.Sub, b.Banner, Pal.C("#5d8ce0"), Pal.C("#d7e6ff"));
+    }
+
+    // A boss's title slammed across the top of the screen, then fading (left: seconds still to show, out of 3.2).
+    void DrawBossBanner(string name, string sub, float left, Color edge, Color subCol)
+    {
+        float age = 3.2f - left, inK = Math.Clamp(age / 0.25f, 0, 1), outK = Math.Clamp(left / 0.6f, 0, 1), a = inK * outK;
         float y = 150, scale = 1 + (1 - inK) * 0.5f;
         Gfx.Rect(0, y - 12, Gfx.LW, 116, Pal.Rgba(6, 12, 30, 0.72f * a));
-        Gfx.Rect(0, y - 12, Gfx.LW, 3, Pal.Rgba(93, 140, 224, a));
-        Gfx.Rect(0, y + 101, Gfx.LW, 3, Pal.Rgba(93, 140, 224, a));
+        Gfx.Rect(0, y - 12, Gfx.LW, 3, Pal.WithAlpha(edge, a));
+        Gfx.Rect(0, y + 101, Gfx.LW, 3, Pal.WithAlpha(edge, a));
         int size = (int)(64 * scale);
-        string name = b.Title;
         float tw = Gfx.Measure(name, FontKind.Ui700, size);
         Gfx.Text(name, Gfx.LW / 2 - tw / 2 + 4, y + 4, FontKind.Ui700, size, Pal.Rgba(0, 0, 0, 0.6f * a));
         Gfx.Text(name, Gfx.LW / 2 - tw / 2, y, FontKind.Ui700, size, Pal.Rgba(243, 194, 91, a));
-        string sub = b.Sub;
-        Gfx.Text(sub, Gfx.LW / 2 - Gfx.Measure(sub, FontKind.Ui600, 22) / 2, y + 72, FontKind.Ui600, 22, Pal.Rgba(215, 230, 255, a));
+        Gfx.Text(sub, Gfx.LW / 2 - Gfx.Measure(sub, FontKind.Ui600, 22) / 2, y + 72, FontKind.Ui600, 22, Pal.WithAlpha(subCol, a));
     }
 
     void DrawBossBar()
@@ -1054,6 +1061,65 @@ partial class Game
             float gk = Math.Clamp(guardian.Spirit / GuardSpirit, 0, 1);
             Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
             if (gk > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * gk), 12, Pal.C("#d9823f"), 4);
+            return;
+        }
+        if (TarponOnLine)
+        {
+            // Haring Buan-buan (TarponBoss.cs): moonlight silver, his stamina what's left to reel in, phase marks.
+            var m = tarpon;
+            int ph = m?.Phase ?? 1;
+            Gfx.Box(x, y, w, h, Pal.C("rgba(14,22,34,0.94)"), Pal.C("#c7d6e6"), 2, 6);
+            Gfx.Text("Haring Buan-buan", x + 16, y + 7, FontKind.Ui700, 20, Pal.C("#f2f7ff"));
+            string tsub = reel.Leap > 0 ? "Leaping!" : m?.Ev switch
+            {
+                "breathWarn" or "breath" => "Rising to breathe!", "pilingsWarn" or "pilings" => "Under the pier!", "shakeWarn" or "shake" => "Shaking his head!",
+                _ => ph switch { 1 => "King beneath the lighthouse", 2 => "Between the pilings", _ => "The king shakes his crown" }
+            };
+            Gfx.Text(tsub, x + w - 16 - Gfx.Measure(tsub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16, tsub.EndsWith("!") ? Pal.Lantern : Pal.C("#b8c6d2"));
+            float tk = Math.Clamp(1 - (reel.Progress - 0.3f) / 0.7f, 0, 1);
+            Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
+            if (tk > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * tk), 12, ph == 3 ? Pal.C("#f3c25b") : ph == 2 ? Pal.C("#e8eff5") : Pal.C("#b8c6d2"), 4);
+            foreach (float mark in new[] { 1 - (0.5f - 0.3f) / 0.7f, 1 - (0.78f - 0.3f) / 0.7f }) Gfx.Rect(x + 16 + (w - 32) * mark - 1, y + 32, 2, 16, Pal.C("#f2f7ff"));
+            return;
+        }
+        if (RayOnLine)
+        {
+            // The Starfall ray (RayBoss.cs): night blue and starlight, its stamina what's left to reel in, phase marks. Out of
+            // the way while it breaches: the drop-off is at the top of the map, so the leap rises where the bar is.
+            if (ray?.Ev == "breach") return;
+            var m = ray;
+            int ph = m?.Phase ?? 1;
+            Gfx.Box(x, y, w, h, Pal.C("rgba(8,14,36,0.94)"), Pal.C("#8ea6d6"), 2, 6);
+            Gfx.Text("Starfall ray", x + 16, y + 7, FontKind.Ui700, 20, Pal.C("#e6eeff"));
+            string rsub = m?.Ev switch
+            {
+                "sweepWarn" or "sweep" => "Feeding!", "loopWarn" or "loop" => "Somersaulting!", "breachWarn" or "breach" => "Breaching!",
+                _ => ph switch { 1 => "Along the silver edge", 2 => "A turning constellation", _ => "Stars above the sea" }
+            };
+            Gfx.Text(rsub, x + w - 16 - Gfx.Measure(rsub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16, rsub.EndsWith("!") ? Pal.Lantern : Pal.C("#aebddc"));
+            float rk = Math.Clamp(1 - (reel.Progress - 0.3f) / 0.7f, 0, 1);
+            Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
+            if (rk > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * rk), 12, ph == 3 ? Pal.C("#f3c25b") : ph == 2 ? Pal.C("#bfe3ff") : Pal.C("#8ea6d6"), 4);
+            foreach (float mark in new[] { 1 - (0.5f - 0.3f) / 0.7f, 1 - (0.78f - 0.3f) / 0.7f }) Gfx.Rect(x + 16 + (w - 32) * mark - 1, y + 32, 2, 16, Pal.C("#e6eeff"));
+            return;
+        }
+        if (MireOnLine)
+        {
+            // The Mire leviathan (MireBoss.cs): mangrove green and rust, its stamina what's left to reel in, phase marks.
+            var m = mire;
+            int ph = m?.Phase ?? 1;
+            Gfx.Box(x, y, w, h, Pal.C("rgba(16,26,16,0.93)"), Pal.C("#7fb069"), 2, 6);
+            Gfx.Text("Mire leviathan", x + 16, y + 7, FontKind.Ui700, 20, Pal.C("#e7f2d8"));
+            string msub = m?.Ev switch
+            {
+                "rise" => "Rising for air!", "gulp" => "Gulping air!", "roots" => "Bolting for the roots!", "rub" => "In the roots!", "leap" => "Leaping!",
+                _ => ph switch { 1 => "Beneath the mud", 2 => "Among the roots", _ => "The moonlit giant" }
+            };
+            Gfx.Text(msub, x + w - 16 - Gfx.Measure(msub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16, msub.EndsWith("!") ? Pal.Lantern : Pal.C("#b9d0a8"));
+            float mk = Math.Clamp(1 - (reel.Progress - 0.3f) / 0.7f, 0, 1);
+            Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
+            if (mk > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * mk), 12, ph == 3 ? Pal.C("#e05a48") : ph == 2 ? Pal.C("#d9823f") : Pal.C("#7fb069"), 4);
+            foreach (float mark in new[] { 1 - (0.5f - 0.3f) / 0.7f, 1 - (0.78f - 0.3f) / 0.7f }) Gfx.Rect(x + 16 + (w - 32) * mark - 1, y + 32, 2, 16, Pal.C("#e7f2d8"));
             return;
         }
         if (IronbillOnLine)

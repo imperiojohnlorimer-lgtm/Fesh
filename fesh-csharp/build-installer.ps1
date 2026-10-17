@@ -15,9 +15,11 @@ dotnet tool restore
 if ($LASTEXITCODE -ne 0) { throw 'dotnet tool restore failed' }
 
 New-Item -ItemType Directory -Force dist | Out-Null
-dotnet tool run wix build installer\Fesh.wxs -arch x64 -d "PublishDir=$PSScriptRoot\publish" -d "Version=$version" -o dist\Fesh-Setup.msi
+# Its working files (a 30 MB cabinet each time) go in obj\wix and are removed after, instead of piling up in %TEMP%.
+dotnet tool run wix build installer\Fesh.wxs -arch x64 -d "PublishDir=$PSScriptRoot\publish" -d "Version=$version" -intermediatefolder obj\wix -o dist\Fesh-Setup.msi
 if ($LASTEXITCODE -ne 0) { throw 'wix build failed' }
 
 Copy-Item publish\Fesh.exe dist\Fesh.exe -Force
 Remove-Item dist\*.wixpdb -ErrorAction SilentlyContinue
+Remove-Item obj\wix -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "Done: $PSScriptRoot\dist\Fesh-Setup.msi (version $version)"

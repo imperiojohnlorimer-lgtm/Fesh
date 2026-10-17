@@ -161,7 +161,7 @@ partial class Game
     }
 
     // Each island has its own tune; the cave and houses have theirs. Rain adds its own patter outdoors.
-    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine || GuardianFighting || IronbillOnLine ? "boss" : SeaEmergency && evac.Phase != "quake" || BagaEvacuating ? "alarm" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
+    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine || GuardianFighting || IronbillOnLine || MireOnLine || RayOnLine || TarponOnLine ? "boss" : SeaEmergency && evac.Phase != "quake" || BagaEvacuating ? "alarm" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
         : RondallaPlaying ? "rondalla" : Data.Biomes[lastBiome < Data.Biomes.Length ? lastBiome : PlayerBiome()].Id;
 
     void PickMusic(float dt)
@@ -193,7 +193,8 @@ partial class Game
             if (birds >= crickets && birds > 0.02f) { name = "birds"; v = 0.5f * birds * dry; }
             else if (crickets > 0.02f) { name = "crickets"; v = 0.42f * crickets * dry; }
         }
-        Music.WantNature(name, v);
+        // The swamp goes quiet while the Mire leviathan comes up for air (MireBoss.cs).
+        Music.WantNature(name, v * (1 - 0.95f * MireHush));
     }
 
     // Sets the world view to the zoom setting: every buffer sized by it is made again (the next frame draws it all).
@@ -1051,6 +1052,9 @@ partial class Game
         if (MatchActive) dt = MathF.Min(dt, MatchMaxDt);
         time += dt;
         LookData.Now = time;
+        UpdateMire(dt);   // forgets a finished Mire leviathan fight, whatever mode comes next (MireBoss.cs)
+        UpdateRay(dt);    // and a Starfall ray fight (RayBoss.cs)
+        UpdateTarpon(dt); // and Haring Buan-buan's (TarponBoss.cs)
         if (toastTimer > 0) toastTimer -= dt;
         toastAlpha = Math.Clamp(toastAlpha + (toastTimer > 0 ? dt : -dt) / 0.25f, 0, 1);
         if (MatchActive) UpdateMatch(dt);
@@ -1271,7 +1275,7 @@ partial class Game
         tomasX = TomasHomeX; tomasY = TomasHomeY;
         // Nothing carries over from a game played earlier in this session (quitting to the title and loading another slot).
         fish = null; reel = null; panel = null; boss = null; dlg = null; eclipse = null; race = null; raceArmed = false; sungka = null;
-        guardian = null; guardianDue = false; rocks.Clear();
+        guardian = null; guardianDue = false; rocks.Clear(); mire = null; ironbill = null; ray = null; rayHome = null; tarpon = null; tarponHome = null;
         ShutSungkaLan();
         ShutDockNet();
         stampDock = false;

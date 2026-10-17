@@ -1384,6 +1384,7 @@ partial class Game
         if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
         AddMarilayaObjects(list);
         AddMatchObjects(list);
+        AddMireObjects(list);
         AddDockObjects(list);
         AddRegattaObjects(list);
         if (Has("boat") > 0 && !Aboard)
@@ -1441,7 +1442,10 @@ partial class Game
             {
                 pix.Rect(bx - 2 + MathF.Round(MathF.Sin(t * 20)), by - 1, 1, 1, "#ffffff");
                 pix.Rect(bx + 2 + MathF.Round(MathF.Cos(t * 17)), by - 2, 1, 1, "#ffffff");
-                if (!OldArt && reel?.Roll?.Id == TowFish) DrawIronbillOver(t);   // the boss fight's own drawing (IronbillFight.cs)
+                if (reel?.Roll?.Id == MireFish) DrawMireOver(t);   // the Mire leviathan's own drawing (MireBoss.cs)
+                else if (reel?.Roll?.Id == RayFish) DrawRayOver(t);   // the Starfall ray's breach (RayBoss.cs)
+                else if (reel?.Roll?.Id == TarponFish) DrawTarponOver(t);   // Haring Buan-buan's leaps (TarponBoss.cs)
+                else if (!OldArt && reel?.Roll?.Id == TowFish) DrawIronbillOver(t);   // the boss fight's own drawing (IronbillFight.cs)
                 else if (reel?.Leap > 0 && OldArt && reel.Roll?.Id == TowFish)
                 {
                     // Ironbill clears the water in a long arc (tools/blender/landmarks2.py): nose up as it rises, level at the
@@ -1607,6 +1611,9 @@ partial class Game
         LightEclipse();
         LightFireflies(t);
         LightBaga(t);
+        LightMire();
+        LightRay();
+        LightTarpon();
         LightWindows();
         KeepMoonPath();
         ApplyDark(new Color(8, 16, 40, 255));
@@ -1619,6 +1626,9 @@ partial class Game
         DrawGlowTrail(t, k);
         DrawFireflies(t, k);
         GlowBaga(t, k);
+        GlowMire(k);
+        GlowRay(t, k);
+        GlowTarpon(t, k);
         GlowMount(k);
         GlowParola(t, k);
         GlowEclipse(k);
@@ -1660,6 +1670,10 @@ partial class Game
         // Under Bakunawa the view frames you and the serpent out in the channel together.
         float fx = player.X, fy = player.Y - 8;
         if (eclipse != null && scene == "world") { fx = (player.X + SerpentX) / 2; fy = (player.Y - 8 + SerpentY - (OldArt ? 12 : 60)) / 2; }
+        // Fighting the Mire leviathan, it eases over to frame you and the pool, with room above for its leaps (MireBoss.cs).
+        (fx, fy) = MireCamera(fx, fy);
+        (fx, fy) = RayCamera(fx, fy);
+        (fx, fy) = TarponCamera(fx, fy);
         camX = sw <= W ? -(W - sw) / 2 : Math.Clamp((int)MathF.Round(fx) - W / 2, 0, sw - W);
         camY = sh <= H ? -(H - sh) / 2 : Math.Clamp((int)MathF.Round(fy) - H / 2, 0, sh - H);
         // Big impacts (Tidemane landing, charging into a palm, stomping) shake the view, unless that is turned off in Settings.
@@ -1695,6 +1709,11 @@ partial class Game
             DrawSpots(t);
             DrawSchools(t);
             DrawIronbillUnder(t);
+            DrawMireUnder(t);
+            DrawRayUnder(t);
+            DrawRayHome(t);
+            DrawTarponUnder(t);
+            DrawTarponHome(t);
             DrawSeaLife(t);
             DrawBuoys(t);
             DrawRaceBuoys(t);
@@ -1708,6 +1727,9 @@ partial class Game
             DrawWhistle();
             DrawBossEffects(t);
             DrawFishing(t);
+            if (mode == "pause" && MireShown) DrawMireOver(t);   // a gulp or a leap stays where it was behind the pause menu
+            if (mode == "pause" && RayShown) DrawRayOver(t);
+            if (mode == "pause" && TarponShown) DrawTarponOver(t);
             DrawRelease(t);
             DrawEclipseRing();
             DrawSpouts(t);
