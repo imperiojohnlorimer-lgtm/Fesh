@@ -64,6 +64,8 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_CAVE_TEST") == "1" ? CaveFeatureScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MUD_TEST") == "1" ? MudScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_TITLE_TEST") == "1" ? TitleShotScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_IRONBILL_TEST") == "1" ? IronbillScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_ISLAND_TEST") == "1" ? IslandScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_WORLD_TEST") == "1" ? WorldScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_HOTBAR_TEST") == "1" ? HotbarScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_CHAPTER_TEST") == "1" ? ChapterScript().GetEnumerator()

@@ -332,7 +332,7 @@ partial class Game
         Settings.Data.dayLength = 24;
         float clock = state.clock, px0 = player.X;
         Inp.Hold(KeyboardKey.Left, true); yield return 30; Inp.Hold(KeyboardKey.Left, false);
-        Check("while it holds the moon the clock stops and you stay put", state.clock == clock && player.X == px0);
+        Check($"while it holds the moon the clock stops, and you can step aside ({px0:0} -> {player.X:0})", state.clock == clock && player.X < px0 && eclipse != null);
         Settings.Data.dayLength = 0;
         OpenPause(); float t0 = eclipse.T; yield return 20;
         Check("pausing pauses it", mode == "pause" && eclipse.T == t0);
@@ -347,14 +347,26 @@ partial class Game
         Check("reloading mid-eclipse brings it back that same night", eclipse != null && mode == "dialogue");
         while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 2; }
         for (int i = 0; i < 400 && eclipse?.Phase == "rise"; i++) yield return 1;
-        bool shot = false;
-        for (int i = 0; i < 3000 && eclipse?.Phase == "bang"; i++)
+        bool shot = false, sawWrithe = false, sawRoar = false, sawSpout = false, spoutShot = false, roarShot = false;
+        int maxVerse = 0, bestCombo = 0;
+        state.hp = 100;
+        for (int i = 0; i < 6000 && eclipse?.Phase == "bang"; i++)
         {
             // Strike as the ring meets the gong.
             if (!eclipse.Judged && (eclipse.Beat < 0.06f || eclipse.Beat > BeatLen - 0.06f)) { Inp.Tap(KeyboardKey.E); yield return 2; }
             else yield return 0;
             if (!shot && eclipse?.Hits >= 8 && eclipse.Beat > 0.05f && eclipse.Beat < 0.15f) { shot = true; pendingShot = "130b-bakunawa-noise"; }
+            if (eclipse != null)
+            {
+                maxVerse = Math.Max(maxVerse, eclipse.Verse); sawWrithe |= eclipse.Writhe > 0; sawRoar |= eclipse.Roar > 0; bestCombo = Math.Max(bestCombo, eclipse.BestCombo);
+                if (!spoutShot && eclipse.Spouts.Count > 0 && eclipse.Spouts[0].t < 0.6f) { spoutShot = true; pendingShot = "130c-bakunawa-spouts"; }
+                if (!roarShot && eclipse.Roar > 0) { roarShot = true; pendingShot = "130d-bakunawa-roar"; }
+                sawSpout |= eclipse.Spouts.Count > 0;
+            }
         }
+        Check($"the fight runs through three verses, writhing between them (verse {maxVerse}, writhed {sawWrithe})", maxVerse == 3 && sawWrithe);
+        Check($"from the second verse it spits seawater at the beach, and in the last it roars ({sawSpout}, {sawRoar})", sawSpout && sawRoar);
+        Check($"a run of four on the beat counts double (best run {bestCombo})", bestCombo >= 4);
         Check($"striking on the beat makes enough noise ({eclipse?.Hits} hits)", eclipse?.Phase is "spit" or "done" || mode == "moon");
         for (int i = 0; i < 400 && mode != "moon"; i++) yield return 1;
         Check("Bakunawa gives the moon back", mode == "moon");

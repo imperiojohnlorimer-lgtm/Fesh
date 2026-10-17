@@ -30,7 +30,7 @@ partial class Game
     const float AsinanBoatX = 225, AsinanBoatY = 530, AsinanWakeX = 196, AsinanWakeY = 662;
 
     // Fishing spots (Data.Spots reads these).
-    public const float AsinanSpotX = 85, AsinanSpotY = 650, PuloSpotX = 630, PuloSpotY = 668, ParolaSpotX = 1120, ParolaSpotY = 548;
+    public const float AsinanSpotX = 52, AsinanSpotY = 652, PuloSpotX = 630, PuloSpotY = 668, ParolaSpotX = 1120, ParolaSpotY = 548;
 
     // Landmarks, in pixels: the salt beds, the lighthouse and the islanders' houses.
     const float SaltBedX = 120, SaltBedY = 620, SaltBedW = 70, SaltBedH = 30;
@@ -41,6 +41,15 @@ partial class Game
         ("pacing", "Lola Pacing", 612, 632, "#8a5fb5", false),
         ("dado", "Dado", 655, 617, "#2f7fa3", true),
         ("celso", "Tatay Celso", 1238, 640, "#5e6468", true)
+    };
+
+    // 1.34: Asinan and Parola grow (bigger ellipses, nudged south, away from the deep rows along HabagatTop), keeping
+    // their north shores as they were where the landing and the Parola pier come in. Daang Pulo's islets stay small.
+    static readonly (float cx, float cy, float rx, float ry, (int x0, int y0, int x1, int y1)[] keep)[] HabagatGrowth =
+    {
+        (22f, 66f, 15.5f, 7.6f, new[] { (12, 50, 32, 59) }),
+        (119f, 65.5f, 12.8f, 7.4f, new[] { (106, 50, 120, 60) }),
+        (64f, 62.5f, 5f, 3.2f, Array.Empty<(int, int, int, int)>())
     };
 
     static double IsleNoise6(int x, int y, int s) => 0.09 * Math.Sin(x * .8 + y * .6 + s) + .06 * Math.Cos(y * 1.2 - x * .3 + s * 2);
@@ -55,7 +64,10 @@ partial class Game
                 for (int i = 0; i < HabagatIslands.Length; i++)
                 {
                     var h = HabagatIslands[i];
-                    double dx = (x + 0.5 - h.cx) / h.rx, dy = (y + 0.5 - h.cy) / h.ry, d = dx * dx + dy * dy + IsleNoise6(x, y, i + 3);
+                    var g = HabagatGrowth[i];
+                    double n = IsleNoise6(x, y, i + 3);
+                    double dx = (x + 0.5 - h.cx) / h.rx, dy = (y + 0.5 - h.cy) / h.ry, gx = (x + 0.5 - g.cx) / g.rx, gy = (y + 0.5 - g.cy) / g.ry;
+                    double d = GrownD(dx * dx + dy * dy + n, gx * gx + gy * gy + n, x, y, g.keep);
                     if (d < best) { best = d; islet = false; }
                 }
                 for (int i = 0; i < Islets.Length; i++)
@@ -80,7 +92,7 @@ partial class Game
                 char t = map[y, x];
                 if (t is not ('g' or 's') || HabagatClear(x, y)) continue;
                 double roll = Pix.Hash(x, y, 287);
-                char kind = t == 's' ? (roll < .1 ? 'h' : '\0') : roll < .05 ? 'y' : roll < .07 ? 'R' : roll < .1 ? 'h' : '\0';
+                char kind = t == 's' ? (BeachPalm(x, y, 6) || roll < .03 ? 'h' : '\0') : PlantRoll(x, y, 6, 'h');
                 if (kind == '\0') continue;
                 if (t == 'g' && (map[y - 1, x] != 'g' || map[y + 1, x] != 'g' || map[y, x - 1] != 'g' || map[y, x + 1] != 'g') && kind != 'h') continue;
                 string key = $"{x},{y}";
@@ -90,6 +102,7 @@ partial class Game
                     { stumps[(x, y)] = kind; continue; }
                     state.felled.Remove(key);
                 }
+                if (BuiltOn(x, y)) continue;
                 map[y, x] = kind; trees.Add((x, y, kind));
             }
         GenerateSanctuary();
@@ -101,6 +114,7 @@ partial class Game
         float px = x * T + 5, py = y * T + 5;
         if (HabagatSolids().Any(b => new Box(b.X - 14, b.Y - 14, b.W + 28, b.H + 28).Overlaps(new Box(x * T, y * T, T, T)))) return true;
         if (HabagatFolk.Any(n => Dist(px, py, n.x, n.y) < 30)) return true;
+        if (Dist(px, py, LighthouseX, LighthouseY + 10) < 48) return true;   // the lighthouse grounds, where the eclipse is watched
         if (HabagatJetties.Any(j => Math.Abs(x - j.x) <= 2 && y >= j.y0 - 1 && y <= j.y1 + 3)) return true;
         if (Data.Spots.Any(s => s.Scene == "world" && s.Biome == "habagat" && Dist(px, py, s.X, s.Y) < s.R + 12)) return true;
         return Islets.Any(s => Dist(px, py, s.cx * T, s.cy * T) < 20);

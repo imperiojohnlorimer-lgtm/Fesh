@@ -348,6 +348,57 @@ partial class Game
         Array.Copy(keepMap, worldMap, keepMap.Length);
         RenderBase();
 
+        // 1.33: every island has terrain of its own, and the coast has banks and steps (Relief.cs).
+        {
+            var names = new (string name, int x0, int x1, int y0, int y1, float minMax)[]
+            {
+                ("Saltmere", 0, 32, 0, 18, 0.2f), ("Frostfang", 45, 80, 0, 20, 0.5f), ("Sunscald", 46, 86, 26, 50, 0.3f), ("Mirewood", 3, 37, 27, 49, 0.2f),
+                ("Amihan Village", 151, 181, 9, 35, 0.2f), ("Luntian", 193, 217, 6, 26, 0.5f)
+            };
+            foreach (var (name, x0, x1, y0, y1, minMax) in names)
+            {
+                float lo = 1, hi = 0;
+                for (int ty = y0; ty < y1; ty++)
+                    for (int tx = x0; tx < x1; tx++)
+                    {
+                        if (landDist[ty, tx] < 3) continue;
+                        for (int py = 0; py < T; py += 3)
+                            for (int px = 0; px < T; px += 3) { float h = Rel(tx * T + px, ty * T + py); lo = MathF.Min(lo, h); hi = MathF.Max(hi, h); }
+                    }
+                Check($"{name} has hills of its own ({lo:0.00} to {hi:0.00})", hi >= minMax && hi - lo > minMax * 0.5f);
+            }
+            int marilayaTerrain = 0, terrainTiles = 0;
+            for (int ty = 0; ty < ROWS; ty++)
+                for (int tx = 0; tx < COLS; tx++)
+                {
+                    if (TerrainAt(tx, ty) == null) continue;
+                    terrainTiles++;
+                    if (tx >= MlStart) marilayaTerrain++;
+                }
+            Check($"Marilaya keeps its own relief ({marilayaTerrain} of {terrainTiles} tiles with the new terrain)", terrainTiles > 1000 && marilayaTerrain == 0);
+            // Banks and steps only ever stand on land with water (or sand, for a step) to the south; beaches have no bank.
+            int faces = 0, loose = 0, sandFaces = 0; var looseAt = new List<string>();
+            var faceColours = new HashSet<Color>(BankFace.Values.SelectMany(a => a));
+            for (int wy = 0; wy < PH; wy += 1)
+                for (int wx = 0; wx < PW; wx += 1)
+                {
+                    char s = ShapePx(wx, wy);
+                    if (!Shore(s) || !BankFace.ContainsKey(s) || TerrainAt(wx / T, wy / T) is not { } tr) continue;
+                    var c = worldBase.Buf[wy * PW + wx];
+                    if (!faceColours.Contains(c) || BankPixel(wx, wy, s, tr, c) is not { } bc || bc.R != c.R || bc.G != c.G || bc.B != c.B) continue;   // a face pixel, not a pebble that happens to match
+                    // Only the face colours that were not mixed with anything else can be told for certain.
+                    bool south = false;
+                    for (int k = 1; k <= 6 && !south; k++) { char u = ShapePx(wx, wy + k); south = u is '~' or 'w' or 's'; }
+                    faces++;
+                    if (!south) { loose++; if (looseAt.Count < 4) looseAt.Add($"{wx},{wy} {s}"); }
+                }
+            for (int wy = 0; wy < PH; wy += 2)
+                for (int wx = 0; wx < PW; wx += 2)
+                    if (ShapePx(wx, wy) == 's' && faceColours.Contains(worldBase.Buf[wy * PW + wx])) sandFaces++;
+            Check($"banks and steps stand on land with water or sand to the south ({faces} face pixels, {loose} loose {string.Join(" ", looseAt)})", faces > 1000 && loose == 0);
+            Check($"a beach has no bank face ({sandFaces} sand pixels in a face colour)", sandFaces == 0);
+        }
+
         // Thinning Tindig's forest doesn't turn the gaps into boulders.
         int rocks = 0, forestTiles = 0;
         for (int ty = 0; ty < ROWS; ty++)

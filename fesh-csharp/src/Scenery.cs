@@ -347,7 +347,14 @@ partial class Game
             var c = tones[v < 0.38f ? 0 : v > 0.62f ? 2 : 1];
             return MlRelief(wx, wy, g, c, shade);
         }
-        // Everywhere else the islands rise gently from their shores into low rolling ground, lit the same way.
+        // Every other island has its own terrain (Relief.cs): baked heights lit from the north-west, banks on its coast.
+        if (TerrainAt(tx, wy / T) is { } terrain && relief != null)
+        {
+            float shade = ReliefShadeAt(wx, wy, terrain);
+            v += shade * 0.6f;
+            return ReliefPixel(wx, wy, g, tones[v < 0.38f ? 0 : v > 0.62f ? 2 : 1], shade, terrain);
+        }
+        // The rest rise gently from their shores into low rolling ground, lit the same way.
         float isle = IsleShade(wx, wy);
         v += isle * 0.5f;
         var col = tones[v < 0.38f ? 0 : v > 0.62f ? 2 : 1];
@@ -758,6 +765,7 @@ partial class Game
         if (fade) pix.Alpha = 0.4f;
         try
         {
+            if (DrawModelTree(tx, ty, kind, bx, by, sw, s / TreeScale(kind), m)) return;
             switch (kind)
             {
                 case 'f': DrawFir(tx, ty, bx, by, sw, s); break;
@@ -984,7 +992,8 @@ partial class Game
     // (a low wide mound, a tall one, a tuft of lobes), with the berries sitting in the shade where they show.
     void DrawBush(int tx, int ty, int bx, int by)
     {
-        if (!OldArt) { DrawLeafyBush(tx, ty, bx, by); return; }
+        if (DrawModelBush(tx, ty, bx, by)) return;
+        if (BushStyle == "leafy") { DrawLeafyBush(tx, ty, bx, by); return; }
         float s = (0.95f + 0.18f * (float)Pix.Hash(tx, ty, 63)) * 1.35f;
         int shape = (int)(Pix.Hash(tx, ty, 64) * 3) % 3, m = Pix.Hash(tx, ty, 65) < 0.5 ? 1 : -1;
         pix.Rect(bx - 8 * s, by - 1, (int)(16 * s), 2, TreeShadow);

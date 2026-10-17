@@ -231,7 +231,8 @@ partial class Game
         var sunk = state.builds.Where(b =>
         {
             var d = Data.BuildById[b.id];
-            return Enumerable.Range(0, d.W).Any(i => worldMap[b.y, Math.Clamp(b.x + i, 0, COLS - 1)] is var t && (d.Water ? t == '~' : Water.Contains(t)));
+            // 1.34: the islands grew, so a crab pot or bubo can now stand on land: it comes back too.
+            return Enumerable.Range(0, d.W).Any(i => worldMap[b.y, Math.Clamp(b.x + i, 0, COLS - 1)] is var t && (d.Water ? t == '~' || Land.Contains(t) : Water.Contains(t)));
         }).ToList();
         foreach (var b in sunk) { state.builds.Remove(b); PackUp(b); }
         if (sunk.Count > 0) { ReindexBuilds(); mapTexDirty = true; Save(); }

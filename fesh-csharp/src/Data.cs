@@ -454,7 +454,7 @@ static class Data
         new("wreck", "Old wreck", "Fish by the old wreck", 76, 164, 26),
         new("deep", "Deep water", "Fish the deep water", 312, 95, 22),
         new("icehole", "Ice hole", "Fish through the ice", 605, 85, 22, "frost"),
-        new("glacier", "Glacier shore", "Fish off the glacier shore", 795, 88, 26, "frost"),
+        new("glacier", "Glacier shore", "Fish off the glacier shore", 835, 75, 26, "frost"),
         new("oasis", "The oasis", "Fish in the oasis", 685, 405, 40, "dunes"),
         new("mirage", "Mirage coast", "Fish off the mirage coast", 665, 505, 26, "dunes"),
         new("swamp", "Mangrove swamp", "Fish in the swamp", 145, 405, 42, "mire"),
@@ -463,7 +463,7 @@ static class Data
         new("cavepool", "Cave pool", "Fish the cave pool", 0, 0, 36, "frost", "cave"),
         new("ancientpool", "Ancient pool", "Fish the ancient pool", 0, 0, 44, "frost", "cave"),
         new("atolllagoon", "Atoll lagoon", "Fish the atoll lagoon", 1060, 272, 32, "atoll"),
-        new("dropoff", "Deep drop-off", "Fish the deep drop-off", 1135, 76, 36, "atoll"),
+        new("dropoff", "Deep drop-off", "Fish the deep drop-off", 1135, 56, 36, "atoll"),
         // A blue hole hidden in a ring of palms on the atoll. It stays off the map and out of the Fish log until you find it.
         new("starwell", "The Starwell", "Fish the Starwell", Game.StarwellX, Game.StarwellY, 40, "atoll"),
         // Anywhere over deep water, from the boat or Tidemane's back: west of Amihan, and in Amihan's own waters.

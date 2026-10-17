@@ -6,13 +6,24 @@ namespace Fesh;
 // stories, rises with the moon in its jaws, and the islanders bang their pots while you beat the agong on the beat until
 // it gives the moon back. Nobody fights it. The eclipse runs in mode "play" like the Tidemane fight (the clock stops,
 // you stay put, and E beats the gong); it isn't saved, so a reload that night starts it again.
-sealed class Eclipse { public string Phase = "rise"; public float T, Beat, Rise; public int Noise, Hits, Misses; public bool Judged; }
+sealed class Eclipse
+{
+    public string Phase = "rise"; public float T, Beat, Rise; public int Noise, Hits, Misses; public bool Judged;
+    // 1.35: three verses, each faster; a combo of hits on the beat counts double; between verses it writhes; it spits
+    // seawater at the beach (verse 2 on) and roars over the noise (verse 3).
+    public int Verse = 1, Combo, BestCombo; public float Writhe, Roar, RoarT = 5, SpoutT = 2.5f, Flinch;
+    public List<(float x, float y, float t)> Spouts = new();
+    public List<(float x, float y, float t)> Splashes = new();
+}
 
 partial class Game
 {
     Eclipse eclipse;
-    const float BeatLen = 0.75f, BeatWindow = 0.17f;
-    const int NoiseNeeded = 14;
+    const float BeatWindow = 0.17f;
+    // The beat quickens verse by verse.
+    float BeatLen => (eclipse?.Verse ?? 1) switch { 1 => 0.75f, 2 => 0.64f, _ => 0.56f };
+    const int VerseNoise = 6;
+    const int NoiseNeeded = VerseNoise * 3;
     const float SerpentY = 545;
     // Where Bakunawa rises, in the channel off Parola's north shore, its tail clear of the pier (the Blender serpent is
     // much longer than the old one, so it rises further east).
@@ -85,13 +96,15 @@ partial class Game
     }
 
     /* ---------- The eclipse ---------- */
-    bool EclipseReady => !MoonReturned && state.parola >= 3 && MoonClueCount == Data.MoonClues.Length && Has("agong") > 0;
+    // 1.35: after the moon is saved, Bakunawa comes back for a rematch on later full-moon nights (once a night).
+    bool EclipseReady => (!MoonReturned || state.gifts.GetValueOrDefault("eclipse", -1) != state.day) && state.parola >= 3 && MoonClueCount == Data.MoonClues.Length && Has("agong") > 0;
     bool OnParola => scene == "world" && !Aboard && !Riding && Dist(player.X, player.Y, LighthouseX, LighthouseY) < 150 && !WaterTile(TileUnder(player.X, player.Y));
 
     void CheckEclipse()
     {
         if (eclipse != null || mode != "play" || !EclipseReady || !FullMoon || Stormy || !OnParola) return;
         eclipse = new Eclipse();
+        if (MoonReturned) state.gifts["eclipse"] = state.day;
         FaceToward(SerpentX, SerpentY);
         player.Moving = false;
         Talk(new()
@@ -120,12 +133,39 @@ partial class Game
                 break;
             case "bang":
             {
+                e.Flinch = Math.Max(0, e.Flinch - dt);
+                UpdateSpouts(e, dt);
+                if (e.Writhe > 0)
+                {
+                    // Between verses it thrashes, half sinking and heaving up again, then the beat comes back faster.
+                    e.Writhe -= dt;
+                    e.Rise = 0.72f + 0.28f * MathF.Abs(MathF.Cos(e.Writhe * 3.2f));
+                    quake = 0.15f;
+                    if (e.Writhe <= 0)
+                    {
+                        e.Verse++; e.Rise = 1; e.Beat = 0; e.Judged = false; e.SpoutT = 1.5f; e.RoarT = 1.8f;
+                        Floater(e.Verse == 2 ? "Faster!" : "Faster still!", player.X, player.Y - 34, "#ffd76a");
+                        Sfx.Play("gong");
+                    }
+                    break;
+                }
                 // The villagers' pots clang on every beat. One strike counts per beat (the window opens again halfway
                 // between beats); a beat that slips by with no strike costs nothing, a strike off the beat does.
                 float before = e.Beat;
                 e.Beat += dt;
-                if (e.Beat >= BeatLen) { e.Beat -= BeatLen; Sfx.Play("clang"); }
+                if (e.Beat >= BeatLen) { e.Beat -= BeatLen; if (e.Roar <= 0) Sfx.Play("clang"); }
                 if (before < BeatLen / 2 && e.Beat >= BeatLen / 2) e.Judged = false;
+                // The last verse: now and then it roars over the noise for a couple of beats. Strikes then are lost.
+                if (e.Verse >= 3)
+                {
+                    if (e.Roar > 0) e.Roar -= dt;
+                    else if ((e.RoarT -= dt) <= 0)
+                    {
+                        e.Roar = BeatLen * 2.5f; e.RoarT = Rand(5f, 7f);
+                        quake = 0.45f; Sfx.Play("splash");
+                        Floater("ROAR! Hold off!", player.X, player.Y - 34, "#ff6a5a");
+                    }
+                }
                 break;
             }
             case "spit":
@@ -140,23 +180,114 @@ partial class Game
     {
         var e = eclipse;
         if (e?.Phase != "bang") return;
+        if (e.Writhe > 0) return;   // it's thrashing: wait for the beat to come back
         float off = MathF.Min(e.Beat, BeatLen - e.Beat);
         Swing("mallet", 0.2f);
+        if (e.Roar > 0)
+        {
+            // Its roar drowns the agong out, and the run of beats is broken.
+            e.Combo = 0;
+            Sfx.Play("nope");
+            Floater("Drowned out!", player.X, player.Y - 30, "#ff9a8a");
+            return;
+        }
         if (off <= BeatWindow && !e.Judged)
         {
             e.Judged = true;
-            e.Noise++; e.Hits++;
+            e.Combo++; e.BestCombo = Math.Max(e.BestCombo, e.Combo); e.Hits++;
+            // Four on the beat in a row and every strike after counts twice.
+            int add = e.Combo >= 4 ? 2 : 1;
+            e.Noise = Math.Min(NoiseNeeded, e.Noise + add);
+            e.Flinch = 0.25f;
             Sfx.Play("gong");
-            Floater(e.Noise >= NoiseNeeded ? "BONG!" : "Bong!", player.X, player.Y - 30, "#ffd76a");
-            quake = 0.12f;
-            if (e.Noise >= NoiseNeeded) { e.Phase = "spit"; e.T = 0; Sfx.Play("rare"); quake = 0.5f; Toast("Bakunawa rears back... and spits out the moon!", 4); }
+            Floater(e.Noise >= NoiseNeeded ? "BONG!" : add == 2 ? $"THUNDER! x{e.Combo}" : "Bong!", player.X, player.Y - 30, add == 2 ? "#ffb04a" : "#ffd76a");
+            quake = add == 2 ? 0.2f : 0.12f;
+            if (e.Noise >= NoiseNeeded) { e.Phase = "spit"; e.T = 0; e.Spouts.Clear(); Sfx.Play("rare"); quake = 0.5f; Toast("Bakunawa rears back... and spits out the moon!", 4); }
+            else if (e.Noise >= e.Verse * VerseNoise && e.Verse < 3)
+            {
+                // A verse done: it loses its grip for a moment and thrashes.
+                e.Writhe = 2.2f; e.Spouts.Clear(); e.Combo = 0;
+                quake = 0.6f; Sfx.Play("splash");
+                Toast(e.Verse == 1 ? "Bakunawa writhes! Its grip on the moon slips. Get ready: it will spit seawater at the beach." : "It writhes again! The last verse: when it roars, hold off the agong.", 4);
+            }
         }
         else
         {
             e.Misses++;
-            e.Noise = Math.Max(0, e.Noise - 1);
+            e.Combo = 0;
+            e.Noise = Math.Max((e.Verse - 1) * VerseNoise, e.Noise - 1);
             Sfx.Play("nope");
             Floater("Off the beat", player.X, player.Y - 30, "#ff9a8a");
+        }
+    }
+
+    // From the second verse it spits seawater at the beach: rings mark where it will come down (shrinking as it falls), and
+    // anyone still standing there is knocked off their feet and the noise falters. Step aside, keep the beat.
+    void UpdateSpouts(Eclipse e, float dt)
+    {
+        for (int i = e.Splashes.Count - 1; i >= 0; i--)
+        {
+            var s = e.Splashes[i];
+            s.t -= dt;
+            if (s.t <= 0) e.Splashes.RemoveAt(i); else e.Splashes[i] = s;
+        }
+        for (int i = e.Spouts.Count - 1; i >= 0; i--)
+        {
+            var s = e.Spouts[i];
+            s.t -= dt;
+            if (s.t > 0) { e.Spouts[i] = s; continue; }
+            e.Spouts.RemoveAt(i);
+            e.Splashes.Add((s.x, s.y, 0.6f));
+            Burst(s.x, s.y - 2, "#cfe8ee", 10);
+            Sfx.Play("splash");
+            quake = Math.Max(quake, 0.2f);
+            if (Dist(player.X, player.Y, s.x, s.y) < SpoutR && iframes <= 0)
+            {
+                state.hp = Math.Max(0, state.hp - 8 * ArmourMul);
+                iframes = 0.8f; hurtFlash = 0.35f; lastHitT = time;
+                e.Combo = 0; e.Noise = Math.Max((e.Verse - 1) * VerseNoise, e.Noise - 1);
+                Sfx.Play("hurt");
+                Floater("Soaked!", player.X, player.Y - 30, "#9fd8ff");
+                if (state.hp <= 0) { Faint(); return; }
+            }
+        }
+        if (e.Verse < 2 || e.Writhe > 0 || e.Phase != "bang") return;
+        if ((e.SpoutT -= dt) > 0) return;
+        e.SpoutT = e.Verse >= 3 ? Rand(2.6f, 3.4f) : Rand(3.2f, 4.2f);
+        int n = e.Verse >= 3 ? 3 : 2;
+        // One right where you stand, the others round about.
+        for (int k = 0; k < n; k++)
+        {
+            float a = Rand(0, MathF.Tau), d = k == 0 ? 0 : Rand(16, 30);
+            e.Spouts.Add((player.X + MathF.Cos(a) * d, player.Y + MathF.Sin(a) * d * 0.7f, SpoutFall));
+        }
+    }
+    const float SpoutR = 9, SpoutFall = 1.4f;
+
+    // The spouts: a shrinking ring on the sand, and the water coming down from the serpent's jaws as it falls.
+    void DrawSpouts(float t)
+    {
+        var e = eclipse;
+        if (e == null) return;
+        var (mx, my) = SerpentMouth(t);
+        foreach (var (x, y, left) in e.Spouts)
+        {
+            float k = 1 - left / SpoutFall;
+            float rr = SpoutR * (1.6f - k * 0.6f);
+            Disc(x, y, SpoutR, Pal.Rgba(255, 60, 50, 0.12f + 0.18f * k));
+            pix.Ring(x, y, rr, Pal.Rgba(255, 120, 90, 0.6f + 0.4f * k));
+            pix.Ring(x, y, rr + 1, Pal.Rgba(255, 90, 70, 0.5f + 0.4f * k));
+            pix.Ring(x, y, SpoutR * 0.4f, Pal.Rgba(255, 90, 70, 0.5f * k));
+            // The water in the air, arcing from the mouth.
+            float bx = mx + (x - mx) * k, by = my + (y - my) * k - MathF.Sin(k * MathF.PI) * 50;
+            pix.Rect(bx - 2, by - 2, 4, 4, Pal.Rgba(170, 220, 240, 0.9f));
+            pix.Rect(bx - 1, by - 3, 2, 1, "#eef9fb");
+        }
+        foreach (var (x, y, left) in e.Splashes)
+        {
+            float k = 1 - left / 0.6f;
+            pix.Ring(x, y, 3 + k * 12, Pal.Rgba(220, 240, 250, 0.8f * (1 - k)));
+            for (int i = 0; i < 6; i++) pix.Rect(x + (i - 3) * 2.5f, y - 8 * (1 - k) * MathF.Abs(MathF.Sin(i * 1.3f + 0.5f)), 1, 2, Pal.Rgba(220, 240, 250, 0.9f * (1 - k)));
         }
     }
 
@@ -172,7 +303,17 @@ partial class Game
         if (mode != "moon" || Raylib_cs.Raylib.GetTime() - catchOpenedAt < 0.6) return;
         eclipse = null;
         mode = "play";
+        if (MoonReturned)
+        {
+            // A rematch: the moon back again, and the islands' thanks.
+            state.coins += 120;
+            Sfx.Play("ui");
+            Save();
+            Talk(new() { new("Tatay Celso", "It came back for the moon, and we drove it off again! Here, the islands put this together for you."), new("", "You got 120 coins.") });
+            return;
+        }
         state.hinted["moonReturned"] = true;
+        state.gifts["eclipse"] = state.day;   // no rematch the same night
         Give("moon_charm");
         Sfx.Play("ui");
         Save();
@@ -320,11 +461,18 @@ partial class Game
     void DrawEclipseRing()
     {
         if (eclipse?.Phase != "bang") return;
-        float ph = eclipse.Beat / BeatLen;
+        var e = eclipse;
+        float ph = e.Beat / BeatLen;
         int gx = (int)MathF.Round(player.X), gy = (int)MathF.Round(player.Y) - 26;
         pix.Rect(gx - 3, gy - 3, 7, 7, "#a8742a"); pix.Rect(gx - 2, gy - 2, 5, 5, "#c98b3a"); pix.Rect(gx, gy, 1, 1, "#ffe8a0");
+        if (e.Writhe > 0) return;   // no beat while it thrashes
         float off = ph < 0.5f ? ph : 1 - ph;   // how far from the beat
-        pix.Ring(gx + 0.5, gy + 0.5, 4 + off * 22, Pal.Rgba(255, 215, 106, 0.95f - off));
+        // Red while it roars (hold off); gold, and orange once a run of four makes every strike count twice.
+        var ring = e.Roar > 0 ? Pal.Rgba(255, 80, 70, 0.95f - off) : e.Combo >= 3 ? Pal.Rgba(255, 170, 70, 0.95f - off) : Pal.Rgba(255, 215, 106, 0.95f - off);
+        pix.Ring(gx + 0.5, gy + 0.5, 4 + off * 22, ring);
+        if (e.Roar > 0) { pix.Rect(gx - 4, gy - 4, 9, 1, "#ff5040"); pix.Rect(gx - 4, gy + 4, 9, 1, "#ff5040"); }
+        // The run of beats: a pip for each, up to four.
+        for (int i = 0; i < Math.Min(4, e.Combo); i++) pix.Rect(gx - 5 + i * 3, gy + 7, 2, 2, e.Combo >= 4 ? "#ffb04a" : "#ffd76a");
     }
 
     // During the eclipse the moonlight goes out: a deep red tint over everything, lifting as the moon comes back.

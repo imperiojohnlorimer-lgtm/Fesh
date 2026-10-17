@@ -267,8 +267,10 @@ partial class Game
     {
         towing = Aboard && mode == "reeling" && reel?.Roll.Id == TowFish && fish != null;
         if (!towing) return;
-        bool run = reel.Running > 0 || reel.Leap > 0;
-        towAng += dt * (run ? 0.75f : 0.3f);
+        // While it charges (IronbillFight.cs) it's on its way across, not towing; while it eyes you up it holds still.
+        if (ironbill is { ChargeT: > 0 }) return;
+        bool run = reel.Running > 0 || reel.Leap > 0 || ironbill is { Walk: > 0 };
+        if (reel.AttackWarning <= 0) towAng += dt * (ironbill is { Walk: > 0 } ? 1.4f : run ? 0.75f : 0.3f);
         float fx = player.X + MathF.Cos(towAng) * 46, fy = player.Y - 4 + MathF.Sin(towAng) * 30;
         fish.Bx = fish.Tx = fx; fish.By = fish.Ty = fy;
         float dx = fx - player.X, dy = fy - player.Y, d = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));

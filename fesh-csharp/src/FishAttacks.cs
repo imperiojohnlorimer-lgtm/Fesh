@@ -6,21 +6,23 @@ partial class Game
     // Release for the last 0.2 seconds to dodge; a held reel takes damage and a small progress penalty.
     bool UpdateFishAttack(ReelState r, float dt, bool hold)
     {
-        int damage = Data.FishById.GetValueOrDefault(r.Roll.Id)?.Attack ?? 0;
+        // Ironbill charges the boat from its second phase on (IronbillFight.cs); it takes longer to come round.
+        bool bill = r.Roll.Id == TowFish;
+        int damage = bill ? IronbillChargeDamage : Data.FishById.GetValueOrDefault(r.Roll.Id)?.Attack ?? 0;
         if (damage == 0) return false;
         if (r.AttackWarning <= 0)
         {
             r.AttackTimer -= dt;
-            if (r.AttackTimer > 0 || r.Leap > 0 || r.Running > 0) return false;
-            r.AttackWarning = 1.25f; r.DuckTime = 0;
+            if (r.AttackTimer > 0 || r.Leap > 0 || r.Running > 0 || bill && ironbill is { Walk: > 0 } or { ChargeT: > 0 }) return false;
+            r.AttackWarning = bill ? 1.5f : 1.25f; r.DuckTime = 0;
             Sfx.Play("splash");
-            Floater("Watch out!", player.X, player.Y - 29, "#ff9a8a");
+            Floater(bill ? "It's turning on you!" : "Watch out!", player.X, player.Y - 29, "#ff9a8a");
         }
         r.AttackWarning = Math.Max(0, r.AttackWarning - dt);
         r.DuckTime = hold ? 0 : r.DuckTime + dt;
-        SetPrompt("Fish attack! Release [<act>] / the mouse to duck until the warning passes!", null, true);
+        SetPrompt(bill ? "Ironbill charges! Let go of [<act>] / the mouse to brace before it hits!" : "Fish attack! Release [<act>] / the mouse to duck until the warning passes!", null, true);
         if (r.AttackWarning > 0) return true;
-        r.AttackTimer = Rand(3.5f, 5f);
+        r.AttackTimer = bill ? Rand(6f, 8.5f) : Rand(3.5f, 5f);
         if (r.DuckTime >= .2f)
         {
             Floater("Dodged!", player.X, player.Y - 24, "#7fd36b"); Sfx.Play("coin");

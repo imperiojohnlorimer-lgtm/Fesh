@@ -161,7 +161,7 @@ partial class Game
     }
 
     // Each island has its own tune; the cave and houses have theirs. Rain adds its own patter outdoors.
-    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine || GuardianFighting ? "boss" : SeaEmergency && evac.Phase != "quake" || BagaEvacuating ? "alarm" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
+    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine || GuardianFighting || IronbillOnLine ? "boss" : SeaEmergency && evac.Phase != "quake" || BagaEvacuating ? "alarm" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
         : RondallaPlaying ? "rondalla" : Data.Biomes[lastBiome < Data.Biomes.Length ? lastBiome : PlayerBiome()].Id;
 
     void PickMusic(float dt)
@@ -1150,7 +1150,8 @@ partial class Game
                 push = Math.Clamp(0.35f + 0.65f * (Inp.Stick.Length() - 0.35f) / 0.5f, 0.35f, 1);
             }
             // Under Bakunawa you stand your ground with the agong.
-            if (eclipse != null || Ducking) dx = dy = 0;
+            // 1.35: during the noise you can step about (out from under the spouts); not while it rises or gives the moon back.
+            if (eclipse is { Phase: not "bang" } || Ducking) dx = dy = 0;
             player.Moving = dx != 0 || dy != 0;
             // On Tidemane you gallop on land and swim through any water, picking up speed and pulling up (Tidemane.cs).
             if (Riding) RideMove(dx, dy, push, dt);
@@ -1233,6 +1234,7 @@ partial class Game
 
         UpdateTow(dt);
         UpdateFishing(dt);
+        UpdateIronbill(dt);
     }
 
     // A short banner when you step off a bridge onto a different island.

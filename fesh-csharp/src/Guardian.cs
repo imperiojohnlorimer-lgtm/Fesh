@@ -42,7 +42,7 @@ partial class Game
     bool GuardianMet => state.Hinted("platejawMet");
     bool GuardianFighting => guardian != null && guardian.Phase != "sink";
     bool CoelacanthCaught => state.commons.GetValueOrDefault("ancient_coelacanth") > 0;
-    bool CanWakeGuardian => OnAncientFloor && CoelacanthCaught && !GuardianBeaten && guardian == null;
+    bool CanWakeGuardian => OnAncientFloor && CoelacanthCaught && guardian == null;   // 1.35: a rematch any time after the win
 
     /* ---------- Waking it ---------- */
     void GuardianRise(bool fromCatch)
@@ -546,8 +546,8 @@ partial class Game
     }
 
     /* ---------- The carved stone ---------- */
-    Target RuneStoneTarget() => CoelacanthCaught && !GuardianBeaten
-        ? new Target { Type = "runestone", Label = GuardianMet ? $"Knock on the carved stone (calls {GuardianName} up)" : "Knock on the carved stone" }
+    Target RuneStoneTarget() => CoelacanthCaught
+        ? new Target { Type = "runestone", Label = GuardianBeaten ? $"Knock on the carved stone (a rematch with {GuardianName})" : GuardianMet ? $"Knock on the carved stone (calls {GuardianName} up)" : "Knock on the carved stone" }
         : new Target { Type = "runestone", Label = "Read the carved stone" };
 
     void UseRuneStone()

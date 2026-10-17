@@ -318,9 +318,11 @@ partial class Game
 
         /* ---------- Afterwards ---------- */
         player.X = RuneStoneX; player.Y = RuneStoneY + 9; player.Face = "up"; yield return 3;
-        Check($"beaten, the stone can only be read (prompt: {prompt.Text})", target?.Type == "runestone" && prompt.Text.Contains("Read"));
+        // 1.35: beaten, it can be called up again for a rematch.
+        Check($"beaten, the stone offers a rematch (prompt: {prompt.Text})", target?.Type == "runestone" && prompt.Text.Contains("rematch"));
         Inp.Tap(KeyboardKey.E); yield return 3;
-        Check("and knocking wakes nothing now", mode == "dialogue" && guardian == null);
+        Check("and knocking calls it up again", guardian != null);
+        GuardianRetreat(); yield return 3;
         while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 2; }
         legendId = "ancient_coelacanth"; catchOpenedAt = -10; mode = "legend";
         CloseLegend(); yield return 3;

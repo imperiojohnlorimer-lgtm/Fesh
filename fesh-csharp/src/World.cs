@@ -14,7 +14,7 @@ partial class Game
     float[] dark = new float[ViewW * ViewH];
     bool mapTexDirty = true;
 
-    static readonly (int x, int y)[] SaltTrees = { (21, 6), (23, 8), (12, 11), (19, 12), (23, 11), (8, 9), (13, 3) };
+    static readonly (int x, int y)[] SaltTrees = { (21, 6), (23, 8), (12, 11), (19, 12), (23, 11), (8, 9), (13, 3), (6, 7), (16, 4) };   // the last two in the room 1.34 added
     static readonly (int x, int y)[] SaltBushes = { (9, 10), (12, 4), (15, 12) };   // the third used to stand at (22, 10), where Pip's stall hid half of it
     // The mouth of Frostfang Caverns covers these four tiles; you enter standing just below it.
     const int MouthX = 56, MouthY = 2;
@@ -24,7 +24,10 @@ partial class Game
     // The other islands: biome, center and radii in tiles. Saltmere keeps its original shape in the top-left corner.
     // Starfall Atoll (biome 4) has no bridge; you get there by boat (or on Tidemane). A channel of deep water keeps
     // it out of reach of waders from the Dunes.
-    static readonly (byte biome, float cx, float cy, float rx, float ry)[] Isles = { (1, 62, 9, 17, 8), (2, 66, 38, 20, 12), (3, 20, 38, 17, 11), (4, 113, 26, 17, 15) };
+    // 1.34: each a quarter bigger than it was (Frostfang 17x8, Sunscald 20x12 at 66,38, Mirewood 17x11 at 20,38, the atoll
+    // 17x15), with narrower shallows (Shallows) so the channels between them stay deep enough to need a bridge or a boat.
+    static readonly (byte biome, float cx, float cy, float rx, float ry)[] Isles = { (1, 62, 9.4f, 20.5f, 8.2f), (2, 66.5f, 37.5f, 21.5f, 13.5f), (3, 20.5f, 38.6f, 19.5f, 11.2f), (4, 113.5f, 25.5f, 20, 17) };
+    const double Shallows = 1.25;
     // Bridges are drawn along these lines, but only over open sea, so they always join shore to shore.
     // The lines run well into both islands so a wobbly coastline can't leave a gap.
     static readonly (int x0, int y0, int x1, int y1)[] Bridges = { (20, 5, 56, 5), (16, 10, 16, 34), (66, 12, 66, 32), (28, 38, 52, 38) };
@@ -43,7 +46,6 @@ partial class Game
     readonly HashSet<(int, int)> bridgeSet = new();
     // Per biome, in Data.Biomes order (Habagat and Marilaya, the last two, place their own trees: GenerateHabagat, GenerateMarilaya).
     static readonly char[] InnerGround = { 'g', 'n', 'D', 'j', 's', 'j', 'g', 'g' }, ShoreGround = { 's', 'e', 's', 's', 's', 's', 's', 's' }, TreeKind = { 't', 'f', 'c', 'h', 'h', 'h', 'h', 't' };
-    static readonly float[] TreeDensity = { 0, 0.12f, 0.05f, 0.24f, 0.16f, 0.12f, 0.1f, 0 }, BoulderDensity = { 0, 0.025f, 0.03f, 0.015f, 0, 0.015f, 0.02f, 0 };
     static readonly HashSet<char> Land = new() { 's', 'g', 'p', 't', 'n', 'e', 'i', 'D', 'j', 'f', 'c', 'h', 'R' };
     static readonly HashSet<char> Water = new() { '~', 'w', 'l', 'T', 'x', 'r', 'o', 'm', 'I', 'k' };
 
@@ -54,6 +56,27 @@ partial class Game
     {
         double dx = (x + 0.5 - 15.5) / 10.6, dy = (y + 0.5 - 8.6) / 6.1;
         return dx * dx + dy * dy + Noise(x, y);
+    }
+
+    // 1.34: Saltmere grows outward (a bigger ellipse) everywhere except round the places its story and spots need just as
+    // they were: the wreck's islet and the tide's path to it (south-west), Pip's jetty, the dock and the deep water off it
+    // (east), and the rocks of the rocky shore (north). The growth fades in over two tiles from those, so no notch shows.
+    static readonly (int x0, int y0, int x1, int y1)[] SaltKeep = { (0, 10, 11, 17), (23, 6, 31, 13), (17, 0, 26, 5) };
+
+    static double SaltGrownD(int x, int y)
+    {
+        double d = SaltD(x, y);
+        double gx = (x + 0.5 - 15.5) / 12.8, gy = (y + 0.5 - 8.4) / 7.1;
+        double big = gx * gx + gy * gy + Noise(x, y);
+        if (big >= d) return d;
+        double near = 99;
+        foreach (var (x0, y0, x1, y1) in SaltKeep)
+        {
+            double ox = Math.Max(0, Math.Max(x0 - x, x - x1)), oy = Math.Max(0, Math.Max(y0 - y, y - y1));
+            near = Math.Min(near, Math.Sqrt(ox * ox + oy * oy));
+        }
+        double w = Math.Clamp((near - 0.5) / 2, 0, 1);
+        return d + (big - d) * w;
     }
 
     // Larger, slower waves than Saltmere's noise, so the new coastlines get bays and headlands.
@@ -114,7 +137,7 @@ partial class Game
                 if (x < 32 && y < 18)
                 {
                     // Saltmere, exactly as it was when it was the whole world.
-                    double d = SaltD(x, y);
+                    double d = SaltGrownD(x, y);
                     t = d < 0.6 ? 'g' : d < 1.0 ? 's' : d < 1.55 ? 'w' : '~';
                     if (InEllipse(x, y, 10, 6.6, 2.7, 1.9)) t = 'l';
                     double ix = (x + 0.5 - 4.2) / 3.0, iy = (y + 0.5 - 15.4) / 1.7, id = ix * ix + iy * iy;
@@ -123,14 +146,14 @@ partial class Game
                 }
                 else
                 {
-                    double best = SaltD(x, y);
+                    double best = SaltGrownD(x, y);
                     foreach (var isle in Isles)
                     {
                         double d = IsleD(x, y, isle);
                         if (d < best) { best = d; bi = isle.biome; }
                     }
                     t = bi == 0 ? (best < 0.6 ? 'g' : best < 1.0 ? 's' : best < 1.55 ? 'w' : '~')
-                        : best < 0.8 ? InnerGround[bi] : best < 1.0 ? ShoreGround[bi] : best < 1.5 ? 'w' : '~';
+                        : best < 0.8 ? InnerGround[bi] : best < 1.0 ? ShoreGround[bi] : best < Shallows ? 'w' : '~';
                 }
                 map[y, x] = t;
                 biome[y, x] = bi;
@@ -150,7 +173,7 @@ partial class Game
                 {
                     case 1: // Frostfang: a frozen lake, and ice floes offshore
                         if (InBlob(x, y, 59.5, 8.5, 5.5, 2.8, 3) && Land.Contains(t)) map[y, x] = 'i';
-                        else if (t == 'w' && Pix.Hash(x, y, 61) < 0.1) map[y, x] = 'I';
+                        else if (t == 'w' && Pix.Hash(x, y, 61) < 0.1 && OffShore(x, y)) map[y, x] = 'I';   // never against the shore, where it read as a block of land
                         break;
                     case 2: // Sunscald: an oasis ringed with grass
                         if (InBlob(x, y, 68.5, 40.5, 4, 2.4, 5)) map[y, x] = 'o';
@@ -204,6 +227,7 @@ partial class Game
                 if (state.day - day < (kind == 'R' ? BoulderRegrowDays : TreeRegrowDays) || RegrowBlocked(x, y)) { stumps[(x, y)] = kind; return; }
                 state.felled.Remove(key);
             }
+            if (BuiltOn(x, y)) return;
             map[y, x] = kind;
             trees.Add((x, y, kind));
         }
@@ -238,22 +262,21 @@ partial class Game
                 byte bi = biome[y, x];
                 if (bi == 0) continue;
                 if (bi == 4 && (GladeDist(x, y) < PalmRingR + 1.5 || hoofprints.Contains((x, y)))) continue;
-                bool palm = bi == 2 && map[y, x] == 'g' && Pix.Hash(x, y, 78) < 0.15;
-                double roll = Pix.Hash(x, y, 77);
-                bool boulder = false, bush = false;
-                if (!palm)
+                // Groves, meadows, bushes at the groves' edges, boulders in clusters, palms on the beaches (Plants.cs).
+                char kind;
+                if (bi == 2 && map[y, x] == 'g' && Pix.Hash(x, y, 78) < 0.15 || BeachPalm(x, y, bi)) kind = 'h';
+                else
                 {
                     char inner = InnerGround[bi];
                     if (map[y, x] != inner) continue;
-                    boulder = roll >= TreeDensity[bi] && roll < TreeDensity[bi] + BoulderDensity[bi];
-                    bush = bi != 2 && bi != 4 && !boulder && roll >= TreeDensity[bi] && Pix.Hash(x, y, 79) < 0.035;
-                    if (roll >= TreeDensity[bi] && !boulder && !bush) continue;
+                    kind = PlantRoll(x, y, bi, TreeKind[bi]);
+                    if (kind == '\0') continue;
                     if (map[y - 1, x] != inner || map[y + 1, x] != inner || map[y, x - 1] != inner || map[y, x + 1] != inner) continue;
                 }
                 if (bridgeTiles.Any(b => Math.Abs(b.x - x) <= 2 && Math.Abs(b.y - y) <= 2)) continue;
                 if (Data.Spots.Any(s => s.Scene == "world" && Dist(x * T + 5, y * T + 5, s.X, s.Y) < s.R + (bi == 4 ? -6 : 10))) continue;
                 if (Math.Abs(x - MouthX) <= 3 && Math.Abs(y - MouthY) <= 4) continue;
-                Place(x, y, palm ? 'h' : boulder ? 'R' : bush ? 'y' : TreeKind[bi]);
+                Place(x, y, kind);
             }
 
         GenerateArchipelago();
@@ -344,6 +367,7 @@ partial class Game
         for (int y = 0; y < ROWS; y++)
             for (int x = 0; x < COLS; x++) groundCache[y, x] = Ground(worldMap[y, x], x, y);
         ComputeDepth();
+        BakeRelief();
         for (int y = 0; y < ROWS; y++)
             for (int x = 0; x < COLS; x++) ShapeTile(x, y);
         for (int y = 0; y < ROWS; y++)
@@ -405,10 +429,21 @@ partial class Game
         }
         if (t == 'I')
         {
-            // A chunk of floating ice, blue where it meets the water.
-            Rock(g, X, Y, "#7fb3cc", "#cfe6f0", "#eef6fa", "#ffffff");
-            g.Rect(X + 1, Y + 6, 8, 1, "#a8d4e6");
-            g.Rect(X + 2, Y + 9, 6, 1, "#cfe8ee");
+            // A flat floe of ice riding low in the water: an uneven plate (its shape by tile), white on top, pale blue at its
+            // lit edge and its wet rim, a dark band where it sits in the sea, and a ripple round it. 1.34: it used to be a
+            // rock-shaped block filling the tile, which read as a square of land.
+            int w = 5 + (int)(Pix.Hash(x, y, 62) * 3), h = 3 + (int)(Pix.Hash(x, y, 63) * 2);
+            int fx = X + 5 - w / 2 + (int)((Pix.Hash(x, y, 64) - 0.5) * 2), fy = Y + 4 + (int)(Pix.Hash(x, y, 65) * 2);
+            g.Rect(fx - 1, fy + h, w + 2, 1, "#5fa3c4");                           // ripple under it
+            g.Rect(fx, fy + h - 1, w, 1, "#7fb3cc");                               // the side in the water
+            for (int r = 0; r < h - 1; r++)
+            {
+                int inset = r == 0 ? 1 : 0;
+                g.Rect(fx + inset, fy + r, w - inset * 2, 1, r == 0 ? "#ffffff" : "#e6f2f8");
+            }
+            g.Rect(fx, fy + 1, 1, Math.Max(1, h - 2), "#cfe6f0");                  // lit left edge
+            g.Rect(fx + w - 1, fy + 1, 1, Math.Max(1, h - 2), "#a8d4e6");          // shaded right edge
+            if (Pix.Hash(x, y, 66) < 0.5) g.Rect(fx + w + 1, fy + h - 1, 2, 1, "#eef6fa");   // a broken-off bit
         }
         if (t == 'T')
         {
@@ -1406,7 +1441,8 @@ partial class Game
             {
                 pix.Rect(bx - 2 + MathF.Round(MathF.Sin(t * 20)), by - 1, 1, 1, "#ffffff");
                 pix.Rect(bx + 2 + MathF.Round(MathF.Cos(t * 17)), by - 2, 1, 1, "#ffffff");
-                if (reel?.Leap > 0 && !OldArt && reel.Roll?.Id == TowFish)
+                if (!OldArt && reel?.Roll?.Id == TowFish) DrawIronbillOver(t);   // the boss fight's own drawing (IronbillFight.cs)
+                else if (reel?.Leap > 0 && OldArt && reel.Roll?.Id == TowFish)
                 {
                     // Ironbill clears the water in a long arc (tools/blender/landmarks2.py): nose up as it rises, level at the
                     // top, nose down into the splash.
@@ -1658,6 +1694,7 @@ partial class Game
             DrawBugs(t);
             DrawSpots(t);
             DrawSchools(t);
+            DrawIronbillUnder(t);
             DrawSeaLife(t);
             DrawBuoys(t);
             DrawRaceBuoys(t);
@@ -1673,6 +1710,7 @@ partial class Game
             DrawFishing(t);
             DrawRelease(t);
             DrawEclipseRing();
+            DrawSpouts(t);
             DrawParticles();
             DrawLeaves();
             DrawCloudShadows(t);

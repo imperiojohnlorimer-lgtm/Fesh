@@ -32,7 +32,7 @@ partial class Game
         && (!f.FullMoon || FullMoon)
         && (f.Need == null || state.Hinted(f.Need))
         && (f.Season == null || f.Season == Season)
-        && (!f.Legend || (state.commons.GetValueOrDefault(f.Id) == 0 && (f.Bait == null || f.Bait == bait)));
+        && (!f.Legend || ((state.commons.GetValueOrDefault(f.Id) == 0 || f.Id == TowFish) && (f.Bait == null || f.Bait == bait)));
 
     static readonly HashSet<string> FreshSpots = new() { "lagoon", "oasis", "swamp", "icehole", "amihanpond", "bakawanpool" };
     static readonly HashSet<string> SeaSpots = new() { "rocks", "wreck", "deep", "glacier", "mirage", "coral", "dropoff", "starwell", "karstlagoon", "bagareef", "opensea", "amihansea",
@@ -476,7 +476,8 @@ partial class Game
             reel.Pull = 0.7f;
             quake = 0.3f;
             Sfx.Play("splash");
-            Toast("Ironbill! The legend takes the lure and tows your boat away. Hang on!", 5);
+            if (OldArt) Toast("Ironbill! The legend takes the lure and tows your boat away. Hang on!", 5);
+            StartIronbill();
             return;
         }
         string hint = reel.Style switch

@@ -319,6 +319,7 @@ partial class Game
             for (int tx = 4; tx < 28; tx++)
             {
                 if (TileAt(tx, ty) != 'g' || TileAt(tx + 1, ty) != 'g' || TileAt(tx + 2, ty) != 'g') continue;
+                if (trees.Any(t => t.x >= tx - 3 && t.x <= tx + 3 && t.y >= ty - 1 && t.y <= ty + 3)) continue;   // nothing tall drawn over you
                 player.X = tx * T + 5; player.Y = ty * T + 8; player.Face = "right";
                 if (!CanStand(player.X, player.Y) || FindTarget() != null || FreeLanding(1f).water) continue;
                 return (player.X, player.Y);

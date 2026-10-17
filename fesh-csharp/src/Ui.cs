@@ -21,7 +21,8 @@ partial class Game
         if (!title && !MatchActive) DrawGuideArrow();
         if (!title && !MatchActive) { DrawPinCompass(); DrawCacheCompass(); }
         if (!title) DrawFishingUi();
-        if (!title && (BossFighting || BossOnLine || GuardianFighting)) DrawBossBar();
+        if (!title && (BossFighting || BossOnLine || GuardianFighting || IronbillOnLine && !OldArt)) DrawBossBar();
+        if (!title) DrawIronbillBanner();
         if (!title && eclipse != null) DrawEclipseBar();
         if (!title && race != null) DrawRaceChip();
         if (mode == "build") DrawBuildBar();
@@ -987,11 +988,16 @@ partial class Game
         float x = Gfx.LW / 2 - w / 2;
         Gfx.Box(x, y, w, h, Pal.C("rgba(40,12,20,0.92)"), Pal.C("#e8a060"), 2, 6);
         Gfx.Text("Bakunawa has the moon!", x + 16, y + 7, FontKind.Ui700, 20, Pal.C("#ffd76a"));
-        string sub = eclipse.Phase == "bang" ? "Beat the agong on the beat" : eclipse.Phase == "spit" ? "It gives the moon back!" : "It's rising...";
-        Gfx.Text(sub, x + w - 16 - Gfx.Measure(sub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16, Pal.C("#f2c8a8"));
-        float k = eclipse.Phase == "spit" || eclipse.Phase == "done" ? 1 : Math.Clamp(eclipse.Noise / (float)NoiseNeeded, 0, 1);
+        var e = eclipse;
+        string sub = e.Phase == "bang" ? (e.Writhe > 0 ? "It writhes! Its grip slips!" : e.Roar > 0 ? "ROAR! Hold off the agong!" : e.Combo >= 4 ? $"Thunder! x{e.Combo}"
+                : $"Verse {e.Verse} of 3: beat the agong") : e.Phase == "spit" ? "It gives the moon back!" : "It's rising...";
+        bool hot = e.Phase == "bang" && (e.Writhe > 0 || e.Roar > 0 || e.Combo >= 4);
+        Gfx.Text(sub, x + w - 16 - Gfx.Measure(sub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16, hot ? Pal.C(e.Roar > 0 ? "#ff8a7a" : "#ffb04a") : Pal.C("#f2c8a8"));
+        float k = e.Phase == "spit" || e.Phase == "done" ? 1 : Math.Clamp(e.Noise / (float)NoiseNeeded, 0, 1);
         Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
-        if (k > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * k), 12, Pal.C("#ffd76a"), 4);
+        if (k > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * k), 12, e.Verse >= 3 ? Pal.C("#ffb04a") : Pal.C("#ffd76a"), 4);
+        // Where each verse ends.
+        foreach (float mark in new[] { 1 / 3f, 2 / 3f }) Gfx.Rect(x + 16 + (w - 32) * mark - 1, y + 32, 2, 16, Pal.C("#f2c8a8"));
     }
 
     void DrawRaceChip()
@@ -1015,6 +1021,24 @@ partial class Game
 
     /* ---------- Tidemane's bar ---------- */
     // Over the top of the screen during the fight: on the line it's "something enormous"; on the sand, its wild spirit.
+    // The title card as Ironbill takes the lure: its name slammed across the top of the screen, then fading.
+    void DrawIronbillBanner()
+    {
+        if (ironbill is not { Banner: > 0 } b || OldArt) return;
+        float age = 3.2f - b.Banner, inK = Math.Clamp(age / 0.25f, 0, 1), outK = Math.Clamp(b.Banner / 0.6f, 0, 1), a = inK * outK;
+        float y = 150, scale = 1 + (1 - inK) * 0.5f;
+        Gfx.Rect(0, y - 12, Gfx.LW, 116, Pal.Rgba(6, 12, 30, 0.72f * a));
+        Gfx.Rect(0, y - 12, Gfx.LW, 3, Pal.Rgba(93, 140, 224, a));
+        Gfx.Rect(0, y + 101, Gfx.LW, 3, Pal.Rgba(93, 140, 224, a));
+        int size = (int)(64 * scale);
+        string name = b.Title;
+        float tw = Gfx.Measure(name, FontKind.Ui700, size);
+        Gfx.Text(name, Gfx.LW / 2 - tw / 2 + 4, y + 4, FontKind.Ui700, size, Pal.Rgba(0, 0, 0, 0.6f * a));
+        Gfx.Text(name, Gfx.LW / 2 - tw / 2, y, FontKind.Ui700, size, Pal.Rgba(243, 194, 91, a));
+        string sub = b.Sub;
+        Gfx.Text(sub, Gfx.LW / 2 - Gfx.Measure(sub, FontKind.Ui600, 22) / 2, y + 72, FontKind.Ui600, 22, Pal.Rgba(215, 230, 255, a));
+    }
+
     void DrawBossBar()
     {
         const float w = 520, h = 56, y = 54;
@@ -1030,6 +1054,22 @@ partial class Game
             float gk = Math.Clamp(guardian.Spirit / GuardSpirit, 0, 1);
             Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
             if (gk > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * gk), 12, Pal.C("#d9823f"), 4);
+            return;
+        }
+        if (IronbillOnLine)
+        {
+            // Ironbill (IronbillFight.cs): its stamina is what's left to reel in, with marks where its phases change.
+            var b = ironbill;
+            Gfx.Box(x, y, w, h, Pal.C("rgba(10,20,48,0.93)"), Pal.C("#5d8ce0"), 2, 6);
+            Gfx.Text("Ironbill", x + 16, y + 7, FontKind.Ui700, 20, Pal.C("#d7e6ff"));
+            string isub = reel.Leap > 0 ? "Breaching!" : reel.AttackWarning > 0 ? "Charging!" : b?.ChargeT > 0 ? "Charging!" : b?.Walk > 0 ? "Tail-walking!"
+                : (b?.Phase ?? 1) switch { 1 => "Legend of the open sea", 2 => "Furious", _ => "Desperate" };
+            Gfx.Text(isub, x + w - 16 - Gfx.Measure(isub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16,
+                isub.EndsWith("!") ? Pal.Lantern : Pal.C("#9fb8e0"));
+            float ik = Math.Clamp(1 - (reel.Progress - 0.3f) / 0.7f, 0, 1);
+            Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
+            if (ik > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * ik), 12, (b?.Phase ?? 1) == 3 ? Pal.C("#e05a48") : (b?.Phase ?? 1) == 2 ? Pal.C("#f3c25b") : Pal.C("#5d8ce0"), 4);
+            foreach (float mark in new[] { 1 - (0.45f - 0.3f) / 0.7f, 1 - (0.75f - 0.3f) / 0.7f }) Gfx.Rect(x + 16 + (w - 32) * mark - 1, y + 32, 2, 16, Pal.C("#d7e6ff"));
             return;
         }
         bool line = BossOnLine;

@@ -32,16 +32,45 @@ partial class Game
         ("ben", "Ben", BenX, BenY, "#2a8a8a")
     };
 
+    // 1.34: each island grows (a bigger ellipse, its centre nudged toward where there's room) except on the sides where
+    // something must stay on the coast as it was: the village's west landing, post and sign route; Bakawan's firefly trees
+    // on its west shore and the sanctuary to its south-east; Baga's reef jetty, the danger zone's lahar mouth and the
+    // station on its north side, and the sanctuary to its south. Same order as AmihanIslands.
+    static readonly (float cx, float cy, float rx, float ry, (int x0, int y0, int x1, int y1)[] keep)[] AmihanGrowth =
+    {
+        (167.5f, 22f, 17f, 15f, new[] { (140, 0, 156, 40) }),
+        (206.5f, 16f, 13.5f, 12f, Array.Empty<(int, int, int, int)>()),
+        (191.5f, 54.5f, 16.5f, 12f, new[] { (140, 40, 180, 76), (197, 61, 252, 76) }),
+        (229.5f, 47f, 13.5f, 14.5f, new[] { (222, 0, 252, 41), (210, 59, 252, 76) })
+    };
+
+    // A grown island's distance: the old one where a keep rectangle is near, the bigger one two tiles out from them.
+    static double GrownD(double old, double big, int x, int y, (int x0, int y0, int x1, int y1)[] keep)
+    {
+        if (big >= old) return old;
+        double near = 99;
+        foreach (var (x0, y0, x1, y1) in keep)
+        {
+            double ox = Math.Max(0, Math.Max(x0 - x, x - x1)), oy = Math.Max(0, Math.Max(y0 - y, y - y1));
+            near = Math.Min(near, Math.Sqrt(ox * ox + oy * oy));
+        }
+        return old + (big - old) * Math.Clamp((near - 0.5) / 2, 0, 1);
+    }
+
     void GenerateArchipelago()
     {
         for (int y = 1; y < ROWS - 1; y++)
             for (int x = EastStart; x < MlStart; x++)
             {
-                double d = AmihanIslands.Min(i =>
+                double wave = 0.09 * Math.Sin(x * .8 + y * .6) + .06 * Math.Cos(y * 1.2 - x * .3), d = double.MaxValue;
+                for (int k = 0; k < AmihanIslands.Length; k++)
                 {
+                    var i = AmihanIslands[k];
+                    var g = AmihanGrowth[k];
                     double dx = (x + 0.5 - i.cx) / i.rx, dy = (y + 0.5 - i.cy) / i.ry;
-                    return dx * dx + dy * dy + 0.09 * Math.Sin(x * .8 + y * .6) + .06 * Math.Cos(y * 1.2 - x * .3);
-                });
+                    double gx = (x + 0.5 - g.cx) / g.rx, gy = (y + 0.5 - g.cy) / g.ry;
+                    d = Math.Min(d, GrownD(dx * dx + dy * dy + wave, gx * gx + gy * gy + wave, x, y, g.keep));
+                }
                 map[y, x] = d < .72 ? 'j' : d < 1 ? 's' : d < 1.3 ? 'w' : '~';
                 biome[y, x] = 5;
             }
@@ -61,7 +90,12 @@ partial class Game
         for (int y = 1; y < ROWS - 1; y++)
             for (int x = EastStart + 1; x < MlStart; x++)
             {
-                if (map[y, x] != 'j') continue;
+                bool beach = map[y, x] == 's' && BeachPalm(x, y, 5);
+                if (map[y, x] != 'j' && !beach) continue;
+                // Palms on the beach stay clear of the landing, its post and notice, the evacuation signs and the jetties.
+                if (beach && (Dist(x * T + 5, y * T + 5, PostX, PostY) < 40 || Dist(x * T + 5, y * T + 5, NoticeX, NoticeY) < 30
+                    || SignSpots.Any(s => Dist(x * T + 5, y * T + 5, s.x, s.y) < 30) || FireflyTrees.Any(f => Dist(x * T + 5, y * T + 5, f.x, f.y) < 30)
+                    || NearPier(x, y))) continue;
                 if (Data.Spots.Any(s => s.Scene == "world" && s.Biome == "amihan" && Dist(x * T + 5, y * T + 5, s.X, s.Y) < s.R + 12)) continue;
                 if (Islanders.Any(n => Dist(x * T + 5, y * T + 5, n.x, n.y) < 48)) continue;
                 // Baga's cone stands on bare ground (Magayon.cs), and the lahar channel is kept clear.
@@ -70,8 +104,7 @@ partial class Game
                 // Nothing grows where Luntian's karst towers stand, or just behind them, where a palm's fronds would poke out
                 // round the rock as if it grew inside it.
                 if (Karsts.Any(k => Math.Abs(x * T + 5 - k.x) < 26 && y * T + 5 - k.y > -64 && y * T + 5 - k.y < 14)) continue;
-                double roll = Pix.Hash(x, y, 183);
-                char kind = roll < .12 ? 'h' : roll < .16 ? 'R' : '\0';
+                char kind = beach ? 'h' : PlantRoll(x, y, 5, 'h');
                 if (kind == '\0') continue;
                 string key = $"{x},{y}";
                 if (state.felled.TryGetValue(key, out int day))
@@ -80,8 +113,19 @@ partial class Game
                     { stumps[(x, y)] = kind; continue; }
                     state.felled.Remove(key);
                 }
+                if (BuiltOn(x, y)) continue;
                 map[y, x] = kind; trees.Add((x, y, kind));
             }
+        bool NearPier(int x, int y)
+        {
+            for (int dy = -3; dy <= 3; dy++)
+                for (int dx = -3; dx <= 3; dx++)
+                {
+                    int nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && ny >= 0 && nx < COLS && ny < ROWS && map[ny, nx] is 'd' or 'b') return true;
+                }
+            return false;
+        }
         void Pool(double cx, double cy, double rx, double ry, char water)
         {
             for (int y = (int)(cy - ry - 2); y <= cy + ry + 2; y++)

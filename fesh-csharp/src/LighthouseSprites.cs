@@ -101,6 +101,7 @@ partial class Game
         Raylib.ImageResizeNN(ref img, ww * 4, h * 4);
         Raylib.ExportImage(img, path.Replace(".png", "-sealife.png"));
         Raylib.UnloadImage(img);
+        ExportTreeSprites(path);
     }
 }
 #endif
