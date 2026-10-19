@@ -40,7 +40,7 @@ partial class Game
 
     bool GuideOn => Settings.Data.guide;
     // The card and the arrow: in ordinary play only, never over a fight, the eclipse or a race (they have their own).
-    bool GuideShown => GuideOn && mode is "play" or "build" && boss == null && guardian == null && tremor == null && evac?.Phase != "quake" && eclipse == null && race == null && !raceArmed;
+    bool GuideShown => (GuideOn || TourActive) && mode is "play" or "build" && boss == null && guardian == null && tremor == null && evac?.Phase != "quake" && eclipse == null && race == null && !raceArmed;
 
     /* ---------- Working out the goals ---------- */
     List<Goal> Goals()
@@ -331,7 +331,8 @@ partial class Game
         {
             string station = Items.StationName.GetValueOrDefault(recipe.Station, recipe.Station).ToLowerInvariant();
             if (recipe.Station == "fire") AtFire(g);
-            else if (recipe.Station is "workbench" or "stove") At(g, recipe.Station == "workbench" ? 4 * T + 10 : 15 * T + 10, 3 * T + 8, $"Tomas's {station}", "house:tomas");
+            else if (recipe.Station == "workbench") AtWorkbench(g);
+            else if (recipe.Station == "stove") AtStove(g);
             else if (recipe.Station == "furnace" && HomeHas("furnace")) AtHome(g, "furnace", "Your furnace");
             return $"Make them at a {station} from {string.Join(", ", recipe.Needs.Select(kv => $"{kv.Value} {IngredientName(kv.Key)}"))}.";
         }
@@ -345,11 +346,34 @@ partial class Game
         if (state.commons.Values.Sum() > 0 && Has("boat") == 0 && !state.tamed)
         {
             var g = E("explore:boat", "Build a sailboat", "");
-            if (Has("sailcloth") == 0) { g.Text = "A boat takes you to the other islands: 20 wood, 4 iron bars and sailcloth, made at a workbench. Pip sells the sailcloth."; At(g, PipX, PipY + 14, "Pip's stall"); }
-            else if (Has("iron_bar") < 4)
-                g.Text = $"Smelt 4 iron bars at a furnace from iron ore, which you mine in Frostfang Caverns (floor 3 and below) with a copper pickaxe{(ShopSells("iron_bar") ? ". Pip sells them too" : "")}. You have {Has("iron_bar")}.";
-            else if (Has("wood") < 20) g.Text = $"Gather 20 wood (you have {Has("wood")}): chop trees with <act> or pick up driftwood. Then make the boat at the workbench in Tomas's hut.";
-            else { g.Text = "You have everything. Make the boat at the workbench in Tomas's hut."; g.Ready = true; At(g, 4 * T + 10, 3 * T + 8, "Workbench", "house:tomas"); }
+            // 1.38: the boat is built stage by stage on a slipway at the shore (BoatYard.cs).
+            var yb = state.builds.Where(b => b.id == "slipway").OrderByDescending(b => (YardOf(b)?.stage ?? 0) * 2 + (YardOf(b)?.paid == true ? 1 : 0)).FirstOrDefault();
+            if (yb == null)
+            {
+                g.Text = Has("sailcloth") == 0
+                    ? "A boat takes you to the other islands. Put up a slipway on the shore (4 wood, 2 stone: build mode, with open sea beside it) and build the boat there in stages: 20 wood, 4 iron bars and sailcloth in all. Pip sells the sailcloth."
+                    : "A boat takes you to the other islands. Put up a slipway on the shore (4 wood, 2 stone: build mode, with open sea beside it) and build the boat there in stages: 20 wood, 4 iron bars and sailcloth in all.";
+                if (Has("sailcloth") == 0) At(g, PipX, PipY + 14, "Pip's stall");
+            }
+            else
+            {
+                var y = YardOf(yb);
+                int stage = y?.stage ?? 0;
+                float sx = yb.x * T + 15, sy = yb.y * T + 8;
+                if (stage >= YardStages.Length) { g.Text = "The boat is finished: launch it from your slipway."; g.Ready = true; At(g, sx, sy, "Your slipway"); }
+                else if (y != null && y.paid) { g.Text = $"Keep working on the {YardStages[stage].name} at your slipway: hold <act> to hammer."; g.Ready = true; At(g, sx, sy, "Your slipway"); }
+                else if (YardCanPay(stage)) { g.Text = $"You have the materials for the {YardStages[stage].name} ({YardCostText(stage)}). Build it at your slipway."; g.Ready = true; At(g, sx, sy, "Your slipway"); }
+                else
+                {
+                    var miss = YardStages[stage].cost.Where(c => Has(c.id) < c.n).ToList();
+                    g.Text = $"The {YardStages[stage].name} (stage {stage + 1} of 5) needs {YardCostText(stage)}. Still to find: {string.Join(", ", miss.Select(c => $"{c.n - Has(c.id)} {Items.ById[c.id].Name.ToLowerInvariant()}"))}."
+                        + (miss.Any(c => c.id == "iron_bar") ? $" Smelt iron bars at a furnace from iron ore, which you mine in Frostfang Caverns (floor 3 and below) with a copper pickaxe{(ShopSells("iron_bar") ? ". Pip sells them too" : "")}." : "")
+                        + (miss.Any(c => c.id == "sailcloth") ? " Pip sells sailcloth." : "")
+                        + (miss.Any(c => c.id == "wood") ? " Chop trees with <act> or pick up driftwood for wood." : "");
+                    if (miss.Any(c => c.id == "sailcloth")) At(g, PipX, PipY + 14, "Pip's stall");
+                    else At(g, sx, sy, "Your slipway");
+                }
+            }
             list.Add(g);
         }
         bool canTravel = Has("boat") > 0 || state.tamed;
@@ -407,6 +431,17 @@ partial class Game
     {
         if (mode is "title" or "create") return;
         if (mode == "play") goalDoneT = Math.Max(0, goalDoneT - dt);
+        // First steps (Tutorial.cs): the card, the arrow and the journal show only the step you're on.
+        if (state.tour < TourDone) UpdateTour();
+        if (TourActive)
+        {
+            var step = TourGoal();
+            goals = new() { step };
+            tracked = step;
+            lastTrackedId = lastTrackedTitle = null;
+            guideWay = Route(step);
+            return;
+        }
         // Heading up to School Rise (RestlessSea.cs): that's the only goal, and nothing you were following is lost.
         if (SeaEmergency)
         {
@@ -604,6 +639,7 @@ partial class Game
     /* ---------- The HUD card ---------- */
     void DrawGuideCard()
     {
+        if (TourActive) { DrawTourBanner(); return; }
         guideCardBottom = 0;
         if (!GuideShown) return;
         const float pad = 12;
@@ -751,7 +787,7 @@ partial class Game
             ("Open the map", "Press <map>. Click the map to drop a pin.", H("map"), 0),
 
             ("Pick up driftwood and stones", "Walk over them on the beaches to pick them up.", L("gather") || Has("axe") > 0 || tier > 0, 1),
-            ("Make a stone axe", "At a workbench (Tomas's hut has one): 3 wood, 2 stone.", Has("axe") > 0, 1),
+            ("Make a stone axe", HomeHas("workbench") ? "At your workbench: 3 wood, 2 stone." : "At a workbench (Tomas's hut has one): 3 wood, 2 stone.", Has("axe") > 0, 1),
             ("Make a stone pickaxe", "At a workbench: 3 wood and 3 stone.", tier > 0, 1),
             ("Chop a tree", "Face a tree with your axe and press <act>.", L("chop"), 1),
             ("Break a boulder", "Grey boulders give stone. Use your pickaxe.", L("boulder"), 1),

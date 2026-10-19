@@ -16,12 +16,13 @@ partial class Game
     {
         if (mode == "create") { DrawCreator(); return; }
         bool title = mode == "title";
+        if (!title && !MatchActive) DrawTourSpotlight();
         if (!title) { if (MatchActive) DrawMatchHud(); else DrawHud(); }
         DrawDockTags();
         if (!title && !MatchActive) DrawGuideArrow();
         if (!title && !MatchActive) { DrawPinCompass(); DrawCacheCompass(); }
         if (!title) DrawFishingUi();
-        if (!title && (BossFighting || BossOnLine || GuardianFighting || IronbillOnLine && !OldArt || MireOnLine || RayOnLine || TarponOnLine)) DrawBossBar();
+        if (!title && (BossFighting || BossOnLine || GuardianFighting || IronbillOnLine && !OldArt || MireOnLine || RayOnLine || TarponOnLine || LungfishOnLine || WhiskersOnLine)) DrawBossBar();
         if (!title) DrawIronbillBanner();
         if (!title && eclipse != null) DrawEclipseBar();
         if (!title && race != null) DrawRaceChip();
@@ -232,9 +233,11 @@ partial class Game
         foreach (var (label, act, on) in buttons)
         {
             rx -= bw;
+            tourBtn[label] = new Rectangle(rx, m, bw, h);
             if (Button(label, rx, m, bw, h, FontKind.Ui600, bfs, on ? Pal.Lantern : Pal.Sand, Pal.Ink, 2, 2, 5, live)) act();
             rx -= 6;
         }
+        DrawTourButtonRing();
         if (clockTip is float tipX) DrawClockTip(tipX, HudY + HudH + 6);
         clockTip = null;
     }
@@ -423,7 +426,7 @@ partial class Game
         var widths = new float[tools.Length];
         float total = 0;
         // Shrink the text if this set of pieces doesn't fit across the screen.
-        for (int pass = 0; pass < 3; pass++)
+        for (int pass = 0; pass < 4; pass++)
         {
             for (int i = 0; i < tools.Length; i++)
             {
@@ -434,7 +437,7 @@ partial class Game
             total = widths.Sum() + gap * (tools.Length - 1) + pad * 2;
             if (total <= Gfx.LW - 30) break;
             // Still too wide (twelve outdoor pieces): smaller again, with less room round each.
-            (fs, small, room) = pass == 0 ? (16f, 13f, 18f) : (14f, 12f, 12f);
+            (fs, small, room) = pass == 0 ? (16f, 13f, 18f) : pass == 1 ? (14f, 12f, 12f) : (13f, 11f, 8f);
         }
         buildBarH = bh + pad * 2;
         lastBuildBarW = total;
@@ -1025,6 +1028,8 @@ partial class Game
     void DrawIronbillBanner()
     {
         if (mire is { Banner: > 0 } mb && MireOnLine) { DrawBossBanner(mb.Title, mb.Sub, mb.Banner, Pal.C("#7fb069"), Pal.C("#e7f2d8")); return; }
+        if (lung is { Banner: > 0 } lb && LungfishOnLine) { DrawBossBanner(lb.Title, Bind.Fix(lb.Sub), lb.Banner, Pal.C("#e0963a"), Pal.C("#fbe9c4")); return; }
+        if (whisk is { Banner: > 0 } wb && WhiskersOnLine) { DrawBossBanner(wb.Title, Bind.Fix(wb.Sub), wb.Banner, Pal.C("#d9a24a"), Pal.C("#fbf0d0")); return; }
         if (ray is { Banner: > 0 } rb && RayOnLine) { DrawBossBanner(rb.Title, Bind.Fix(rb.Sub), rb.Banner, Pal.C("#8ea6d6"), Pal.C("#e6eeff")); return; }
         if (tarpon is { Banner: > 0 } tb && TarponOnLine) { DrawBossBanner(tb.Title, Bind.Fix(tb.Sub), tb.Banner, Pal.C("#c7d6e6"), Pal.C("#f2f7ff")); return; }
         if (ironbill is not { Banner: > 0 } b || OldArt) return;
@@ -1101,6 +1106,44 @@ partial class Game
             Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
             if (rk > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * rk), 12, ph == 3 ? Pal.C("#f3c25b") : ph == 2 ? Pal.C("#bfe3ff") : Pal.C("#8ea6d6"), 4);
             foreach (float mark in new[] { 1 - (0.5f - 0.3f) / 0.7f, 1 - (0.78f - 0.3f) / 0.7f }) Gfx.Rect(x + 16 + (w - 32) * mark - 1, y + 32, 2, 16, Pal.C("#e6eeff"));
+            return;
+        }
+        if (WhiskersOnLine)
+        {
+            // Old Whiskers (WhiskersBoss.cs): rain-green and amber, his stamina what's left to reel in, phase marks.
+            var m = whisk;
+            int ph = m?.Phase ?? 1;
+            Gfx.Box(x, y, w, h, Pal.C("rgba(18,30,28,0.93)"), Pal.C("#d9a24a"), 2, 6);
+            Gfx.Text("Old Whiskers", x + 16, y + 7, FontKind.Ui700, 20, Pal.C("#fbf0d0"));
+            string wsub = m?.Ev switch
+            {
+                "thiefWarn" or "thief" => "Stealing the berry!", "memoryWarn" or "memory" => "Flicking his whiskers!", "quietWarn" or "quiet" => "Listening...",
+                _ => ph switch { 1 => "Wait for the bobber", 2 => "Remember, then repeat", _ => "Hands off" }
+            };
+            Gfx.Text(wsub, x + w - 16 - Gfx.Measure(wsub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16, wsub.EndsWith("!") ? Pal.Lantern : Pal.C("#d8c79a"));
+            float wk = Math.Clamp(1 - (reel.Progress - 0.3f) / 0.7f, 0, 1);
+            Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
+            if (wk > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * wk), 12, ph == 3 ? Pal.C("#c4603a") : ph == 2 ? Pal.C("#d9a24a") : Pal.C("#7fb8a8"), 4);
+            foreach (float mark in new[] { 1 - (0.5f - 0.3f) / 0.7f, 1 - (0.78f - 0.3f) / 0.7f }) Gfx.Rect(x + 16 + (w - 32) * mark - 1, y + 32, 2, 16, Pal.C("#fbf0d0"));
+            return;
+        }
+        if (LungfishOnLine)
+        {
+            // The Sunscale lungfish (LungfishBoss.cs): oasis gold on dark sand, its stamina what's left to reel in, phase marks.
+            var m = lung;
+            int ph = m?.Phase ?? 1;
+            Gfx.Box(x, y, w, h, Pal.C("rgba(38,26,10,0.93)"), Pal.C("#e0963a"), 2, 6);
+            Gfx.Text("Sunscale lungfish", x + 16, y + 7, FontKind.Ui700, 20, Pal.C("#fbe9c4"));
+            string lsub = m?.Ev switch
+            {
+                "breathWarn" or "breath" => "Coming up for air!", "marchWarn" or "march" => "Walking the bottom!", "cradleWarn" or "cradle" => "In its mud hollow!",
+                _ => ph switch { 1 => "The oasis remembers", 2 => "Footsteps under water", _ => "The patient survivor" }
+            };
+            Gfx.Text(lsub, x + w - 16 - Gfx.Measure(lsub, FontKind.Ui600, 16), y + 10, FontKind.Ui600, 16, lsub.EndsWith("!") ? Pal.Lantern : Pal.C("#e8cf9a"));
+            float lk = Math.Clamp(1 - (reel.Progress - 0.3f) / 0.7f, 0, 1);
+            Gfx.Rect(x + 16, y + 34, w - 32, 12, Pal.C("rgba(0,0,0,0.4)"), 4);
+            if (lk > 0) Gfx.Rect(x + 16, y + 34, MathF.Max(8, (w - 32) * lk), 12, ph == 3 ? Pal.C("#c85a1e") : ph == 2 ? Pal.C("#e0963a") : Pal.C("#f3c25b"), 4);
+            foreach (float mark in new[] { 1 - (0.5f - 0.3f) / 0.7f, 1 - (0.78f - 0.3f) / 0.7f }) Gfx.Rect(x + 16 + (w - 32) * mark - 1, y + 32, 2, 16, Pal.C("#fbe9c4"));
             return;
         }
         if (MireOnLine)

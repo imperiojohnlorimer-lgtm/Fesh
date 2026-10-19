@@ -7,7 +7,7 @@ namespace Fesh;
 // Player preferences. They belong to the computer, not to a save slot, so they live in settings.json next to the saves.
 sealed class SettingsData
 {
-    public float music = 0.8f, sound = 0.8f;   // volumes, 0..1
+    public float music = 0.7f, sound = 0.8f;   // volumes, 0..1
     public bool musicOn = true, muted;
     public bool fullscreen;
     public bool shake = true;                  // screen shake on big impacts

@@ -504,6 +504,12 @@ partial class Game
     // A boat runs aground on the bar while it's dry (BoatCanStand).
     bool SandbarDryAt(float x, float y) => SandbarDry((int)MathF.Floor(x / T), (int)MathF.Floor(y / T));
 
+    // How far a pixel of the bar stands above the sea (negative: under it), as DrawSandbar paints it.
+    float BarAbove(int wx, int wy) => MlBarHeight(MlLx(wx + 0.5f), MlLy(wy + 0.5f)) + (float)(Pix.Hash(wx, wy, 977) - 0.5) * 0.015f - SeaLevel;
+    // Pixels drawn as sand (dry or just awash): not water, so no wading rectangle and no swimming (TideDry says so too).
+    bool SandbarSandAt(int wx, int wy) =>
+        scene == "world" && sandbar.Count > 0 && wx >= (MlStart - 20) * T && sandbar.ContainsKey((wx / T, wy / T)) && BarAbove(wx, wy) >= -0.04f;
+
     void MakeSandbar()
     {
         sandbar.Clear();

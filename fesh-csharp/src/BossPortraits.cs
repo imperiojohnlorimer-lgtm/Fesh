@@ -22,6 +22,8 @@ partial class Game
             "leviathan" => (MireFrame(MireFrameIndex(10, 0, false)).col, ArapaimaArt.Width, ArapaimaArt.Height),
             "starray" => (RayFrame(RayGlideFrame(-MathF.PI / 2, 1)).col, MantaArt.Width, MantaArt.Height),
             "tarpon" => (TarponFrame(TarponFrameIndex(20, 1, false, 0)).col, TarponArt.Width, TarponArt.Height),
+            "lungfish" => (LungFrame(LungFrameIndex(10, 0, false)).col, LungfishArt.Width, LungfishArt.Height),
+            "whiskers" => (WhiskFrame(WhiskFrameIndex(10, 0, false)).col, WhiskersArt.Width, WhiskersArt.Height),
             "marlin" => MarlinSprite(-0.32f),
             "platejaw" => (PlatejawPixels(2, 4, 1, false), PjW, PjH),
             "tidemane" => TidemaneSprite(),

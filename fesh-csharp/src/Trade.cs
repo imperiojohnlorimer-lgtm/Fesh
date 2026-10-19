@@ -9,6 +9,7 @@ partial class Game
     void TalkPip()
     {
         Say P(string t) => new("Pip", t);
+        if (TourBlocked(4, "Pip's stall opens once you've caught a fish and looked in your bag.")) return;
         if (!PipOpen) { Sfx.Play("nope"); Toast("Pip's stall has just closed for the night."); return; }
         if (!state.Hinted("metPip"))
         {
@@ -132,7 +133,7 @@ partial class Game
         {
             "bait" when !state.Hinted("bait") => " Bait is used up automatically, one per cast.",
             "sapling" when !state.Hinted("sapling") => " Plant it outdoors with <build>.",
-            "sailcloth" when !state.Hinted("sailcloth") => " A boat is made at a workbench: 20 wood, 4 iron bars and this.",
+            "sailcloth" when !state.Hinted("sailcloth") => " A boat is built on a slipway, stage by stage: 20 wood, 4 iron bars and this.",
             "crab_pot" when !state.Hinted("crab_pot") => " Press <build> outdoors and set it in shallow water.",
             "chum" when !state.Hinted("chum") => " At a fishing spot, press <alt> to throw it.",
             "suka" when !state.Hinted("suka") => " Simmer a fish in it at a cooking stove: paksiw.",
@@ -253,7 +254,7 @@ partial class Game
         if (Has("boat") == 0)
         {
             Sfx.Play("nope");
-            Toast("You'd need a boat. Make one at a workbench: 20 wood, 4 iron bars and sailcloth from Pip.", 4.5f);
+            Toast("You'd need a boat. Build one on a slipway at the shore: 20 wood, 4 iron bars and sailcloth from Pip.", 4.5f);
             return;
         }
         if (state.weather == "storm") { Sfx.Play("nope"); Toast("Far too rough to sail in a storm. Wait for it to pass."); return; }

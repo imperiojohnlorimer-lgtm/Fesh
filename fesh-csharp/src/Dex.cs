@@ -239,6 +239,8 @@ partial class Game
     {
         TowFish => Bind.Fix("a boss fight: it tows your boat and breaches (press on the gold), charges once it's furious (let go of <act> to brace) and tail-walks at the end (ease off the reel)"),
         MireFish => Bind.Fix("a boss fight: pump it up; press <act> as it gulps air, pull it away from the mangrove roots with <left>/<right>, and press on the gold when it leaps"),
+        WhiskersFish => Bind.Fix("a boss fight: a bottom-hugger; wait for the bobber to go under and press <act> once, repeat the three arrows his whiskers flick, and keep every control still while he listens in the rain"),
+        LungfishFish => Bind.Fix("a boss fight: a runner; ease off when it runs, tap <act> with its three ripples, alternate <left> and <right> as it walks the bottom, and pump <act> (pull, rest) at its mud hollow"),
         RayFish => Bind.Fix("a boss fight: let go when it runs; follow its feeding sweep with <left>/<right>, let go through a somersault, and hold <down> to bow to a breach"),
         TarponFish => Bind.Fix("a boss fight: press on the gold when he leaps; hold <up> as he rolls to breathe, mash <act> at the pilings and hold <act> through a head-shake"),
         _ => null

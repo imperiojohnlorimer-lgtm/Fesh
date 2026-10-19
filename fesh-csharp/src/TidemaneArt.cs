@@ -652,7 +652,7 @@ partial class Game
                 char m = c.M[cy * W + cx];
                 int wx = dir > 0 ? x + cx - OX : x - (cx - OX), wy = y + cy - OY;
                 if (clip is { } k && (wx < k.x0 || wx > k.x1 || wy < k.y0 || wy > k.y1)) continue;
-                bool under = wy >= wl && Wet(ShapePx(wx, wy)) && !DryMud(wx, wy);
+                bool under = wy >= wl && Wet(ShapePx(wx, wy)) && !DryMud(wx, wy) && !TideDry(wx, wy);
                 if (m != '.')
                 {
                     var col = flash ? white : MountArt.Colors[m];

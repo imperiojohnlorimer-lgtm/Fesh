@@ -38,7 +38,7 @@ partial class Game
     // The legends with boss fights come back to be fought again (Ironbill, the Mire leviathan, the Starfall ray, Haring
     // Buan-buan); the others bite once. Tidemane is tamed, so it never comes back to the line. One rule for the bite, the
     // Fish log's "biting now" dot and its words.
-    static bool Refightable(CommonFish f) => f.Id is TowFish or MireFish or RayFish or TarponFish;
+    static bool Refightable(CommonFish f) => f.Id is TowFish or MireFish or RayFish or TarponFish or LungfishFish or WhiskersFish;
     // The two that are let go when they're in (a manta and the king tarpon): the record, never the bag.
     static bool LetGoLegend(string id) => id is RayFish or TarponFish;
 
@@ -288,6 +288,7 @@ partial class Game
     // Hold E (or the mouse) to power up a cast; let go to throw. A short cast lands in the shallows, a long one in deep water.
     void StartCharge(string spotId)
     {
+        if (TourBlocked(2, "Meet Tomas first: follow the arrow. Fishing opens up after that.")) return;
         chargeSpot = spotId;
         charge = 0;
         chargeDir = 1;
@@ -494,6 +495,18 @@ partial class Game
             StartRay();
             return;
         }
+        if (roll.Id == WhiskersFish && !MatchActive)
+        {
+            // Old Whiskers: a bobber to strike, whiskers to remember and a line to keep quiet, in the lagoon (WhiskersBoss.cs).
+            StartWhiskers();
+            return;
+        }
+        if (roll.Id == LungfishFish && !MatchActive)
+        {
+            // The Sunscale lungfish: ripples to tap, a march to follow and mud to pump out of, in the oasis (LungfishBoss.cs).
+            StartLungfish();
+            return;
+        }
         if (roll.Id == MireFish && !MatchActive)
         {
             // The Mire leviathan: a long fight in the swamp pool, with breaths, runs for the roots and leaps (MireBoss.cs).
@@ -622,6 +635,8 @@ partial class Game
         reelTap = false;
         if (UpdateFishAttack(r, dt, hold)) return;
         if (r.Roll.Id == MireFish && !MatchActive && UpdateMireReel(r, dt, hold, tap)) return;
+        if (r.Roll.Id == LungfishFish && !MatchActive && UpdateLungfishReel(r, dt, hold, tap)) return;
+        if (r.Roll.Id == WhiskersFish && !MatchActive && UpdateWhiskersReel(r, dt, hold, tap)) return;
         if (r.Roll.Id == RayFish && !MatchActive && UpdateRayReel(r, dt, hold, tap)) return;
         if (r.Roll.Id == TarponFish && !MatchActive && UpdateTarponReel(r, dt, hold, tap)) return;
         if (r.Roll.Boss)

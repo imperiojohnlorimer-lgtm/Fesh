@@ -56,7 +56,7 @@ partial class Game
 
     void LaunchBoat()
     {
-        if (Has("boat") == 0) { Toast("Build a sailboat at a workbench: 20 wood, 4 iron bars and sailcloth from Pip.", 5); return; }
+        if (Has("boat") == 0) { Toast("Build a sailboat: put up a slipway on the shore (4 wood, 2 stone, in build mode) and build it there in stages: 20 wood, 4 iron bars and sailcloth from Pip.", 6); return; }
         if (Stormy) { Toast("Wait for the storm to pass before launching."); return; }
         bool atoll = Dist(player.X, player.Y, AtollJettyX, AtollJettyY) < 12, asinan = Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 12,
             marilaya = Dist(player.X, player.Y, MlJettyX, MlJettyY) < 12;
@@ -260,7 +260,10 @@ partial class Game
                 // Dado's painted sail (a regatta prize) is panels of red, gold, blue and green.
                 string cloth = row == rows - 2 ? "#58a5a1" : row == rows - 1 ? "#d7cda8"
                     : painted ? PaintedPanel[row * PaintedPanel.Length / (rows - 2)] : big && row == rows / 2 ? "#e3c46f" : "#f4edce";
+                // Battens: a slightly darker seam every third row; a tanned rope along the edge by the mast.
+                if (!OldArt && !painted && row % 3 == 2 && row < rows - 2 && width > 2) cloth = "#e3d9b8";
                 R(sx, sy, width, 1, cloth);
+                if (!OldArt && width > 1 && row < rows - 2) R(sx, sy, 1, 1, "#b79865");
                 if (underWay && width > 3) R(sx + width / 2, sy, 1, 1, "#e6dcbc");
                 // Seen from astern, the back of the sail is shaded along the mast.
                 if (astern && width > 2 && row < rows - 2) R(sx, sy, 1, 1, "#e6dcbc");
@@ -316,7 +319,7 @@ partial class Game
 
         if (endOn)
         {
-            DrawBoatEndOn(R, astern);
+            if (OldArt) DrawBoatEndOn(R, astern); else BlitBoatHull(face, false, X, Y, dir);
             if (astern)
             {
                 // From astern: the mast and sail beyond, then you on the stern thwart, which hides your legs.
@@ -333,7 +336,21 @@ partial class Game
                 if (occupied && trolling) DrawTroll(X + 3, Y - 10, X + 7, Y - 18, t);
                 Rig(3, 4);
             }
-            DrawBoatNearEnd(R, astern);
+            if (OldArt) DrawBoatNearEnd(R, astern); else BlitBoatHull(face, true, X, Y, dir);
+            return;
+        }
+
+        if (!OldArt)
+        {
+            // The Blender hull: the far half and the inside, then the rig and the fisher, then the near wall and float.
+            BlitBoatHull(face, false, X, Y, dir);
+            Rig(2, 0);
+            if (occupied)
+            {
+                Fisher(X - 5 * dir, Y + 2);
+                if (trolling) DrawTroll(X - 10 * dir, Y - 1, X - 15 * dir, Y - 9, t);
+            }
+            BlitBoatHull(face, true, X, Y, dir);
             return;
         }
 

@@ -137,7 +137,7 @@ partial class Game
         : Items.ById[id].Name.ToLowerInvariant();
 
     // The bubo only shows at the workbench once Tala has shown you how it's woven.
-    bool RecipeKnown(Recipe r) => r.Out switch { "bubo" => state.Hinted("bubo"), "plate_armor" => GuardianBeaten, _ => true };
+    bool RecipeKnown(Recipe r) => r.Out switch { "bubo" => state.Hinted("bubo"), "plate_armor" => GuardianBeaten, "boat" => false, _ => true };   // the boat is built on a slipway now (BoatYard.cs)
 
     // The workbench makes too much for one list, so it's split into tabs.
     static readonly string[] CraftTabs = { "Tools", "Rods", "Tackle", "Gear", "Combat", "Bait" };

@@ -471,6 +471,12 @@ partial class Game
         }
         var note = Gfx.Wrap("Your game saves itself every few seconds and each morning. Quitting saves it too.", FontKind.Note, 18, iw);
         Lines(note, ix, bottom - 18 - note.Count * 25, 25, FontKind.Note, 18, Muted);
+        // The way out of First steps, for anyone it isn't working for (Tutorial.cs).
+        if (TourActive && SmallButton("Skip First steps", ix, bottom - 18 - note.Count * 25 - 58))
+        {
+            SkipTour();
+            return;
+        }
     }
 
     void DrawSettingsTab(float x, float y, float w)

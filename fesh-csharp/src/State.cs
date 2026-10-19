@@ -40,6 +40,7 @@ sealed class State
     public Flags flags = new();
     public Dictionary<string, int> pity = new();
     public Dictionary<string, bool> hinted = new();
+    public int tour = 99;                            // First steps (Tutorial.cs): the step a new fisher is on; 99 is done (every older save)
     public float px = 160, py = 115;
     public Mats mats = new(); // only read when loading saves from before the bag existed
     public List<Build> builds = new();
@@ -102,6 +103,7 @@ sealed class State
 
     // Habagat (the story flags are in hinted: "habagat", "isletsCharted", "parolaLit", "moonReturned", "bk:...")
     public Dictionary<string, RackLoad> racks = new(); // drying rack "x,y" -> what's drying on it
+    public Dictionary<string, Yard> yards = new();      // slipway "x,y" -> the boat being built on it (BoatYard.cs)
     public int saltDay;                              // the day you last raked Asinan's salt beds
     public int parola;                               // how much of the Parola lighthouse is mended (0 to 3; 3 is lit)
     public Dictionary<string, int> sightings = new(); // sanctuary animal -> times watched
@@ -254,6 +256,7 @@ static class SaveFile
             s.picked ??= new(); s.gifts ??= new(); s.rooms ??= new(); s.scene ??= "world";
             s.tanks ??= new(); s.weather ??= "clear"; s.boatAt ??= "saltmere";
             s.tackle ??= new(); s.records ??= new(); s.trophies ??= new(); s.big ??= new(); s.pots ??= new();
+            s.yards = (s.yards ?? new()).Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => new Yard { stage = Math.Clamp(kv.Value.stage, 0, 5), paid = kv.Value.paid && kv.Value.stage < 5, work = Math.Clamp(kv.Value.work, 0, 2.5f) });
             s.racks ??= new(); s.sightings ??= new(); s.gleanTide ??= "";
             s.guso = (s.guso ?? new()).Where(kv => kv.Value != null && kv.Key is "0" or "1" or "2" or "3").ToDictionary(kv => kv.Key, kv => kv.Value);
             foreach (var key in s.racks.Keys.ToList())

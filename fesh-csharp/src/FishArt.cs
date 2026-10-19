@@ -282,15 +282,29 @@ static class FishArt
                 for (int xx = 0; xx < 12; xx++)
                     if (g.Buf[yy * 12 + xx].A > 0 && Pix.Hash(xx, yy, 17) < (L.Pattern == "glow" ? 0.12 : 0.18) && g.Buf[yy * 12 + xx].R + g.Buf[yy * 12 + xx].G != 0x10 + 0x24)
                         g.Rect(xx, yy, 1, 1, m);
-        // Scale the template into the box, keeping it square and centred.
+        // Scale the template into the box, keeping it square and centred on whole pixels (a half-pixel offset rounded
+        // to alternate columns, which drew a crab or a squid held up after a catch as stripes). Shrinking, each pixel
+        // takes the commonest colour of the block it covers, so a thin leg isn't dropped.
         int s = Math.Min(w, h);
-        float ox = (w - s) / 2f, oy = (h - s) / 2f;
+        int ox = (w - s) / 2, oy = (h - s) / 2;
         for (int yy = 0; yy < s; yy++)
             for (int xx = 0; xx < s; xx++)
             {
-                var c = g.Buf[(yy * 12 / s) * 12 + xx * 12 / s];
-                if (c.A == 0) continue;
-                Px(ox + xx, oy + yy, $"#{c.R:x2}{c.G:x2}{c.B:x2}");
+                int x0 = xx * 12 / s, x1 = Math.Max(x0 + 1, (xx + 1) * 12 / s), y0 = yy * 12 / s, y1 = Math.Max(y0 + 1, (yy + 1) * 12 / s);
+                var counts = new Dictionary<Color, int>();
+                int opaque = 0, total = 0;
+                for (int sy = y0; sy < y1; sy++)
+                    for (int sx = x0; sx < x1; sx++)
+                    {
+                        var c = g.Buf[sy * 12 + sx];
+                        total++;
+                        if (c.A == 0) continue;
+                        opaque++;
+                        counts[c] = counts.GetValueOrDefault(c) + 1;
+                    }
+                if (opaque * 2 < total) continue;
+                var best = counts.OrderByDescending(kv => kv.Value).First().Key;
+                Px(ox + xx, oy + yy, $"#{best.R:x2}{best.G:x2}{best.B:x2}");
             }
     }
 

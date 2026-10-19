@@ -157,7 +157,9 @@ partial class Game
 
     bool TideDry(int wx, int wy)
     {
-        if (scene != "world" || flatPx == null) return false;
+        if (scene != "world") return false;
+        if (SandbarSandAt(wx, wy)) return true;   // Marilaya's bar (MarilayaPlaces.cs)
+        if (flatPx == null) return false;
         int px = wx - FlatBoxX, py = wy - FlatBoxY;
         if (px < 0 || py < 0 || px >= FlatBoxW || py >= FlatBoxH) return false;
         byte d = flatPx[py * FlatBoxW + px];

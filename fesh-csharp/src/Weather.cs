@@ -138,7 +138,8 @@ partial class Game
     bool Stormy => state.weather == "storm";
 
     // A storm closes the bridges, but if one caught you halfway across you can still walk off it.
-    bool BridgeClosed(int tx, int ty) => scene == "world" && Stormy && bridgeSet.Contains((tx, ty)) && !OnBridge();
+    // First steps close them too (Tutorial.cs): a new fisher stays on Saltmere until they are done.
+    bool BridgeClosed(int tx, int ty) => scene == "world" && (Stormy || TourActive) && bridgeSet.Contains((tx, ty)) && !OnBridge();
     bool OnBridge()
     {
         float x = player.X, y = player.Y;

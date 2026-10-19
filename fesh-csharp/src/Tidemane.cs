@@ -391,7 +391,8 @@ partial class Game
     char TileUnder(float x, float y)
     {
         char t = TileAt((int)MathF.Floor(x / T), (int)MathF.Floor((y - 1.5f) / T));
-        return t == 'l' && DryMud(x, y - 1.5f) ? 'p' : t;
+        // Water the tide has drawn back off a reef flat is sand, drawn as sand: you ride over it, not swim in it.
+        return t == 'l' && DryMud(x, y - 1.5f) || t == 'w' && TideDry((int)x, (int)(y - 1.5f)) ? 'p' : t;
     }
     bool Swimming => Riding && Swimmable(TileUnder(player.X, player.Y));
 
@@ -1015,7 +1016,7 @@ partial class Game
     {
         void OnWater(int px, int py, Color c)
         {
-            if (px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py)) && !DryMud(px, py)) pix.Rect(px, py, 1, 1, c);
+            if (px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py)) && !DryMud(px, py) && !TideDry(px, py)) pix.Rect(px, py, 1, 1, c);
         }
         int lap = (int)(time * 5);
         var foam = Pal.Rgba(232, 246, 250, 0.65f);
@@ -1080,7 +1081,7 @@ partial class Game
 
     void DrawEndOnSwimWater(int x, int y, bool away, bool moving)
     {
-        bool IsWater(int px, int py) => px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py)) && !DryMud(px, py);
+        bool IsWater(int px, int py) => px >= 0 && py >= 0 && px < PW && py < PH && Wet(ShapePx(px, py)) && !DryMud(px, py) && !TideDry(px, py);
         void Foam(int px, int py, float alpha)
         {
             if (IsWater(px, py)) pix.Rect(px, py, 1, 1, Pal.Rgba(232, 246, 250, alpha));

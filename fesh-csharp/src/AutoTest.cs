@@ -40,6 +40,8 @@ partial class Game
         Inp.ScriptFocused = true;
         // Tomas, Pip and the villagers stay at home unless a check wants them strolling (see Folk.cs).
         standStill = true;
+        // A new fisher's First steps (Tutorial.cs) would take over the guide in every script that starts a new game.
+        tourOff = true;
         // People's own blinking would make pixel checks on faces depend on the moment (the scenery shots keep it).
         LookData.AutoBlink = Environment.GetEnvironmentVariable("FESH_SCENIC") == "1";
         script = Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster2" ? Poster2Script().GetEnumerator()
@@ -66,12 +68,16 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_TITLE_TEST") == "1" ? TitleShotScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_IRONBILL_TEST") == "1" ? IronbillScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MIRE_TEST") == "1" ? MireScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_LUNGFISH_TEST") == "1" ? LungfishScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_WHISKERS_TEST") == "1" ? WhiskersScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_YARD_TEST") == "1" ? BoatYardScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_RAY_TEST") == "1" ? RayScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_TARPON_TEST") == "1" ? TarponScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_PORTRAIT_TEST") == "1" ? PortraitScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_ISLAND_TEST") == "1" ? IslandScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_WORLD_TEST") == "1" ? WorldScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_HOTBAR_TEST") == "1" ? HotbarScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_TOUR_TEST") == "1" ? TourScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_CHAPTER_TEST") == "1" ? ChapterScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MOUNT_TEST") == "1" ? MountScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_SEA_TEST") == "1" ? RestlessSeaScript().GetEnumerator()
@@ -125,6 +131,9 @@ partial class Game
         if (Environment.GetEnvironmentVariable("FESH_SPRITES_ONLY") == "tidemane") return;
         ExportGuardianSprites(path);
         ExportMireSprites(path);
+        ExportLungfishSprites(path);
+        ExportWhiskersSprites(path);
+        ExportYardSprites(path);
         ExportRaySprites(path);
         ExportTarponSprites(path);
         ExportSeaSprites(path);
@@ -200,6 +209,25 @@ partial class Game
                 for (int x = 0; x < w; x++) ImageDrawPixel(ref img, x, y, fishes.Buf[y * w + x]);
             ImageResizeNN(ref img, w * 3, h * 3);
             ExportImage(img, path.Replace(".png", "-fish.png"));
+            UnloadImage(img);
+        }
+        // Every fish as it's held up after a catch (DrawHeld: 13x8, and 15x10 for a big one), ten to a row.
+        {
+            var ids = FishArt.Looks.Keys.ToList();
+            int cols = 10, cw = 36, ch = 14, w = cols * cw, h = (ids.Count + cols - 1) / cols * ch;
+            var held = new Pix(w, h);
+            Array.Fill(held.Buf, Pal.C("#4a7a9a"));
+            for (int i = 0; i < ids.Count; i++)
+            {
+                int cx = i % cols * cw + 2, cy = i / cols * ch + 2;
+                FishArt.Draw(held, ids[i], cx, cy, 13, 8, false);
+                FishArt.Draw(held, ids[i], cx + 17, cy - 1, 15, 10, true);
+            }
+            var img = GenImageColor(w, h, Color.Black);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++) ImageDrawPixel(ref img, x, y, held.Buf[y * w + x]);
+            ImageResizeNN(ref img, w * 4, h * 4);
+            ExportImage(img, path.Replace(".png", "-held.png"));
             UnloadImage(img);
         }
         // Two halves (front and back, then the sides), each small enough to judge pixel by pixel.
@@ -1564,7 +1592,7 @@ partial class Game
         yield return 45;
         pendingShot = "58-legend-whiskers"; yield return 2;
         Inp.Tap(KeyboardKey.E); yield return 3;
-        Check("and only bites once", mode == "play" && !FishWeights("lagoon", "berries", 1).Any(p => p.f.Id == "old_whiskers"));
+        Check("and, as a boss, bites again for a rematch", mode == "play" && FishWeights("lagoon", "berries", 1).Any(p => p.f.Id == "old_whiskers"));
         state.weather = "clear";
 
         // The Fish log and the tackle recipes

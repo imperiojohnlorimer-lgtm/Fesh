@@ -90,6 +90,8 @@ partial class Game
         if (r.Style == "runner")
             Outlined("Tension", (ReelBarX() + 27) * zk - Gfx.Measure("Tension", FontKind.Ui600, 14) / 2 + 2 * zk, (26 + 120) * zk + 6, FontKind.Ui600, 14, Pal.C("#dfe9ee"));
         if (r.Roll?.Id == MireFish && mire is { Ev: not ("" or "leap" or "dive") } me) { DrawMireCue(me, rx, Y); return; }
+        if (r.Roll?.Id == LungfishFish && lung is { Ev: not "" } le) { DrawLungfishCue(le, rx, Y); return; }
+        if (r.Roll?.Id == WhiskersFish && whisk is { Ev: not "" } we) { DrawWhiskersCue(we, rx, Y); return; }
         if (r.Roll?.Id == RayFish && ray is { Ev: not "" } re) { DrawRayCue(re, rx, Y); return; }
         if (r.Roll?.Id == TarponFish && tarpon is { Ev: not "" } te) { DrawTarponCue(te, rx, Y); return; }
         if (r.Style == "bottom")

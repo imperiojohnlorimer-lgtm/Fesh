@@ -751,11 +751,26 @@ partial class Game
             hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
         if (InWater && !Riding)
         {
-            // Wading: the water comes up past your knees, with a ripple around you.
             string water = TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T)) switch { 'l' => "#2a9d8f", 'o' => "#22a6a0", 'm' => "#4f6440", _ => "#2f7fa3" };
-            pix.Rect(x - 4, y - 3, 9, 4, water);
-            pix.Rect(x - 4, y - 3, 9, 1, Pal.Rgba(230, 246, 250, 0.6f));
-            pix.Ring(x + 0.5, y - 2, 3 + (time * 2 % 1) * 2, Pal.Rgba(230, 246, 250, 0.5f * (1 - time * 2 % 1)));
+            // Wading: the water comes up past your knees. A soft, wavy surface that lets your legs show through and
+            // dips at the edges (a bowl of water, not a box), with ripples spreading out round you.
+            var wc = Pal.C(water);
+            for (int dx = -4; dx <= 4; dx++)
+            {
+                int ax = Math.Abs(dx);
+                int top = y - 3 + (ax >= 4 ? 1 : 0) - (MathF.Sin(time * 3.2f + dx * 1.1f) > 0.55f ? 1 : 0), bottom = y - (ax >= 3 ? 1 : 0);
+                for (int yy = top; yy <= bottom; yy++) pix.Rect(x + dx, yy, 1, 1, Pal.WithAlpha(wc, yy == top ? 0.3f : 0.52f - ax * 0.035f));
+                if (MathF.Sin(time * 2f + dx * 0.8f) > -0.25f) pix.Rect(x + dx, top, 1, 1, Pal.Rgba(235, 248, 252, 0.5f));
+            }
+            for (int k = 0; k < 2; k++)
+            {
+                float ph = (time * 1.1f + k * 0.5f) % 1, rx = 4 + ph * 5, ry = rx * 0.4f;
+                for (int a = 0; a < 20; a++)
+                {
+                    float ang = a * MathF.Tau / 20;
+                    pix.Rect(x + 0.5f + MathF.Cos(ang) * rx, y - 1 + MathF.Sin(ang) * ry, 1, 1, Pal.Rgba(235, 248, 252, 0.4f * (1 - ph)));
+                }
+            }
         }
         if (hands != null && !hands.ToolBehind)
         {
@@ -1039,6 +1054,7 @@ partial class Game
             case "campfire": DrawFire(t, X + 5, Y + 6); break;
             case "shack": DrawShack(X, Y); break;
             case "kubo": DrawKubo(X, Y); break;
+            case "slipway": DrawYard(b, X, Y, t); break;
             case "workbench":
                 pix.Rect(X + 1, Y + 9, 18, 1, "rgba(0,0,0,0.25)");
                 pix.Rect(X + 2, Y + 4, 2, 5, "#6b4a2b"); pix.Rect(X + 16, Y + 4, 2, 5, "#6b4a2b");
@@ -1443,6 +1459,8 @@ partial class Game
                 pix.Rect(bx - 2 + MathF.Round(MathF.Sin(t * 20)), by - 1, 1, 1, "#ffffff");
                 pix.Rect(bx + 2 + MathF.Round(MathF.Cos(t * 17)), by - 2, 1, 1, "#ffffff");
                 if (reel?.Roll?.Id == MireFish) DrawMireOver(t);   // the Mire leviathan's own drawing (MireBoss.cs)
+                else if (reel?.Roll?.Id == LungfishFish) DrawLungOver(t);   // the lungfish's breath at the surface (LungfishBoss.cs)
+                else if (reel?.Roll?.Id == WhiskersFish) DrawWhiskOver(t);   // Old Whiskers' bobber and whisker badges (WhiskersBoss.cs)
                 else if (reel?.Roll?.Id == RayFish) DrawRayOver(t);   // the Starfall ray's breach (RayBoss.cs)
                 else if (reel?.Roll?.Id == TarponFish) DrawTarponOver(t);   // Haring Buan-buan's leaps (TarponBoss.cs)
                 else if (!OldArt && reel?.Roll?.Id == TowFish) DrawIronbillOver(t);   // the boss fight's own drawing (IronbillFight.cs)
@@ -1672,6 +1690,8 @@ partial class Game
         if (eclipse != null && scene == "world") { fx = (player.X + SerpentX) / 2; fy = (player.Y - 8 + SerpentY - (OldArt ? 12 : 60)) / 2; }
         // Fighting the Mire leviathan, it eases over to frame you and the pool, with room above for its leaps (MireBoss.cs).
         (fx, fy) = MireCamera(fx, fy);
+        (fx, fy) = LungCamera(fx, fy);
+        (fx, fy) = WhiskCamera(fx, fy);
         (fx, fy) = RayCamera(fx, fy);
         (fx, fy) = TarponCamera(fx, fy);
         camX = sw <= W ? -(W - sw) / 2 : Math.Clamp((int)MathF.Round(fx) - W / 2, 0, sw - W);
@@ -1705,11 +1725,14 @@ partial class Game
             DrawMountGround();
             DrawTreeShadows();
             DrawBuildingShadows();
+            DrawOasisMud();
             DrawBugs(t);
             DrawSpots(t);
             DrawSchools(t);
             DrawIronbillUnder(t);
             DrawMireUnder(t);
+            DrawLungUnder(t);
+            DrawWhiskUnder(t);
             DrawRayUnder(t);
             DrawRayHome(t);
             DrawTarponUnder(t);
@@ -1728,6 +1751,8 @@ partial class Game
             DrawBossEffects(t);
             DrawFishing(t);
             if (mode == "pause" && MireShown) DrawMireOver(t);   // a gulp or a leap stays where it was behind the pause menu
+            if (mode == "pause" && LungfishShown) DrawLungOver(t);
+            if (mode == "pause" && WhiskersShown) DrawWhiskOver(t);
             if (mode == "pause" && RayShown) DrawRayOver(t);
             if (mode == "pause" && TarponShown) DrawTarponOver(t);
             DrawRelease(t);

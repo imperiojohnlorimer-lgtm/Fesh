@@ -65,6 +65,11 @@ partial class Game
         return At(g, b.x * T + Data.BuildById[b.id].W * 5f, b.y * T + 12, place, key);
     }
 
+    // Where to make something at a workbench or stove: your own once your shack has one, else Tomas's in his hut.
+    Goal AtWorkbench(Goal g) => HomeHas("workbench") ? AtHome(g, "workbench", "Your workbench") : At(g, 4 * T + 10, 3 * T + 8, "Tomas's workbench", "house:tomas");
+    Goal AtStove(Goal g) => HomeHas("stove") ? AtHome(g, "stove", "Your stove") : At(g, 15 * T + 10, 3 * T + 8, "Tomas's stove", "house:tomas");
+    string WorkbenchWhere => HomeHas("workbench") ? "your workbench" : "the workbench in Tomas's hut";
+
     // Pip keeps copper and iron bars only once you've smelted that kind yourself (or in a save from before 1.22).
     bool ShopSells(string id) => id is not ("copper_bar" or "iron_bar") || state.Hinted("pipBars") || state.Hinted("tut:smelted:" + id);
     IEnumerable<(string id, int price)> ShopStock() => Items.Shop.Where(s => ShopSells(s.id));
@@ -100,9 +105,9 @@ partial class Game
         // Enough for the first of them: off to the workbench.
         if (Has("wood") >= 3 && Has("stone") >= (axe ? 2 : 3))
         {
-            g.Text = $"Make {what} at the workbench in Tomas's hut. You have {Has("wood")} wood and {Has("stone")} stone.";
+            g.Text = $"Make {what} at {WorkbenchWhere}. You have {Has("wood")} wood and {Has("stone")} stone.";
             g.Ready = Has("wood") >= wood && Has("stone") >= stone;
-            return At(g, 4 * T + 10, 3 * T + 8, "Workbench", "house:tomas");
+            return AtWorkbench(g);
         }
         g.Text = $"You need {wood} wood and {stone} stone for {what}. You have {Has("wood")} and {Has("stone")}: walk over driftwood and stones on the beaches to pick them up.";
         string kind = Has("wood") < 3 ? "wood" : "stone";
@@ -116,7 +121,8 @@ partial class Game
     Goal HatchGoal()
     {
         if (PickTier >= 2) return OpenHatchGoal();
-        if (!state.Hinted("ch:homeAsked"))
+        // A shack already standing means Tomas's advice is taken: on to its workbench and furnace, not back to him.
+        if (!state.Hinted("ch:homeAsked") && !HasHome)
         {
             if (!state.Hinted("ch:hatchSeen"))
                 return At(StoryStep("wreck", "Walk out to the old wreck", "The tide's out. Walk out to the old wreck off Saltmere's southwest shore and have a look at it."), HatchFrontX, HatchFrontY, "Old wreck");
@@ -151,9 +157,9 @@ partial class Game
 
     Goal CopperPickGoal()
     {
-        var g = StoryStep("copperpick", "Make a copper pickaxe", $"At your workbench: 2 copper bars and 2 wood. You have {Has("copper_bar")} copper bars and {Has("wood")} wood.");
+        var g = StoryStep("copperpick", "Make a copper pickaxe", $"At {WorkbenchWhere}: 2 copper bars and 2 wood. You have {Has("copper_bar")} copper bars and {Has("wood")} wood.");
         g.Ready = Has("copper_bar") >= 2 && Has("wood") >= 2;
-        return HomeHas("workbench") ? AtHome(g, "workbench", "Your workbench") : At(g, 4 * T + 10, 3 * T + 8, "Workbench", "house:tomas");
+        return AtWorkbench(g);
     }
 
     // After the Hollow Eel: the key card, then two iron bars for the dock.
@@ -191,7 +197,7 @@ partial class Game
         }
         // Iron needs a copper pickaxe, so copper bars first; copper only needs any pickaxe.
         if (metal == "iron" && PickTier < 2) return MetalStep("copper", 2, "a copper pickaxe") ?? CopperPickGoal();
-        if (PickTier < 1) return At(StoryStep($"{id}:pick", "Make a stone pickaxe", "At a workbench: 3 wood and 3 stone. Tomas's hut has one."), 4 * T + 10, 3 * T + 8, "Workbench", "house:tomas");
+        if (PickTier < 1) return AtWorkbench(StoryStep($"{id}:pick", "Make a stone pickaxe", HomeHas("workbench") ? "At your workbench: 3 wood and 3 stone." : "At a workbench: 3 wood and 3 stone. Tomas's hut has one."));
         var mine = StoryStep($"{id}:mine", $"Mine {metal} ore ({Has(ore)} of {oreNeed})",
             metal == "iron" ? $"Iron is the pale rock in the walls of Frostfang Caverns, from the third floor down. Your copper pickaxe cuts it. Each one gives two ore, for {forWhat}."
                 : $"Copper is the orange rock in the walls of Frostfang Caverns. Face one and press <act> with your pickaxe: each gives two ore, for {forWhat}.");
@@ -282,7 +288,8 @@ partial class Game
                 Tm(state.Hinted("ch:hatchSeen") ? "That hatch on the wreck? Rusted shut since before the Halcyon ever sailed." : "The tide's out, so you can walk to the old wreck off the southwest shore. Its hatch rusted shut years ago, mind."),
                 Tm("A stone pick will just bounce off it. Copper, though. A copper pickaxe would pry it open."),
                 Tm("There's copper in Frostfang Caverns, across the bridge east. You'll need a furnace to smelt it, and a furnace wants a roof over it."),
-                Tm("Time you had a place of your own, I'd say. Build yourself a shack, and put your own workbench and a furnace in it."),
+                HasHome ? Tm("And you've built yourself a shack already. Good. Put your own workbench and a furnace in it.")
+                    : Tm("Time you had a place of your own, I'd say. Build yourself a shack, and put your own workbench and a furnace in it."),
                 Tm("Here, what's left from patching my roof: five planks and five stones. Chop and break the rest."),
                 Tm("Whatever lives in that hull, go gently with it.")
             }, () => Toast("Got 5 wood and 5 stone. Your journal (<journal>) has every step.", 4));

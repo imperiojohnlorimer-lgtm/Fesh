@@ -117,7 +117,10 @@ partial class Game
         // Exploring: the boat, then the atoll.
         Check($"no boat yet: build one, starting at Pip's stall ({tracked?.Id}, {guideWay?.Place})", tracked?.Id == "explore:boat" && guideWay?.Place == "Pip's stall");
         state.inv["sailcloth"] = 1; state.inv["iron_bar"] = 4; state.inv["wood"] = 20; yield return 2;
-        Check($"with everything for it: the workbench in Tomas's hut ({guideWay?.How})", tracked.Ready && tracked.Scene == "house:tomas" && guideWay.How.Contains("Tomas's hut"));
+        Check($"with the materials but no slipway: put one up first ({tracked?.Text})", tracked?.Id == "explore:boat" && tracked.Text.Contains("slipway"));
+        state.builds.Add(new Build { id = "slipway", x = 8, y = 8 }); ReindexBuilds(); yield return 2;
+        Check($"with a slipway and the first stage's materials: it points at the slipway ({guideWay?.Place})", tracked.Ready && guideWay?.Place == "Your slipway" && tracked.Text.Contains("keel and ribs"));
+        state.builds.RemoveAll(b => b.id == "slipway"); ReindexBuilds();
         state.inv["boat"] = 1; yield return 2;
         Check($"with a boat: sail to the atoll from Pip's jetty ({guideWay?.Place}: {guideWay?.How})",
             tracked?.Id == "explore:atoll" && guideWay?.Place == "Pip's jetty" && guideWay.How.Contains("sail to Starfall Atoll"));

@@ -50,7 +50,7 @@ partial class Game
         get
         {
             int tx = (int)MathF.Floor(player.X / T), ty = (int)MathF.Floor((player.Y - 1.5f) / T);
-            return scene == "world" && Wadeable(TileAt(tx, ty)) && !FlatOpen(tx, ty) && !DryMud(player.X, player.Y - 1.5f);
+            return scene == "world" && Wadeable(TileAt(tx, ty)) && !FlatOpen(tx, ty) && !DryMud(player.X, player.Y - 1.5f) && !TideDry((int)player.X, (int)(player.Y - 1.5f));
         }
     }
 
@@ -117,6 +117,11 @@ partial class Game
             if (InHouse && tx + i == RoomDoorX && ty >= SRows - 3) return "Keep the doorway clear";
             if (BuildAt(tx + i, ty) != null) return "Something is already here";
         }
+        if (d.Id == "slipway" && scene == "world" && YardFace(tx, ty) == 0) return "Build it beside the sea, with open water to the east or west";
+        if (d.Id == "slipway" && scene == "world")
+            for (int dx = -1; dx <= 3; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                    if (Water.Contains(TileAt(tx + dx, ty + dy)) || TileAt(tx + dx, ty + dy) is 'd' or 'b') return "The boat needs dry beach all round it: not on a jetty, and not right at the water's edge";
         var area = new Box(tx * T, ty * T, d.W * T, T);
         if (scene == "world" && IslandSolids().Concat(HabagatSolids()).Concat(MlSolids()).Any(b => b.Overlaps(area))) return "Keep the island landmarks clear";
         if (scene == "world" && area.Overlaps(new Box(SelaX - 26, SelaY - 38, 52, 62))) return "Keep the village paths clear";
@@ -206,6 +211,7 @@ partial class Game
         foreach (var (id, n) in d.Cost) Give(id, n);
         string extra = "";
         if (b.id == "aquarium" && EmptyTank(TankKey(b)) is int fishBack && fishBack > 0) extra = $" The {fishBack} fish went back in your bag.";
+        if (b.id == "slipway") extra = YardRefund(b);
         if (b.id == "dryrack" && state.racks.Remove(RackKey(b), out var load) && load.fish.Count > 0)
         {
             foreach (var f in load.fish) Give(f);
@@ -242,6 +248,7 @@ partial class Game
     void EnterBuild()
     {
         if (Aboard) { Toast("Land your boat before building."); return; }
+        if (TourActive) { Sfx.Play("nope"); Toast("Finish your first steps before building."); return; }
         if (mode == "panel") ClosePanels();
         if (boss != null || guardian != null) { Sfx.Play("nope"); Toast("Not in the middle of a fight!"); return; }
         if (eclipse != null) { Sfx.Play("nope"); Toast("Not now: Bakunawa has the moon!"); return; }

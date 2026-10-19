@@ -17,11 +17,11 @@ static class Music
     static readonly int[] Maj = { 0, 4, 7 }, Min = { 0, 3, 7 };
 
     sealed record TrackDef(int Root, int[] Scale, int Bpm, (int semis, int[] chord)[] Prog, string Lead, string Bass, string Pad,
-        bool Drums, int Seed, float Density, float LeadVol);
+        bool Drums, int Seed, float Density, float LeadVol, bool Calm = true);
 
     static readonly Dictionary<string, TrackDef> Tracks = new()
     {
-        ["saltmere"] = new(60, Major, 96, new[] { (0, Maj), (9, Min), (5, Maj), (7, Maj) }, "pulse", "tri", null, true, 1, 0.7f, 0.07f),
+        ["saltmere"] = new(60, Major, 96, new[] { (0, Maj), (9, Min), (5, Maj), (7, Maj) }, "soft", "tri", null, true, 1, 0.7f, 0.07f),
         ["frost"] = new(57, Minor, 70, new[] { (0, Min), (8, Maj), (3, Maj), (10, Maj) }, "bell", "sine", "pad", false, 2, 0.45f, 0.09f),
         ["dunes"] = new(62, PhrygianDominant, 84, new[] { (0, Maj), (1, Maj), (0, Maj), (10, Min) }, "pluck", "tri", null, true, 3, 0.6f, 0.07f),
         ["mire"] = new(55, PentatonicMajor, 100, new[] { (0, Maj), (9, Min), (5, Maj), (7, Maj) }, "marimba", "tri", null, true, 4, 0.75f, 0.1f),
@@ -30,20 +30,20 @@ static class Music
         // Habagat: a row of little gongs over a deep hanging agung, kulintang-style.
         ["habagat"] = new(60, Kulintang, 108, new[] { (0, Min), (5, Min), (7, Maj), (0, Min) }, "gong", "agung", null, true, 23, 0.85f, 0.075f),
         // Bakunawa holds the moon: faster, darker, the gongs hammering.
-        ["eclipse"] = new(55, Kulintang, 80, new[] { (0, Min), (1, Maj), (0, Min), (8, Maj) }, "gong", "agung", "pad", true, 29, 0.95f, 0.08f),
+        ["eclipse"] = new(55, Kulintang, 80, new[] { (0, Min), (1, Maj), (0, Min), (8, Maj) }, "gong", "agung", "pad", true, 29, 0.95f, 0.08f, false),
         // Amihan Village's rondalla on an evening after the supper (Rondalla.cs): bandurria tremolo over a plucked guitar, no drums.
         ["rondalla"] = new(60, Major, 84, new[] { (0, Maj), (5, Maj), (7, Maj), (0, Maj) }, "bandurria", "pluck", null, false, 31, 0.7f, 0.07f),
         ["cave"] = new(45, Minor, 60, new[] { (0, Min), (0, Min), (8, Maj), (7, Min) }, "bell", "sine", "pad", false, 6, 0.25f, 0.08f),
         ["home"] = new(65, Major, 80, new[] { (0, Maj), (5, Maj), (9, Min), (7, Maj) }, "musicbox", "sine", null, false, 7, 0.55f, 0.08f),
         // The fight with Tidemane: fast, minor and driving.
-        ["boss"] = new(52, Minor, 150, new[] { (0, Min), (8, Maj), (10, Maj), (7, Maj) }, "pulse", "tri", null, true, 8, 0.9f, 0.07f),
+        ["boss"] = new(52, Minor, 150, new[] { (0, Min), (8, Maj), (10, Maj), (7, Maj) }, "pulse", "tri", null, true, 8, 0.9f, 0.07f, false),
         // Up to School Rise (RestlessSea.cs): urgent and steady, Amihan's marimba over a walking beat, never frightening.
-        ["alarm"] = new(57, Minor, 126, new[] { (0, Min), (5, Min), (8, Maj), (7, Maj) }, "marimba", "tri", "pad", true, 41, 0.7f, 0.07f),
+        ["alarm"] = new(57, Minor, 126, new[] { (0, Min), (5, Min), (8, Maj), (7, Maj) }, "marimba", "tri", "pad", true, 41, 0.7f, 0.07f, false),
         // Marilaya (1.23): kalutang-led. Pairs of wooden bars struck together, each a definite pitch, over a plucked bass.
         ["marilaya"] = new(62, Major, 112, new[] { (0, Maj), (5, Maj), (7, Maj), (9, Min) }, "kalutang", "pluck", null, false, 47, 0.8f, 0.08f)
     };
 
-    static readonly ConcurrentDictionary<string, float[]> pcm = new();
+    static readonly ConcurrentDictionary<string, short[]> pcm = new();
     static readonly Dictionary<string, Sound> sounds = new();
     static string current, wanted, amb, ambWanted, nat, natWanted;
     static float vol, wantVol = 0.45f, ambVol, ambWantVol, natVol, natWantVol;
@@ -55,16 +55,23 @@ static class Music
     public static string NatureWanted => natWanted;
     public static float NatureVolume => natWantVol;
     public static IEnumerable<string> Names => Tracks.Keys;
+#if DEBUG
+    // For the autotest: a built loop, one composed again from the same seed, and whether a track is a calm one.
+    public static short[] Loop(string name) => pcm.TryGetValue(name, out var p) ? p : null;
+    public static short[] Rebuild(string name) => Pack(Tracks[name].Calm ? ComposeCalm(Tracks[name]) : Compose(Tracks[name]));
+    public static bool IsCalm(string name) => Tracks[name].Calm;
+    public static int SampleRate => Rate;
+#endif
 
     public static void Init()
     {
         if (!IsAudioDeviceReady()) return;
         Task.Run(() =>
         {
-            foreach (var name in Tracks.Keys) pcm[name] = Compose(Tracks[name]);
-            pcm["rain"] = RainLoop();
-            pcm["birds"] = BirdLoop();
-            pcm["crickets"] = CricketLoop();
+            foreach (var name in Tracks.Keys) pcm[name] = Pack(Tracks[name].Calm ? ComposeCalm(Tracks[name]) : Compose(Tracks[name]));
+            pcm["rain"] = Pack(RainLoop());
+            pcm["birds"] = Pack(BirdLoop());
+            pcm["crickets"] = Pack(CricketLoop());
         });
     }
 
@@ -184,25 +191,146 @@ static class Music
         return buf;
     }
 
-    static void Note(float[] buf, float start, float freq, float dur, string inst, float vol)
+    /* ---------- The calm tracks (1.37) ---------- */
+    // Eight bars on repeat wore thin in a minute. The island, cave and home tunes now run thirty-two bars in four
+    // sections (a theme, the theme over other chords, a sparse middle, a return that settles on the tonic) and then
+    // eight bars of silence baked into the loop, so the rain, birds and waves have the island to themselves for a
+    // while. Fewer notes, softer voices (a rolled-off top, a gentle attack, one quiet echo), almost no drums, and the
+    // tune never repeats the same two bars twice in a row. The fights keep their continuous, driving loops (Compose).
+    const int CalmBars = 32, RestBars = 4;
+    // Which of the track's four chords each two-bar step of a section plays.
+    static readonly int[][] SectionChords = { new[] { 0, 1, 2, 3 }, new[] { 0, 2, 1, 3 }, new[] { 1, 2, 0, 3 }, new[] { 2, 0, 3, 0 } };
+    // Which eighth-notes of a bar a phrase may start a note on.
+    static readonly int[][] Rhythms = { new[] { 0, 3, 4, 6 }, new[] { 0, 2, 4 }, new[] { 0, 4, 6 }, new[] { 0, 3, 6 }, new[] { 0, 4 }, new[] { 2, 4, 7 }, new[] { 0, 2, 3, 6 }, new[] { 0, 5 } };
+
+    // One note of a phrase: its bar (0 or 1), the eighth it starts on, how many scale steps it moves from the last,
+    // how long it lasts, and whether it settles the phrase.
+    sealed record Atk(int Bar, int Slot, int Step, float Eighths, bool End);
+
+    // A two-bar phrase: a question, then an answer that comes to rest on a chord tone.
+    static List<Atk> Motif(Random r, float density, bool sparse)
+    {
+        var list = new List<Atk>();
+        int[] steps = { -2, -1, -1, 0, 1, 1, 2 };
+        for (int b = 0; b < 2; b++)
+        {
+            var slots = Rhythms[r.Next(Rhythms.Length)].Where((s, i) => i == 0 || r.NextDouble() < Math.Min(1, density + 0.35f)).ToList();
+            if (sparse && slots.Count > 3) slots = slots.Take(3).ToList();
+            if (b == 1 && slots[0] < 2 && (slots.Count == 1 || slots[1] > 2) && r.NextDouble() < 0.5) slots[0] = 2;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                int next = i + 1 < slots.Count ? slots[i + 1] : 8;
+                bool end = b == 1 && i == slots.Count - 1;
+                list.Add(new Atk(b, slots[i], steps[r.Next(steps.Length)], Math.Min(end ? 6 : 4, next - slots[i]) + (end ? 1 : 0), end));
+            }
+        }
+        return list;
+    }
+
+    // The same phrase with a couple of notes nudged, so a return isn't a copy.
+    static List<Atk> Vary(List<Atk> m, Random r) =>
+        m.Select(a => !a.End && r.NextDouble() < 0.3 ? a with { Step = Math.Clamp(a.Step + (r.Next(2) == 0 ? -1 : 1), -2, 2) } : a).ToList();
+
+    static float[] ComposeCalm(TrackDef d)
+    {
+        var rm = new Random(d.Seed * 7919);          // the tune
+        var rp = new Random(d.Seed * 104729 + 5);    // the percussion, on its own stream
+        float beat = 60f / d.Bpm, bar = beat * 4, eighth = beat / 2;
+        var buf = new float[(int)(bar * (CalmBars + RestBars) * Rate)];
+        var lead = new float[buf.Length];
+        var notes = new List<int>();
+        for (int oct = 0; oct < 2; oct++) foreach (int s in d.Scale) notes.Add(d.Root + 12 + oct * 12 + s);
+        notes.Add(d.Root + 36);
+        var theme = new[] { Motif(rm, d.Density, false), Motif(rm, d.Density, false) };
+        var middle = new[] { Motif(rm, d.Density * 0.6f, true), Motif(rm, d.Density * 0.6f, true) };
+        float leadVol = d.LeadVol * 1.05f;
+        int idx = notes.Count / 3;
+        for (int sec = 0; sec < 4; sec++)
+        {
+            if (sec == 2) idx = notes.Count / 4;
+            else if (sec == 3) idx = notes.Count / 3;
+            for (int c = 0; c < 4; c++)
+            {
+                int bar0 = sec * 8 + c * 2;
+                float t0 = bar0 * bar;
+                var (semis, chord) = d.Prog[SectionChords[sec][c] % d.Prog.Length];
+                // Bass: the root, then (outside the sparse middle) the fifth.
+                Note(buf, t0, Hz(d.Root - 12 + semis), beat * 3.6f, d.Bass, 0.13f, true);
+                Note(buf, t0 + bar + beat * 2, Hz(d.Root - 12 + semis + chord[2]), beat * 1.8f, d.Bass, sec == 2 ? 0.07f : 0.10f, true);
+                foreach (int tone in chord) Note(buf, t0, Hz(d.Root + semis + tone), bar * 2, "pad", d.Pad != null ? 0.03f : 0.02f);
+                // The melody, with a breath: the last chord of a section leaves its second bar empty (the return ends on a held note).
+                var motif = sec == 2 ? middle[c % 2] : sec == 1 ? Vary(theme[c % 2], rm) : sec == 3 ? Vary(theme[c % 2], rm) : theme[c % 2];
+                var tones = chord.Select(x => (semis + x) % 12).ToHashSet();
+                foreach (var a in motif)
+                {
+                    if (c == 3 && a.Bar == 1 && sec is 0 or 2) continue;
+                    idx = Math.Clamp(idx + a.Step - (idx > notes.Count * 0.7 ? 1 : 0) + (idx < notes.Count * 0.2 ? 1 : 0), 0, notes.Count - 1);
+                    if (a.Slot % 4 == 0 || a.End)
+                    {
+                        int from = idx;
+                        idx = Enumerable.Range(0, notes.Count).Where(i => tones.Contains(((notes[i] - d.Root) % 12 + 12) % 12)).OrderBy(i => Math.Abs(i - from)).First();
+                    }
+                    Note(lead, t0 + a.Bar * bar + a.Slot * eighth, Hz(notes[idx]), a.Eighths * eighth, d.Lead, leadVol, true);
+                }
+                // Percussion, kept light so it grooves without nagging: hats on the offbeats and a soft kick in the
+                // theme, a fuller beat over the other chords, just a pulse in the sparse middle.
+                if (!d.Drums) continue;
+                for (int b = 0; b < 2; b++)
+                {
+                    float tb = t0 + b * bar;
+                    if (sec == 1 || sec == 3)
+                    {
+                        Kick(buf, tb, 0.10f); Kick(buf, tb + beat * 2, 0.07f);
+                        for (int s = 0; s < 8; s++) Hat(buf, tb + s * eighth, s % 2 == 0 ? 0.016f : 0.010f, rp);
+                    }
+                    else if (sec == 2) { if (b == 0) Kick(buf, tb, 0.06f); Hat(buf, tb + eighth * 2, 0.010f, rp); Hat(buf, tb + eighth * 6, 0.010f, rp); }
+                    else { if (b == 0) Kick(buf, tb, 0.07f); Hat(buf, tb + eighth * 2, 0.010f, rp); Hat(buf, tb + eighth * 6, 0.008f, rp); }
+                }
+            }
+        }
+        // The kalutang pair keeps its pattern, but only over the other chords; the cave's drip is one a bar.
+        for (int b = 0; b < CalmBars; b++)
+        {
+            float t0 = b * bar;
+            int sec = b / 8;
+            if (d.Lead == "kalutang" && sec is 1 or 3)
+                for (int s = 0; s < 8; s += 2)
+                    Note(buf, t0 + s * eighth, Hz(d.Root + 12 + (s % 4 == 0 ? 7 : 0)), 0.14f, "kalutang", s % 4 == 0 ? 0.03f : 0.02f, true);
+            if (d.Seed == 6) Note(buf, t0 + (float)rp.NextDouble() * bar, 1800 + (float)rp.NextDouble() * 900, 0.08f, "sine", 0.04f);
+        }
+        // One quiet echo of the lead, then fade the last two bars out into the silence.
+        int delay = (int)(beat * 0.75f * Rate), fadeFrom = (int)(bar * (CalmBars - 2) * Rate), fadeLen = (int)(bar * 2 * Rate);
+        for (int i = 0; i < buf.Length; i++)
+        {
+            float x = buf[i] + lead[i] + (i >= delay ? lead[i - delay] * 0.12f : 0);
+            float gain = i < fadeFrom ? 1 : Math.Max(0, 1 - (float)(i - fadeFrom) / fadeLen);
+            buf[i] = MathF.Tanh(x * 1.15f * gain);
+        }
+        return buf;
+    }
+
+    // soft: a gentle attack and the top rolled off, for the calm tracks (ComposeCalm).
+    static void Note(float[] buf, float start, float freq, float dur, string inst, float vol, bool soft = false)
     {
         int s0 = (int)(start * Rate), n = (int)(dur * Rate);
         bool pad = inst == "pad";
-        float decaySec = inst switch { "bell" => 1.6f, "pluck" => 0.25f, "bandurria" => 0.9f, "marimba" => 0.35f, "steel" => 0.6f, "musicbox" => 0.9f, "pulse" => 0.45f, "gong" => 0.8f, "agung" => 1.4f, "kalutang" => 0.14f, _ => dur };
+        float decaySec = inst switch { "soft" => 0.7f, "bell" => 1.6f, "pluck" => 0.25f, "bandurria" => 0.9f, "marimba" => 0.35f, "steel" => 0.6f, "musicbox" => 0.9f, "pulse" => 0.45f, "gong" => 0.8f, "agung" => 1.4f, "kalutang" => 0.14f, _ => dur };
         double decay = Math.Exp(Math.Log(0.001) / (decaySec * Rate));
         double ph = 0, g = 1, step = freq / Rate;
-        int attack = pad ? (int)(0.3f * Rate) : (int)(0.005f * Rate), release = (int)(0.3f * Rate);
+        int attack = pad ? (int)(0.3f * Rate) : (int)((soft ? 0.014f : 0.005f) * Rate), release = (int)(0.3f * Rate);
+        double lp = 0, lpa = 1 - Math.Exp(-Math.Tau * 3600 / Rate);
         for (int i = 0; i < n && s0 + i < buf.Length; i++)
         {
             ph += step;
             double p = ph % 1.0, w = inst switch
             {
-                "pulse" => p < 0.25 ? 1 : -1,
+                "pulse" => p < 0.25 ? 1 : -1.0 / 3,
                 "tri" or "pad" => 4 * Math.Abs(p - 0.5) - 1,
                 "pluck" => 2 * p - 1,
                 // A bandurria: bright steel strings, picked in a fast tremolo (each pick a fresh little pluck).
                 "bandurria" => (Math.Sin(ph * Math.Tau) + 0.5 * Math.Sin(ph * Math.Tau * 2) + 0.3 * Math.Sin(ph * Math.Tau * 3) + 0.15 * Math.Sin(ph * Math.Tau * 5))
                     * (0.45 + 0.55 * Math.Exp(-(i % (Rate / 13)) / (double)Rate * 30)),
+                "soft" => Math.Sin(ph * Math.Tau) + 0.28 * Math.Sin(ph * Math.Tau * 2) + 0.08 * Math.Sin(ph * Math.Tau * 3),
                 "bell" => Math.Sin(ph * Math.Tau) + 0.4 * Math.Sin(ph * Math.Tau * 2.76),
                 "marimba" => Math.Sin(ph * Math.Tau) + 0.25 * Math.Sin(ph * Math.Tau * 4),
                 "steel" => Math.Sin(ph * Math.Tau) + 0.5 * Math.Sin(ph * Math.Tau * 2) + 0.2 * Math.Sin(ph * Math.Tau * 3),
@@ -214,6 +342,7 @@ static class Music
                 "kalutang" => Math.Sin(ph * Math.Tau) + 0.5 * Math.Sin(ph * Math.Tau * 2.76) * g + (i < Rate / 200 ? 0.6 * Math.Sin(i * 1.7) : 0),
                 _ => Math.Sin(ph * Math.Tau)
             };
+            if (soft) { lp += (w - lp) * lpa; w = lp; }
             double env = i < attack ? (double)i / attack : 1;
             if (pad) { if (i > n - release) env *= (double)(n - i) / release; }
             else { g *= decay; if (i > n - release) env *= (double)(n - i) / release; }
@@ -353,7 +482,14 @@ static class Music
         return buf;
     }
 
-    static byte[] Wav(float[] samples)
+    static short[] Pack(float[] f)
+    {
+        var s = new short[f.Length];
+        for (int i = 0; i < f.Length; i++) s[i] = (short)Math.Clamp(f[i] * 32767, -32768, 32767);
+        return s;
+    }
+
+    static byte[] Wav(short[] samples)
     {
         using var ms = new MemoryStream();
         using var w = new BinaryWriter(ms);
@@ -361,7 +497,7 @@ static class Music
         w.Write("RIFF"u8); w.Write(36 + dataLen); w.Write("WAVE"u8);
         w.Write("fmt "u8); w.Write(16); w.Write((short)1); w.Write((short)1); w.Write(Rate); w.Write(Rate * 2); w.Write((short)2); w.Write((short)16);
         w.Write("data"u8); w.Write(dataLen);
-        foreach (var s in samples) w.Write((short)Math.Clamp(s * 32767, -32768, 32767));
+        foreach (var s in samples) w.Write(s);
         w.Flush();
         return ms.ToArray();
     }

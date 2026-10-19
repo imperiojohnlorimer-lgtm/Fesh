@@ -49,9 +49,9 @@ partial class Game
     static readonly HashSet<char> Buildable = new() { 's', 'g', 'n', 'e', 'D', 'j' };
     static readonly HashSet<char> WoodGround = new() { 's', 'e' };
     static readonly Dictionary<string, int> LooseMax = new() { ["wood"] = 5, ["stone"] = 4, ["worm"] = 3, ["glean"] = 5 };
-    static readonly string[] FishingModes = { "charging", "casting", "waiting", "bite", "reeling", "chest", "spear", "drill" };
+    static readonly string[] FishingModes = { "charging", "casting", "waiting", "bite", "reeling", "chest", "spear", "drill", "boatwork", "boatanim" };
     // Modes where the world keeps going: food, health, monsters and the derby clock all tick.
-    static readonly string[] ActiveModes = { "play", "build", "charging", "casting", "waiting", "bite", "reeling", "chest", "spear", "drill" };
+    static readonly string[] ActiveModes = { "play", "build", "charging", "casting", "waiting", "bite", "reeling", "chest", "spear", "drill", "boatwork", "boatanim" };
 
     State state = new();
     Random rng = new();   // swapped for a match's own while one is on (Match.cs), and put back after
@@ -161,14 +161,16 @@ partial class Game
     }
 
     // Each island has its own tune; the cave and houses have theirs. Rain adds its own patter outdoors.
-    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine || GuardianFighting || IronbillOnLine || MireOnLine || RayOnLine || TarponOnLine ? "boss" : SeaEmergency && evac.Phase != "quake" || BagaEvacuating ? "alarm" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
+    string WantedTrack() => mode is "title" or "create" ? "saltmere" : BossFighting || BossOnLine || GuardianFighting || IronbillOnLine || MireOnLine || RayOnLine || TarponOnLine || LungfishOnLine || WhiskersOnLine ? "boss" : SeaEmergency && evac.Phase != "quake" || BagaEvacuating ? "alarm" : eclipse != null ? "eclipse" : scene == "cave" ? "cave" : InHouse ? "home"
         : RondallaPlaying ? "rondalla" : Data.Biomes[lastBiome < Data.Biomes.Length ? lastBiome : PlayerBiome()].Id;
 
     void PickMusic(float dt)
     {
         // lastBiome only changes on land, so crossing a bridge or standing on a jetty keeps the island's tune.
         string track = WantedTrack();
-        Music.Want(track, Night && mode is not ("title" or "create") ? 0.3f : 0.42f);
+        // The calm tunes sit lower than the fights' (1.37).
+        bool fight = track is "boss" or "alarm" or "eclipse";
+        Music.Want(track, Night && mode is not ("title" or "create") ? (fight ? 0.3f : 0.3f) : fight ? 0.42f : 0.42f);
         // The rain loop swells and fades with the rain on screen.
         bool wet = scene == "world" && rainAmt > 0.02f && mode is not ("title" or "create");
         Music.WantAmbience(wet ? "rain" : null, (0.32f + 0.23f * stormAmt) * rainAmt);
@@ -327,6 +329,8 @@ partial class Game
             else if (mode is "waiting" or "charging") ReelIn("You reeled in.");
             else if (mode == "spear") EndSpear();
             else if (mode == "drill") { mode = "play"; Toast("You stop chipping at the ice."); }
+            else if (mode == "boatwork") StopYardWork("You put the hammer down. The work is kept.");
+            else if (mode == "boatanim") SkipYardAnim();
             else if (mode == "play") OpenPause();
         }
     }
@@ -361,6 +365,8 @@ partial class Game
         {
             case "build": hover = PointerTile(); BuildAction(); return;
             case "reeling": pointerHold = true; reelTap = true; return;
+            case "boatwork": pointerHold = true; return;
+            case "boatanim": SkipYardAnim(); return;
             case "spear": AimAtPointer(); ThrowSpear(); return;
             case "waiting": case "bite": case "dialogue": case "drill":
                 OnAction();
@@ -660,11 +666,12 @@ partial class Game
             if (FishingModes.Contains(mode)) Toast("Finish fishing first.");
             return;
         }
+        if (!TourAllowsPanel(which)) { Sfx.Play("nope"); Toast("That opens after your first steps. Follow the gold card.", 3.5f); return; }
         Sfx.Play("ui");
         panel = which;
         mode = "panel";
         if (which == "map") ChooseChart();
-        if (which is "dex" or "map") Learned(which);
+        if (which is "dex" or "map" or "bag" or "journal") Learned(which);
         if (which == "journal") basicsPage = -1;
         SetPrompt("");
     }
@@ -856,6 +863,7 @@ partial class Game
             if (d.Station == "smoker" && Dist(x, y, b.x * T + 5, b.y * T + 10) < 13)
                 return new Target { Type = "craft", Id = "smoker", Label = "Use the smoking rack" };
             if (b.id == "dryrack" && Dist(x, y, b.x * T + 5, b.y * T + 10) < 13) return RackTarget(b);
+            if (b.id == "slipway" && Dist(x, y, b.x * T + 15, b.y * T + 8) < 22) return YardTarget(b);
         }
         // Bakawan's firefly trees: after dark, watch the alitaptap (Bakawan.cs).
         if (FireflyTarget() is Target fireflies) return fireflies;
@@ -870,7 +878,7 @@ partial class Game
         if (BuildAt(fx, fy) is Build planted && planted.id == "berrybush") return new Target { Type = "planter", Ref = planted, Label = "Pick berries" };
         if (k is 't' or 'f' or 'h' or 'c' or 'R')
             return new Target { Type = "tree", Tx = fx, Ty = fy, Label = k == 'R' ? "Break the boulder" : $"Chop the {TreeName(k)}" };
-        if (BridgeClosed(fx, fy)) return new Target { Type = "info", Label = "The bridge is closed until the storm passes" };
+        if (BridgeClosed(fx, fy)) return new Target { Type = "info", Label = Stormy ? "The bridge is closed until the storm passes" : "The bridge is roped off until you have finished your first steps" };
         foreach (var s in Data.Spots)
             if (s.Scene == "world" && SpotOpen(s.Id) && Dist(x, y, s.X, s.Y) < s.R) return SpotTarget(s);
         // A moored boat comes last: it mustn't hide anything else, and <ride> boards it from beside them anyway.
@@ -982,6 +990,7 @@ partial class Game
                     case "rest": Rest(target.Id == "shelter"); break;
                     case "spot": if (target.Id == "icehole") Cast(target.Id); else StartCharge(target.Id); break;
                     case "drill": StartDrill(); break;
+                    case "yard": OnYard((Build)target.Ref); break;
                     case "dig": DigWorms((Loose)target.Ref); break;
                     case "cricket": CatchCricket((Bug)target.Ref); break;
                     case "pot": HaulPot((Build)target.Ref); break;
@@ -1042,6 +1051,7 @@ partial class Game
             case "bite": Hook(); return;
             case "spear": ThrowSpear(); return;
             case "drill": DrillHit(); return;
+            case "boatanim": SkipYardAnim(); return;
         }
     }
 
@@ -1053,6 +1063,8 @@ partial class Game
         time += dt;
         LookData.Now = time;
         UpdateMire(dt);   // forgets a finished Mire leviathan fight, whatever mode comes next (MireBoss.cs)
+        UpdateLungfish(dt);   // and the Sunscale lungfish's (LungfishBoss.cs)
+        UpdateWhiskers(dt);   // and Old Whiskers' (WhiskersBoss.cs)
         UpdateRay(dt);    // and a Starfall ray fight (RayBoss.cs)
         UpdateTarpon(dt); // and Haring Buan-buan's (TarponBoss.cs)
         if (toastTimer > 0) toastTimer -= dt;
@@ -1236,6 +1248,7 @@ partial class Game
             return;
         }
 
+        UpdateYard(dt);
         UpdateTow(dt);
         UpdateFishing(dt);
         UpdateIronbill(dt);
@@ -1275,7 +1288,7 @@ partial class Game
         tomasX = TomasHomeX; tomasY = TomasHomeY;
         // Nothing carries over from a game played earlier in this session (quitting to the title and loading another slot).
         fish = null; reel = null; panel = null; boss = null; dlg = null; eclipse = null; race = null; raceArmed = false; sungka = null;
-        guardian = null; guardianDue = false; rocks.Clear(); mire = null; ironbill = null; ray = null; rayHome = null; tarpon = null; tarponHome = null;
+        guardian = null; guardianDue = false; rocks.Clear(); mire = null; lung = null; whisk = null; yardB = null; yardLaunching = false; ironbill = null; ray = null; rayHome = null; tarpon = null; tarponHome = null;
         ShutSungkaLan();
         ShutDockNet();
         stampDock = false;
@@ -1296,6 +1309,7 @@ partial class Game
         state.track ??= "";
         NoteGuideVersion(fresh);
         NoteChapterVersion(fresh);
+        StartTour(fresh);
         rockHits = 0;
         // A story finished without ever meeting Tomas (the early-Glowgill bug): he's met, so he gives requests.
         if (state.flags.ended) state.flags.metTomas = true;
@@ -1353,7 +1367,7 @@ partial class Game
             Talk(new()
             {
                 new("", "You arrive on Saltmere Island with a rod, a bucket and a lot of questions."),
-                new("", "Tomas waves from his hut. Walk over with <move> and press <act> to talk.")
+                new("", state.tour < TourDone ? "First steps: seven short tasks, each one shown in the gold box at the top left, with an arrow to where it happens. Fishing, Pip's stall, the map and the journal open up as you go. Start by walking with <move>." : "Tomas waves from his hut. Walk over with <move> and press <act> to talk.")
             });
         }
         else if (sunk > 0)

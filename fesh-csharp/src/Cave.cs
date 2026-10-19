@@ -98,6 +98,7 @@ partial class Game
 
     void EnterCaveFromMouth()
     {
+        if (TourActive) { Sfx.Play("nope"); Toast("Finish your first steps before going underground."); return; }
         if (state.caveDeepest >= 5)
         {
             Sfx.Play("ui");

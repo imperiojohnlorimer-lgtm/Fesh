@@ -537,6 +537,9 @@ static class Data
         // 1.15: the twelfth piece, once you've been to Amihan (Build.BuildTools). A shack on stilts, furnished the same way.
         new("kubo", "Bahay kubo", Cost(("wood", 10), ("stone", 2)), "A nipa hut on stilts, cool and airy. Furnish it like a shack.", W: 2, Box: new[] { 1, 0, 18, 9 },
             Light: new[] { 10, 2, 16 }, Tip: "Press <act> at the steps to go inside and furnish it.", Door: true),
+        // 1.38: the boatyard (BoatYard.cs): the boat is built on it in stages. Needs open sea to the east or west of it.
+        new("slipway", "Slipway", Cost(("wood", 4), ("stone", 2)), "Build your boat here, one stage at a time.", W: 3, Box: new[] { 1, 2, 28, 7 },
+            Tip: "Press <act> at the slipway to build your boat in stages."),
 
         new("workbench", "Workbench", Cost(("wood", 6), ("stone", 2)), "Craft tools and rods.", W: 2, Box: new[] { 1, 3, 18, 6 }, Indoor: true, Station: "workbench",
             Tip: "Press <act> at the workbench to craft."),

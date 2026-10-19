@@ -186,6 +186,7 @@ partial class Game
     // Hold to power up a cast in the way you're facing (no named spot: chargeSpot stays null).
     void StartFreeCharge()
     {
+        if (TourBlocked(2, "Meet Tomas first: follow the arrow. Fishing opens up after that.")) return;
         chargeSpot = null;
         charge = 0;
         chargeDir = 1;
