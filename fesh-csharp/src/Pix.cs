@@ -129,6 +129,54 @@ sealed class Pix
             }
     }
 
+    // Light added to the picture, not paint laid over it: out = dst + (1 - dst) * colour * a, with a = k * (1 - d^2 / r^2)^2.
+    // The edge is smooth and finite (no square root), and overlapping lamps brighten without clipping to white.
+    public void AddGlow(double wx, double wy, double r, Color c, float k)
+    {
+        k *= Alpha;
+        if (k <= 0.001f || r <= 0) return;
+        double cx = wx - CamX, cy = wy - CamY, r2 = r * r;
+        int x0 = Math.Max(0, (int)Math.Floor(cx - r)), x1 = Math.Min(W, (int)Math.Ceiling(cx + r));
+        int y0 = Math.Max(0, (int)Math.Floor(cy - r)), y1 = Math.Min(H, (int)Math.Ceiling(cy + r));
+        float cr = c.R / 255f, cg = c.G / 255f, cb = c.B / 255f;
+        for (int y = y0; y < y1; y++)
+        {
+            double dy = y + 0.5 - cy;
+            for (int x = x0; x < x1; x++)
+            {
+                double dx = x + 0.5 - cx, d2 = dx * dx + dy * dy;
+                if (d2 >= r2) continue;
+                float f = (float)(1 - d2 / r2), a = k * f * f;
+                var d = Buf[y * W + x];
+                Buf[y * W + x] = new Color(
+                    (byte)Math.Min(255, d.R + (255 - d.R) * cr * a + 0.5f),
+                    (byte)Math.Min(255, d.G + (255 - d.G) * cg * a + 0.5f),
+                    (byte)Math.Min(255, d.B + (255 - d.B) * cb * a + 0.5f),
+                    (byte)255);
+            }
+        }
+    }
+
+    // The same blend over a rectangle (a lit window, the bright core of a lamp).
+    public void AddRect(double x, double y, int w, int h, Color c, float k)
+    {
+        k *= Alpha;
+        int x0 = Math.Max(0, Round(x) - CamX), y0 = Math.Max(0, Round(y) - CamY);
+        int x1 = Math.Min(W, Round(x) - CamX + w), y1 = Math.Min(H, Round(y) - CamY + h);
+        if (k <= 0.001f || x0 >= x1 || y0 >= y1) return;
+        float cr = c.R / 255f * k, cg = c.G / 255f * k, cb = c.B / 255f * k;
+        for (int yy = y0; yy < y1; yy++)
+            for (int xx = x0; xx < x1; xx++)
+            {
+                var d = Buf[yy * W + xx];
+                Buf[yy * W + xx] = new Color(
+                    (byte)Math.Min(255, d.R + (255 - d.R) * cr + 0.5f),
+                    (byte)Math.Min(255, d.G + (255 - d.G) * cg + 0.5f),
+                    (byte)Math.Min(255, d.B + (255 - d.B) * cb + 0.5f),
+                    (byte)255);
+            }
+    }
+
     public static double Hash(int x, int y, int k)
     {
         unchecked

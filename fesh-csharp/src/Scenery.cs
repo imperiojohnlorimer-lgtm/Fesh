@@ -540,6 +540,7 @@ partial class Game
                 bool touches = Shore(ShapePx(wx + 1, wy)) || Shore(ShapePx(wx - 1, wy)) || Shore(ShapePx(wx, wy + 1)) || Shore(ShapePx(wx, wy - 1));
                 if (touches) shore.Add(((short)wx, (short)wy, (sbyte)nx, (sbyte)ny, w));
             }
+        IndexShore();
     }
 
     /* ---------- Water life ---------- */
@@ -551,14 +552,20 @@ partial class Game
         var dim = Pal.Rgba(236, 248, 252, 0.3f);
         var wash = Pal.Rgba(236, 248, 252, 0.32f);
         var murky = Pal.Rgba(196, 214, 168, 0.45f);
-        foreach (var (sx, sy, nx, ny, w) in shore)
+        // With light on, the foam follows the swell: more of it and further up the shore as it builds, and in a storm it
+        // breaks harder (Light: Soft or Full; Off keeps the old strokes exactly).
+        bool rich = LightMode > 0;
+        float storm = rich ? Math.Clamp(stormAmt, 0, 1) : 0;
+        double cover = 0.55 + 0.2 * storm;   // a double, like the old threshold, so light off compares exactly as it did
+        foreach (int si in ShoreInView())
         {
+            var (sx, sy, nx, ny, w) = shore[si];
             if (sx < x0 || sx > x1 || sy < y0 || sy > y1) continue;
-            bool on = (Pix.Hash(sx / 3, sy / 3, 5) + t * 0.3) % 1 < 0.55;
+            bool on = (Pix.Hash(sx / 3, sy / 3, 5) + t * 0.3) % 1 < cover;
             if (w == 'm') { if (on) pix.Rect(sx, sy, 1, 1, murky); continue; }
             pix.Rect(sx, sy, 1, 1, on ? bright : dim);
             if (!on || ((sx + sy) & 1) != 0) continue;
-            int off = 2 + (int)MathF.Round(MathF.Sin(t * 1.8f + sx * 0.11f + sy * 0.13f));
+            int off = rich ? Math.Clamp((int)MathF.Round(2 + storm + SeaSwell(sx, sy, t) * (1 + 0.5f * storm)), 1, 4) : 2 + (int)MathF.Round(MathF.Sin(t * 1.8f + sx * 0.11f + sy * 0.13f));
             pix.Rect(sx + nx * off, sy + ny * off, 1, 1, wash);
         }
     }
@@ -568,14 +575,18 @@ partial class Game
     {
         var glint = Pal.Rgba(214, 228, 240, 0.3f * k);
         int x0 = camX - 1, x1 = camX + W + 1, y0 = camY - 1, y1 = camY + H + 1;
-        foreach (var (sx, sy, _, _, w) in shore)
+        foreach (int si in ShoreInView())
+        {
+            var (sx, sy, _, _, w) = shore[si];
             if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1 && w != 'm' && (Pix.Hash(sx / 3, sy / 3, 5) + t * 0.3) % 1 < 0.55 && !TideDry(sx, sy))
                 pix.Rect(sx, sy, 1, 1, glint);
+        }
     }
 
     // Now and then a little ripple opens on open water and fades.
     void DrawRipples(float t)
     {
+        if (LightMode > 0 && ChopK > 0.4f) return;   // a stormy sea has its chop instead
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
         for (int y = vy0; y <= vy1; y++)
             for (int x = vx0; x <= vx1; x++)
@@ -598,6 +609,7 @@ partial class Game
     {
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
         float wind = Stormy ? 3.4f : 1.5f, amp = Stormy ? 1.6f : 0.75f;
+        float seasonMix = SeasonMix();
         for (int y = vy0; y <= vy1; y++)
             for (int x = vx0; x <= vx1; x++)
             {
@@ -616,20 +628,31 @@ partial class Game
                     'j' => ("#2f6a2e", "#5fae4c"), 'D' => ("#b8904a", "#dcb66c"), 's' => ("#9fae72", "#c6cf98"), _ => ("#3f7a32", "#7cbf5a")
                 };
                 if (gust > 0.55f) light = g switch { 'j' => "#86c86a", 'D' => "#ecd08e", 's' => "#dde3b4", _ => "#a6dc80" };
-                bool flower = g == 'g' && h < 0.05;
+                // With light on the season shows in the grass: dry and golden in the amihan, lush and deep in the habagat, with
+                // more flowers when it is wet (Soft halves it). Off draws the old tufts exactly.
+                var dk = Pal.C(dark); var lt = Pal.C(light);
+                double flowerCut = 0.05;
+                if (LightMode > 0 && g is 'g' or 'j')
+                {
+                    float half = LightMode == 1 ? 0.5f : 1;
+                    var tone = Pix.Mix(Pal.C("#c9b94a"), Pal.C("#1f7a3a"), seasonMix);
+                    dk = Pix.Mix(dk, tone, 0.3f * half); lt = Pix.Mix(lt, tone, 0.3f * half);
+                    flowerCut = 0.05 + 0.03 * half * (2 * seasonMix - 1);
+                }
+                bool flower = g == 'g' && h < flowerCut;
                 if (flower)
                 {
                     string petal = h < 0.017 ? "#f3e27a" : h < 0.034 ? "#ffffff" : "#f2a5b5";
-                    pix.Rect(bx, by - 2, 1, 3, dark);
+                    pix.Rect(bx, by - 2, 1, 3, dk);
                     pix.Rect(bx + s, by - 3, 1, 1, petal);
                     pix.Rect(bx + s - 1, by - 3, 1, 1, Pal.WithAlpha(Pal.C(petal), 0.6f));
                     continue;
                 }
                 int tall = g == 'j' ? 4 : 3;
-                pix.Rect(bx, by - 1, 3, 1, dark);
-                pix.Rect(bx, by - 2, 1, 1, dark); pix.Rect(bx - 1 + (s < 0 ? s : 0), by - 3, 1, 1, light);
-                pix.Rect(bx + 1, by - tall + 1, 1, tall - 1, dark); pix.Rect(bx + 1 + s, by - tall, 1, 1, light);
-                pix.Rect(bx + 2, by - 2, 1, 1, dark); pix.Rect(bx + 3 + (s > 0 ? s : 0), by - 3, 1, 1, light);
+                pix.Rect(bx, by - 1, 3, 1, dk);
+                pix.Rect(bx, by - 2, 1, 1, dk); pix.Rect(bx - 1 + (s < 0 ? s : 0), by - 3, 1, 1, lt);
+                pix.Rect(bx + 1, by - tall + 1, 1, tall - 1, dk); pix.Rect(bx + 1 + s, by - tall, 1, 1, lt);
+                pix.Rect(bx + 2, by - 2, 1, 1, dk); pix.Rect(bx + 3 + (s > 0 ? s : 0), by - 3, 1, 1, lt);
             }
     }
 
@@ -683,7 +706,7 @@ partial class Game
         if (scene != "world" || Night || leaves.Count > 40) return;
         leafT -= dt * (Stormy ? 5 : 1);
         if (leafT > 0) return;
-        leafT = 0.4f + (float)fxRng.NextDouble() * 0.8f;
+        leafT = (0.4f + (float)fxRng.NextDouble() * 0.8f) * (LightMode > 0 ? 0.55f + 0.45f * SeasonMix() : 1);   // more leaves come down in the dry amihan
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
         (int x, int y, char kind) pick = (-1, -1, ' ');
         int seen = 0;

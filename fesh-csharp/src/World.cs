@@ -364,6 +364,7 @@ partial class Game
     // The whole outdoor base layer: depth, the rounded coast, every tile's ground and details, then where the foam goes.
     void RenderBase()
     {
+        worldRich = null;   // the richer sea (WaterRich.cs) is made again from this bake the next time it is wanted
         for (int y = 0; y < ROWS; y++)
             for (int x = 0; x < COLS; x++) groundCache[y, x] = Ground(worldMap[y, x], x, y);
         ComputeDepth();
@@ -394,6 +395,7 @@ partial class Game
         bridgeClip = (Math.Max(0, x - 3) * T, Math.Max(0, y - 3) * T, (Math.Min(COLS - 1, x + 3) + 1) * T, (Math.Min(ROWS - 1, y + 3) + 1) * T);
         Ring(4, PaintBridge);   // a bridge four tiles away still throws its shadow into the cleared tiles
         bridgeClip = null;
+        if (worldRich != null) Ring(4, RichTile);
     }
 
     void PaintTile(int x, int y)
@@ -479,6 +481,7 @@ partial class Game
         DrawGlints(t);
         PlanMoonPath(t);
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
+        float chop = ChopK;
         for (int y = vy0; y <= vy1; y++)
             for (int x = vx0; x <= vx1; x++)
             {
@@ -486,6 +489,7 @@ partial class Game
                 string c = tile switch { '~' => "#3a6f99", 'l' => "#5cc7b8", 'o' => "#62dccf", 'm' => "#6b7f4a", 'w' or 'T' => "#6ab0cc", _ => null };
                 if (c == null) continue;
                 double k = Pix.Hash(x, y, 7);
+                if (chop > 0 && k < chop * 0.9) continue;   // the storm's own chop takes over (SeaRain.cs)
                 int gx = x * T + (int)(k * 7), gy = y * T + (int)(Pix.Hash(x, y, 9) * 9);
                 if ((t * 0.35 + k) % 1 < 0.2 && Wet(ShapePx(gx, gy)) && Wet(ShapePx(gx + 1, gy))) pix.Rect(gx, gy, 2, 1, c);
             }
@@ -496,6 +500,9 @@ partial class Game
         DrawTideFlats(t);
         DrawSandbar();
         DrawPools();
+        DrawReflections(t);
+        DrawSeaRain(t);
+        DrawSeaChop(t);
     }
 
     void DrawSpots(float t)
@@ -749,7 +756,7 @@ partial class Game
         }
         else LookData.DrawPerson(pix, state.look, x, y, f, walk, idle: false, bob: bob, blink: blink, arms: arms, swing: pump, lean: lean, head: glance,
             hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
-        if (InWater && !Riding)
+        if (InWater && !Riding && !reflecting)   // a reflection (Reflections.cs) is you alone, not the wading bowl
         {
             string water = TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T)) switch { 'l' => "#2a9d8f", 'o' => "#22a6a0", 'm' => "#4f6440", _ => "#2f7fa3" };
             // Wading: the water comes up past your knees. A soft, wavy surface that lets your legs show through and
@@ -1608,72 +1615,86 @@ partial class Game
     // k is how dark it is (Darkness): the lights, glows and fireflies fade in with it at dusk and out at dawn.
     void DrawNight(float t)
     {
-        float k = Darkness;
-        // With the moon swallowed, the night is darker still.
-        Array.Fill(dark, (eclipse is { Phase: "rise" or "bang" } ? 0.74f : 0.63f) * k);
-        LightHole(player.X, player.Y - 6, Wears("headlamp") ? 58 : 32, 0.85f);
-        LightHole(FireX, FireY - 3, 44 + MathF.Sin(t * 9) * 2, 1);
-        LightHole(165, 61, 12, 0.7f);
-        if (fish != null) LightHole(fish.Bx, fish.By, 12, 0.5f);
-        foreach (var b in state.builds)
+        float k = Darkness, lk = LampK;
+        if (k > 0)
         {
-            var d = Data.BuildById[b.id];
-            if (d.Light == null) continue;
-            float r = d.Light[2] + (b.id == "campfire" ? MathF.Sin(t * 9 + b.x) * 2 : 0);
-            LightHole(b.x * T + d.Light[0], b.y * T + d.Light[1], r, b.id is "shack" or "kubo" ? 0.75f : 1);
+            // With the moon swallowed, the night is darker still.
+            Array.Fill(dark, (eclipse is { Phase: "rise" or "bang" } ? 0.74f : 0.63f) * k);
+            LightHole(player.X, player.Y - 6, Wears("headlamp") ? 58 : 32, 0.85f);
+            LightHole(FireX, FireY - 3, 44 + MathF.Sin(t * 9) * 2, 1);
+            LightHole(165, 61, 12, 0.7f);
+            if (fish != null) LightHole(fish.Bx, fish.By, 12, 0.5f);
+            foreach (var b in state.builds)
+            {
+                var d = Data.BuildById[b.id];
+                if (d.Light == null) continue;
+                float r = d.Light[2] + (b.id == "campfire" ? MathF.Sin(t * 9 + b.x) * 2 : 0);
+                LightHole(b.x * T + d.Light[0], b.y * T + d.Light[1], r, b.id is "shack" or "kubo" ? 0.75f : 1);
+            }
+            // The Starwell glows after dark, enough to light a fight around it (and to catch your eye through the palms).
+            LightHole(StarwellX, StarwellY, 62 + MathF.Sin(t * 1.3f) * 4, 0.8f);
+            if (boss != null) LightHole(boss.X, boss.Y - 8, 34, 0.7f);
+            LightParola(t);
+            LightEclipse();
+            LightFireflies(t);
+            LightBaga(t);
+            LightMire();
+            LightRay();
+            LightTarpon();
+            LightWindows();
+            KeepMoonPath();
+            ApplyDark(new Color(8, 16, 40, 255));
         }
-        // The Starwell glows after dark, enough to light a fight around it (and to catch your eye through the palms).
-        LightHole(StarwellX, StarwellY, 62 + MathF.Sin(t * 1.3f) * 4, 0.8f);
-        if (boss != null) LightHole(boss.X, boss.Y - 8, 34, 0.7f);
-        LightParola(t);
-        LightEclipse();
-        LightFireflies(t);
-        LightBaga(t);
-        LightMire();
-        LightRay();
-        LightTarpon();
-        LightWindows();
-        KeepMoonPath();
-        ApplyDark(new Color(8, 16, 40, 255));
-        GlowWindows(t, k);
-        DrawMoonPath(k);
-        // With the moon in Bakunawa's jaws, the surf doesn't catch any moonlight.
-        if (eclipse == null || eclipse.Phase == "spit") DrawMoonlitShore(t, k);
-        // Bakawan's glowing water and its alitaptap (Bakawan.cs).
-        DrawGlowingSurf(t, k);
-        DrawGlowTrail(t, k);
-        DrawFireflies(t, k);
-        GlowBaga(t, k);
-        GlowMire(k);
-        GlowRay(t, k);
-        GlowTarpon(t, k);
-        GlowMount(k);
-        GlowParola(t, k);
-        GlowEclipse(k);
-        pix.Glow(StarwellX, StarwellY, 30, Pal.Rgba(120, 220, 255, (0.22f + 0.06f * MathF.Sin(t * 1.3f)) * k));
-
-        var warm = Pal.Rgba(243, 150, 60, 0.18f * k);
-        pix.Glow(FireX, FireY - 3, 40, warm);
-        foreach (var b in state.builds)
+        // The lamps (windows, fires, lanterns) come on at dusk, before the dark does (LampK): they glow while the sky is orange.
+        GlowWindows(t, lk);
+        if (k > 0)
         {
-            if (b.id != "campfire" && b.id != "lantern") continue;
-            var l = Data.BuildById[b.id].Light;
-            pix.Glow(b.x * T + l[0], b.y * T + l[1], l[2] - 4, warm);
+            DrawMoonPath(k);
+            // With the moon in Bakunawa's jaws, the surf doesn't catch any moonlight.
+            if (eclipse == null || eclipse.Phase == "spit") DrawMoonlitShore(t, k);
+            // Bakawan's glowing water and its alitaptap (Bakawan.cs).
+            DrawGlowingSurf(t, k);
+            DrawGlowTrail(t, k);
+            DrawFireflies(t, k);
+            GlowBaga(t, k);
+            GlowMire(k);
+            GlowRay(t, k);
+            GlowTarpon(t, k);
+            GlowMount(k);
+            GlowParola(t, k);
+            GlowEclipse(k);
+            float well = MathF.Sin(t * 1.3f);
+            LightGlow(StarwellX, StarwellY, 30, 120, 220, 255, (0.22f + 0.06f * well) * k, (0.3f + 0.08f * well) * k);
         }
-        if (Eligible(Data.ById["glowgill"]))
+        if (lk > 0)
         {
-            float gx = 100 + MathF.Sin(t * 0.7f) * 13, gy = 66 + MathF.Cos(t * 0.9f) * 5;
-            pix.Glow(gx, gy, 9, Pal.Rgba(127, 243, 255, 0.55f * k));
-            pix.Rect(gx, gy, 2, 1, "#bdfaff");
+            LightGlow(FireX, FireY - 3, 40, 243, 150, 60, 0.18f * lk, 0.5f * lk);
+            foreach (var b in state.builds)
+            {
+                if (b.id != "campfire" && b.id != "lantern") continue;
+                var l = Data.BuildById[b.id].Light;
+                LightGlow(b.x * T + l[0], b.y * T + l[1], l[2] - 4, 243, 150, 60, 0.18f * lk, 0.5f * lk);
+                // A small bright core, so the flame itself reads as the source.
+                if (LightMode > 0) pix.AddGlow(b.x * T + l[0], b.y * T + l[1], 7, new Color(255, 214, 140, 255), 0.5f * lk);
+            }
         }
-        if (Eligible(Data.ById["abyssal"]) && state.flags.dockFixed)
+        if (k > 0)
         {
-            float a = (0.4f + 0.4f * MathF.Sin(t * 1.4f)) * k;
-            foreach (var (x, y) in new[] { (300, 112), (306, 115), (311, 110), (316, 116), (304, 120) })
-                pix.Rect(x, y, 1, 1, Pal.Rgba(255, 215, 106, a));
+            if (Eligible(Data.ById["glowgill"]))
+            {
+                float gx = 100 + MathF.Sin(t * 0.7f) * 13, gy = 66 + MathF.Cos(t * 0.9f) * 5;
+                pix.Glow(gx, gy, 9, Pal.Rgba(127, 243, 255, 0.55f * k));
+                pix.Rect(gx, gy, 2, 1, "#bdfaff");
+            }
+            if (Eligible(Data.ById["abyssal"]) && state.flags.dockFixed)
+            {
+                float a = (0.4f + 0.4f * MathF.Sin(t * 1.4f)) * k;
+                foreach (var (x, y) in new[] { (300, 112), (306, 115), (311, 110), (316, 116), (304, 120) })
+                    pix.Rect(x, y, 1, 1, Pal.Rgba(255, 215, 106, a));
+            }
+            // Fireflies drift over Mirewood after dark, and a few over Saltmere's grass, each with a soft glow.
+            DrawNightFireflies(t, k);
         }
-        // Fireflies drift over Mirewood after dark, and a few over Saltmere's grass, each with a soft glow.
-        DrawNightFireflies(t, k);
     }
 
     void ApplyDark(Color c)
@@ -1708,9 +1729,10 @@ partial class Game
     void RenderWorld(float t)
     {
         litWindows.Clear();
+        liveRender = true;
         UpdateCamera();
         pix.CamX = camX; pix.CamY = camY;
-        pix.CopyFrom(basePix, camX, camY, scene == "world" ? Pal.Sea : scene == "cave" ? Pal.C("#0b0908") : Pal.C("#140f0c"));
+        pix.CopyFrom(LiveBase(), camX, camY, scene == "world" ? Pal.Sea : scene == "cave" ? Pal.C("#0b0908") : Pal.C("#140f0c"));
         if (scene == "world")
         {
             DrawWater(t);
@@ -1723,8 +1745,8 @@ partial class Game
             DrawGusoFarm(t);
             DrawLoose(t);
             DrawMountGround();
-            DrawTreeShadows();
-            DrawBuildingShadows();
+            if (LightMode == 0) { DrawTreeShadows(); DrawBuildingShadows(); }
+            else DrawShadows();   // shadows that follow the sun (Shadows.cs)
             DrawOasisMud();
             DrawBugs(t);
             DrawSpots(t);
@@ -1764,10 +1786,11 @@ partial class Game
             DrawMist(t);
             DrawSkyLife(t);
             DrawSnow(t);
-            DrawWeatherTint();
-            DrawSunGlow();
+            // With light on, one colour grade (Grade.cs) takes the place of the flat rain tint and the flat sunset fill.
+            if (LightMode == 0) { gradeMatrix = null; DrawWeatherTint(); DrawSunGlow(); }
+            else ApplyGrade();
             DrawSunBeams(t);
-            if (Darkness > 0) DrawNight(t);
+            if (Darkness > 0 || LampK > 0) DrawNight(t);
             DrawEclipseSky();
             DrawRainSplashes(t);
             DrawRain(t);
@@ -1776,7 +1799,9 @@ partial class Game
         }
         else if (scene == "cave") RenderCave(t);
         else RenderRoom(t);
-        if (scene is "world" or "cave") ApplyVignette(scene == "cave" ? 0.4f : 0.2f);
+        liveRender = false;
+        if (scene is "world" or "cave") ApplyVignette(VignetteStrength);
+        if (GrainOn) ApplyGrain();
         if (mode == "bite") DrawBang();
         pix.CamX = pix.CamY = 0;
         // The title's tour fades through dark between islands (UiMenu.cs).

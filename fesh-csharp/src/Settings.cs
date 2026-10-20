@@ -17,6 +17,10 @@ sealed class SettingsData
     public bool guide = true;                  // the goal card and the arrow to it (Guide.cs); the journal works either way
     public int zoom = 4;                       // game pixels shown this many screen pixels wide: 5 closer, 4 normal, 3 wider, 2 widest (Game.ZoomLevels)
     public bool clearFont;                     // Atkinson Hyperlegible in place of the pixel and typewriter fonts (Gfx.Clear)
+    public int light = -1;                     // light and colour (Light.cs): -1 automatic (Full on a PC, Soft on a phone), 0 off, 1 soft, 2 full
+    public int vignette = 2;                   // darkened corners: 0 off, 1 soft, 2 normal (the look before 1.39)
+    public bool bloom;                         // a soft halo round lights (Light.cs)
+    public bool grain;                         // faint film grain
     public Dictionary<string, int[]> keys = new(); // action -> its two keys (KeyboardKey values, 0 = none); missing actions use the defaults
 }
 
@@ -41,6 +45,8 @@ static class Settings
         Data.sound = float.IsFinite(Data.sound) ? Math.Clamp(Data.sound, 0, 1) : 0.8f;
         if (!DayLengths.Contains(Data.dayLength)) Data.dayLength = 24;
         if (Data.zoom is < 2 or > 5) Data.zoom = 4;
+        if (Data.light is < -1 or > 2) Data.light = -1;
+        if (Data.vignette is < 0 or > 2) Data.vignette = 2;
         Bind.Load(Data.keys);
         ApplyAudio();
     }

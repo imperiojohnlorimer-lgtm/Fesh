@@ -12,6 +12,19 @@ partial class Game
     static string SeasonOf(int day) => (Math.Max(day, 1) - 1) / SeasonDays % 2 == 0 ? "amihan" : "habagat";
     string Season => SeasonOf(state.day);
     int SeasonDay => (Math.Max(state.day, 1) - 1) % SeasonDays + 1;
+
+    // How far the island has turned from the amihan (0) to the habagat (1) (1.41). It is derived from the day and the clock,
+    // so nothing is saved and a test that sets state.day gets the right look: each season lasts SeasonDays days from 06:00,
+    // and the look eases over from the last one across its first half day. The first season, from day 1, is fully amihan.
+    internal float SeasonMix()
+    {
+        float minutes = 1440f * (Math.Max(state.day, 1) - 1) + ((state.clock - 360) % 1440 + 1440) % 1440;
+        float length = SeasonDays * 1440f;
+        int index = (int)(minutes / length);
+        if (index == 0) return 0;
+        float now = index % 2, before = 1 - now;
+        return before + (now - before) * Smooth((minutes - index * length) / 720f);
+    }
     static string SeasonName(string season) => season == "amihan" ? "Amihan" : "Habagat";
 
     // "Amihan season (northeast wind), day 2 of 5", for the clock and the menu.

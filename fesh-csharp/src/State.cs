@@ -52,6 +52,8 @@ sealed class State
     public float food = 100;
     public int day = 1;
     public Dictionary<string, int> felled = new();  // "x,y" of a chopped tree or broken boulder -> day it happened
+    public Dictionary<string, int> wear = new();    // "x,y" of a grass or forest tile -> how many times you have walked onto it (Wear.cs); older saves have none
+    public int wearDay;                              // the day the wear last faded (0 = not yet: it starts from the day a save is loaded)
     public Dictionary<string, int> mined = new();   // unused since cave floors became random; kept so older saves load
     public Dictionary<string, int> picked = new();  // berry bush "x,y" -> day picked
     public Dictionary<string, int> gifts = new();   // animal -> day it last gave a gift
@@ -252,7 +254,7 @@ static class SaveFile
             var s = JsonSerializer.Deserialize<State>(File.ReadAllText(path), Opts);
             if (s == null) return null;
             s.caught ??= new(); s.commons ??= new(); s.odd ??= new(); s.flags ??= new(); s.pity ??= new(); s.hinted ??= new();
-            s.mats ??= new(); s.loose ??= new(); s.look ??= new(); s.inv ??= new(); s.felled ??= new(); s.mined ??= new();
+            s.mats ??= new(); s.loose ??= new(); s.look ??= new(); s.inv ??= new(); s.felled ??= new(); s.mined ??= new(); s.wear ??= new();
             s.picked ??= new(); s.gifts ??= new(); s.rooms ??= new(); s.scene ??= "world";
             s.tanks ??= new(); s.weather ??= "clear"; s.boatAt ??= "saltmere";
             s.tackle ??= new(); s.records ??= new(); s.trophies ??= new(); s.big ??= new(); s.pots ??= new();

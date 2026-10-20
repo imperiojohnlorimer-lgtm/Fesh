@@ -14,7 +14,7 @@ partial class Game
     int slotConfirm;                  // the slot whose delete (or replace) button is waiting for a second click
     int renameSlot;                   // the slot whose name is being typed (0 when none)
     string renameText = "";
-    string menuTab = "game";          // "game", "settings" or "controls"
+    string menuTab = "game";          // "game", "settings", "graphics" or "controls"
     (string id, int slot)? rebind;    // the control waiting for a key
     string rebindNote = "";
     bool controlsPad;                 // the Controls tab is showing the gamepad layout
@@ -399,7 +399,7 @@ partial class Game
         Gfx.Text(head, x + pad, cy, FontKind.Ui700, 40, Pal.PaperInk);
         float tx = x + pad + Gfx.Measure(head, FontKind.Ui700, 40) + 28;
         string controlsName = Platform.Touch ? "Touch" : "Controls";
-        var tabs = title ? new[] { ("settings", "Settings"), ("controls", controlsName) } : new[] { ("game", "Game"), ("settings", "Settings"), ("controls", controlsName) };
+        var tabs = title ? new[] { ("settings", "Settings"), ("graphics", "Graphics"), ("controls", controlsName) } : new[] { ("game", "Game"), ("settings", "Settings"), ("graphics", "Graphics"), ("controls", controlsName) };
         foreach (var (id, label) in tabs)
         {
             float w = SmallW(label);
@@ -415,6 +415,7 @@ partial class Game
         {
             case "game": DrawGameTab(cx, cy, inner, bottom); break;
             case "settings": DrawSettingsTab(cx, cy, inner); break;
+            case "graphics": DrawGraphicsTab(cx, cy, inner); break;
             default: DrawControlsTab(cx, cy, inner); break;
         }
         if (!Gfx.Down) EndSliderDrag();

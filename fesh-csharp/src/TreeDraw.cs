@@ -63,7 +63,7 @@ partial class Game
         return s;
     }
 
-    static TreeSprite[] oakSprites, palmSprites, firSprites, bushSprites;
+    static TreeSprite[] oakSprites, palmSprites, firSprites, bushSprites, oakTwinSprites, palmLeanSprites;
 
     static void LoadTreeSprites()
     {
@@ -96,22 +96,38 @@ partial class Game
             LoadTree(TreeArt.Bush2, TreeArt.Bush2Height, TreeArt.Bush2Palette, TreeArt.Bush2AnchorX, TreeArt.Bush2AnchorY),
             LoadTree(TreeArt.Bush3, TreeArt.Bush3Height, TreeArt.Bush3Palette, TreeArt.Bush3AnchorX, TreeArt.Bush3AnchorY)
         };
+        // 1.41's two extra silhouettes (tools/blender/trees2.py): three sizes each, standing in for the three ordinary bands.
+        oakTwinSprites = new[]
+        {
+            LoadTree(TreeArt2.OakTwin0, TreeArt2.OakTwin0Height, TreeArt2.OakTwin0Palette, TreeArt2.OakTwin0AnchorX, TreeArt2.OakTwin0AnchorY),
+            LoadTree(TreeArt2.OakTwin1, TreeArt2.OakTwin1Height, TreeArt2.OakTwin1Palette, TreeArt2.OakTwin1AnchorX, TreeArt2.OakTwin1AnchorY),
+            LoadTree(TreeArt2.OakTwin2, TreeArt2.OakTwin2Height, TreeArt2.OakTwin2Palette, TreeArt2.OakTwin2AnchorX, TreeArt2.OakTwin2AnchorY)
+        };
+        palmLeanSprites = new[]
+        {
+            LoadTree(TreeArt2.PalmLean0, TreeArt2.PalmLean0Height, TreeArt2.PalmLean0Palette, TreeArt2.PalmLean0AnchorX, TreeArt2.PalmLean0AnchorY),
+            LoadTree(TreeArt2.PalmLean1, TreeArt2.PalmLean1Height, TreeArt2.PalmLean1Palette, TreeArt2.PalmLean1AnchorX, TreeArt2.PalmLean1AnchorY),
+            LoadTree(TreeArt2.PalmLean2, TreeArt2.PalmLean2Height, TreeArt2.PalmLean2Palette, TreeArt2.PalmLean2AnchorX, TreeArt2.PalmLean2AnchorY)
+        };
         foreach (var set in new[] { oakSprites, palmSprites, firSprites }) Array.Sort(set, (a, b) => a.Size.CompareTo(b.Size));
+        foreach (var set in new[] { oakTwinSprites, palmLeanSprites }) Array.Sort(set, (a, b) => a.Size.CompareTo(b.Size));
     }
 
     // The variant nearest a tree's own size: 'rel' is its size against the usual (0.8 to 1.2, smaller up Marilaya's hills).
-    static TreeSprite PickTree(TreeSprite[] set, float rel, int tx, int ty)
+    static TreeSprite PickTree(TreeSprite[] set, float rel, int tx, int ty) => set[TreeBand(rel, tx, ty)];
+
+    // Which size band a tree is in: 0 the small one (Pip's stall, high on Marilaya's hills), then three ordinary sizes.
+    static int TreeBand(float rel, int tx, int ty)
     {
-        // set[0] is the small one (Pip's stall, high on Marilaya's hills), then three ordinary sizes.
-        if (rel < 0.78f) return set[0];
+        if (rel < 0.78f) return 0;
         int i = rel < 0.92f ? 1 : rel > 1.08f ? 3 : 2;
         if (rel >= 0.92f && rel <= 1.08f && Pix.Hash(tx, ty, 63) < 0.3) i = Pix.Hash(tx, ty, 64) < 0.5 ? 1 : 3;
-        return set[i];
+        return i;
     }
 
     // Draws a sprite with its foot at (x, y), mirrored if m < 0, the crown shifted by sw at the top and not at all at the
     // trunk. berry: the special pixels' three tones (null leaves them as they are). tint: mixed over every pixel.
-    void BlitTree(TreeSprite s, int x, int y, int m, int sw, Color[] berry = null, Color? tint = null, float tintAmt = 0)
+    void BlitTree(TreeSprite s, int x, int y, int m, int sw, Color[] berry = null, Color? tint = null, float tintAmt = 0, Color? leaf = null, float leafAmt = 0)
     {
         float hMax = Math.Max(1, s.AY - s.Top), h0 = hMax * 0.35f;
         int cx = pix.CamX, cy = pix.CamY;
@@ -130,6 +146,8 @@ partial class Game
                 int dx = sw == 0 ? 0 : (int)MathF.Round(sw * Math.Clamp((hh - h0) / (hMax - h0), 0, 1));
                 if (!line && s.Special[k] >= 0 && berry != null) c = berry[s.Special[k]];
                 if (tint is { } t) c = Pix.Mix(c, t, tintAmt);
+                // A leaf tint (Light: Soft or Full) colours the foliage only: green-dominant pixels, never bark or outline.
+                if (leaf is { } lt && !line && s.Special[k] < 0 && c.G > c.R + 6 && c.G > c.B + 6) c = Pix.Mix(c, lt, leafAmt);
                 int px = (m < 0 ? x - (i - s.AX) : x + (i - s.AX)) + dx - cx;
                 pix.Fill(px, py, 1, 1, c);
             }
@@ -148,11 +166,12 @@ partial class Game
         LoadTreeSprites();
         switch (kind)
         {
-            case 't': BlitTree(PickTree(oakSprites, rel, tx, ty), bx, by, m, sw); return true;
-            case 'f': BlitTree(PickTree(firSprites, rel, tx, ty), bx, by, m, sw); return true;
+            case 't': { var (lc, la) = LeafTint(tx, ty, kind); BlitTree(TreeSpriteFor(tx, ty, kind, rel), bx, by, m, sw, null, null, 0, lc, la); return true; }
+            case 'f': { var (lc, la) = LeafTint(tx, ty, kind); BlitTree(PickTree(firSprites, rel, tx, ty), bx, by, m, sw, null, null, 0, lc, la); return true; }
             case 'h':
                 bool jungle = BiomeAt(tx, ty) == 3;
-                BlitTree(PickTree(palmSprites, jungle ? rel * 0.9f : rel, tx, ty), bx, by, m, sw, null, jungle ? JungleTint : null, 0.22f);
+                var (pc, pa) = LeafTint(tx, ty, kind);
+                BlitTree(TreeSpriteFor(tx, ty, kind, jungle ? rel * 0.9f : rel), bx, by, m, sw, null, jungle ? JungleTint : null, 0.22f, pc, pa);
                 return true;
         }
         return false;

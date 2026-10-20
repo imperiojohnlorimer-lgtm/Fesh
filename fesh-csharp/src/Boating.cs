@@ -117,7 +117,7 @@ partial class Game
     // to one side, so the mast and sail in front of them stand clear of their face.
     (int x, int y) BoatSeat()
     {
-        int X = (int)MathF.Round(player.X), Y = (int)MathF.Round(player.Y) + BoatBob(time);
+        int X = (int)MathF.Round(player.X), Y = (int)MathF.Round(player.Y) + BoatBobAt(time, player.X, player.Y, BoatUnderWay);
         return boatFace switch { "up" => (X, Y + 5), "down" => (X - 1, Y - 5), _ => (X - 5 * BoatDir, Y + 2) };
     }
     // The hand on the rod while fishing from the boat (pump lifts it a pixel while you reel).
@@ -146,13 +146,13 @@ partial class Game
             {
                 // Heading up or down, it flies off both sides of the bow, and a little off the float ends.
                 int ahead = boatFace == "up" ? -1 : 1, side = fxRng.Next(2) == 0 ? -1 : 1;
-                float by = player.Y + BoatBob(time) + (ahead < 0 ? -12 : 9);
+                float by = player.Y + BoatBobAt(time, player.X, player.Y, BoatUnderWay) + (ahead < 0 ? -12 : 9);
                 particles.Add(new Particle { X = player.X + side * FxRand(1, 3), Y = by, Vx = side * FxRand(8, 24), Vy = FxRand(-34, -12) + ahead * FxRand(0, 8), Life = FxRand(0.2f, 0.38f), Color = white });
                 if (fxRng.Next(4) == 0)
                     particles.Add(new Particle { X = player.X + side * 10.5f, Y = by - ahead * 2, Vx = side * FxRand(2, 8), Vy = FxRand(-18, -8), Life = FxRand(0.15f, 0.28f), Color = "#eef9fb" });
                 continue;
             }
-            float bx = player.X + 12 * BoatDir, bsy = player.Y + 3 + BoatBob(time);
+            float bx = player.X + 12 * BoatDir, bsy = player.Y + 3 + BoatBobAt(time, player.X, player.Y, BoatUnderWay);
             particles.Add(new Particle { X = bx + FxRand(-1, 1), Y = bsy, Vx = BoatDir * FxRand(6, 26) + FxRand(-8, 8), Vy = FxRand(-34, -12), Life = FxRand(0.2f, 0.38f), Color = white });
             if (fxRng.Next(4) == 0)
                 particles.Add(new Particle { X = player.X + (fxRng.Next(2) == 0 ? -11 : 11) * BoatDir, Y = bsy + (fxRng.Next(2) == 0 ? -6 : 6), Vx = -BoatDir * FxRand(4, 12), Vy = FxRand(-18, -8), Life = FxRand(0.15f, 0.28f), Color = "#eef9fb" });
@@ -170,12 +170,13 @@ partial class Game
         bool endOn = face is "up" or "down", astern = face == "up";
         int dir = BoatDir;
         bool underWay = occupied && (BoatUnderWay || towing), fishing = occupied && (fish != null || mode == "charging");
+        // A reflection (Reflections.cs) is the hull and rig alone, in the same pose: no wake, rings or shadow.
         // The big sail stands taller and wider on a taller mast.
         bool big = Wears("big_sail"), painted = Wears("painted_sail");
         int rows = big ? 13 : 10, mast = big ? 18 : 15;
         float furl = occupied ? sailFurl : 1;
         int X = (int)MathF.Round(x), waterY = (int)MathF.Round(y);
-        int Y = waterY + BoatBob(t);
+        int Y = waterY + BoatBobAt(t, x, y, BoatUnderWay);
         // The mast sways a pixel either way as the hull rolls.
         float roll = t * (underWay ? 3.2f : 2) + 1.3f;
         int lean = (int)MathF.Round(MathF.Sin(roll) * (Stormy ? 1.4f : underWay ? .9f : .6f));
@@ -186,9 +187,11 @@ partial class Game
 
         // The reflection, wake and ripples stay on the water rather than bobbing with the boat.
         var shadow = Pal.Rgba(10, 35, 51, .24f);
-        if (endOn) { pix.Rect(X - 5, waterY + 9, 11, 2, shadow); pix.Rect(X - 12, waterY + 7, 4, 1, shadow); pix.Rect(X + 9, waterY + 7, 4, 1, shadow); }
+        if (reflecting) { }
+        else if (endOn) { pix.Rect(X - 5, waterY + 9, 11, 2, shadow); pix.Rect(X - 12, waterY + 7, 4, 1, shadow); pix.Rect(X + 9, waterY + 7, 4, 1, shadow); }
         else pix.Rect(X - 10, waterY + 4, 21, 2, shadow);
-        if (underWay)
+        if (reflecting) { }
+        else if (underWay)
         {
             // A V of foam spreading behind the stern, and a bow wave curling off either side of the bow.
             float dx = face == "left" ? -1 : face == "right" ? 1 : 0;

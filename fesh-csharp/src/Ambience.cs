@@ -27,8 +27,11 @@ partial class Game
     {
         int x0 = camX - 10, x1 = camX + W + 10, y0 = camY - 10, y1 = camY + H + 10;
         float night = 1 - 0.6f * Darkness;
-        foreach (var (sx, sy, nx, ny, w) in shore)
+        bool rich = LightMode > 0;
+        float storm = rich ? Math.Clamp(stormAmt, 0, 1) : 0;
+        foreach (int si in ShoreInView())
         {
+            var (sx, sy, nx, ny, w) = shore[si];
             if (sx < x0 || sx > x1 || sy < y0 || sy > y1 || w is not ('w' or '~' or 'T') || (nx == 0 && ny == 0)) continue;
             if (TideDry(sx, sy)) continue;
             float p = (t * 0.2f + VNoise(sx, sy, 46, 391) * 1.7f) % 1f;
@@ -40,6 +43,8 @@ partial class Game
                 if (Wet(ShapePx(cx, cy)))
                 {
                     float a = MathF.Sin(p * MathF.PI) * 0.32f * night;
+                    // The crests ride the swell, and build with the weather.
+                    if (rich) a *= Math.Clamp(1 + 0.35f * SeaSwell(sx, sy, t) + 0.5f * storm, 0, 1.8f);
                     if (a > 0.03f) pix.Rect(cx, cy, 1, 1, Pal.Rgba(236, 248, 252, a));
                 }
             }
@@ -91,20 +96,27 @@ partial class Game
     {
         float day = 1 - Darkness, clear = 1 - rainAmt;
         if (day * clear < 0.2f) return;
+        // With the sun low (Light: Full) the sea glitters gold, thicker over the swell and in the shallows too, as the
+        // moon's glitter does at night.
+        var (dusk, dawn) = SunGlow();
+        float low = LightMode == 2 ? MathF.Max(dusk, dawn) : 0;
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
         for (int y = vy0; y <= vy1; y++)
             for (int x = vx0; x <= vx1; x++)
             {
-                if (map[y, x] != '~') continue;
+                bool shallow = low > 0 && map[y, x] == 'w';
+                if (map[y, x] != '~' && !shallow) continue;
                 float cycle = 2.6f + (float)Pix.Hash(x, y, 393) * 2.4f;
                 int n = (int)((t + (float)Pix.Hash(x, y, 394) * 9) / cycle);
-                if (Pix.Hash(x, y, 395 + n % 50) > 0.07) continue;
+                double chance = 0.07;
+                if (low > 0) chance += 0.2 * low * (0.35f + 0.65f * (0.5f + 0.5f * MathF.Sin(x * 0.09f - y * 0.05f - t * 0.25f)));
+                if (Pix.Hash(x, y, 395 + n % 50) > chance) continue;
                 float ph = (t + (float)Pix.Hash(x, y, 394) * 9) % cycle / 0.7f;
                 if (ph > 1) continue;
                 int gx = x * T + 2 + (int)(Pix.Hash(x, n, 396) * 6), gy = y * T + 2 + (int)(Pix.Hash(n, y, 397) * 6);
-                if (!Wet(ShapePx(gx, gy))) continue;
+                if (!Wet(ShapePx(gx, gy)) || shallow && TideDry(gx, gy)) continue;
                 float a = MathF.Sin(ph * MathF.PI) * 0.85f * day * clear;
-                var c = Pal.Rgba(255, 252, 228, a);
+                var c = low > 0 ? Pal.Rgba((int)(255), (int)(252 - 46 * low), (int)(228 - 108 * low), a) : Pal.Rgba(255, 252, 228, a);
                 pix.Rect(gx, gy, 1, 1, c);
                 if (ph > 0.3f && ph < 0.7f)
                 {
@@ -176,10 +188,15 @@ partial class Game
     {
         // Only in the live view: the chart's texture is drawn through the same code onto a world-sized picture, kept for
         // hours, so it always shows the windows by day.
-        bool lit = Darkness > 0 && LampsLit && pix.W == W;
-        pix.Rect(x, y, w, h, lit ? "#f3c25b" : day);
-        // Only in the live view (the chart's texture is drawn through the same code onto a world-sized picture).
-        if (lit) litWindows.Add((x, y, w, h));
+        bool lit = LampK > 0 && LampsLit && liveRender && pix.W == W;
+        // Coming on at dusk, a window warms from its day colour to the lamp's over the hour (LampK).
+        if (!lit) pix.Rect(x, y, w, h, day);
+        else
+        {
+            float on = LampK;
+            pix.Rect(x, y, w, h, on >= 1 || LightMode == 0 ? Pal.C("#f3c25b") : Pix.Mix(Pal.C(day), Pal.C("#f3c25b"), on));
+            litWindows.Add((x, y, w, h));
+        }
     }
 
     void LightWindows()
@@ -194,7 +211,7 @@ partial class Game
             float flick = 0.9f + 0.1f * MathF.Sin(t * 7 + x * 0.7f);
             pix.Rect(x, y, w, h, Pal.Rgba(255, 214, 120, k * flick));
             pix.Rect(x, y, w, 1, Pal.Rgba(255, 238, 180, k * 0.8f));
-            pix.Glow(x + w / 2f, y + h / 2f, w + 4, Pal.Rgba(255, 190, 90, 0.22f * k));
+            LightGlow(x + w / 2f, y + h / 2f, w + 4, 255, 190, 90, 0.22f * k, 0.55f * k * flick);
         }
     }
 
@@ -269,6 +286,7 @@ partial class Game
     // leans away from its base. x, y is the left end of the base, w its width, h roughly how tall it stands.
     void BuildingShadow(int x, int y, int w, int h)
     {
+        if (shadeActive) { ShadeBuilding(x, y, w, h); return; }   // light on: into the sun's shadow mask (Shadows.cs)
         var c = Pal.Rgba(18, 40, 36, 0.16f * (1 - Darkness * 0.7f));
         int top = y - h / 2 + 3;
         // Along the east wall, widening toward the ground, and a strip along the foot of the building.
@@ -464,7 +482,7 @@ partial class Game
             if (BiomeAt(wx / T, wy / T) == 1) continue;
             char s = ShapePx(wx, wy);
             float a = (1 - age) * 0.5f * rainAmt;
-            if (Wet(s)) pix.Ring(wx + 0.5, wy + 0.5, 0.6 + age * 2.4, Pal.Rgba(220, 238, 248, a));
+            if (Wet(s)) { if (LightMode == 0) pix.Ring(wx + 0.5, wy + 0.5, 0.6 + age * 2.4, Pal.Rgba(220, 238, 248, a)); }   // with light on the sea's rain is DrawSeaRain's
             else if (age < 0.4f)
             {
                 var c = Pal.Rgba(220, 234, 244, a);

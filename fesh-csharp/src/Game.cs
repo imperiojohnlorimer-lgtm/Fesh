@@ -1062,6 +1062,7 @@ partial class Game
         if (MatchActive) dt = MathF.Min(dt, MatchMaxDt);
         time += dt;
         LookData.Now = time;
+        if (state != null && state.wearDay != state.day && !MatchActive) CatchUpWear();   // trodden ground fades with the days (Wear.cs)
         UpdateMire(dt);   // forgets a finished Mire leviathan fight, whatever mode comes next (MireBoss.cs)
         UpdateLungfish(dt);   // and the Sunscale lungfish's (LungfishBoss.cs)
         UpdateWhiskers(dt);   // and Old Whiskers' (WhiskersBoss.cs)
@@ -1190,6 +1191,7 @@ partial class Game
                 int frameBefore = (int)(player.WalkT * 9);
                 player.WalkT += dt * push * (wet ? 0.75f : 1);
                 int frame = (int)(player.WalkT * 9);
+                if (!Aboard) NoteWear();
                 if (!Aboard && frame != frameBefore && frame % 2 == 0) Footstep();
                 heldT = 0;
             }
@@ -1282,6 +1284,7 @@ partial class Game
             if (look != null) { state.look = look; state.created = true; }
         }
         state.FixClock();
+        lastWearTile = (-1, -1); CatchUpWear();
         chartEast = false;
         if (state.aboard && (Has("boat") == 0 || state.scene != "world")) state.aboard = false;
         if (state.aboard) state.riding = false;

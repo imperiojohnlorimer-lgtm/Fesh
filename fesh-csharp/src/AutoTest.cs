@@ -42,6 +42,8 @@ partial class Game
         standStill = true;
         // A new fisher's First steps (Tutorial.cs) would take over the guide in every script that starts a new game.
         tourOff = true;
+        // Light and colour (Light.cs) are off for the old scripts, so their exact-pixel checks keep their colours; LightScript turns them on.
+        EffectsOff = true;
         // People's own blinking would make pixel checks on faces depend on the moment (the scenery shots keep it).
         LookData.AutoBlink = Environment.GetEnvironmentVariable("FESH_SCENIC") == "1";
         script = Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster2" ? Poster2Script().GetEnumerator()
@@ -63,6 +65,9 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_QUIZ_TEST") == "1" ? QuizScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_REEF_TEST") == "1" ? ReefScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_ZOOM_TEST") == "1" ? ZoomScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_LIGHT_TEST") == "1" ? LightScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_WATER_TEST") == "1" ? WaterScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_GROUND_TEST") == "1" ? GroundScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_CAVE_TEST") == "1" ? CaveFeatureScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_MUD_TEST") == "1" ? MudScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_TITLE_TEST") == "1" ? TitleShotScript().GetEnumerator()
@@ -2101,6 +2106,9 @@ partial class Game
         foreach (int frames in WorldScript()) yield return frames;
         foreach (int frames in GraphicsScript()) yield return frames;
         foreach (int frames in ZoomScript()) yield return frames;
+        foreach (int frames in LightScript()) yield return frames;
+        foreach (int frames in WaterScript()) yield return frames;
+        foreach (int frames in GroundScript()) yield return frames;
         foreach (int frames in MatchScript()) yield return frames;
         foreach (int frames in DockScript()) yield return frames;
         foreach (int frames in DockNetScript()) yield return frames;

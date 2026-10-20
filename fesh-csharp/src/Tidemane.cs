@@ -1318,7 +1318,7 @@ partial class Game
             pix.Glow(x + 0.5, y + 0.5, eye ? 3 : 2.5, eye ? Pal.Rgba(255, 215, 106, 0.55f * k) : Pal.Rgba(255, 242, 196, 0.4f * k));
             pix.Rect(x, y, 1, 1, eye ? Pal.Rgba(255, 225, 130, k) : Pal.Rgba(255, 246, 214, 0.9f * k));
         }
-        pix.Glow(sx / mountGlints.Count + 0.5, sy / mountGlints.Count + 0.5, 11, Pal.Rgba(120, 230, 220, 0.11f * k));
+        LightGlow(sx / mountGlints.Count + 0.5, sy / mountGlints.Count + 0.5, 11, 120, 230, 220, 0.11f * k, 0.22f * k);
     }
 
     // The shockwave and the water bolts, drawn over everything on the ground.

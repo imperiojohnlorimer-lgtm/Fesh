@@ -536,8 +536,8 @@ partial class Game
     {
         if (state.parola < 3 || Math.Abs(LighthouseX - player.X) > 420 || Math.Abs(LighthouseY - player.Y) > 300) return;
         float lx = LighthouseX, ly = LighthouseY - LampRise, a = t * 0.7f;
-        pix.Glow(lx, ly, 14, Pal.Rgba(255, 226, 138, 0.45f * k));
+        LightGlow(lx, ly, 14, 255, 226, 138, 0.45f * k, 0.8f * k);
         for (int i = 1; i <= 9; i++)
-            pix.Glow(lx + MathF.Cos(a) * i * 20, ly + MathF.Sin(a) * i * 12, 4 + i * 1.6f, Pal.Rgba(255, 238, 180, (0.2f - i * 0.016f) * k));
+            LightGlow(lx + MathF.Cos(a) * i * 20, ly + MathF.Sin(a) * i * 12, 4 + i * 1.6f, 255, 238, 180, (0.2f - i * 0.016f) * k, (0.34f - i * 0.028f) * k);
     }
 }
