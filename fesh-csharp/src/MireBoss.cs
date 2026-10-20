@@ -322,6 +322,7 @@ partial class Game
         var m = mire;
         var r = reel;
         m.Ev = ev;
+        arrowTap = null;
         r.HoldT = 0; r.Digging = false; r.ZoneV = 0;
         switch (ev)
         {
@@ -555,7 +556,7 @@ partial class Game
     {
         void Big(string s, Color c, float at) => Outlined(s, rx - Gfx.Measure(s, FontKind.Ui700, 30), Y(at), FontKind.Ui700, 30, c);
         void Small(string s, float at) => Outlined(s, rx - Gfx.Measure(s, FontKind.Ui600, 18), Y(at), FontKind.Ui600, 18, Pal.C("#ffffff"));
-        bool blink = (int)(time * 8) % 2 == 0;
+        bool blink = Calm || (int)(time * 8) % 2 == 0;
         switch (m.Ev)
         {
             case "rise": Big("Bubbles...", Pal.C("#cfe3c0"), 130); Small("Get ready!", 168); break;
@@ -570,6 +571,7 @@ partial class Game
                 Gfx.Rect(cx - 34, cy - 34, 68, 68, Pal.C("rgba(16,26,16,0.85)"), 8);
                 DrawArrow(cx, cy, away, Pal.C("#f3c25b"));
                 Small(Bind.Fix(away == 1 ? "Pull: <right>" : "Pull: <left>"), 238);
+                if (Platform.Touch) DrawArrowPad(rx + 30, Y(262), 80, 16, 3, 1);   // left and right to tap, on a phone
                 break;
             }
             case "rub": Big("Tangled!", Pal.C("#ff9a8a"), 130); break;

@@ -111,7 +111,7 @@ partial class Game
         string id = dexExtra[(dexExtra.IndexOf(':') + 1)..];
         const float w = DexCardW, h = DexCardH, pad = DexCardPad, picW = DexPicW, picH = DexPicH;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         if (SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { dexExtra = null; return; }
         Gfx.Text(name, x + pad, y + pad - 2, FontKind.Ui700, 34, dexExtra is "tidemane" or "bakunawa" or "platejaw" && got ? Pal.C("#9a6a1a") : Pal.PaperInk);
 

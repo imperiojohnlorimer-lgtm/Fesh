@@ -220,7 +220,7 @@ partial class Game
         const float cw = 900, pad = 26, cardH = 140, gap = 12;
         float h = pad + 44 + 8 + 28 + 18 + SaveFile.Slots * (cardH + gap) + 6 + 44 + pad;
         float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, cw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, cw, h);
         Gfx.Block(x, y, cw, h);
         float cy = y + pad;
         Gfx.Text(slotsFor == "new" ? "Pick a slot for your new game" : "Saved games", x + pad, cy, FontKind.Ui700, 36, Pal.PaperInk);
@@ -392,7 +392,7 @@ partial class Game
         if (!title) Backdrop();
         const float cw = 960, ch = 625, pad = 28;
         float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, cw, ch);
         Gfx.Block(x, y, cw, ch);
         float cy = y + pad;
         string head = title ? "Settings" : "Paused";

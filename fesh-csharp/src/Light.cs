@@ -15,14 +15,25 @@ partial class Game
     bool liveRender;
 
     // 0 off, 1 soft, 2 full.
-    internal int LightMode => EffectsOff ? 0 : Settings.Data.light >= 0 ? Settings.Data.light : Platform.Touch ? 1 : 2;
+    internal int LightMode
+    {
+        get
+        {
+            if (EffectsOff) return 0;
+            int m = RequestedLight;
+            // Quality.cs may have stepped it down to keep a slow device smooth; the player's setting itself is untouched.
+            return Quality.Rung >= 7 ? 0 : Quality.Rung >= 6 ? Math.Min(m, 1) : m;
+        }
+    }
+    // What the player chose (automatic: Full on a PC, Soft on a phone).
+    internal static int RequestedLight => Settings.Data.light >= 0 ? Settings.Data.light : Platform.Touch ? 1 : 2;
 
     // The darkened corners (Settings > Vignette): normal is the look before 1.39 (0.2 outdoors, 0.4 in the caves).
     float VignetteStrength
     {
         get
         {
-            float f = EffectsOff ? 1 : Settings.Data.vignette switch { 0 => 0, 1 => 0.6f, _ => 1 };
+            float f = EffectsOff ? 1 : Gfx.HighContrast ? 0 : Settings.Data.vignette switch { 0 => 0, 1 => 0.6f, _ => 1 };
             return (scene == "cave" ? 0.4f : 0.2f) * f;
         }
     }
@@ -55,8 +66,8 @@ partial class Game
         if (BloomOn) pix.AddGlow(wx, wy, r * 2.4, colour, k * 0.22f);
     }
 
-    internal bool BloomOn => LightMode > 0 && Settings.Data.bloom;
-    internal bool GrainOn => !EffectsOff && Settings.Data.grain;
+    internal bool BloomOn => LightMode > 0 && Settings.Data.bloom && Quality.Rung < 2;
+    internal bool GrainOn => !EffectsOff && Settings.Data.grain && Quality.Rung < 1;
 
     // Film grain: every pixel moves one level up or down, in a pattern that changes about eight times a second.
     void ApplyGrain()

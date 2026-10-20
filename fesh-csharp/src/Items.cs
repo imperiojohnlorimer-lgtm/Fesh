@@ -428,7 +428,13 @@ static class Items
 static class ItemArt
 {
     const int S = 12;
+    // The texture is 14x14: the 12x12 picture with a one pixel border all round for its outline (1.43). DrawIcon draws it a
+    // whole number of screen pixels per art pixel, with the picture exactly where it always was and the outline spilling out.
+    public const int Box = S + 2;
     static readonly Dictionary<string, Texture2D> cache = new();
+    // The outline is a darker shade of the icon's own edge (not one navy for everything), soft rather than solid, so the icons
+    // stay bright. Its alpha is the marker the autotest looks for.
+    public const byte OutlineAlpha = 150;
 
     public static Texture2D Icon(string itemId)
     {
@@ -438,9 +444,36 @@ static class ItemArt
         if (FishArt.Looks.ContainsKey(itemId)) FishArt.Draw(p, itemId, 0, 0, S, S);
         else if (Items.ById.TryGetValue(itemId, out var d)) Draw(p, d.Icon ?? itemId, d.Tint);
         else Draw(p, itemId, null);
-        tex = Gfx.ToTexture(p.Buf, S, S, TextureFilter.Point);
+        tex = Gfx.ToTexture(Outlined(p.Buf), Box, Box, TextureFilter.Point);
         cache[itemId] = tex;
         return tex;
+    }
+
+    // The picture inside a 14x14 box with a dark 1 px outline round its silhouette, and a lighter rim on the edges that face the
+    // light (up and left), so every icon has the same edge and the same light.
+    internal static Color[] Outlined(Color[] art)
+    {
+        var o = new Color[Box * Box];
+        bool On(int x, int y) => x >= 0 && y >= 0 && x < S && y < S && art[y * S + x].A >= 128;
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                if (!On(x, y)) continue;
+                var c = art[y * S + x];
+                if (!On(x, y - 1) || !On(x - 1, y)) c = new Color((byte)Math.Min(255, c.R + (255 - c.R) / 4), (byte)Math.Min(255, c.G + (255 - c.G) / 4), (byte)Math.Min(255, c.B + (255 - c.B) / 4), c.A);
+                o[(y + 1) * Box + x + 1] = c;
+            }
+        for (int y = -1; y <= S; y++)
+            for (int x = -1; x <= S; x++)
+            {
+                if (On(x, y) || !(On(x + 1, y) || On(x - 1, y) || On(x, y + 1) || On(x, y - 1))) continue;
+                // The colour of what it borders (the average of the picture's pixels beside it), darkened.
+                int r = 0, g = 0, b = 0, n = 0;
+                foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                    if (On(nx, ny)) { var c = art[ny * S + nx]; r += c.R; g += c.G; b += c.B; n++; }
+                o[(y + 1) * Box + x + 1] = new Color((byte)(r / n * 0.5f), (byte)(g / n * 0.5f), (byte)(b / n * 0.55f), OutlineAlpha);
+            }
+        return o;
     }
 
     public static void Shutdown()

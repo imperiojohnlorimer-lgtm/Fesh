@@ -51,8 +51,9 @@ partial class Game
         while (mins > 0)
         {
             float toDusk = Until(DuskMin), toDawn = Until(DawnMin), hit = Math.Min(toDusk, toDawn);
-            if (mins < hit) { DryRacks(state.clock, mins); state.clock = Wrap(state.clock + mins); FollowForecast(quiet); return; }
+            if (mins < hit) { DryRacks(state.clock, mins); NoteRain(state.clock, mins); state.clock = Wrap(state.clock + mins); FollowForecast(quiet); return; }
             DryRacks(state.clock, hit);
+            NoteRain(state.clock, hit);
             state.clock = toDusk < toDawn ? DuskMin : DawnMin;
             mins -= hit;
             if (toDusk < toDawn) { FollowForecast(quiet); if (!quiet) Toast(FullMoon ? "Night falls. The moon is full tonight." : "Night falls.", 3); }

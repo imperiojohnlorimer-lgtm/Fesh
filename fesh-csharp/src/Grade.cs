@@ -24,6 +24,7 @@ partial class Game
         new(21 * 60, 0.98f, 1.00f, 1.02f, 0.98f, 0, 0, 0),        // night
     };
     static readonly GradeKey AmihanKey = new(0, 1.035f, 1.00f, 0.955f, 0.97f, 0, 0, 0), HabagatKey = new(0, 0.975f, 1.03f, 1.005f, 1.05f, 0, 0, 0);
+    static readonly GradeKey OvercastKey = new(0, 0.965f, 0.975f, 1.0f, 0.93f, 0, 0, 0);
     static readonly GradeKey RainKey = new(0, 0.85f, 0.89f, 0.95f, 0.88f, 0, 0, 1);
     static readonly GradeKey StormKey = new(0, 0.68f, 0.74f, 0.85f, 0.75f, 0, 1, 3);
 
@@ -52,6 +53,7 @@ partial class Game
         var season = LerpKey(AmihanKey, HabagatKey, SeasonMix());
         g = g with { R = g.R * season.R, G = g.G * season.G, B = g.B * season.B, Sat = g.Sat * season.Sat };
         float rain = Math.Clamp(rainAmt, 0, 1), storm = Math.Clamp(stormAmt, 0, 1);
+        g = LerpKey(g, OvercastKey, overShown * (1 - rain) * 0.85f);   // clouds gathering before the rain keys take over (Overcast.cs)
         g = LerpKey(g, RainKey, rain * (1 - storm));
         g = LerpKey(g, StormKey, storm);
         float k = LightMode == 1 ? 0.5f : 1;

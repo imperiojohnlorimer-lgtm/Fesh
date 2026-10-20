@@ -315,6 +315,7 @@ partial class Game
                 Gfx.Circle(X(am), Y(TideAt(am)), 5, Pal.Paper);
             }
             if (riddle.ClickM >= 0) Gfx.Circle(X(riddle.ClickM), Y(TideAt(riddle.ClickM)), 4, riddle.Right ? Pal.C("#3fae5a") : PinRed);
+            if (riddle.ClickM >= 0) DrawVerdict(X(riddle.ClickM), Y(TideAt(riddle.ClickM)) - 14, 7, riddle.Right, riddle.Right ? Pal.C("#2f7d3a") : PinRed, 2.5f);
         }
         // Hovering reads the graph; clicking answers Lola.
         tideHoverM = -1;

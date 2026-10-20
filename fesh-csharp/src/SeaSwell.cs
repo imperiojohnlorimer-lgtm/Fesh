@@ -27,6 +27,7 @@ partial class Game
     // How far a hull rides it: calm about a pixel, a storm about two (the old bob's own sizes), the swell carrying most of it.
     internal int BoatBobAt(float t, float wx, float wy, bool underWay)
     {
+        if (Calm) return 0;
         if (LightMode == 0) return BoatBob(t);
         float amp = (underWay ? 1.1f : 0.8f) + 0.8f * Math.Clamp(stormAmt, 0, 1);
         float wave = SeaSwell(wx, wy, t) * 0.75f + MathF.Sin(t * (underWay ? 3.2f : 2)) * 0.25f;

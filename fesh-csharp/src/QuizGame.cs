@@ -140,7 +140,7 @@ partial class Game
         Backdrop();
         const float w = 1000, h = 620;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2 - 10;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         Gfx.Text("Sea School Duel", x + 30, y + 18, FontKind.Ui700, 26, Pal.PaperInk);
         // Progress: yours (right or wrong, for you only) and theirs (answered, nothing more).
         void Dots(float dx, bool right, string name, IList<QuizAnswer> list, bool mine)
@@ -154,6 +154,7 @@ partial class Game
             {
                 Color c = i >= list.Count ? Pal.C("rgba(16,36,58,0.18)") : !mine ? Pal.Lantern : list[i].Right ? Pal.C("#2f7d3a") : Rust;
                 Gfx.Rect(sx + i * 20, y + 44, 16, 16, c, 3);
+                if (mine && i < list.Count) DrawVerdict(sx + i * 20 + 8, y + 52, 6.5f, list[i].Right, White, 2);
             }
         }
         Dots(x + 330, false, "You", s.Mine, true);
@@ -195,6 +196,7 @@ partial class Game
             Gfx.Seen[$"quizq:{i}"] = new Rectangle(x + 30, by, w - 60, bh);
 #endif
             if (Button(shown, x + 30, by, w - 60, bh, FontKind.Ui600, 22, bg, fg, 5, 3, 6, !feedback)) { PickAnswer(i); return; }
+            if (feedback && (i == right || i == quizPick)) DrawVerdict(x + w - 62, by + bh / 2, 15, i == right, White, 3.5f);   // a tick or a cross as well as the colour
             by += bh + 10;
         }
     }
@@ -205,7 +207,7 @@ partial class Game
         Backdrop();
         const float w = 1000, h = 640;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         string r = s.Result;
         string title = r == "win" ? "You win the duel!" : r == "loss" ? $"{quizPeerName} wins" : r == "draw" ? "A draw!" : "No result";
         var tone = r == "win" ? Pal.C("#2f7d3a") : r == "loss" ? Rust : Pal.PaperInk;

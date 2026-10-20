@@ -661,16 +661,20 @@ partial class Game
     void DrawCloudShadows(float t)
     {
         float fair = (1 - rainAmt) * (1 - Darkness);
-        if (fair <= 0.02f) return;
-        var shade = Pal.Rgba(16, 34, 56, 0.1f * fair);
+        // With light on the clouds gather before rain, thicken and darken, and stay through it (Overcast.cs): more of them,
+        // bigger, and a deeper shade, instead of fading out as the rain arrives.
+        float over = LightMode > 0 ? overShown * (1 - Darkness) : 0;
+        if (fair + over <= 0.02f) return;
+        var shade = Pal.Rgba(16, 34, 56, 0.1f * fair + 0.13f * over);
         float span = PW + 360;
+        int clouds = 8 + (int)(over * 8);
         Span<(float ox, float oy, float rx, float ry)> lobes = stackalloc (float, float, float, float)[4];
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < clouds; i++)
         {
             float speed = 4 + (float)Pix.Hash(i, 1, 160) * 3;
             float cx = (float)((Pix.Hash(i, 2, 160) * span + t * speed) % span) - 180;
             float cy = (float)(Pix.Hash(i, 3, 160) * PH) + MathF.Sin(t * 0.05f + i) * 6;
-            float rx = 36 + (float)Pix.Hash(i, 4, 160) * 28, ry = rx * 0.42f;
+            float rx = (36 + (float)Pix.Hash(i, 4, 160) * 28) * (1 + 0.5f * over), ry = rx * 0.42f;
             int sx0 = Math.Max(0, (int)(cx - rx * 1.4f) - camX), sx1 = Math.Min(W, (int)(cx + rx * 1.4f) - camX);
             int sy0 = Math.Max(0, (int)(cy - ry * 1.6f) - camY), sy1 = Math.Min(H, (int)(cy + ry * 1.6f) - camY);
             if (sx0 >= sx1 || sy0 >= sy1) continue;
@@ -729,6 +733,8 @@ partial class Game
         {
             var c = l.Life < 1.5f ? Pal.WithAlpha(l.Color, l.Life / 1.5f) : l.Color;
             bool down = l.Y >= l.Ground;
+            // With light on a falling leaf throws a small shadow on the ground below it, so it reads as being up in the air.
+            if (LightMode > 0 && !down) pix.Rect(l.X, l.Ground, 2, 1, Pal.Rgba(10, 30, 20, 0.2f * Math.Clamp(1 - (l.Ground - l.Y) / 34f, 0, 1)));
             pix.Rect(l.X, l.Y, down || (int)((time + l.Phase) * 5) % 2 == 0 ? 2 : 1, 1, c);
         }
     }

@@ -185,7 +185,7 @@ partial class Game
     // A red ring round you while the ground shakes and there's a palm or a house beside you.
     void DrawShakeWarn()
     {
-        float pulse = 0.5f + 0.5f * MathF.Sin(time * 10);
+        float pulse = Calm ? 1 : 0.5f + 0.5f * MathF.Sin(time * 10);
         pix.Ring(player.X, player.Y - 3, 10 + pulse * 2, Pal.Rgba(232, 70, 58, 0.55f + 0.4f * pulse));
         pix.Ring(player.X, player.Y - 3, 12 + pulse * 2, Pal.Rgba(232, 70, 58, 0.25f * pulse));
     }

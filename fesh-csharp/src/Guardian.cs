@@ -498,6 +498,7 @@ partial class Game
         g.Hurt = 0.55f;
         Sfx.Play("hit");
         Burst(bx, by - 3, dazed ? "#ffd76a" : "#ffffff", dazed ? 9 : 5);
+        Impact(dazed ? 0.22f : 0.1f, dazed ? "#ffd76a" : "#ffffff", dazed ? 0.2f : 0.1f, dazed ? 0.07f : 0.045f);
         if (dazed) Floater("Big hit!", g.X, g.Y - 24, "#ffd76a");
         if (g.Spirit <= 0) GuardianDefeated();
     }
@@ -637,7 +638,7 @@ partial class Game
     {
         var g = guardian;
         if (g == null || guardianUndrawn || g.Phase is "prowl" or "slam" or "surgeRear" or "surge" or "rise" || (g.Phase == "sink" && g.T > 0.6f)) return;
-        bool flash = g.Hurt > 0.25f;
+        bool flash = g.Hurt > 0.25f && !Calm;
         if (g.Phase is "aim" or "snapRear" or "snap")
         {
             // Head and shoulders out of the water at the edge, jaws open.

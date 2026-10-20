@@ -1143,6 +1143,7 @@ partial class Game
         DrawAshHaze();
         if (!AshFalling || scene != "world") { if (ashFlakes.Count > 0) ashFlakes.Clear(); return; }
         pix.Fill(0, 0, W, H, Pal.Rgba(122, 116, 106, 0.4f));
+        if (LightMode > 0) { DrawAshSoft(); return; }
         while (ashFlakes.Count < 160) ashFlakes.Add((FxRand(0, W), FxRand(0, H), FxRand(-8, 3), FxRand(0, 1)));
         for (int i = 0; i < ashFlakes.Count; i++)
         {
@@ -1153,6 +1154,22 @@ partial class Game
             ashFlakes[i] = (x, y, vx, life);
             int sz = life > 0.7f ? 2 : 1;
             pix.Fill((int)x, (int)y, sz, sz, Pal.Rgba(96, 92, 86, 0.85f));
+        }
+    }
+
+    // The ash with light on: world-anchored (it slides past as you walk, like the rain) and worked out from the time alone, so
+    // nothing changes while drawing. Each flake has its own depth: faint and small far off, big and dark with a halo near.
+    void DrawAshSoft()
+    {
+        for (int i = 0; i < 160; i++)
+        {
+            float depth = (float)Pix.Hash(i, 3, 97);
+            double sx = Wrap(Pix.Hash(i, 0, 97) * W + time * (-6 + 8 * Pix.Hash(i, 1, 97)) + Math.Sin(time * 1.6 + i) * 5 - camX, W);
+            double sy = Wrap(Pix.Hash(i, 2, 97) * H + time * (9 + depth * 14) - camY, H);
+            int x = (int)sx, y = (int)sy;
+            float a = 0.35f + 0.55f * depth;
+            if (depth > 0.7f) { pix.Fill(x - 1, y, 3, 1, Pal.Rgba(96, 92, 86, a * 0.3f)); pix.Fill(x, y - 1, 1, 3, Pal.Rgba(96, 92, 86, a * 0.3f)); pix.Fill(x, y, 2, 2, Pal.Rgba(88, 84, 78, a)); }
+            else pix.Fill(x, y, 1, 1, Pal.Rgba(96, 92, 86, a));
         }
     }
 

@@ -97,7 +97,7 @@ partial class Game
         if (r.Style == "bottom")
         {
             string s = r.Digging ? "Digging in!" : "Pump!";
-            float bounce = (int)(time * 6) % 2 * 3;
+            float bounce = Calm ? 0 : (int)(time * 6) % 2 * 3;
             Outlined(s, rx - Gfx.Measure(s, FontKind.Ui700, 26), Y(140) - bounce, FontKind.Ui700, 26, r.Digging ? Pal.C("#ff9a5a") : Pal.C("#bff4ff"));
         }
         if (r.Leap > 0)
@@ -122,8 +122,9 @@ partial class Game
         int n = chestSeq.Count;
         const float box = 66, gap = 12;
         float w = n * box + (n - 1) * gap, x = Gfx.LW / 2 - w / 2, y = 250;
-        float shake = chestShake > 0 ? MathF.Sin(time * 80) * 6 : 0;
-        Gfx.Box(x - 28 + shake, y - 74, w + 56, box + 128, Pal.Paper, Pal.Ink, 3, 8, 6);
+        float shake = chestShake > 0 && !Calm ? MathF.Sin(time * 80) * 6 : 0;
+        float pw = Math.Max(w + 56, 560);   // wide enough for the title
+        PanelBox(Gfx.LW / 2 - pw / 2 + shake, y - 74, pw, box + 128);
         Gfx.TextCenter("A sunken chest! Press the arrows in order", Gfx.LW / 2 + shake, y - 56, FontKind.Ui700, 24, Pal.PaperInk);
         for (int i = 0; i < n; i++)
         {
@@ -132,9 +133,30 @@ partial class Game
             Gfx.Box(bx, y, box, box, done ? Pal.C("#7fd36b") : now ? Pal.Lantern : Pal.Sand, Pal.Ink, 3, 6, now ? 4 : 2);
             DrawArrow(bx + box / 2, y + box / 2, chestSeq[i], done ? Pal.C("#2f6428") : Pal.Ink);
         }
-        float total = 4.5f + n * 0.35f, k = Math.Clamp(chestT / total, 0, 1);
+        float k = Math.Clamp(chestT / chestTotal, 0, 1);
         Gfx.Rect(x, y + box + 22, w, 14, Pal.C("rgba(0,0,0,0.15)"), 4);
         Gfx.Rect(x, y + box + 22, w * k, 14, k < 0.3f ? Pal.Buoy : Pal.C("#5fb04f"), 4);
+        // Four big buttons under the panel: tapping or clicking one is that arrow (the stick can't hit them one after another).
+        const float pad = 92;
+        DrawArrowPad(Gfx.LW / 2 - (4 * pad + 3 * 14) / 2, y + box + 70, pad, 14, 3, 0, 2, 1);
+    }
+
+    // A row of big arrow buttons (0 up, 1 right, 2 down, 3 left), in the order given. Tapping or clicking one sets arrowTap,
+    // which ArrowPressed reads next frame. (Gfx.Seen: arrow:<direction>.)
+    void DrawArrowPad(float x, float y, float size, float gap, params int[] dirs)
+    {
+        for (int i = 0; i < dirs.Length; i++)
+        {
+            int dir = dirs[i];
+            float bx = x + i * (size + gap);
+            bool over = Gfx.Hover(bx, y, size, size), held = over && Gfx.Down;
+            Gfx.Box(bx, y, size, size, held ? Pal.Lantern : Pal.Paper, Pal.Ink, 3, 8, held ? 1 : 4);
+            DrawArrow(bx + size / 2, y + size / 2, dir, Pal.Ink);
+#if DEBUG
+            Gfx.Seen["arrow:" + dir] = new Rectangle(bx, y, size, size);
+#endif
+            if (Gfx.Click(bx, y, size, size)) arrowTap = dir;
+        }
     }
 
     static void DrawArrow(float cx, float cy, int dir, Color c)

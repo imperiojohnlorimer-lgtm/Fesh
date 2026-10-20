@@ -112,7 +112,7 @@ partial class Game
     // A big sail is a third faster; trolling goes slowly; a storm slows everything.
     float BoatSpeed => (trolling ? 58 : Wears("big_sail") ? 124 : 96) * (Stormy ? 2f / 3 : 1);
     // The hull rides the swell: faster under way, harder in a storm.
-    int BoatBob(float t) => (int)MathF.Round(MathF.Sin(t * (BoatUnderWay ? 3.2f : 2)) * (Stormy ? 1.6f : BoatUnderWay ? 1.1f : .8f));
+    int BoatBob(float t) => Calm ? 0 : (int)MathF.Round(MathF.Sin(t * (BoatUnderWay ? 3.2f : 2)) * (Stormy ? 1.6f : BoatUnderWay ? 1.1f : .8f));
     // Where the fisher sits (their feet, on the bobbing hull): at the stern, behind the mast. Bow-on they sit a pixel
     // to one side, so the mast and sail in front of them stand clear of their face.
     (int x, int y) BoatSeat()

@@ -449,7 +449,7 @@ partial class Game
         var reg = RegionById[atlasRegion];
         const float w = 1200, h = 664, pad = 22;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         Gfx.Text(reg.Name, x + pad, y + pad - 4, FontKind.Ui700, 30, Pal.PaperInk);
         float kx = x + pad + Gfx.Measure(reg.Name, FontKind.Ui700, 30) + 14, kw = Gfx.Measure(reg.Kind, FontKind.Ui700, 14) + 18;
         Gfx.Rect(kx, y + pad + 2, kw, 22, Pal.C("#3f6a8a"), 4);

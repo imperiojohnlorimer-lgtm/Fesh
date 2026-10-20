@@ -484,7 +484,7 @@ partial class Game
     {
         void Big(string s, Color c, float at) => Outlined(s, rx - Gfx.Measure(s, FontKind.Ui700, 30), Y(at), FontKind.Ui700, 30, c);
         void Small(string s, float at) => Outlined(s, rx - Gfx.Measure(s, FontKind.Ui600, 18), Y(at), FontKind.Ui600, 18, Pal.C("#ffffff"));
-        bool blink = (int)(time * 8) % 2 == 0;
+        bool blink = Calm || (int)(time * 8) % 2 == 0;
         float x0 = rx - 340, cy = Y(238);
         var gold = Pal.C("#f3c25b"); var green = Pal.C("#7fd36b"); var panel = Pal.C("rgba(26,30,22,0.88)");
         switch (m.Ev)

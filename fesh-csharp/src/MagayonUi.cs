@@ -20,8 +20,8 @@ partial class Game
         var notes = Gfx.Wrap("These are PHIVOLCS's alert levels for Mayon (revised January 2018); each volcano has its own table. Baga and its station are made up for this game and borrow Mayon's. Mayon reached Level 5 in 2000 and 2001. In January 2018 it went to Level 4 while lava was already fountaining, with an 8 km danger zone.", FontKind.Note, 17, cw - pad * 2);
         float ch = pad + 44 + 30 + rowsH + 14 + notes.Count * 24 + pad;
         float x = (Gfx.LW - cw) / 2, y = Math.Max(8, (Gfx.LH - ch) / 2);
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Volcano alert levels", x + pad, y + pad, FontKind.Ui700, 32, Pal.PaperInk);
+        PanelBox(x, y, cw, ch);
+        Gfx.Text("Volcano alert levels", x + pad, y + pad, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         Gfx.Text($"Baga today: Level {BagaLevel}, {AlertLevels[BagaLevel].Name}", x + pad, y + pad + 42, FontKind.Ui600, 18, Pal.C("#b5523b"));
         if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) { ClosePanels(); return; }
         float ry = y + pad + 76;
@@ -71,8 +71,8 @@ partial class Game
         if (r == null) { ClosePanels(); return; }
         const float cw = 1080, ch = 660, pad = 24;
         float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text(r.Round == 1 ? "Today's readings" : "New readings", x + pad, y + pad, FontKind.Ui700, 32, Pal.PaperInk);
+        PanelBox(x, y, cw, ch);
+        Gfx.Text(r.Round == 1 ? "Today's readings" : "New readings", x + pad, y + pad, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         Gfx.Text("Simplified examples of what Baga's station measures.", x + pad, y + pad + 42, FontKind.Note, 17, Muted);
         if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) { readings = null; ClosePanels(); Toast("Ben: \"Come back when you're ready; the readings will wait.\""); return; }
         // The four steps along the top.
@@ -398,8 +398,8 @@ partial class Game
         const float cw = 1060, pad = 24, cardW = 190, cardH = 116, gap = 12;
         float ch = pad + 44 + 34 + 2 * (cardH + gap) + 20 + 90 + 60 + pad;
         float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Pack a go-bag", x + pad, y + pad, FontKind.Ui700, 32, Pal.PaperInk);
+        PanelBox(x, y, cw, ch);
+        Gfx.Text("Pack a go-bag", x + pad, y + pad, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         Gfx.Text("Click what goes in. A real go-bag can hold more; these are the essentials here.", x + pad, y + pad + 42, FontKind.Note, 17, Muted);
         if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) { gobag = null; ClosePanels(); return; }
         float gy = y + pad + 84;
@@ -499,8 +499,8 @@ partial class Game
         if (w == null) { ClosePanels(); return; }
         const float cw = 1120, ch = 640, pad = 24;
         float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Lahar watch", x + pad, y + pad, FontKind.Ui700, 32, Pal.PaperInk);
+        PanelBox(x, y, cw, ch);
+        Gfx.Text("Lahar watch", x + pad, y + pad, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         Gfx.Text(w.Live ? "Live from Baga's station: it's raining on the fresh ash." : "Recorded at Baga's station during the last rain.", x + pad, y + pad + 42, FontKind.Note, 17, Muted);
         if (SmallButton("Close", x + cw - pad - SmallW("Close"), y + pad - 2)) { CloseLaharWatch(); return; }
         // The map of Baga's north-east, with the three places to decide about.

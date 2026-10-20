@@ -12,7 +12,7 @@ partial class Game
     string mapHover;   // the dot the mouse is over on the chart (its tooltip's title), for the autotest
 
     // Region: an island's name label that opens its page in the island guide when clicked (Atlas.cs).
-    sealed record MapMark(string Label, float X, float Y, Color Dot, Color Text, float Size, bool HasDot, List<string> Tip, int Prio, string Region = null);
+    sealed record MapMark(string Label, float X, float Y, Color Dot, Color Text, float Size, bool HasDot, List<string> Tip, int Prio, string Region = null, int Glyph = 0);
 
     /* ---------- Charting ---------- */
     // An island: one of the five original biomes, one of Amihan's four islands by name, or a Habagat island (Asinan,
@@ -70,16 +70,14 @@ partial class Game
         return c.ToList();
     }
 
-    // Uncharted land on the chart texture: plain parchment with hatching and an inked coast (RefreshMapTexture).
+    // Uncharted land on the chart texture: plain parchment with hatching and an inked coast, and (1.43, light on or off, it is
+    // the chart) hand-inked coasts round the charted islands (RefreshMapTexture).
     void FogUncharted(Pix img)
     {
-        if (state.charted == null) return;
         var fog = new bool[ROWS, COLS];
-        bool any = false;
         for (int ty = 0; ty < ROWS; ty++)
             for (int tx = 0; tx < COLS; tx++)
-                any |= fog[ty, tx] = !Charted(RegionAt(tx, ty));
-        if (!any) return;
+                fog[ty, tx] = !Charted(RegionAt(tx, ty));
         // The open sea is whatever water joins the edge of the map; lakes, lagoons and blue holes inside an island
         // are hidden with the rest of it.
         var sea = new bool[ROWS, COLS];
@@ -110,6 +108,41 @@ partial class Game
                 if (!fog[wy / T, wx / T] || Open(wx, wy)) continue;
                 bool coast = Open(wx - 1, wy) || Open(wx + 1, wy) || Open(wx, wy - 1) || Open(wx, wy + 1);
                 img.Buf[wy * img.W + wx] = coast ? ink : (wx + wy) % 6 == 0 ? hatch : paper;
+            }
+        InkCoasts(img, fog, Open);
+    }
+
+    // Pen-and-ink coasts for the charted islands: a dark brown line where land meets the open sea (a lighter one round lakes and
+    // lagoons), a faint shadow on the water just past it to the south-east as if the pen leaned, and short dashed ripples a
+    // few pixels further out. Fogged land keeps its own ink (FogUncharted), and it is all in the chart's texture only.
+    void InkCoasts(Pix img, bool[,] fog, Func<int, int, bool> open)
+    {
+        int W0 = img.W, H0 = img.H;
+        var isOpen = new bool[W0 * H0];
+        for (int y = 0; y < H0; y++) for (int x = 0; x < W0; x++) isOpen[y * W0 + x] = open(x, y);
+        bool Open(int x, int y) => x < 0 || y < 0 || x >= W0 || y >= H0 || isOpen[y * W0 + x];
+        bool Land(int x, int y) => x >= 0 && y >= 0 && x < W0 && y < H0 && !Wet(shape[y * PW + x]);
+        var inkC = Pal.C("#4d3d28");
+        for (int y = 0; y < H0; y++)
+            for (int x = 0; x < W0; x++)
+            {
+                if (fog[y / T, x / T]) continue;
+                int i = y * W0 + x;
+                if (!isOpen[i])
+                {
+                    if (!Land(x, y))   // lagoon and pond rims: the water touching their shore
+                    {
+                        if (Land(x - 1, y) || Land(x + 1, y) || Land(x, y - 1) || Land(x, y + 1)) img.Buf[i] = Pix.Mix(img.Buf[i], inkC, 0.35f);
+                        continue;
+                    }
+                    bool coast = Open(x - 1, y) || Open(x + 1, y) || Open(x, y - 1) || Open(x, y + 1);
+                    if (coast) img.Buf[i] = Pix.Mix(img.Buf[i], inkC, 0.82f);
+                    continue;
+                }
+                // Open water: the shadow of the coast to its south-east, then ripples.
+                if (!Open(x - 1, y - 1) && Land(x - 1, y - 1)) { img.Buf[i] = Pix.Mix(img.Buf[i], inkC, 0.24f); continue; }
+                if (((x + y) & 1) == 0 && (Land(x - 3, y) || Land(x + 3, y) || Land(x, y - 3) || Land(x, y + 3)) && !Land(x - 1, y) && !Land(x + 1, y) && !Land(x, y - 1) && !Land(x, y + 1))
+                    img.Buf[i] = Pix.Mix(img.Buf[i], inkC, 0.13f);
             }
     }
 
@@ -207,6 +240,13 @@ partial class Game
         Gfx.Rect(mx - 5, my - 5, mw + 10, mh + 10, Pal.Paper, 1);
         Gfx.Rect(mx - 3, my - 3, mw + 6, mh + 6, Pal.Ink);
         DrawTexturePro(mapTex, new Rectangle(origin, 0, chartW, chartH), Gfx.S(mx, my, mw, mh), Vector2.Zero, 0, Color.White);
+        // Aged paper (1.43): the edges of the chart darken a little, the corners a little more.
+        for (int e = 0; e < 8; e++)
+        {
+            var shade = Pal.Rgba(70, 46, 20, 0.24f * (1 - e / 8f) * (1 - e / 8f));
+            Gfx.Rect(mx, my + e * 3, mw, 3, shade); Gfx.Rect(mx, my + mh - (e + 1) * 3, mw, 3, shade);
+            Gfx.Rect(mx + e * 3, my + 24, 3, mh - 48, shade); Gfx.Rect(mx + mw - (e + 1) * 3, my + 24, 3, mh - 48, shade);
+        }
         var grid = Pal.C("rgba(241,230,200,0.13)");
         for (float gxw = MathF.Ceiling(origin / 200) * 200; gxw < origin + chartW; gxw += 200) Gfx.Rect(mx + (gxw - origin) * scale, my, 1, mh, grid);
         for (float gyw = 200; gyw < chartH; gyw += 200) Gfx.Rect(mx, my + gyw * scale, mw, 1, grid);
@@ -259,14 +299,22 @@ partial class Game
             var p = M(wx, wy);
             marks.Add(new(label, p.X, p.Y, gold, gold, 14, true, tip, prio));
         }
-        if (Charted("frost")) Place("Frostfang Caverns", MouthDoorX, MouthDoorY - 26, new() { "Frostfang Caverns", state.caveDeepest > 0 ? $"Deepest floor reached: {state.caveDeepest}" : "Twelve floors down, they say." });
-        Place("Pip's stall", PipX, PipY - 6, new() { "Pip's stall", PipOpen ? $"Open until {HourText(21 * 60)}" : $"Closed. Opens at {HourText(7 * 60)}" });
-        Place("Pip's jetty", SaltJettyX, SaltJettyY, new() { "Pip's jetty", Has("boat") > 0 ? "E sails to Starfall Atoll; F takes the helm" : "You'll need a boat" });
+        // A place with a small picture instead of a dot (MapGlyph): 1 a stall, 2 a pier, 3 a cave, 4 a volcano, 5 a flag,
+        // 6 seaweed lines, 7 a tree, 8 a boat. It still keeps the dot's place, colour and tooltip.
+        void PlaceG(string label, float wx, float wy, int glyph, List<string> tip, int prio = 3)
+        {
+            if (!OnChart(wx, wy)) return;
+            var p = M(wx, wy);
+            marks.Add(new(label, p.X, p.Y, gold, gold, 14, true, tip, prio, null, glyph));
+        }
+        if (Charted("frost")) PlaceG("Frostfang Caverns", MouthDoorX, MouthDoorY - 26, 3, new() { "Frostfang Caverns", state.caveDeepest > 0 ? $"Deepest floor reached: {state.caveDeepest}" : "Twelve floors down, they say." });
+        PlaceG("Pip's stall", PipX, PipY - 6, 1, new() { "Pip's stall", PipOpen ? $"Open until {HourText(21 * 60)}" : $"Closed. Opens at {HourText(7 * 60)}" });
+        PlaceG("Pip's jetty", SaltJettyX, SaltJettyY, 2, new() { "Pip's jetty", Has("boat") > 0 ? "E sails to Starfall Atoll; F takes the helm" : "You'll need a boat" });
         if (chartEast)
         {
-            Place("Village landing", 1495, 217, new() { "Village landing", "Moor here for Amihan Village" });
+            PlaceG("Village landing", 1495, 217, 2, new() { "Village landing", "Moor here for Amihan Village" });
             // Once Ma'am Isay has marked the route (RestlessSea.cs).
-            if (state.Hinted("rs:signs")) Place("School Rise", RiseX, RiseY + 12, new() { "School Rise", "Amihan Village's evacuation area", "Follow the green signs up from the landing" }, 2);
+            if (state.Hinted("rs:signs")) PlaceG("School Rise", RiseX, RiseY + 12, 5, new() { "School Rise", "Amihan Village's evacuation area", "Follow the green signs up from the landing" }, 2);
             foreach (var n in Islanders)
                 if (Charted(RegionOf(n.x, n.y + 10))) Place(n.name, n.x, n.y, new() { n.name, IslanderNote(n.id) });
             // Baga's volcano (Magayon.cs): the permanent danger zone, the alert level, and the evacuation while it stands.
@@ -274,7 +322,7 @@ partial class Game
             {
                 var tip = new List<string> { "Baga's permanent danger zone", "Closed at every alert level", $"Alert level {BagaLevel}: {AlertLevels[BagaLevel].Name}" };
                 if (BagaClosed) tip.Add("Baga is evacuated until the advisory reopens it");
-                Place("Danger zone", PdzX, PdzY + 4, tip, 1);
+                PlaceG("Danger zone", PdzX, PdzY + 4, 4, tip, 1);
             }
             // The sanctuary's name sits in its middle, and Bantay Joy on her platform.
             var sp = M(SanctCX * T, (SanctCY + SanctRY + 1.2f) * T);
@@ -284,10 +332,10 @@ partial class Game
             if (Charted("amihan:Luntian Karsts"))
             {
                 bool ready = Enumerable.Range(0, GusoLines.Length).Any(i => GusoLineOpen(i) && GusoReady(GusoAt(i)));
-                Place(ready ? "Seaweed farm (ready)" : "Seaweed farm", GusoLines[0].x, GusoFarmY, GusoTip(), 2);
+                PlaceG(ready ? "Seaweed farm (ready)" : "Seaweed farm", GusoLines[0].x, GusoFarmY, 6, GusoTip(), 2);
             }
             if (Charted("amihan:Bakawan Island") && (state.Hinted("fireflies") || state.sightings.GetValueOrDefault("alitaptap") > 0))
-                Place("Alitaptap trees", FireflyTrees[1].x, FireflyTrees[1].y - 6, new()
+                PlaceG("Alitaptap trees", FireflyTrees[1].x, FireflyTrees[1].y - 6, 7, new()
                 {
                     "Pagatpat trees", "The alitaptap gather here after dark, but not in the rain",
                     GlowNight ? "Tonight the water glows: the moon is small" : "The water glows on nights when the moon is small"
@@ -295,7 +343,7 @@ partial class Game
         }
         else if (state.Hinted("habagat"))
         {
-            Place("Asinan landing", AsinanJettyX, AsinanJettyY - 16, new() { "Asinan landing", Has("boat") > 0 ? "E sails from here; F takes the helm" : "You'll need a boat" });
+            PlaceG("Asinan landing", AsinanJettyX, AsinanJettyY - 16, 2, new() { "Asinan landing", Has("boat") > 0 ? "E sails from here; F takes the helm" : "You'll need a boat" });
             foreach (var n in HabagatFolk)
                 if (Charted(RegionOf(n.x, n.y + 10))) Place(n.name, n.x, n.y, new() { n.name, HabagatNote(n.id) });
             if (race != null || raceArmed)
@@ -309,7 +357,7 @@ partial class Game
         if (chart == 2) MarilayaChartMarks(Place);
         foreach (var b in state.builds.Where(b => b.id == "dryrack" && Rack(b) is RackLoad r && r.fish.Count > 0))
             Place(RackDone(Rack(b)) ? "Rack (dry!)" : "Drying rack", b.x * T + 5, b.y * T + 5, new() { "Your drying rack", RackDone(Rack(b)) ? (RackIsGuso(Rack(b)) ? "The dried guso is ready" : "The dried fish are ready") : $"{(int)((DryGoal - Rack(b).dry) / DryRate)} minutes of sun to go" }, 2);
-        if (Has("boat") > 0 && !Aboard) { var bp = BoatPosition(); Place("Your boat", bp.x, bp.y, new() { "Your boat", "Moored here. R beside it to board." }, 1); }
+        if (Has("boat") > 0 && !Aboard) { var bp = BoatPosition(); PlaceG("Your boat", bp.x, bp.y, 8, new() { "Your boat", "Moored here. R beside it to board." }, 1); }
         if (state.tamed && !state.riding) Place(Data.MountName, state.mountX, state.mountY - 6, new() { Data.MountName, Bind.Fix("Waiting here. <ride> whistles it over from anywhere outdoors; it comes to you.") }, 1);
         foreach (var b in state.builds.Where(b => b.id == "crabpot"))
         {
@@ -349,8 +397,11 @@ partial class Game
         // Dots first, then the labels placed so they don't overlap (with a short line when one has to move away).
         foreach (var m in marks.Where(m => m.HasDot))
         {
-            Gfx.Circle(m.X, m.Y, m.Label == "Pin" ? 7 : 6.5f, Pal.Ink);
-            Gfx.Circle(m.X, m.Y, m.Label == "Pin" ? 5.5f : 5, m.Label == "Pin" ? Pal.C("#e04b3a") : m.Dot);
+            // A shape as well as a colour, so the key reads without telling green from red: a square is your goal, a diamond your
+            // pin, a cross over the dot is a spot that is shut.
+            int kind = m.Label == "Goal" ? 1 : m.Label == "Pin" ? 2 : m.Dot.Equals(Pal.C("#8a8f93")) ? 3 : 0;
+            if (m.Glyph > 0) MapGlyph(m.X, m.Y, m.Glyph, m.Dot);
+            else MapShape(m.X, m.Y, kind, m.Label == "Pin" ? Pal.C("#e04b3a") : m.Dot);
         }
         var chartBox = new Rectangle(mx, my, mw, mh);
         foreach (var m in marks.OrderBy(m => m.Prio))
@@ -485,21 +536,96 @@ partial class Game
     {
         Gfx.Text("Key", x, y, FontKind.Ui700, 20, Pal.PaperInk);
         float ky = y + 34;
-        void Row(Color dot, string what, bool you = false)
+        void Row(Color dot, string what, bool you = false, int kind = 0, int glyph = 0)
         {
             if (you) { Gfx.Circle(x + 8, ky + 9, 6.5f, White); Gfx.Circle(x + 8, ky + 9, 5, Pal.Buoy); }
-            else { Gfx.Circle(x + 8, ky + 9, 5.5f, Pal.Ink); Gfx.Circle(x + 8, ky + 9, 4, dot); }
+            else if (glyph > 0) MapGlyph(x + 8, ky + 9, glyph, dot, 0.8f);
+            else MapShape(x + 8, ky + 9, kind, dot, 4);
             foreach (var line in Gfx.Wrap(what, FontKind.Ui600, 15, w - 24)) { Gfx.Text(line, x + 22, ky, FontKind.Ui600, 15, Muted); ky += 19; }
             ky += 8;
         }
         Row(Pal.C("#7fd6f0"), "Fishing spot");
-        Row(Pal.C("#8a8f93"), "Closed for now");
+        Row(Pal.C("#8a8f93"), "Closed for now (crossed)", kind: 3);
         Row(Pal.Lantern, "Someone to meet, or a place");
-        Row(Pal.C("#7fd36b"), "Your goal");
+        Row(Pal.Lantern, "A place with its own picture (stall, pier, cave...)", glyph: 1);
+        Row(Pal.C("#7fd36b"), "Your goal (square)", kind: 1);
+        Row(Pal.C("#e04b3a"), "Your pin (diamond)", kind: 2);
         Row(Pal.Buoy, "You", you: true);
         ky += 6;
         foreach (var line in Gfx.Wrap("Click the chart to drop a pin. Click an island's name to read about it.", FontKind.Ui500, 14, w))
         { Gfx.Text(line, x, ky, FontKind.Ui500, 14, Muted); ky += 18; }
+    }
+
+    // A small picture for a place on the chart (1.43), drawn outlined in the mark's colour: 1 a stall, 2 a pier, 3 a cave, 4 a
+    // volcano, 5 a flag, 6 seaweed lines, 7 a tree, 8 a boat. `s` scales it. Places only: the goal, the pin and a closed spot keep
+    // their own shapes (MapShape).
+    static void MapGlyph(float cx, float cy, int glyph, Color fill, float s = 1)
+    {
+        void Draw(float e, Color c, bool inner)
+        {
+            switch (glyph)
+            {
+                case 1:
+                    Gfx.Triangle(cx - 7 * s - e, cy - 1 * s + e, cx + 7 * s + e, cy - 1 * s + e, cx, cy - 8 * s - e, c);
+                    Gfx.Rect(cx - 5 * s - e, cy - 1 * s, 10 * s + 2 * e, 7 * s + e, c);
+                    if (inner) Gfx.Rect(cx - 1.5f * s, cy + 2 * s, 3 * s, 4 * s, Pal.Ink);
+                    break;
+                case 2:
+                    Gfx.Rect(cx - 2 * s - e, cy - 8 * s - e, 4 * s + 2 * e, 16 * s + 2 * e, c);
+                    Gfx.Rect(cx - 6 * s - e, cy - 5 * s - e, 12 * s + 2 * e, 2 * s + 2 * e, c);
+                    Gfx.Rect(cx - 6 * s - e, cy + 2 * s - e, 12 * s + 2 * e, 2 * s + 2 * e, c);
+                    break;
+                case 3:
+                    Gfx.Circle(cx, cy - 1 * s, 7 * s + e, c);
+                    Gfx.Rect(cx - 7 * s - e, cy - 1 * s, 14 * s + 2 * e, 7 * s + e, c);
+                    if (inner) { Gfx.Circle(cx, cy, 3 * s, Pal.Ink); Gfx.Rect(cx - 3 * s, cy, 6 * s, 5 * s, Pal.Ink); }
+                    break;
+                case 4:
+                    Gfx.Triangle(cx - 8 * s - e, cy + 6 * s + e, cx + 8 * s + e, cy + 6 * s + e, cx, cy - 7 * s - e, c);
+                    if (inner) { Gfx.Rect(cx - 2 * s, cy - 6 * s, 4 * s, 2 * s, Pal.Ink); Gfx.Rect(cx - 1 * s, cy - 7 * s, 2 * s, 2 * s, Pal.C("#e04b3a")); }
+                    break;
+                case 5:
+                    Gfx.Rect(cx - 1 * s - e, cy - 8 * s - e, 2 * s + 2 * e, 16 * s + 2 * e, c);
+                    Gfx.Triangle(cx + 1 * s, cy - 8 * s - e, cx + 8 * s + e, cy - 5 * s, cx + 1 * s, cy - 2 * s + e, c);
+                    break;
+                case 6:
+                    for (int i = -1; i <= 1; i++) Gfx.Rect(cx + i * 4 * s - 1 * s - e, cy - (5 - i * i * 2) * s - e, 2 * s + 2 * e, (12 - i * i * 2) * s + 2 * e, c);
+                    break;
+                case 7:
+                    Gfx.Circle(cx, cy - 3 * s, 5 * s + e, c);
+                    Gfx.Rect(cx - 1 * s - e, cy, 2 * s + 2 * e, 7 * s + e, c);
+                    break;
+                case 8:
+                    Gfx.Rect(cx - 7 * s - e, cy + 1 * s - e, 14 * s + 2 * e, 3 * s + 2 * e, c);
+                    Gfx.Triangle(cx, cy - 8 * s - e, cx + 6 * s + e, cy, cx, cy, c);
+                    break;
+            }
+        }
+        Draw(1.6f * s, Pal.Ink, false);
+        Draw(0, fill, true);
+    }
+
+    // A chart mark's shape (so it reads without its colour): 0 a dot, 1 a square, 2 a diamond, 3 a dot with a cross over it.
+    static void MapShape(float x, float y, int kind, Color fill, float r = 5)
+    {
+        switch (kind)
+        {
+            case 1:
+                Gfx.Rect(x - r - 1.5f, y - r - 1.5f, 2 * r + 3, 2 * r + 3, Pal.Ink);
+                Gfx.Rect(x - r, y - r, 2 * r, 2 * r, fill);
+                break;
+            case 2:
+                float o = r + 3.5f;
+                Gfx.Triangle(x, y - o, x + o, y, x, y + o, Pal.Ink); Gfx.Triangle(x, y - o, x, y + o, x - o, y, Pal.Ink);
+                float i = r + 0.5f;
+                Gfx.Triangle(x, y - i, x + i, y, x, y + i, fill); Gfx.Triangle(x, y - i, x, y + i, x - i, y, fill);
+                break;
+            default:
+                Gfx.Circle(x, y, r + 1.5f, Pal.Ink);
+                Gfx.Circle(x, y, r, fill);
+                if (kind == 3) { Gfx.Line(x - r * 0.7f, y - r * 0.7f, x + r * 0.7f, y + r * 0.7f, 2, Pal.Ink); Gfx.Line(x - r * 0.7f, y + r * 0.7f, x + r * 0.7f, y - r * 0.7f, 2, Pal.Ink); }
+                break;
+        }
     }
 
     // What's at a spot: whether it's open, how much of it you've caught, and what's biting there now.

@@ -150,7 +150,7 @@ partial class Game
         Backdrop();
         const float w = 960, h = 640;
         float x = (Gfx.LW - w) / 2, y = 30;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         Gfx.Text("Reef Run", x + 30, y + 14, FontKind.Ui700, 28, Pal.PaperInk);
         Gfx.Text("Fish: small 1 point, medium 2, big 4", x + 30, y + 52, FontKind.Note, 16, Muted);
         float left = Math.Max(0, ReefRules.Duration - r.T);
@@ -242,7 +242,7 @@ partial class Game
         var r = reef;
         const float w = 620, h = 360;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         string title = r.Result == "win" ? "You win the Reef Run!" : r.Result == "loss" ? $"{r.RivalName} wins" : "A draw!";
         Gfx.TextCenter(title, x + w / 2, y + 22, FontKind.Ui700, 40, r.Result == "win" ? Pal.C("#2f7d3a") : r.Result == "loss" ? Rust : Pal.PaperInk);
         Gfx.TextCenter($"{r.Points} points to {r.AnglerPts}", x + w / 2, y + 84, FontKind.Ui700, 26, Pal.PaperInk);

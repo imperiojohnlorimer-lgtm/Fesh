@@ -451,7 +451,13 @@ partial class Game
         if (col == null || scene != "world") return;
         // Boots leave prints in sand and snow that fade after a while (Ambience.cs).
         if (!Riding && g is 's' or 'D' or 'n') AddFootprint(g == 'n');
-        // Hooves kick up a lot more than boots do.
+        // Hooves kick up a lot more than boots do. With light on, dry ground gives a soft puff that grows and fades.
+        if (LightMode > 0 && g is 's' or 'p' or 'D' or 'n' or 'i' or 'e')
+        {
+            for (int i = 0; i < (Riding ? 4 : 2); i++)
+                Puff(player.X + FxRand(-2, 2), player.Y, col, FxRand(-8, 8), FxRand(-9, -3), FxRand(0.4f, 0.75f), 1.5f, FxRand(3f, 4.6f), 0.55f);
+            return;
+        }
         for (int i = 0; i < (Riding ? 4 : 2); i++)
             particles.Add(new Particle { X = player.X + Rand(-2, 2), Y = player.Y, Vx = Rand(-10, 10), Vy = Rand(-22, -10), Life = Rand(0.18f, 0.3f), Color = col });
     }

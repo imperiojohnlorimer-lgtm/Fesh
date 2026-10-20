@@ -24,9 +24,11 @@ internal static class TouchHud
     public static volatile bool Editing;
     public static volatile bool WheelAllowed; // a menu or panel is up: a vertical drag scrolls it
     public static int W = 1280, H = 720;
-    public const string Build = "1.41.0";
+    public const string Build = "1.43.0";
 
-    static readonly string[] Live = { "play", "build", "charging", "casting", "waiting", "bite", "reeling", "chest", "spear", "drill" };
+    // "chest" is left out on purpose: the sunken chest's four arrow buttons are drawn by the game, and the stick's zone would
+    // swallow the left ones before the game ever saw the tap.
+    static readonly string[] Live = { "play", "build", "charging", "casting", "waiting", "bite", "reeling", "spear", "drill" };
 
     // ---------- layout ----------
     // Each control: where it sits by default (layout units from its side edge and from the bottom), how big it is, and

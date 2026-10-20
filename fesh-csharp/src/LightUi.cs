@@ -36,6 +36,12 @@ partial class Game
         int gr = Choices(new[] { "Grain", "No grain" }, d.grain ? 0 : 1, cx + 250 + 130, y);
         if (gr >= 0 && (gr == 0) != d.grain) { d.grain = gr == 0; changed = true; Sfx.Play("ui"); }
         y += rowH;
+        // Switches the dearest effects off for a while if the game can't keep up, and back on when there's room (Quality.cs).
+        d.autoQuality = Pick("Keep it smooth", new[] { "Automatic", "Keep all" }, d.autoQuality ? 0 : 1) == 0;
+        // Accessibility (Access.cs): Reduce motion keeps every warning but stops the shaking, flashing, swaying and bobbing;
+        // High contrast makes the cards solid, the small text darker, and the night and corners lighter.
+        d.reduceMotion = Pick("Reduce motion", new[] { "Normal motion", "Reduced" }, d.reduceMotion ? 1 : 0) == 1;
+        d.highContrast = Pick("High contrast", new[] { "Normal colours", "High contrast" }, d.highContrast ? 1 : 0) == 1;
         if (changed) Settings.Save();
 
         y += 6;
@@ -45,6 +51,6 @@ partial class Game
             1 => "Soft: glowing lamps and windows that come on at dusk, gentle colour through the day and weather, and a faint palette for each island.",
             _ => "Full: glowing lamps and windows that come on at dusk, colour that follows the sun and the weather, a palette for each island, and shadows that move with the sun.",
         };
-        Lines(Gfx.Wrap(note, FontKind.Note, 17, w), x, y, 23, FontKind.Note, 17, Muted);
+        Lines(Gfx.Wrap(note + " Automatic keeps the picture smooth by switching the dearest effects off for a while if the game can't keep up.", FontKind.Note, 17, w), x, y, 23, FontKind.Note, 17, Muted);
     }
 }

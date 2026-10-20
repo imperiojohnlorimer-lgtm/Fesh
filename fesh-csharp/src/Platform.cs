@@ -16,6 +16,7 @@ static class Platform
     public static bool Haptics = true;         // a short buzz on a button press
     public static int Fps = 60;                // 30 or 60
     public static bool ShowDebug;              // a line of build information at the bottom of the screen
+    public static bool TapWorld;               // a tap on the world itself acts like E (off: only the round buttons act)
 
     public static Action Changed;              // a touch setting changed: the app saves it
     public static Action EditLayout;           // the app lets you drag the controls where you want them

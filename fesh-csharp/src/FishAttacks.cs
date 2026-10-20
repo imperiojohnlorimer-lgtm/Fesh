@@ -33,6 +33,7 @@ partial class Game
             float taken = damage * ArmourMul;
             state.hp = Math.Max(0, state.hp - taken);
             lastHitT = time; hurtFlash = .35f; iframes = .9f;
+            Impact(0.12f, "#e04b3a", 0.22f);
             // The hit costs progress but never loses the fish by itself, and never adds any either.
             r.Progress = Math.Min(r.Progress, Math.Max(.05f, r.Progress - .08f));
             Sfx.Play("hurt"); Floater($"-{taken:0} health", player.X, player.Y - 24, "#ff9a8a");

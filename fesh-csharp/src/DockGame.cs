@@ -276,7 +276,7 @@ partial class Game
         {
             const float w = 560, h = 230;
             float x = (Gfx.LW - w) / 2, y = 150;
-            Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+            PanelBox(x, y, w, h);
             Gfx.TextCenter($"{DockName(iv.from)} challenges you!", x + w / 2, y + 22, FontKind.Ui700, 30, Pal.PaperInk);
             Gfx.TextCenter($"A game of {DockRules.Modes[iv.mode]}.", x + w / 2, y + 72, FontKind.Ui600, 22, Muted);
             int left = Math.Max(0, (int)Math.Ceiling(iv.until - (dockClient?.Now() ?? 0)));
@@ -316,7 +316,7 @@ partial class Game
     {
         const float w = 560;
         float h = 140 + items.Length * 70 + 78, x = (Gfx.LW - w) / 2, y = Math.Max(30, (Gfx.LH - h) / 2 - 60);
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         Gfx.TextCenter(title, x + w / 2, y + 22, FontKind.Ui700, 30, Pal.PaperInk);
         Gfx.TextCenter(sub, x + w / 2, y + 74, FontKind.Ui600, 20, Muted);
         float by = y + 116;

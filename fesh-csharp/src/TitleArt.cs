@@ -27,7 +27,7 @@ partial class Game
             }
         // The fish: out of the waves at the left, over the letters, back in at the right.
         float ph = (t % 9f) / 2.8f;
-        if (ph < 1)
+        if (ph < 1 && !Settings.Data.reduceMotion)
         {
             float fx = 6 + ph * 88, fy = WavesSurf - 1 - 21 * 4 * ph * (1 - ph);
             float vx = 88, vy = -21 * 4 * (1 - 2 * ph);

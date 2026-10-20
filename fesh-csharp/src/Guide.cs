@@ -675,7 +675,7 @@ partial class Game
         GoalMarker(x + pad + 7, y + pad + 8, 0.7f);
         string title = Gfx.Ellipsize(g.Title, FontKind.Ui700, 17, w - 2 * pad - 22 - distW);
         Gfx.Text(title, x + pad + 22, y + pad - 2, FontKind.Ui700, 17, Pal.Lantern);
-        if (dist != "") Gfx.Text(dist, x + w - pad - distW + 10, y + pad, FontKind.Ui600, 15, Pal.C("#9fc3d1"));
+        if (dist != "") Gfx.Text(dist, x + w - pad - distW + 10, y + pad, FontKind.Ui600, 15, CardText("#9fc3d1"));
         float ty = y + pad + 22;
         Lines(text, x + pad, ty, 19, FontKind.Ui500, 15, Pal.Paper);
         ty += Math.Max(3, text.Count) * 19;
@@ -718,7 +718,7 @@ partial class Game
         float cx = (player.X - camX) * k, cy = (player.Y - 6 - camY) * k;
         if (MarkerAt(sx, sy) is { } at)
         {
-            GoalMarker(at.x, at.y + MathF.Sin(time * 4) * 3, 1, at.up);
+            GoalMarker(at.x, at.y + (Calm ? 0 : MathF.Sin(time * 4) * 3), 1, at.up);
             return;
         }
         float dx = sx - cx, dy = sy - cy, len = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));

@@ -6,8 +6,15 @@ namespace Fesh;
 
 partial class Game
 {
-    static readonly Color Navy = Pal.C("rgba(16,36,58,0.8)"), NavyStrong = Pal.C("rgba(16,36,58,0.88)"), White = Color.White,
-        Muted = Pal.C("#6b5a45"), Rust = Pal.C("#b5523b"), CardBg = Pal.C("#fffaf0"), NoteBg = Pal.C("#fdf3c4"), PinRed = Pal.C("#c0392b");
+    // High contrast (Settings > Graphics) makes the dark cards solid and the small brown text darker on the paper.
+    static readonly Color NavyN = Pal.C("rgba(16,36,58,0.8)"), NavyStrongN = Pal.C("rgba(16,36,58,0.88)"), NavySolid = Pal.C("#091526"),
+        MutedN = Pal.C("#6b5a45"), MutedHC = Pal.C("#32271b");
+    static Color Navy => Gfx.HighContrast ? NavySolid : NavyN;
+    static Color NavyStrong => Gfx.HighContrast ? NavySolid : NavyStrongN;
+    static Color Muted => Gfx.HighContrast ? MutedHC : MutedN;
+    // The pale blue-grey of small text on the dark cards: plain white in high contrast.
+    static Color CardText(string normal) => Gfx.HighContrast ? Pal.Paper : Pal.C(normal);
+    static readonly Color White = Color.White, Rust = Pal.C("#b5523b"), CardBg = Pal.C("#fffaf0"), NoteBg = Pal.C("#fdf3c4"), PinRed = Pal.C("#c0392b");
     static readonly float[] Tilts = { -2, 1.6f, -1, 2.2f, -1.4f };
     float buildBarH;
     float? clockTip;   // where the clock chip is, while the mouse is over it (its tooltip is drawn last, over the meters)
@@ -125,12 +132,25 @@ partial class Game
     // activity panels keep their own looks.
     const float PanelX = 50, PanelY = 20, PanelW = 1180, PanelH = 680, PanelPad = 24, PanelTitleSize = 34;
     static (float x, float y, float w, float h) panelAt = (PanelX, PanelY, PanelW, PanelH);
+
+    // The paper box every panel and card sits on (1.43): the same frame as always, with a fine ink line a little inside it and
+    // a pale edge along the top, so every one of them reads as the same sheet of paper.
+    internal static int PanelBoxCalls;   // the autotest checks the real panels go through here
+    static void PanelBox(float x, float y, float w, float h)
+    {
+        PanelBoxCalls++;
+        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        var line = Pal.WithAlpha(Pal.Ink, 0.13f);
+        Gfx.Rect(x + 8, y + 8, w - 16, 1, line); Gfx.Rect(x + 8, y + h - 9, w - 16, 1, line);
+        Gfx.Rect(x + 8, y + 9, 1, h - 18, line); Gfx.Rect(x + w - 9, y + 9, 1, h - 18, line);
+        Gfx.Rect(x + 10, y + 3, w - 20, 1, Pal.Rgba(255, 252, 238, 0.55f));
+    }
     static (float x, float y, float w, float h) PanelFrame(string title, string subtitle = null, float w = PanelW, float h = PanelH)
     {
         Backdrop();
         float x = (Gfx.LW - w) / 2, y = Math.Max(8, (Gfx.LH - h) / 2);
         panelAt = (x, y, w, h);
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         Gfx.Text(title, x + PanelPad, y + PanelPad - 2, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         if (subtitle != null) Gfx.Text(subtitle, x + PanelPad, y + PanelPad + 44, FontKind.Note, 18, Muted);
         return panelAt;
@@ -200,7 +220,7 @@ partial class Game
         // Where you are.
         Gfx.Rect(x + 12, y + 37, w - 24, 1, Pal.C("rgba(255,255,255,0.12)"));
         DrawPin(x + 21, y + 49);
-        Gfx.Text(Gfx.Ellipsize(AreaName(), FontKind.Ui600, 16, w - 52), x + 38, y + 41, FontKind.Ui600, 16, Pal.C("#cfe3ea"));
+        Gfx.Text(Gfx.Ellipsize(AreaName(), FontKind.Ui600, 16, w - 52), x + 38, y + 41, FontKind.Ui600, 16, CardText("#cfe3ea"));
         // Health and food, side by side.
         DrawHealthMeter(x, y + 62, w / 2, 36);
         DrawFoodMeter(x + w / 2, y + 62, w / 2, 36);
@@ -224,7 +244,6 @@ partial class Game
             ("Matches", () => TogglePanel("matches"), false),
             ("Map", () => TogglePanel("map"), false),
             ("Tackle", () => TogglePanel("tackle"), false),
-            ("Bag", () => TogglePanel("bag"), false),
             (mode == "build" ? "Done" : "Build", ToggleBuild, mode == "build")
         };
         // Every button the same width, sized for the longest label.
@@ -286,9 +305,10 @@ partial class Game
         DrawIcon("grilled_fish", x + 7, y + 4, 24);
         float f = state.food / 100f;
         var c = f > 0.5f ? Pal.C("#7fd36b") : f > 0.25f ? Pal.Lantern : Pal.Buoy;
-        if (Starving && (int)(time * 3) % 2 == 0) c = Pal.C("#ff8b7a");
+        if (Starving && !Calm && (int)(time * 3) % 2 == 0) c = Pal.C("#ff8b7a");
         Gfx.Rect(x + 34, y + 11, bw, 12, Pal.C("rgba(0,0,0,0.35)"), 3);
         if (f > 0) Gfx.Rect(x + 34, y + 11, Math.Max(6, bw * f), 12, c, 3);
+        MeterNumber(x + 34, y, bw, $"{state.food:0}");
         if (Gfx.Hover(x, y, w, h)) meterTip = ($"Food {state.food:0}/100", x, y + h + 6);
     }
 
@@ -298,16 +318,26 @@ partial class Game
         float bw = w - 34 - 14, f = state.hp / 100f;
         if (hurtFlash > 0) Gfx.Rect(x + 4, y, w - 8, h - 4, Pal.C("rgba(150,30,30,0.85)"), 5);
         string[] heart = { ".XX.XX.", "XXXXXXX", "XXXXXXX", ".XXXXX.", "..XXX..", "...X..." };
-        float px = f < 0.25f ? 3 + 0.5f * MathF.Max(0, MathF.Sin(time * 9)) : 3;
+        float px = f < 0.25f && !Calm ? 3 + 0.5f * MathF.Max(0, MathF.Sin(time * 9)) : 3;
         float hx = x + 20 - 3.5f * px, hy = y + 17 - 3 * px;
         for (int r = 0; r < heart.Length; r++)
             for (int c = 0; c < heart[r].Length; c++)
                 if (heart[r][c] == 'X') Gfx.Rect(hx + c * px, hy + r * px, px, px, r == 1 && c == 1 ? Pal.C("#ff9a8a") : Pal.C("#e04b3a"));
         var col = f > 0.5f ? Pal.C("#e8574a") : f > 0.25f ? Pal.C("#f08a3a") : Pal.C("#ff4040");
-        if (f < 0.25f && (int)(time * 3) % 2 == 0) col = Pal.C("#ffb0a0");
+        if (f < 0.25f && !Calm && (int)(time * 3) % 2 == 0) col = Pal.C("#ffb0a0");
         Gfx.Rect(x + 34, y + 11, bw, 12, Pal.C("rgba(0,0,0,0.35)"), 3);
         if (f > 0) Gfx.Rect(x + 34, y + 11, Math.Max(6, bw * f), 12, col, 3);
+        MeterNumber(x + 34, y, bw, $"{state.hp:0}");
         if (Gfx.Hover(x, y, w, h)) meterTip = ($"Health {state.hp:0}/100", x, y + h + 6);
+    }
+
+    // High contrast: the reading stays on the meter (a phone has no hover), on a solid chip at the bar's end.
+    static void MeterNumber(float x, float y, float bw, string s)
+    {
+        if (!Gfx.HighContrast) return;
+        float tw = Gfx.Measure(s, FontKind.Ui700, 14);
+        Gfx.Rect(x + bw - tw - 10, y + 8, tw + 10, 18, NavySolid, 4);
+        Gfx.Text(s, x + bw - tw - 5, y + 9, FontKind.Ui700, 14, Pal.Paper);
     }
 
     // A meter's reading under it, on a dark chip so it reads over the goal card.
@@ -317,8 +347,22 @@ partial class Game
         Gfx.Text(s, x + 8, y + 1, FontKind.Ui600, 16, Pal.Paper);
     }
 
-    static void DrawIcon(string itemId, float x, float y, float size) =>
-        DrawTexturePro(ItemArt.Icon(itemId), new Rectangle(0, 0, 12, 12), Gfx.S(x, y, size, size), Vector2.Zero, 0, Color.White);
+    // An item's icon in a square of `size`: the 12x12 picture is drawn a whole number of screen pixels per art pixel (the
+    // nearest to what was asked for, centred in the square) so no pixel is wider than another, and its outline spills one art
+    // pixel outside the square.
+    static void DrawIcon(string itemId, float x, float y, float size)
+    {
+        var (dx, dy, d) = IconBox(x, y, size, out float k);
+        DrawTexturePro(ItemArt.Icon(itemId), new Rectangle(0, 0, ItemArt.Box, ItemArt.Box), Gfx.S(dx, dy, ItemArt.Box * k, ItemArt.Box * k), Vector2.Zero, 0, Color.White);
+    }
+
+    // Where the 14x14 texture goes for an icon of the given size at (x, y); k is the screen pixels per art pixel.
+    internal static (float x, float y, float size) IconBox(float x, float y, float size, out float k)
+    {
+        k = MathF.Max(1, MathF.Round(size / 12));
+        float art = 12 * k, off = (size - art) / 2;
+        return (x + off - k, y + off - k, ItemArt.Box * k);
+    }
 
     /* ---------- Prompt and toast ---------- */
     static List<(string text, bool key)> Segments(string s)
@@ -510,8 +554,9 @@ partial class Game
         float clueH = 14 + clueTitle.Count * 26 + 4 + clueText.Count * 27 + 14;
         float h = pad + artH + 14 + 38 + 8 + 26 + 12 + desc.Count * 29 + 12 + clueH + 18 + 56 + pad + 8;
         float x = (Gfx.LW - cw) / 2, y = Math.Max(10, (Gfx.LH - h) / 2);
-        Gfx.Box(x, y, cw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, cw, h);
         float cy = y + pad;
+        CardGlow(x + pad - 2, cy - 2, iw + 4, artH + 4);
         Gfx.Box(x + pad - 2, cy - 2, iw + 4, artH + 4, Pal.Ink, Pal.Ink, 2, 4);
         Gfx.Portrait(catchId, false, x + pad, cy, iw, artH);
         cy += artH + 14;
@@ -596,9 +641,14 @@ partial class Game
         Gfx.Seen["fish:" + f.Id] = new Rectangle(x - 6, y, w - 4, 26);   // so the autotest can click a row
 #endif
         if (known) DrawIcon(f.Id, x, y + 1, 22);
-        else if (seen) DrawTexturePro(ItemArt.Icon(f.Id), new Rectangle(0, 0, 12, 12), Gfx.S(x, y + 1, 22, 22), Vector2.Zero, 0, Pal.C("#1d3550"));
+        else if (seen) { var (sx, sy, sd) = IconBox(x, y + 1, 22, out float sk); DrawTexturePro(ItemArt.Icon(f.Id), new Rectangle(0, 0, ItemArt.Box, ItemArt.Box), Gfx.S(sx, sy, ItemArt.Box * sk, ItemArt.Box * sk), Vector2.Zero, 0, Pal.C("#1d3550")); }
         else Gfx.Rect(x + 2, y + 3, 18, 18, Pal.C("rgba(0,0,0,0.08)"), 4);
-        if (BitingNow(f)) { Gfx.Circle(x + 21, y + 4, 4.5f, Pal.C("#fffaf0")); Gfx.Circle(x + 21, y + 4, 3.2f, Pal.C("#3fae5a")); }
+        if (BitingNow(f))
+        {
+            // A tick in the dot, so it reads without telling its green from red.
+            Gfx.Circle(x + 21, y + 4, 6f, Pal.C("#fffaf0")); Gfx.Circle(x + 21, y + 4, 4.8f, Pal.C("#3fae5a"));
+            Gfx.Line(x + 18.3f, y + 4.2f, x + 20.2f, y + 6.2f, 1.6f, Pal.C("#fffaf0")); Gfx.Line(x + 20.2f, y + 6.2f, x + 24, y + 1.8f, 1.6f, Pal.C("#fffaf0"));
+        }
         // Learned in Ma'am Isay's class (School.cs): a little gold star by the icon.
         if (Learnt(f.Id)) DrawIcon("star", x - 7, y + 12, 14);
         var c = !known && !seen ? Pal.C("#9a8a70") : !known ? Pal.C("#5a6a80") : f.Legend ? Pal.C("#9a6a1a") : f.Rare ? Rust : Pal.PaperInk;
@@ -672,7 +722,7 @@ partial class Game
         int leadLines = Math.Max(lead.Count, Gfx.Wrap(log ? leadCreatures : leadLog, FontKind.Note, 20, innerW).Count);
         float h = padT + 46 + 10 + leadLines * 28 + 16 + contentH + padB + 6;
         float ny = Math.Max(14, (Gfx.LH - h) / 2);
-        Gfx.Box(nx, ny, nw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(nx, ny, nw, h);
         for (float ly = ny + 37; ly < ny + h - 4; ly += 37) Gfx.Rect(nx + 3, ly, nw - 6, 1, Pal.C("rgba(29,79,120,0.13)"));
         Gfx.Rect(nx + 45, ny + 3, 3, h - 6, Pal.C("rgba(224,75,58,0.4)"));
 
@@ -898,7 +948,7 @@ partial class Game
         float boxH = 12 + where.Count * 22 + 10;
         float h = pad + artH + 14 + 38 + 8 + 26 + 12 + desc.Count * 29 + 12 + boxH + 18 + 56 + pad + 8;
         float x = (Gfx.LW - cw) / 2, y = Math.Max(10, (Gfx.LH - h) / 2);
-        Gfx.Box(x, y, cw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, cw, h);
         float cy = y + pad, ax = x + pad;
         Gfx.Box(ax - 2, cy - 2, iw + 4, artH + 4, Pal.Ink, Pal.Ink, 2, 4);
         var sky = Gfx.S(ax, cy, iw, artH * 0.55f);
@@ -912,7 +962,7 @@ partial class Game
         DrawTexturePro(tex, new Rectangle(0, 0, sw, sh), Gfx.S(spx, spy, sw * k, sh * k), Vector2.Zero, 0, Color.White);
         for (int i = 0; i < 10; i++)
         {
-            float dx = spx + (float)Pix.Hash(i, 1, 33) * sw * k, fall = (float)((time * 70 + i * 17) % 50);
+            float dx = spx + (float)Pix.Hash(i, 1, 33) * sw * k, fall = Calm ? 18 + i * 3 % 28 : (float)((time * 70 + i * 17) % 50);   // still with Reduce motion
             Gfx.Rect(dx, spy + sh * k * 0.5f + fall, 4, 7, Pal.WithAlpha(Pal.C("#7fd6f0"), 1 - fall / 50));
         }
         cy += artH + 14;
@@ -962,8 +1012,9 @@ partial class Game
         float h = pad + artH + 14 + 38 + 8 + 26 + 12 + desc.Count * 29 + 12 + boxH + 18 + 56 + pad + 8;
         float x = (Gfx.LW - cw) / 2, y = Math.Max(10, (Gfx.LH - h) / 2);
         lastGoldBottom = y + h;
-        Gfx.Rect(x - 7, y - 7, cw + 14, h + 14, Pal.WithAlpha(Pal.Lantern, 0.4f + 0.2f * MathF.Sin(time * 3)), 12);
-        Gfx.Box(x, y, cw, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        Gfx.Rect(x - 7, y - 7, cw + 14, h + 14, Pal.WithAlpha(Pal.Lantern, 0.4f + (Calm ? 0 : 0.2f * MathF.Sin(time * 3))), 12);
+        CardGlow(x - 7, y - 7, cw + 14, h + 14, 1.4f);
+        PanelBox(x, y, cw, h);
         float cy = y + pad;
         Gfx.Box(x + pad - 2, cy - 2, iw + 4, artH + 4, Pal.Ink, Pal.Ink, 2, 4);
         Gfx.Portrait(art, false, x + pad, cy, iw, artH);
@@ -1206,8 +1257,8 @@ partial class Game
         string deepest = state.caveDeepest >= AncientFloor ? "the Ancient Floor" : $"floor {state.caveDeepest}";
         float h = pad + 44 + 8 + 26 + 18 + floors.Count * (rowH + gap) - gap + pad;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Frostfang Caverns", x + pad, y + pad, FontKind.Ui700, 32, Pal.PaperInk);
+        PanelBox(x, y, w, h);
+        Gfx.Text("Frostfang Caverns", x + pad, y + pad, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         if (SmallButton("Close", x + w - pad - SmallW("Close"), y + pad - 4)) { ClosePanels(); return; }
         float cy = y + pad + 44 + 8;
         Gfx.Text($"Where do you want to climb down to? Deepest so far: {deepest}.", x + pad, cy, FontKind.Ui500, 18, Muted);
@@ -1258,7 +1309,13 @@ partial class Game
         FogUncharted(img);
         // Printed on parchment: every colour drawn a little toward the paper.
         var paper = Pal.C("#efe2c0");
-        for (int i = 0; i < img.Buf.Length; i++) img.Buf[i] = Pix.Mix(img.Buf[i], paper, 0.1f);
+        // A little grain in the paper: each pixel a few levels lighter or darker, by a hash so it never changes.
+        for (int i = 0; i < img.Buf.Length; i++)
+        {
+            var c = Pix.Mix(img.Buf[i], paper, 0.1f);
+            int g = (int)(WetHash(i % img.W, i / img.W, 911) % 7) - 3;
+            img.Buf[i] = new Color((byte)Math.Clamp(c.R + g, 0, 255), (byte)Math.Clamp(c.G + g, 0, 255), (byte)Math.Clamp(c.B + g, 0, 255), (byte)255);
+        }
         if (mapTex.Id != 0) UnloadTexture(mapTex);
         // Shrunk smoothly (mipmaps), so the coasts and the shallows don't break up into stair steps.
         mapTex = Gfx.ToTexture(img.Buf, img.W, img.H, TextureFilter.Point);

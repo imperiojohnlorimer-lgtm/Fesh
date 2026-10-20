@@ -8,7 +8,7 @@ partial class Game
 {
     void DrawTouchTab(float x, float y, float w)
     {
-        const float rowH = 48, labelW = 250;
+        const float rowH = 44, labelW = 250;
         float cx = x + labelW;
         bool changed = false;
         void Label(string s) => Gfx.Text(s, x, y + 9, FontKind.Ui600, 21, Pal.PaperInk);
@@ -37,6 +37,7 @@ partial class Game
         Platform.ButtonScale = Range("Button size", "touchbuttons", Platform.ButtonScale, 0.6f, 1.6f, false);
         Platform.Opacity = Range("Opacity", "touchopacity", Platform.Opacity, 0.25f, 1f, true);
         Platform.SwapSides = Pick("Hand", new[] { "Right-handed", "Left-handed" }, Platform.SwapSides ? 1 : 0) == 1;
+        Platform.TapWorld = Pick("Tap the screen", new[] { "Buttons only", "Acts like E" }, Platform.TapWorld ? 1 : 0) == 1;
         Platform.Haptics = Pick("Vibration", new[] { "On", "Off" }, Platform.Haptics ? 0 : 1) == 0;
         Platform.Fps = Pick("Frame rate", new[] { "30", "60" }, Platform.Fps == 30 ? 0 : 1) == 0 ? 30 : 60;
         Platform.ShowDebug = Pick("Debug line", new[] { "Off", "On" }, Platform.ShowDebug ? 1 : 0) == 1;

@@ -800,6 +800,7 @@ partial class Game
             state.pity[spot] = 0;
             GainXp(30);
             Save();
+            NoteCatch(roll.Id, 3, 1, waterX, waterY, perfect);
             Sfx.Play("rare");
             ShowCatch(roll.Id);
             return;
@@ -809,6 +810,7 @@ partial class Game
             state.odd[roll.Id] = state.odd.GetValueOrDefault(roll.Id) + 1;
             GainXp(8);
             Save();
+            NoteCatch(roll.Id, 3, 1, waterX, waterY, perfect);
             Sfx.Play("odd");
             ShowOdd(roll.Id, spot);
             return;
@@ -820,6 +822,7 @@ partial class Game
         float kg = AddCatch(f, bonus, perfect, back != null ? MathF.Max(1.3f, back.kg / f.Kg * 1.2f) : 0);
         float landedM = lastM;
         int n = state.commons[f.Id];
+        NoteCatch(f.Id, CatchTierOf(f.Rare, f.Legend, landedM, perfect), landedM, waterX, waterY, perfect);
         // The Starfall ray goes back: the record and the card are yours, the manta isn't (RayBoss.cs).
         if (f.Id == RayFish) FreeRay();
         if (f.Id == TarponFish) FreeTarpon();   // and so does the king of the tarpon (TarponBoss.cs)
@@ -934,24 +937,28 @@ partial class Game
     /* ---------- Sunken chests ---------- */
     List<int> chestSeq;
     int chestAt;
-    float chestT, chestShake;
+    float chestT, chestShake, chestTotal;
+    int? arrowTap;   // an arrow tapped on the on-screen pad (DrawArrowPad): 0 up, 1 right, 2 down, 3 left
     static readonly string[] ArrowNames = { "Up", "Right", "Down", "Left" };
 
-    // A chest on the line: press the arrows in order before it slips off.
+    // A chest on the line: press the arrows in order before it slips off. On a phone the stick is a poor way to hit four
+    // directions one after another, so the arrows are tap buttons and the timer is kinder.
     void StartChest()
     {
         int n = 5 + Math.Min(2, FishLevel / 4);
         chestSeq = Enumerable.Range(0, n).Select(_ => rng.Next(4)).ToList();
         chestAt = 0;
-        chestT = 4.5f + n * 0.35f;
+        chestT = chestTotal = 4.5f + n * 0.35f + (Platform.Touch ? 1.5f : 0);
+        arrowTap = null;
         reel = null;
         mode = "chest";
         Sfx.Play("odd");
-        if (!state.Hinted("chest")) { state.hinted["chest"] = true; Toast("A sunken chest! Press the direction keys (<move>) in order to haul it up.", 4); }
+        if (!state.Hinted("chest")) { state.hinted["chest"] = true; Toast("A sunken chest! Press the arrows (<move>) or tap them in order to haul it up.", 4); }
     }
 
     int? ArrowPressed()
     {
+        if (arrowTap is int tapped) { arrowTap = null; return tapped; }
         if (Bind.Pressed("up")) return 0;
         if (Bind.Pressed("right")) return 1;
         if (Bind.Pressed("down")) return 2;
@@ -964,6 +971,7 @@ partial class Game
         chestT -= dt;
         chestShake = Math.Max(0, chestShake - dt);
         SetPrompt("Haul it up: press the arrows in order!", null, true);
+        if (chestT <= 0) { GotAway("The chest slipped off the hook and sank back into the dark."); return; }   // out of time: a last press doesn't count
         if (ArrowPressed() is int d)
         {
             if (d == chestSeq[chestAt])
@@ -974,7 +982,7 @@ partial class Game
             }
             else
             {
-                chestT -= 0.8f;
+                chestT -= Platform.Touch ? 0.4f : 0.8f;
                 chestShake = 0.3f;
                 Sfx.Play("nope");
             }

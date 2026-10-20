@@ -501,7 +501,7 @@ partial class Game
         Backdrop();
         const float w = 560, h = 250;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         Gfx.TextCenter(match.Phase == "dock" ? "Leave the dock?" : "Leave the match?", x + w / 2, y + 26, FontKind.Ui700, 34, Pal.PaperInk);
         var lines = Gfx.Wrap(match.Phase == "dock" ? "You go back to the island, as you were." : match.RivalRun != null ? "The match goes on while you decide. If you leave, it counts as a loss." : "The match goes on while you decide. Leaving ends the run.", FontKind.Note, 20, w - 60);
         Lines(lines, x + 30, y + 80, 26, FontKind.Note, 20, Pal.PaperInk);
@@ -522,7 +522,7 @@ partial class Game
         Backdrop();
         const float w = 820, h = 560;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         var tone = o.Result == "win" ? Pal.C("#2f7d3a") : o.Result == "loss" ? Rust : Pal.PaperInk;
         Gfx.TextCenter(o.Title, x + w / 2, y + 22, FontKind.Ui700, 46, tone);
         string sub = o.Result == "solo" ? m.Spec.Label : o.Reason;

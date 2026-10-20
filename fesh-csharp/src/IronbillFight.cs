@@ -283,7 +283,7 @@ partial class Game
         if (warn)
         {
             // The charge lane: a flashing red dashed line from the fish to the boat, and a "!" over the sail.
-            bool on = (int)(t * 10) % 2 == 0;
+            bool on = Calm || (int)(t * 10) % 2 == 0;   // Reduce motion: the lane stays lit, it doesn't flash
             float dx = player.X - x, dy = player.Y - y, d = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));
             for (float k = 6; k < d + 10; k += 4)
                 pix.Rect(x + dx / d * k, y + dy / d * k, 2, 1, Pal.Rgba(255, 90, 70, on ? 0.9f : 0.45f));

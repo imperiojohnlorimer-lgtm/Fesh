@@ -65,6 +65,13 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_QUIZ_TEST") == "1" ? QuizScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_REEF_TEST") == "1" ? ReefScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_ZOOM_TEST") == "1" ? ZoomScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_TOUCH_TEST") == "1" ? TouchScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_PROF_TEST") == "1" ? ProfScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_ACCESS_TEST") == "1" ? AccessScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_PARTICLE_TEST") == "1" ? ParticleScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_IMPACT_TEST") == "1" ? ImpactScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_WEATHER_TEST") == "1" ? WeatherFxScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_UILOOK_TEST") == "1" ? UiLookScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_LIGHT_TEST") == "1" ? LightScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_WATER_TEST") == "1" ? WaterScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_GROUND_TEST") == "1" ? GroundScript().GetEnumerator()
@@ -117,9 +124,22 @@ partial class Game
         }
     }
 
+    // A test can draw something over the finished frame (screenDraw) and read the screen back (screenProbe) once.
+    Action screenDraw;
+    Action<Image> screenProbe;
+
     partial void AutoTestAfterDraw()
     {
         ExportPixShot();
+        if (screenProbe != null)
+        {
+            screenDraw?.Invoke();
+            Rlgl.DrawRenderBatchActive();
+            var probeImg = LoadImageFromScreen();
+            var probe = screenProbe; screenProbe = null; screenDraw = null;
+            probe(probeImg);
+            UnloadImage(probeImg);
+        }
         if (pendingShot == null) return;
         Rlgl.DrawRenderBatchActive();
         var img = LoadImageFromScreen();
@@ -2106,6 +2126,13 @@ partial class Game
         foreach (int frames in WorldScript()) yield return frames;
         foreach (int frames in GraphicsScript()) yield return frames;
         foreach (int frames in ZoomScript()) yield return frames;
+        foreach (int frames in TouchScript()) yield return frames;
+        foreach (int frames in ProfScript()) yield return frames;
+        foreach (int frames in AccessScript()) yield return frames;
+        foreach (int frames in ParticleScript()) yield return frames;
+        foreach (int frames in ImpactScript()) yield return frames;
+        foreach (int frames in WeatherFxScript()) yield return frames;
+        foreach (int frames in UiLookScript()) yield return frames;
         foreach (int frames in LightScript()) yield return frames;
         foreach (int frames in WaterScript()) yield return frames;
         foreach (int frames in GroundScript()) yield return frames;

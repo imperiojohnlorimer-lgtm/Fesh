@@ -356,9 +356,9 @@ partial class Game
         var c = sorting[sortAt];
         const float w = 1000, h = 510, pad = 26;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         string name = Items.ById[c.Id].Name;
-        Gfx.Text("Sort your catch", x + pad, y + pad - 2, FontKind.Ui700, 32, Pal.PaperInk);
+        Gfx.Text("Sort your catch", x + pad, y + pad - 2, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         string count = $"{sortAt + 1} of {sorting.Count}";
         Gfx.Text(count, x + pad + Gfx.Measure("Sort your catch", FontKind.Ui700, 32) + 18, y + pad + 10, FontKind.Ui600, 18, Muted);
         Gfx.Text(Gfx.Ellipsize(name, FontKind.Ui700, 20, 430), x + pad, y + pad + 44, FontKind.Ui700, 20, Pal.PaperInk);

@@ -477,7 +477,8 @@ partial class Game
             Gfx.Rect(x, y, w, hgt, Pal.C("#1d4f78"), 4);
             Gfx.Rect(x + w * (m.Mark - 0.12f), y, w * 0.24f, hgt, Pal.C("#bfe3ff"), 3);
             float rxp = x + w * m.Rod;
-            Gfx.Rect(rxp - 3, y - 8, 6, hgt + 16, MathF.Abs(m.Rod - m.Mark) < 0.12f ? Pal.C("#7fd36b") : White);
+            bool lined = MathF.Abs(m.Rod - m.Mark) < 0.12f;   // lined up: a wider, green marker (not only a colour change)
+            Gfx.Rect(rxp - (lined ? 6 : 3), y - 8, lined ? 12 : 6, hgt + 16, lined ? Pal.C("#7fd36b") : White);
             Gfx.Rect(x, y + hgt + 4, w * Math.Clamp(m.OnT / SweepNeed, 0, 1), 4, Pal.C("#7fd36b"));
             string s = Bind.Fix("FOLLOW IT!  <left> <right>");
             Outlined(s, Gfx.LW / 2 - Gfx.Measure(s, FontKind.Ui700, 26) / 2, y - 40, FontKind.Ui700, 26, Pal.C("#bfe3ff"));

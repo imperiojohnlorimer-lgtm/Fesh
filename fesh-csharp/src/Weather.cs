@@ -178,7 +178,7 @@ partial class Game
         if (!Stormy || scene != "world" || mode is "title" or "create") return;
         thunderT -= dt;
         if (thunderT > 0) return;
-        flash = 1;
+        flash = Calm ? 0 : 1;   // Reduce motion: the thunder still sounds, the sky doesn't flash
         thunderT = Rand(6, 14);
         Sfx.Play("thunder");
     }
@@ -188,6 +188,7 @@ partial class Game
     {
         rainAmt = state.weather == "clear" ? 0 : 1;
         stormAmt = Stormy ? 1 : 0;
+        SnapOvercast();
     }
 
     void DrawWeatherTint()
@@ -213,7 +214,11 @@ partial class Game
                 double sx = Wrap(Pix.Hash(i, 7, 95) * (W + 40) + t * drift - camX, W + 40) - 20;
                 double sy = Wrap(Pix.Hash(i, 8, 95) * H + t * fall * (0.8 + Pix.Hash(i, 9, 95) * 0.4) - camY, H);
                 if (BiomeAt(((int)sx + camX) / T, ((int)sy + camY) / T) == 1) continue;
-                for (int k = 0; k < len; k++) pix.Fill((int)sx - (heavy ? k / 2 : 0), (int)sy + k, 1, 1, drop);
+                if (LightMode > 0)
+                    // Tapered: a bright head and a tail that fades, so the drops read as streaks.
+                    for (int k = 0; k < len; k++) pix.Fill((int)sx - (heavy ? k / 2 : 0), (int)sy + k, 1, 1, Pal.WithAlpha(drop, 0.45f + 0.9f * k / len));
+                else
+                    for (int k = 0; k < len; k++) pix.Fill((int)sx - (heavy ? k / 2 : 0), (int)sy + k, 1, 1, drop);
             }
         }
         if (flash > 0) pix.Fill(0, 0, W, H, Pal.Rgba(235, 240, 255, flash * 0.55f));

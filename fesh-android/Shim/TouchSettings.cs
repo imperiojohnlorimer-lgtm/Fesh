@@ -14,6 +14,7 @@ internal static class TouchSettings
     public static bool Haptics { get => Platform.Haptics; set => Platform.Haptics = value; }
     public static int Fps { get => Platform.Fps; set => Platform.Fps = value; }
     public static bool ShowDebug { get => Platform.ShowDebug; set => Platform.ShowDebug = value; }
+    public static bool TapWorld { get => Platform.TapWorld; set => Platform.TapWorld = value; }
     // Where the player has dragged a control to: distance in layout units from its side edge and from the bottom.
     public static readonly Dictionary<string, (float ax, float ay)> Pos = new();
 
@@ -41,6 +42,7 @@ internal static class TouchSettings
                     case "haptics": Haptics = v == "1"; break;
                     case "fps": Fps = v == "30" ? 30 : 60; break;
                     case "debug": ShowDebug = v == "1"; break;
+                    case "tapWorld": TapWorld = v == "1"; break;
                     default:
                         if (k.StartsWith("pos.")) { var p = v.Split(','); Pos[k[4..]] = (F(p[0]), F(p[1])); }
                         break;
@@ -60,6 +62,7 @@ internal static class TouchSettings
             {
                 "fixedStick=" + (FixedStick ? 1 : 0), "stickScale=" + StickScale.ToString(inv), "buttonScale=" + ButtonScale.ToString(inv),
                 "opacity=" + Opacity.ToString(inv), "swapSides=" + (SwapSides ? 1 : 0), "haptics=" + (Haptics ? 1 : 0), "fps=" + Fps, "debug=" + (ShowDebug ? 1 : 0),
+                "tapWorld=" + (TapWorld ? 1 : 0),
             };
             foreach (var (k, (ax, ay)) in Pos) lines.Add($"pos.{k}={ax.ToString(inv)},{ay.ToString(inv)}");
             File.WriteAllLines(path, lines);
@@ -69,7 +72,7 @@ internal static class TouchSettings
 
     public static void Reset()
     {
-        FixedStick = false; StickScale = 1; ButtonScale = 1; Opacity = 0.8f; SwapSides = false; Haptics = true; Fps = 60; ShowDebug = false;
+        FixedStick = false; StickScale = 1; ButtonScale = 1; Opacity = 0.8f; SwapSides = false; Haptics = true; Fps = 60; ShowDebug = false; TapWorld = false;
         Pos.Clear();
         Save();
     }

@@ -477,7 +477,7 @@ partial class Game
 
     void DrawWater(float t)
     {
-        DrawCaustics(t);
+        Prof.Begin(Pass.Caustics); DrawCaustics(t); Prof.End(Pass.Caustics);
         DrawGlints(t);
         PlanMoonPath(t);
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
@@ -613,6 +613,7 @@ partial class Game
     // Trees sway a pixel in the breeze, and a lot more in a storm.
     int Sway(int tx, int ty)
     {
+        if (Calm) return 0;
         float wind = Stormy ? 3.2f : 1.1f, amp = Stormy ? 1.4f : 0.62f;
         // A passing gust (Ambience.cs) bends the tree over and shakes it a little harder.
         float g = Gust(tx * T + 5, ty * T);
@@ -685,6 +686,12 @@ partial class Game
                 float sx = fx + 1 + MathF.Sin(ph * 6 + k * 1.7f) * 1.6f + lean * ph * ph, sy = fy - 9 - ph * 24;
                 float a = (ph < 0.15f ? ph / 0.15f : 1 - ph) * 0.2f * (1 - 0.5f * Darkness);
                 int r = 1 + (int)(ph * 3);
+                if (LightMode > 0 && liveRender)
+                {
+                    // Round puffs that swell as they rise, their rims dithered away (the old smoke was three stacked rows).
+                    SoftDot(sx, sy, 2 + ph * 6, Pal.Rgba(205, 208, 212, 255), a * 1.9f);
+                    continue;
+                }
                 pix.Rect(sx - r, sy, r * 2 + 1, 1, Pal.Rgba(205, 208, 212, a));
                 pix.Rect(sx - r + 1, sy - 1, r * 2 - 1, 1, Pal.Rgba(205, 208, 212, a * 0.8f));
                 pix.Rect(sx - r + 1, sy + 1, r * 2 - 1, 1, Pal.Rgba(205, 208, 212, a * 0.8f));
@@ -822,8 +829,16 @@ partial class Game
     // What you hold over your head after a catch: the fish (wriggling), or a chest spilling light.
     void DrawHeld(int x, int y)
     {
+        if (LightMode > 0)
+        {
+            // Over the time it is really held: it comes up from below with a small overshoot, then settles (the old 1.8 s was
+            // longer than most holds, so the rise-in never played).
+            float kk = 1 - heldT / Math.Max(heldPeak, 0.4f), r = Math.Clamp(kk / 0.2f, 0, 1);
+            y += (int)MathF.Round((1 - r) * 7 - 2.5f * MathF.Sin(r * MathF.PI));
+            DrawHeldGlow(x, y);
+        }
         float k = 1 - heldT / 1.8f;
-        y -= k < 0.15f ? (int)((0.15f - k) * 20) : 0;
+        if (LightMode == 0) y -= k < 0.15f ? (int)((0.15f - k) * 20) : 0;
         if (heldItem == "chest")
         {
             pix.Rect(x - 4, y - 1, 9, 5, "#8a5f36"); pix.Rect(x - 4, y + 1, 9, 1, "#f3c25b"); pix.Rect(x, y, 1, 3, "#f3c25b");
@@ -849,9 +864,10 @@ partial class Game
             pix.Rect(tx, y - 1 + (flip ? 0 : 1), 1, 2, tint); pix.Rect(tx, y + 2 + big - (flip ? 0 : 1), 1, 2, tint);
             pix.Rect(flip ? fx + w - 2 : fx + 2, y + 1, 1, 1, "#10243a");
         }
-        for (int s = 0; s < 3; s++)
-            if ((time * 4 + s * 0.33f) % 1 < 0.5f)
-                pix.Rect(x - 7 + s * 7, y - 4 + (s % 2) * 6, 1, 1, "#ffffff");
+        if (LightMode == 0 || catchSnap is not { Tier: >= 2 })   // a rare catch has its own stars (DrawHeldGlow)
+            for (int s = 0; s < 3; s++)
+                if (Calm || (time * 4 + s * 0.33f) % 1 < 0.5f)
+                    pix.Rect(x - 7 + s * 7, y - 4 + (s % 2) * 6, 1, 1, "#ffffff");
     }
 
     void DrawWreck()
@@ -1207,10 +1223,19 @@ partial class Game
             return;
         }
         var d = Data.BuildById[buildTool];
-        pix.Alpha = 0.55f + 0.15f * MathF.Sin(t * 6);
+        pix.Alpha = 0.55f + (Calm ? 0 : 0.15f * MathF.Sin(t * 6));
         DrawBuild(new Build { id = d.Id, x = g.Tx, y = g.Ty }, t);
         pix.Alpha = 1;
-        Outline(g.Tx * T, g.Ty * T, d.W * T, T, Pal.C(g.Reason != "" ? "#e04b3a" : "#7fd36b"));
+        // Blocked is a dashed red outline with a cross, fine is a solid green one (so it reads without the colours).
+        if (g.Reason != "")
+        {
+            int bx = g.Tx * T, by = g.Ty * T, bw = d.W * T;
+            var red = Pal.C("#e04b3a");
+            for (int k = 0; k < bw; k += 4) { pix.Rect(bx + k, by, Math.Min(2, bw - k), 1, red); pix.Rect(bx + k, by + T - 1, Math.Min(2, bw - k), 1, red); }
+            for (int k = 0; k < T; k += 4) { pix.Rect(bx, by + k, 1, Math.Min(2, T - k), red); pix.Rect(bx + bw - 1, by + k, 1, Math.Min(2, T - k), red); }
+            pix.Line(bx + 2, by + 2, bx + bw - 3, by + T - 3, "#e04b3a"); pix.Line(bx + bw - 3, by + 2, bx + 2, by + T - 3, "#e04b3a");
+        }
+        else Outline(g.Tx * T, g.Ty * T, d.W * T, T, Pal.C("#7fd36b"));
     }
 
     void DrawAnimal(Animal a)
@@ -1566,6 +1591,7 @@ partial class Game
         pix.Rect(x0 + 2, zy, 12, zh, reel.Inside ? "#7fd36b" : reel.Digging ? "#c98b3a" : "#4f9a45");
         pix.Alpha = 1;
         pix.Rect(x0 + 2, zy, 12, 1, "#d6f5c6"); pix.Rect(x0 + 2, zy + zh - 1, 12, 1, "#d6f5c6");
+        if (reel.Inside) { pix.Rect(x0 + 2, zy, 1, zh, "#ffffff"); pix.Rect(x0 + 13, zy, 1, zh, "#ffffff"); }   // inside the zone: a bright frame, not only a brighter green
         string fishCol = reel.Roll.Exotic ? "#f3c25b" : reel.Roll.Odd ? "#c08a55" : reel.Roll.Rare ? "#b8f0ff" : "#cfe8ee";
         int wiggle = (int)MathF.Round(MathF.Sin(time * 18) * (reel.Running > 0 ? 1.5f : 0.6f));
         if (reel.Leap <= 0) DrawTinyFish(x0 + 4 + wiggle, y0 + (int)MathF.Round(reel.FishY) - 2, fishCol);
@@ -1573,12 +1599,13 @@ partial class Game
         pix.Rect(x0 + 18, y0, 6, bh, "#12304a");
         int ph = (int)MathF.Round(bh * Math.Clamp(reel.Progress, 0, 1));
         pix.Rect(x0 + 18, y0 + bh - ph, 6, ph, reel.Progress > 0.66f ? "#7fd36b" : reel.Progress > 0.33f ? "#f3c25b" : "#e04b3a");
+        pix.Rect(x0 + 18, y0 + bh / 3, 6, 1, "#12304a"); pix.Rect(x0 + 18, y0 + bh * 2 / 3, 6, 1, "#12304a");   // thirds, so the bar reads without its colour
         if (ph > 2) pix.Rect(x0 + 18, y0 + bh - ph + (int)(time * 40 % Math.Max(1, ph - 1)), 6, 1, Pal.Rgba(255, 255, 255, 0.35f));
         if (tension)
         {
             pix.Rect(x0 + 27, y0, 4, bh, "#12304a");
             int th = (int)MathF.Round(bh * reel.Tension);
-            string tc = reel.Tension > 0.7f ? ((int)(time * 10) % 2 == 0 ? "#ff4040" : "#ffb0a0") : reel.Tension > 0.4f ? "#f08a3a" : "#e8c27a";
+            string tc = reel.Tension > 0.7f ? (Calm || (int)(time * 10) % 2 == 0 ? "#ff4040" : "#ffb0a0") : reel.Tension > 0.4f ? "#f08a3a" : "#e8c27a";
             pix.Rect(x0 + 27, y0 + bh - th, 4, th, tc);
         }
     }
@@ -1595,7 +1622,14 @@ partial class Game
             double sy = Wrap(Pix.Hash(i, 2, 91) * H + t * (16 + Pix.Hash(i, 3, 91) * 14) - camY, H);
             int wx = (int)sx + camX, wy = (int)sy + camY;
             if (BiomeAt(wx / T, wy / T) != 1) continue;
-            pix.Fill((int)sx, (int)sy, i % 5 == 0 ? 2 : 1, i % 5 == 0 ? 2 : 1, flake);
+            if (LightMode > 0)
+            {
+                // Three depths: far flakes are faint and small, near ones are big with a soft halo.
+                int layer = i % 5 == 0 ? 2 : i % 2 == 0 ? 1 : 0;
+                if (layer == 2) { pix.Fill((int)sx - 1, (int)sy, 4, 2, Pal.Rgba(255, 255, 255, 0.2f)); pix.Fill((int)sx, (int)sy - 1, 2, 4, Pal.Rgba(255, 255, 255, 0.2f)); }
+                pix.Fill((int)sx, (int)sy, layer == 2 ? 2 : 1, layer == 2 ? 2 : 1, Pal.Rgba(255, 255, 255, layer == 0 ? 0.5f : layer == 1 ? 0.8f : 0.95f));
+            }
+            else pix.Fill((int)sx, (int)sy, i % 5 == 0 ? 2 : 1, i % 5 == 0 ? 2 : 1, flake);
         }
     }
 
@@ -1699,7 +1733,8 @@ partial class Game
 
     void ApplyDark(Color c)
     {
-        for (int i = 0; i < dark.Length; i++) if (dark[i] > 0.002f) pix.Buf[i] = Pix.Mix(pix.Buf[i], c, dark[i]);
+        float k = Gfx.HighContrast ? 0.7f : 1f;   // High contrast: a lighter night
+        for (int i = 0; i < dark.Length; i++) if (dark[i] > 0.002f) pix.Buf[i] = Pix.Mix(pix.Buf[i], c, dark[i] * k);
     }
 
     // Follows the player, and centres scenes smaller than the view (house interiors).
@@ -1718,7 +1753,7 @@ partial class Game
         camX = sw <= W ? -(W - sw) / 2 : Math.Clamp((int)MathF.Round(fx) - W / 2, 0, sw - W);
         camY = sh <= H ? -(H - sh) / 2 : Math.Clamp((int)MathF.Round(fy) - H / 2, 0, sh - H);
         // Big impacts (Tidemane landing, charging into a palm, stomping) shake the view, unless that is turned off in Settings.
-        if (quake > 0 && Settings.Data.shake && mode is not ("pause" or "panel"))
+        if (quake > 0 && Settings.Data.shake && !Calm && mode is not ("pause" or "panel"))
         {
             float k = Math.Min(1, quake * 4);
             camX += (int)MathF.Round(MathF.Sin(time * 71) * 2 * k);
@@ -1732,10 +1767,17 @@ partial class Game
         liveRender = true;
         UpdateCamera();
         pix.CamX = camX; pix.CamY = camY;
+        Prof.Begin(Pass.Copy);
         pix.CopyFrom(LiveBase(), camX, camY, scene == "world" ? Pal.Sea : scene == "cave" ? Pal.C("#0b0908") : Pal.C("#140f0c"));
+        Prof.End(Pass.Copy);
         if (scene == "world")
         {
+            Prof.Begin(Pass.Water);
             DrawWater(t);
+            Prof.End(Pass.Water);
+            Prof.Begin(Pass.Wet);
+            DrawWetGround();
+            Prof.End(Pass.Wet);
             DrawTufts(t);
             foreach (var b in state.builds) if (b.id == "path") DrawBuild(b, t);
             DrawRestlessSea(t);
@@ -1745,8 +1787,10 @@ partial class Game
             DrawGusoFarm(t);
             DrawLoose(t);
             DrawMountGround();
+            Prof.Begin(Pass.Shadows);
             if (LightMode == 0) { DrawTreeShadows(); DrawBuildingShadows(); }
             else DrawShadows();   // shadows that follow the sun (Shadows.cs)
+            Prof.End(Pass.Shadows);
             DrawOasisMud();
             DrawBugs(t);
             DrawSpots(t);
@@ -1767,7 +1811,9 @@ partial class Game
             DrawIceCap();
             DrawSpearing(t);
             DrawEclipse(t);
+            Prof.Begin(Pass.Objects);
             DrawObjects(t);
+            Prof.End(Pass.Objects);
             CullMountGlints();
             DrawWhistle();
             DrawBossEffects(t);
@@ -1781,27 +1827,40 @@ partial class Game
             DrawEclipseRing();
             DrawSpouts(t);
             DrawParticles();
+            DrawSplashRings();
             DrawLeaves();
+            Prof.Begin(Pass.Sky);
             DrawCloudShadows(t);
             DrawMist(t);
             DrawSkyLife(t);
             DrawSnow(t);
+            Prof.End(Pass.Sky);
             // With light on, one colour grade (Grade.cs) takes the place of the flat rain tint and the flat sunset fill.
+            Prof.Begin(Pass.Grade);
             if (LightMode == 0) { gradeMatrix = null; DrawWeatherTint(); DrawSunGlow(); }
             else ApplyGrade();
+            Prof.End(Pass.Grade);
             DrawSunBeams(t);
+            Prof.Begin(Pass.Night);
             if (Darkness > 0 || LampK > 0) DrawNight(t);
+            Prof.End(Pass.Night);
+            DrawBossLane(t);
             DrawEclipseSky();
+            Prof.Begin(Pass.Weather);
             DrawRainSplashes(t);
             DrawRain(t);
             DrawAshfall(Raylib.GetFrameTime());
+            Prof.End(Pass.Weather);
             DrawGhost(t);
         }
         else if (scene == "cave") RenderCave(t);
         else RenderRoom(t);
         liveRender = false;
+        Prof.Begin(Pass.Finish);
         if (scene is "world" or "cave") ApplyVignette(VignetteStrength);
         if (GrainOn) ApplyGrain();
+        Prof.End(Pass.Finish);
+        DrawScreenFlash();
         if (mode == "bite") DrawBang();
         pix.CamX = pix.CamY = 0;
         // The title's tour fades through dark between islands (UiMenu.cs).

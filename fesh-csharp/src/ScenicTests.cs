@@ -499,7 +499,7 @@ partial class Game
         // The HUD: one card that never changes size, buttons all the same width.
         (player.X, player.Y) = StandableNear(TindigX, TindigY + 30);
         yield return 4;
-        var labels = new[] { "Build", "Bag", "Tackle", "Map", "Fesh-dex", "Case board" };
+        var labels = new[] { "Build", "Tackle", "Map", "Fesh-dex", "Case board" };
         var widths = labels.Select(l => Gfx.Seen.TryGetValue(l, out var r) ? r.Width : -1).ToList();
         Check($"the top buttons are all one width ({string.Join(", ", widths.Select(w => w.ToString("0")))})", widths.All(w => w > 0 && Math.Abs(w - widths[0]) < 0.5f));
         float leftButton = labels.Min(l => Gfx.Seen[l].X);

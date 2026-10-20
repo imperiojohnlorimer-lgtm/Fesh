@@ -196,7 +196,7 @@ partial class Game
         Backdrop();
         const float w = 1040, h = 540, pad = 26;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         Gfx.Text("Sungka over the network", x + pad, y + pad, FontKind.Ui700, 32, Pal.PaperInk);
         bool playing = lanView == "play" && lan != null;
         string closeLabel = playing && lan.State == "play" ? "Leave" : "Close";
@@ -321,7 +321,7 @@ partial class Game
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
         Gfx.Rect(0, 0, Gfx.LW, Gfx.LH, Pal.C("rgba(6,14,24,0.45)"));
         Gfx.Block(-5000, -5000, 10000, 10000);
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         Gfx.TextCenter("Leave the game?", x + w / 2, y + 24, FontKind.Ui700, 32, Pal.PaperInk);
         var lines = Gfx.Wrap("If you leave, your opponent wins.", FontKind.Note, 20, w - 60);
         Lines(lines, x + 30, y + 78, 26, FontKind.Note, 20, Pal.PaperInk);

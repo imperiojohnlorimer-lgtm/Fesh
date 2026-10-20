@@ -314,7 +314,7 @@ partial class Game
         Backdrop();
         const float w = 820, h = 540;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         string r = s.Result;
         string title = r == "win" ? "You win the regatta!" : r == "loss" ? $"{regPeerName} wins" : r == "draw" ? "A draw!" : "No result";
         var tone = r == "win" ? Pal.C("#2f7d3a") : r == "loss" ? Rust : Pal.PaperInk;

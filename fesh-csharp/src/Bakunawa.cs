@@ -245,6 +245,7 @@ partial class Game
             {
                 state.hp = Math.Max(0, state.hp - 8 * ArmourMul);
                 iframes = 0.8f; hurtFlash = 0.35f; lastHitT = time;
+                Impact(0.15f, "#9fd8ff", 0.2f, 0.04f);
                 e.Combo = 0; e.Noise = Math.Max((e.Verse - 1) * VerseNoise, e.Noise - 1);
                 Sfx.Play("hurt");
                 Floater("Soaked!", player.X, player.Y - 30, "#9fd8ff");

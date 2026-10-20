@@ -67,6 +67,7 @@ sealed class State
     public List<WeatherSpell> forecast;              // today's weather from 06:00, rolled each morning (null in older saves)
     public List<WeatherSpell> tomorrow;              // tomorrow's forecast, rolled a day early so Tomas and Pip can tell you (null in older saves)
     public int toldDay;                              // the day Tomas or Pip last told you tomorrow's weather
+    public float lastRain = -1000000f;               // the latest moment it rained, in absolute minutes (TideMinute): how wet the ground still is (Overcast.cs)
     public float clock = -1;                         // minutes since midnight; a day starts at 06:00. -1 in saves from before the clock
     public double playSecs;                          // time played, for the save slot list
     public string savedAt;                           // when this save was last written (local time, round-trip format)

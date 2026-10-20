@@ -770,6 +770,7 @@ partial class Game
         hurtFlash = 0.35f;
         lastHitT = time;
         Sfx.Play("hurt");
+        Impact(Math.Min(0.35f, 0.08f + dmg * 0.01f), "#e04b3a", 0.3f, dmg >= 10 ? 0.05f : 0);
         float dx = player.X - fromX, dy = player.Y - fromY, d = MathF.Max(1, MathF.Sqrt(dx * dx + dy * dy));
         for (int i = 0; i < push; i++)
         {
@@ -946,6 +947,11 @@ partial class Game
             float a = 0.25f + 0.15f * MathF.Sin(t * 0.7f);
             pix.Glow(AncientPoolX + MathF.Sin(t * 0.4f) * 20, AncientPoolY + MathF.Cos(t * 0.3f) * 8, 14, Pal.Rgba(255, 215, 106, a));
         }
-        if (hurtFlash > 0) pix.Fill(0, 0, W, H, Pal.Rgba(224, 75, 58, hurtFlash * 0.6f));
+        if (hurtFlash > 0)
+        {
+            // Reduce motion: a steady red edge for the same moment instead of the whole view flashing.
+            if (Calm) { var edge = Pal.Rgba(224, 75, 58, 0.75f); pix.Rect(camX, camY, W, 3, edge); pix.Rect(camX, camY + H - 3, W, 3, edge); pix.Rect(camX, camY, 3, H, edge); pix.Rect(camX + W - 3, camY, 3, H, edge); }   // pix.Rect takes world coordinates
+            else pix.Fill(0, 0, W, H, Pal.Rgba(224, 75, 58, hurtFlash * 0.6f));
+        }
     }
 }

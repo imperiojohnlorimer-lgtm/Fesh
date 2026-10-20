@@ -576,8 +576,8 @@ partial class Game
         Backdrop();
         const float w = 1120, h = 650, pad = 26;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Ma'am Isay's class", x + pad, y + pad - 4, FontKind.Ui700, 32, Pal.PaperInk);
+        PanelBox(x, y, w, h);
+        Gfx.Text("Ma'am Isay's class", x + pad, y + pad - 4, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         if (SmallButton("Close", x + w - pad - SmallW("Close"), y + pad - 4)) { ClosePanels(); return; }
         float classY = y + h - 168;
         if (q.View == "intro") DrawQuizIntro(x, y, w, pad);

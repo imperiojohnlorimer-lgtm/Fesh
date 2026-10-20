@@ -22,7 +22,7 @@ partial class Game
     {
         get
         {
-            if (LightMode < 2 || scene != "world" || Stormy || SeaEmergency || eclipse != null) return 0;
+            if (LightMode < 2 || Quality.Rung >= 3 || scene != "world" || Stormy || SeaEmergency || eclipse != null) return 0;
             return Math.Clamp(1 - rainAmt / 0.6f, 0, 1) * (1 - Math.Clamp(stormAmt, 0, 1));
         }
     }

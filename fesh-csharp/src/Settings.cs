@@ -21,6 +21,9 @@ sealed class SettingsData
     public int vignette = 2;                   // darkened corners: 0 off, 1 soft, 2 normal (the look before 1.39)
     public bool bloom;                         // a soft halo round lights (Light.cs)
     public bool grain;                         // faint film grain
+    public bool reduceMotion;                  // no screen shake, flashes, sway, bobbing or blinking (Access.cs)
+    public bool highContrast;                  // solid cards, darker small text, no vignette, a lighter night, readings on the meters (Gfx.HighContrast)
+    public bool autoQuality = true;            // switch the dearest effects off for a while when the game can't keep up (Quality.cs)
     public Dictionary<string, int[]> keys = new(); // action -> its two keys (KeyboardKey values, 0 = none); missing actions use the defaults
 }
 

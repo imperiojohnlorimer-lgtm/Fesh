@@ -174,7 +174,7 @@ partial class Game
         if (guideWay == null || tracked?.HasPoint != true) return;
         float k = ViewK, xc = (guideWay.X - camX) * k, yc = (guideWay.Y - camY) * k - 22;
         if (!(xc > 0 && xc < lw && yc > 0 && yc < lh)) return;   // out of view: the edge arrow does the pointing
-        float breathe = 5 * MathF.Sin(time * 3);
+        float breathe = Calm ? 0 : 5 * MathF.Sin(time * 3);
         // Three bands of shade, each outside a wider circle, so the light falls off softly.
         foreach (var (r, a) in new[] { (78f + breathe, 0.17f), (112f + breathe, 0.17f), (150f + breathe, 0.17f) })
             for (float y = 0; y < lh; y += 6)
@@ -192,9 +192,18 @@ partial class Game
     void DrawTourButtonRing()
     {
         if (TourButton is not string name || mode != "play" || !tourBtn.TryGetValue(name, out var r)) return;
-        float pulse = 0.5f + 0.5f * MathF.Sin(time * 5);
+        float pulse = Calm ? 1 : 0.5f + 0.5f * MathF.Sin(time * 5);
         Gfx.Box(r.X - 5, r.Y - 5, r.Width + 10, r.Height + 10, Pal.Rgba(0, 0, 0, 0), Pal.WithAlpha(Pal.Lantern, 0.6f + 0.4f * pulse), 4, 8);
-        float cx = r.X + r.Width / 2, ty = r.Y + r.Height + 12 + 3 * MathF.Sin(time * 5);
+        float cx = r.X + r.Width / 2, bob = Calm ? 0 : 3 * MathF.Sin(time * 5);
+        if (r.Y > Gfx.LH / 2)
+        {
+            // A button low on the screen (the bag on the hotbar): the arrow sits above it, pointing down.
+            float ay = r.Y - 14 - bob;
+            Gfx.Triangle(cx - 9, ay - 12, cx + 9, ay - 12, cx, ay, Pal.Ink);
+            Gfx.Triangle(cx - 7, ay - 10, cx + 7, ay - 10, cx, ay - 3, Pal.Lantern);
+            return;
+        }
+        float ty = r.Y + r.Height + 12 + bob;
         Gfx.Triangle(cx - 9, ty + 12, cx + 9, ty + 12, cx, ty, Pal.Ink);
         Gfx.Triangle(cx - 7, ty + 10, cx + 7, ty + 10, cx, ty + 3, Pal.Lantern);
     }

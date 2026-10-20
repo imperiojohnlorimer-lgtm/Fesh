@@ -12,12 +12,13 @@ partial class Game
     // west, stronger and closer together in a storm.
     float Gust(float wx, float wy)
     {
+        if (Calm) return Stormy ? 0.3f : 0.12f;   // Reduce motion: a steady lean, no gusts rolling through
         float speed = Stormy ? 1.6f : 0.75f;
         float band = MathF.Sin(wx * 0.011f + wy * 0.004f - time * speed);
         float g = MathF.Max(0, band);
         g *= g; g *= g;
         float patch = 0.45f + 0.55f * VNoise((int)wx + (int)(time * 18), (int)wy, 70, 390);
-        return Math.Clamp(g * patch * (Stormy ? 1.3f : 1), 0, 1);
+        return Math.Clamp(g * patch * (Stormy ? 1.3f : 1) + (LightMode > 0 ? 0.08f * overShown : 0), 0, 1);
     }
 
     /* ---------- Water ---------- */
@@ -66,11 +67,28 @@ partial class Game
     void DrawCaustics(float t)
     {
         float day = 1 - Darkness, clear = 1 - 0.7f * rainAmt;
-        if (day < 0.1f) return;
+        if (day < 0.1f || Quality.Rung >= 5) return;
         float tq = MathF.Floor(t * 6) / 6;
         float a = 0.15f * day * clear;
         var sea = Pal.Rgba(196, 238, 246, a);
         var pond = Pal.Rgba(206, 250, 238, a);
+        // The two sums of waves each have an inner wave that depends on only one of x or y, so those are worked out once per
+        // column and row, and the outer ones come from a table (CausticSin): a thread per pixel costs two table reads.
+        if (causticAx.Length < W) { causticAx = new float[W]; causticBx = new float[W]; }
+        if (causticAy.Length < H) { causticAy = new float[H]; causticBy = new float[H]; }
+        for (int px = 0; px < W; px++)
+        {
+            int wx = px + camX;
+            causticAx[px] = wx * 0.31f + tq * 1.1f;
+            causticBx[px] = CausticSin(wx * 0.11f - tq * 0.4f) * 1.8f;
+        }
+        for (int py = 0; py < H; py++)
+        {
+            int wy = py + camY;
+            causticAy[py] = CausticSin(wy * 0.13f + tq * 0.5f) * 1.8f;
+            causticBy[py] = wy * 0.37f - tq * 0.9f;
+        }
+        float alpha = sea.A / 255f;
         for (int py = 0; py < H; py++)
         {
             int wy = py + camY;
@@ -82,14 +100,19 @@ partial class Game
                 char s = shape[wy * PW + wx];
                 if (s is not ('w' or 'l' or 'o')) continue;
                 // Where two slow wavy fields cancel out, a thin bright thread: a net of light like the real thing.
-                float v = MathF.Sin(wx * 0.31f + tq * 1.1f + MathF.Sin(wy * 0.13f + tq * 0.5f) * 1.8f)
-                        + MathF.Sin(wy * 0.37f - tq * 0.9f + MathF.Sin(wx * 0.11f - tq * 0.4f) * 1.8f);
+                float v = CausticSin(causticAx[px] + causticAy[py]) + CausticSin(causticBy[py] + causticBx[px]);
                 if (MathF.Abs(v) > 0.13f || (s == 'w' && TideDry(wx, wy))) continue;
-                var c = s == 'w' ? sea : pond;
-                pix.Buf[py * W + px] = Pix.Mix(pix.Buf[py * W + px], c, c.A / 255f);
+                pix.Buf[py * W + px] = Pix.Mix(pix.Buf[py * W + px], s == 'w' ? sea : pond, alpha);
             }
         }
     }
+
+    float[] causticAx = Array.Empty<float>(), causticBx = Array.Empty<float>(), causticAy = Array.Empty<float>(), causticBy = Array.Empty<float>();
+    const int CausticN = 4096;
+    static readonly float[] causticLut = MakeSinTable();
+    static float[] MakeSinTable() { var t = new float[CausticN]; for (int i = 0; i < CausticN; i++) t[i] = MathF.Sin(i * (MathF.PI * 2 / CausticN)); return t; }
+    // sin(a) from a 4096 entry table (within 0.002 of the real thing; the thread's threshold is 0.13).
+    internal static float CausticSin(float a) => causticLut[(int)(a * (CausticN / (MathF.PI * 2))) & (CausticN - 1)];
 
     // The sun glinting on the open sea: tiny stars that flash and go.
     void DrawGlints(float t)
@@ -160,9 +183,11 @@ partial class Game
     void DrawSunBeams(float t)
     {
         var (dusk, dawn) = SunGlow();
-        float k = MathF.Max(dusk, dawn) * (1 - rainAmt);
+        float k = MathF.Max(dusk, dawn) * (1 - rainAmt) * (LightMode > 0 ? 1 - 0.7f * overShown : 1);
+        float shafts = ClearingShafts();   // after rain: sun through thinning cloud (Overcast.cs)
+        if (shafts > k) k = shafts;
         if (k <= 0.02f || scene != "world") return;
-        var beam = dusk > dawn ? Pal.Rgba(255, 196, 120, 0.06f * k) : Pal.Rgba(255, 214, 190, 0.05f * k);
+        var beam = shafts > MathF.Max(dusk, dawn) * (1 - rainAmt) ? Pal.Rgba(255, 246, 214, 0.085f * k) : dusk > dawn ? Pal.Rgba(255, 196, 120, 0.06f * k) : Pal.Rgba(255, 214, 190, 0.05f * k);
         // The beams are lines in the world (x = intercept + 0.55 y), a couple to every 260 px, so they stay put as you walk.
         const int cell = 260;
         int u0 = (int)MathF.Floor((camX - 0.55f * (camY + H) - 60) / cell), u1 = (int)MathF.Floor((camX + W - 0.55f * camY) / cell);
@@ -172,6 +197,18 @@ partial class Game
                 if (Pix.Hash(c, b, 397) > 0.75) continue;
                 float u = (c + (float)Pix.Hash(c, b, 399) * 0.9f) * cell + MathF.Sin(t * 0.07f + c + b) * 16;
                 int bw = 10 + (int)(Pix.Hash(c, b, 398) * 22);
+                if (LightMode > 0)
+                {
+                    // Soft edged: a wide faint band under a narrower brighter one.
+                    var wide = Pal.WithAlpha(beam, 0.45f);
+                    for (int py = 0; py < H; py++)
+                    {
+                        int bx = (int)(u + 0.55f * (py + camY)) - camX;
+                        pix.Fill(bx - 3, py, bw + 6, 1, wide);
+                        pix.Fill(bx, py, bw, 1, beam);
+                    }
+                    continue;
+                }
                 for (int py = 0; py < H; py++)
                     pix.Fill((int)(u + 0.55f * (py + camY)) - camX, py, bw, 1, beam);
             }
@@ -417,6 +454,7 @@ partial class Game
     float leapT = 3;
     void DrawLeaps(float t)
     {
+        if (Calm) return;   // Reduce motion: nothing leaps out of the sea
         float dt = Raylib.GetFrameTime();
         if (scene == "world" && !Night && !Stormy)
         {

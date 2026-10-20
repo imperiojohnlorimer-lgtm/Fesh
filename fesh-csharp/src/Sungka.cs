@@ -150,8 +150,8 @@ partial class Game
         Backdrop();
         const float w = 1040, h = 470, pad = 26;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Sungka with Lola Pacing", x + pad, y + pad, FontKind.Ui700, 32, Pal.PaperInk);
+        PanelBox(x, y, w, h);
+        Gfx.Text("Sungka with Lola Pacing", x + pad, y + pad, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         if (SmallButton("Close", x + w - pad - SmallW("Close"), y + pad - 4)) { CloseSungka(); return; }
         Gfx.Text(Gfx.Ellipsize(sungkaNote, FontKind.Ui600, 19, w - pad * 2), x + pad, y + pad + 46, FontKind.Ui600, 19, sungkaOver ? Pal.C("#9a6a1a") : Muted);
 

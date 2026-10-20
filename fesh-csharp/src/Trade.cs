@@ -310,8 +310,8 @@ partial class Game
         const float w = 620, pad = 24, rowH = 62, gap = 10;
         float h = pad + 44 + 8 + 26 + 18 + places.Count * (rowH + gap) - gap + pad;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
-        Gfx.Text("Set sail", x + pad, y + pad, FontKind.Ui700, 32, Pal.PaperInk);
+        PanelBox(x, y, w, h);
+        Gfx.Text("Set sail", x + pad, y + pad, FontKind.Ui700, PanelTitleSize, Pal.PaperInk);
         if (SmallButton("Close", x + w - pad - SmallW("Close"), y + pad - 4)) { ClosePanels(); return; }
         float cy = y + pad + 44 + 8;
         Gfx.Text("Where to? (Or press F at the jetty to take the helm yourself.)", x + pad, cy, FontKind.Ui500, 18, Muted);

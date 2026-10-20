@@ -84,7 +84,7 @@ partial class Game
         else Array.Clear(shadeMask);
         shadeActive = true;
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
-        bool dapples = LightMode == 2;
+        bool dapples = LightMode == 2 && Quality.Rung < 4;
         foreach (var tr in trees)
         {
             if (tr.kind is not ('t' or 'h' or 'f')) continue;

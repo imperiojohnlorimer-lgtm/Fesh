@@ -121,6 +121,7 @@ partial class Game
 
         while (!quit && !WindowShouldClose())
         {
+            Prof.FrameStart();
             float dt = Math.Min(0.05f, GetFrameTime());
             if (Settings.Data.zoom != ViewK) ApplyZoom();
             // Menus, panels and the title take a gamepad pointer (see Inp).
@@ -128,18 +129,35 @@ partial class Game
             Gfx.BeginFrame();
             AutoTestTick();
             CheckAutoPause();
-            HandleKeys();
-            HandlePointer();
-            Update(dt);
-            PickMusic(dt);
+            if (HitStopped())   // a hit-stop (Impact.cs): the game holds still for a moment; the music and the pause button don't
+            {
+                if (Inp.Pressed(KeyboardKey.Escape)) OpenPause();
+                else if (Inp.PadPressed(GamepadButton.MiddleRight)) OpenPause(anyMode: true);
+                PickMusic(dt);
+            }
+            else
+            {
+                HandleKeys();
+                HandlePointer();
+                Prof.Begin(Pass.Update);
+                Update(dt);
+                PickMusic(dt);
+                Prof.End(Pass.Update);
+            }
             RenderWorld(time);
+            Prof.Begin(Pass.Upload);
             UpdateTexture(worldTex, pix.Buf);
+            Prof.End(Pass.Upload);
             BeginDrawing();
             ClearBackground(Pal.Page);
             DrawTexturePro(worldTex, new Rectangle(0, 0, W, H), Gfx.S(0, 0, W * ViewK, H * ViewK), Vector2.Zero, 0, Color.White);
+            Prof.Begin(Pass.Ui);
             DrawUi();
+            Prof.End(Pass.Ui);
             DrawPadPointer();
+            DrawProfOverlay();
             AutoTestAfterDraw();
+            UpdateQuality();   // the frame's work is done; what follows (EndDrawing) waits for the screen
             EndDrawing();
             Inp.EndFrame();
         }
@@ -210,6 +228,7 @@ partial class Game
         pix = new Pix(ViewW, ViewH);
         dark = new float[ViewW * ViewH];
         vignette = null;
+        Quality.Hold(2);   // the frames after a change of view say nothing about the steady cost
         if (worldTex.Id != 0) UnloadTexture(worldTex);
         worldTex = Gfx.ToTexture(new Color[ViewW * ViewH], ViewW, ViewH, TextureFilter.Point);
     }
@@ -269,6 +288,7 @@ partial class Game
     {
         mlFreshPanel = false;
         if (rebind != null) { CaptureRebind(); return; }
+        if (Inp.Pressed(KeyboardKey.F3)) Prof.Overlay = !Prof.Overlay;
         // While you type your fisher's name, a letter bound to fullscreen types the letter instead.
         if (mode == "create" || mode == "title" && renameSlot > 0 ? Bind.PressedNotTyping("fullscreen") : Bind.Pressed("fullscreen")) ToggleFullscreen();
         if (mode == "create") { CreatorKeys(); return; }
@@ -355,12 +375,18 @@ partial class Game
 
     (int tx, int ty) PointerTile() => ((int)MathF.Floor((Gfx.Mouse.X / ViewK + camX) / T), (int)MathF.Floor((Gfx.Mouse.Y / ViewK + camY) / T));
 
+    // Touch only: the modes where a tap on empty screen does nothing (it used to cast, hook, reel, use the held tool or act on
+    // the target). Building, the spear's aim and dialogue still take taps, because those point at something or just read.
+    static bool TapsIgnored(string m) => Platform.Touch && !Platform.TapWorld && m is "play" or "waiting" or "bite" or "drill" or "reeling" or "boatwork" or "boatanim";
+
     // Clicks on the world itself (not on a button or panel).
     void HandlePointer()
     {
         if (!Gfx.Down) pointerHold = false;
         if (mode == "build" && Gfx.MouseMoved) hover = Gfx.OverUiPrev ? null : PointerTile();
         if (!Gfx.Pressed || Gfx.OverUiPrev) return;
+        // On a phone a touch that isn't on a button would otherwise act as E; the round buttons do that (Settings > Touch).
+        if (TapsIgnored(mode)) { pointerHold = false; return; }
         switch (mode)
         {
             case "build": hover = PointerTile(); BuildAction(); return;
@@ -726,6 +752,7 @@ partial class Game
     // (Settings: on by default) pauses from those too, even mid-cast or mid-fight, and Resume goes straight back.
     void OpenPause(bool auto = false, bool anyMode = false)
     {
+        ClearImpact();
         // In a match Esc asks whether to leave; the match itself never pauses.
         if (MatchActive) { if (!auto && match.Phase is "countdown" or "run" or "dock" or "netwait" or "regatta" or "quiz" or "reef") match.LeaveAsk = true; return; }
         if (mode != "play" && !((auto || anyMode) && ActiveModes.Contains(mode))) return;
@@ -1091,6 +1118,7 @@ partial class Game
             UpdateSeaLife(dt);
             UpdateLeaves(dt);
             UpdateWeather(dt);
+            UpdateOvercast(dt);
             heldT = Math.Max(0, heldT - dt);
             UpdateRelease(dt);
         }
@@ -1275,6 +1303,7 @@ partial class Game
     /* ---------- Start ---------- */
     void StartGame(bool fresh, Look look = null)
     {
+        ClearImpact(); catchSnap = null; splashRings.Clear(); heldPeak = 0;
         if (fresh)
         {
             // Only now, with the new fisher made, does the slot they picked lose whatever was in it.

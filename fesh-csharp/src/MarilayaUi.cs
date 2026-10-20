@@ -63,7 +63,7 @@ partial class Game
         lastMlPanelBottom = y + h;
         sub = Bind.Fix(sub);
         lastMlPanelSub = sub;
-        Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, w, h);
         Gfx.Text(title, x + 24, y + 20, FontKind.Ui700, 30, Pal.PaperInk);
         if (sub != "") Lines(Gfx.Wrap(sub, FontKind.Note, 17, w - 48 - SmallW("Close") - 20), x + 24, y + 58, 21, FontKind.Note, 17, Muted);
         return (x, y);
@@ -643,7 +643,7 @@ partial class Game
         float px = x + 24, py = y + 102, pw = 560, ph = 300;
         Gfx.Rect(px, py, pw, ph, Pal.C("#d8ecf2"));
         float lift = m.Playing == "land" ? Math.Min(1, m.T / 3) * 40 : m.Playing == "quake" ? (m.T < 0.25f ? m.T / 0.25f : 1) * 40 : 0;
-        float shake = m.Playing == "quake" && m.T < 0.8f ? MathF.Sin(m.T * 80) * 4 * (0.8f - m.T) : 0;
+        float shake = m.Playing == "quake" && m.T < 0.8f && !Calm ? MathF.Sin(m.T * 80) * 4 * (0.8f - m.T) : 0;
         float sea = py + ph * 0.55f + (m.Playing == "tide" ? MathF.Sin(m.T * 1.6f) * 26 : 0);
         // Lifting the land carries everything on it: the rock, the beach, the post and the bar (Codex).
         float liftNow = m.Playing == "land" ? Math.Min(1, m.T / 3) * 40 : m.Playing == "quake" ? (m.T < 0.25f ? m.T / 0.25f : 1) * 40 : 0;

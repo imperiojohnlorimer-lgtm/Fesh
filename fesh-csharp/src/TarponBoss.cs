@@ -383,7 +383,7 @@ partial class Game
         if (m.Ev is "pilingsWarn" or "pilings")
         {
             // The piling he's heading for flashes, and a V of water behind him.
-            bool on = (int)(t * 8) % 2 == 0;
+            bool on = Calm || (int)(t * 8) % 2 == 0;
             pix.Rect(m.PileX - 1, m.PileY - 6, 3, 10, on ? Pal.Rgba(255, 170, 120, 0.85f) : Pal.Rgba(140, 90, 60, 0.6f));
             for (int k = 2; k < 14; k++)
             {
@@ -477,7 +477,7 @@ partial class Game
     {
         void Big(string s, Color c, float at) => Outlined(s, rx - Gfx.Measure(s, FontKind.Ui700, 30), Y(at), FontKind.Ui700, 30, c);
         void Small(string s, float at) => Outlined(s, rx - Gfx.Measure(s, FontKind.Ui600, 18), Y(at), FontKind.Ui600, 18, Pal.C("#ffffff"));
-        bool blink = (int)(time * 8) % 2 == 0;
+        bool blink = Calm || (int)(time * 8) % 2 == 0;
         float need = 0, have = 0;
         switch (m.Ev)
         {

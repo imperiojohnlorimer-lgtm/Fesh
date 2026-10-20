@@ -340,6 +340,7 @@ partial class Game
         b.Hurt = 0.4f;
         Sfx.Play("hit");
         Burst(b.X, b.Y - 8, open ? "#ffd76a" : "#cfe8ee", open ? 9 : 5);
+        Impact(open ? 0.22f : 0.1f, open ? "#ffd76a" : "#ffffff", open ? 0.2f : 0.1f, open ? 0.07f : 0.045f);
         if (open) Floater("Big hit!", b.X, b.Y - 26, "#ffd76a");
         if (b.Spirit <= 0) { CalmBoss(); return; }
         // Hit it while it's fresh and it may well rear up and charge straight back at you.
@@ -592,7 +593,10 @@ partial class Game
         char g = FlatOpen(ftx, fty) ? 's' : TileAt(ftx, fty);
         string col = g switch { 's' or 'p' => "#d8bb7e", 'D' => "#d9a457", 'n' or 'i' => "#ffffff", 'e' => "#a19c90", 'w' or 'l' or 'o' or 'm' or 'x' => "#cfe8ee", _ => null };
         float hx = player.X + dir * 6, hy = player.Y;
-        if (col != null)
+        if (col != null && LightMode > 0 && g is 's' or 'p' or 'D' or 'n' or 'i' or 'e')
+            for (int i = 0; i < (p.Kind == "gallop" ? 3 : 2); i++)
+                Puff(hx + FxRand(-2, 2), hy, col, FxRand(-8, 8) - dir * 10, FxRand(-12, -4), FxRand(0.45f, 0.8f), 1.5f, FxRand(3.2f, 5f), 0.6f);
+        else if (col != null)
             for (int i = 0; i < (p.Kind == "gallop" ? 3 : 2); i++)
                 particles.Add(new Particle { X = hx + (float)(fxRng.NextDouble() * 4 - 2), Y = hy, Vx = (float)(fxRng.NextDouble() * 16 - 8) - dir * 10, Vy = -(float)(fxRng.NextDouble() * 14 + 8), Life = (float)(fxRng.NextDouble() * 0.12 + 0.18), Color = col });
         if (g is 's' or 'p' or 'D' or 'n' or 'i')
@@ -1229,7 +1233,7 @@ partial class Game
             return;
         }
         // No flashing once it has calmed down (the last blow would otherwise keep it white through the dialogue).
-        var p = new MountPose { Time = t, Seed = 0.11f, Flash = b.Hurt > 0.25f && b.Phase != "calm" };
+        var p = new MountPose { Time = t, Seed = 0.11f, Flash = b.Hurt > 0.25f && b.Phase != "calm" && !Calm };
         switch (b.Phase)
         {
             case "emerge" or "surface": p.Kind = "leap"; p.Leap = MathF.Min(1, b.T / 0.6f); break;
@@ -1241,7 +1245,7 @@ partial class Game
             default: p.Kind = "stand"; p.Toss = b.Phase == "winded" ? 0 : IdleToss(t, 0.11f); break;
         }
         // Shaking while it rears, so you can see something's coming.
-        float jx = b.Phase is "rear" or "stompRear" ? MathF.Sin(t * 60) : 0;
+        float jx = b.Phase is "rear" or "stompRear" && !Calm ? MathF.Sin(t * 60) : 0;   // (steady with Reduce motion: the "!" still says it)
         DrawTidemane(b.X + jx, b.Y, b.Dir, p, b.Lift);
         if (b.Phase == "winded")
         {
@@ -1322,6 +1326,22 @@ partial class Game
     }
 
     // The shockwave and the water bolts, drawn over everything on the ground.
+    // Where the charge will go, once it is rearing (1.43, light on): a red lane from its hooves along the line it has picked,
+    // the length of the run, drawn after the dark so it reads at night. Steady, not blinking, so it needs no Reduce motion gate.
+    void DrawBossLane(float t)
+    {
+        if (LightMode == 0 || scene != "world" || boss is not { Phase: "rear" } b) return;
+        float lock01 = b.T < 0.45f ? 0.45f : 0.9f;   // brighter once the line is locked
+        float len = ChargeRange;
+        for (float d = 8; d < len; d += 5)
+        {
+            float x = b.X + b.AimX * d, y = b.Y + b.AimY * d;
+            float a = lock01 * (1 - 0.5f * d / len);
+            pix.Rect(x - 1, y - 1, 3, 1, Pal.Rgba(255, 90, 70, a));
+            pix.Rect(x - 1, y + 1, 3, 1, Pal.Rgba(255, 90, 70, a * 0.6f));
+        }
+    }
+
     void DrawBossEffects(float t)
     {
         if (boss is { Ring: > 0 } b)

@@ -1,7 +1,18 @@
+using Raylib_cs;
+
 namespace Fesh;
 
 sealed class Animal { public string Kind, Key; public float X, Y, HomeX, HomeY, Vx, Vy, Timer, Pause, Hearts; public bool Flip, Asleep; }
-sealed class Particle { public float X, Y, Vx, Vy, Life; public string Color; }
+// A speck. With Light off it is the old opaque 1 px square; with light on every particle fades out over the end of its life,
+// and the soft ones (Puff) also grow, as dust and smoke do (Life0 is read once when it is first drawn).
+sealed class Particle
+{
+    public float X, Y, Vx, Vy, Life;
+    public string Color;
+    public float Life0, Size0 = 1, Size1 = 1, Alpha0 = 1, Gy = 140;
+    public bool Soft, HasCol;
+    public Color Col;
+}
 
 partial class Game
 {
@@ -153,17 +164,22 @@ partial class Game
             particles.Add(new Particle { X = x, Y = y, Vx = Rand(-30, 30), Vy = Rand(-50, -15), Life = Rand(0.3f, 0.6f), Color = color });
     }
 
+    const int MaxParticles = 400;
+
     void UpdateParticles(float dt)
     {
         shakeT = Math.Max(0, shakeT - dt);
         swingT = Math.Max(0, swingT - dt);
         quake = Math.Max(0, quake - dt);
+        screenFlash = Math.Max(0, screenFlash - dt * 4);
+        UpdateCatchFx(dt);
+        if (particles.Count > MaxParticles) particles.RemoveRange(0, particles.Count - MaxParticles);   // the oldest go first
         for (int i = particles.Count - 1; i >= 0; i--)
         {
             var p = particles[i];
             p.Life -= dt;
             if (p.Life <= 0) { particles.RemoveAt(i); continue; }
-            p.Vy += 140 * dt;
+            p.Vy += p.Gy * dt;
             p.X += p.Vx * dt;
             p.Y += p.Vy * dt;
         }
@@ -171,7 +187,41 @@ partial class Game
 
     void DrawParticles()
     {
-        foreach (var p in particles) pix.Rect(p.X, p.Y, 1, 1, p.Color);
+        if (LightMode == 0) { foreach (var p in particles) pix.Rect(p.X, p.Y, 1, 1, p.Color); return; }
+        foreach (var p in particles)
+        {
+            if (!p.HasCol) { p.Col = Pal.C(p.Color ?? "#ffffff"); p.HasCol = true; }
+            if (p.Life0 <= 0) p.Life0 = p.Life;
+            float k = Math.Clamp(p.Life / p.Life0, 0, 1);
+            float a = p.Alpha0 * (k > 0.55f ? 1 : k / 0.55f);   // solid for the first half, then gone by the end
+            SoftDot(p.X, p.Y, p.Size0 + (p.Size1 - p.Size0) * (1 - k), p.Col, a);
+        }
+    }
+
+    // A round dot of any size in pixel art: one pixel, a 2x2, or a disc whose rim is dithered away. `a` fades the lot.
+    void SoftDot(float cx, float cy, float size, Color c, float a)
+    {
+        if (a <= 0.01f) return;
+        if (size < 1.5f) { pix.Rect(cx, cy, 1, 1, Pal.WithAlpha(c, a)); return; }
+        if (size < 2.5f) { pix.Rect(cx - 1, cy - 1, 2, 2, Pal.WithAlpha(c, a)); return; }
+        float rr = size / 2;
+        int r = (int)MathF.Ceiling(rr), ix = (int)MathF.Round(cx), iy = (int)MathF.Round(cy);
+        for (int dy = -r; dy <= r; dy++)
+            for (int dx = -r; dx <= r; dx++)
+            {
+                float d = MathF.Sqrt(dx * dx + dy * dy) / rr;
+                if (d > 1) continue;
+                if (d > 0.6f && BayerAt(ix + dx, iy + dy) < (d - 0.6f) / 0.4f) continue;
+                pix.Rect(ix + dx, iy + dy, 1, 1, Pal.WithAlpha(c, a * (1 - d * 0.35f)));
+            }
+    }
+
+    // A puff of dust, smoke or mist: drifts, grows from s0 to s1 pixels and fades. Looks only, so it uses fxRng. With light off
+    // it is a couple of the old hard specks instead, so that look doesn't change.
+    void Puff(float x, float y, string colour, float vx, float vy, float life, float s0, float s1, float alpha, float gy = -3)
+    {
+        if (LightMode == 0) { particles.Add(new Particle { X = x, Y = y, Vx = vx, Vy = vy, Life = Math.Min(life, 0.3f), Color = colour }); return; }
+        particles.Add(new Particle { X = x, Y = y, Vx = vx, Vy = vy, Life = life, Color = colour, Soft = true, Size0 = s0, Size1 = s1, Alpha0 = alpha, Gy = gy });
     }
 
     // One swing at a tree or boulder. Trees take three hits, boulders four.

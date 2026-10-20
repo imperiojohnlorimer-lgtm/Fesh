@@ -320,7 +320,7 @@ partial class Game
         Backdrop();
         const float cw = 1000, ch = 620, pad = 28;
         float x = (Gfx.LW - cw) / 2, y = (Gfx.LH - ch) / 2;
-        Gfx.Box(x, y, cw, ch, Pal.Paper, Pal.Ink, 3, 8, 6);
+        PanelBox(x, y, cw, ch);
         Gfx.Text(creatorFor == "edit" ? "Change your look" : "Make your fisher", x + pad, y + pad, FontKind.Ui700, 40, Pal.PaperInk);
 
         // Preview, walking on the spot.

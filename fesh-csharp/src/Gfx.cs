@@ -140,6 +140,7 @@ static class Gfx
     // in place of the pixel and typewriter faces. Every layout was measured with the pixel font, so each kind is drawn at
     // the size that makes it as wide as the pixel one (Fit), and moved so its capitals sit at the same height.
     public static bool Clear => Settings.Data.clearFont;
+    public static bool HighContrast => Settings.Data.highContrast;
     static readonly Dictionary<FontKind, (float scale, float dy)> clearFit = new();
     static readonly Dictionary<string, Texture2D> art = new();
     static int[] codepoints;
