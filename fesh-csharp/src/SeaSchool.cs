@@ -55,18 +55,24 @@ partial class Game
                 string prize = b.Prizes[t];
                 if (prize.StartsWith("coins:")) state.coins += int.Parse(prize[6..]);
                 else Give(prize);
-                Sfx.Play(t == 2 ? "rare" : "coin");
                 string got = prize.StartsWith("coins:") ? PrizeText(prize) : "a " + PrizeText(prize);
                 lessonPrizes?.Add($"{TierNames[t]} for {b.Name}: {got}");
-                BadgeNews($"Sea school: {TierNames[t]} for {b.Name}! You get {got}. See your journal (<journal>).");
+                int tier = t;
+                Celebrate(new Celeb
+                {
+                    Kind = "badge", Badge = b.Id, BadgeTier = t + 1, Sting = "badge", Tag = $"Sea school: {TierNames[t]}", Title = b.Name,
+                    Sub = $"You get {got}.", Note = "See your journal (<journal>)."
+                }, () => { Sfx.Play(tier == 2 ? "rare" : "coin"); BadgeNews($"Sea school: {TierNames[tier]} for {b.Name}! You get {got}. See your journal (<journal>)."); });
             }
         if (!state.Hinted("diploma") && Badges.All(b => BadgeTier(b) == 3))
         {
             state.hinted["diploma"] = true;
             state.coins += DiplomaCoins;
-            Sfx.Play("rare");
             lessonPrizes?.Add($"the Sea school diploma: {DiplomaCoins} coins");
-            BadgeNews($"Sea school diploma! Gold in every badge. Ma'am Isay's class sends {DiplomaCoins} coins and a very loud cheer.");
+            var c = new Celeb { Kind = "diploma", Card = true, Icon = "star", Sting = "levelup", Tag = "Graduate of the Sea school", Title = "Sea school diploma!", Button = "Thank you!" };
+            c.Body.Add("Gold in every badge.");
+            c.Body.Add($"Ma'am Isay's class sends {DiplomaCoins} coins and a very loud cheer.");
+            Celebrate(c, () => { Sfx.Play("rare"); BadgeNews($"Sea school diploma! Gold in every badge. Ma'am Isay's class sends {DiplomaCoins} coins and a very loud cheer."); });
         }
     }
 

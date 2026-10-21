@@ -24,7 +24,7 @@ partial class Game
     bool MrStopsDone => Data.MarilayaClues.Where(c => c.Key != "mr:legend").All(c => state.Hinted(c.Key));
     bool MrAllClues => MrClueCount == Data.MarilayaClues.Length;
     bool MrBearingsDone => state.Hinted("mr:ab") && state.Hinted("mr:ac") && state.Hinted("mr:bc");
-    // All five stories done: the Halcyon, the moon, the restless sea, Baga, and this one.
+    // All five stories done: the guardian of the deep, the moon, the restless sea, Baga, and this one.
     bool AllStoriesDone => state.flags.ended && MoonReturned && SeaCaseClosed && MgDone && MrDone;
     bool GatherDue => AllStoriesDone && !state.Hinted("mr:gathered");
     // The heliotrope flashes while the sun's out on a clear day (MarilayaUi.cs reads it for the sight).
@@ -421,7 +421,7 @@ partial class Game
     // What's said once everything's done (checked: nothing claims more than the stories measure).
     const string MlSelaLastWords = "Every story told. Come and fish the harbour with me any time.";
     const string MlGatherToast = "Thank you for playing Fesh. All five stories are told, and the sea is still full of fish. Keep exploring!";
-    const string MlGatherAbout = "Tomas's Halcyon, Bakunawa and the moon, the restless sea, Baga beneath the clouds, and the heart that rose: all five stories told.";
+    const string MlGatherAbout = "Tomas's guardian of the deep, Bakunawa and the moon, the restless sea, Baga beneath the clouds, and the heart that rose: all five stories told.";
     // What a crab pot brings up on an island (Marilaya's are Amihan's): one answer for hauling and for the island guide.
     static CommonFish[] PotCatchFor(string biome) => Data.PotCatch.GetValueOrDefault(biome) ?? (biome == "marilaya" ? Data.PotCatch["amihan"] : null);
 
@@ -570,7 +570,7 @@ partial class Game
         Talk(new()
         {
             L("Aling Sela", "They came! Every one of them, by boat and by banca, to hear the end of the stories. Look at them all on my little jetty."),
-            L("Tomas", "Mara set the creatures free, and you found every one of them. The Halcyon's story is told now. Thank you."),
+            L("Tomas", "Mara set the creatures free, and you found every one of them. The Lalim's story is told now. Salamat."),
             L("Lola Pacing", "And the moon still rises over Parola, full and round. The islands made their noise, and Bakunawa gave it back."),
             L("Lira", "When the ground shook, Amihan Village knew what to do. Shake, drop, roar: any one of them, and you go up."),
             L("Manay Mila", "My lola's story kept Mayon's name, and Ben's readings told us when to leave. Between them, nobody had to be brave."),

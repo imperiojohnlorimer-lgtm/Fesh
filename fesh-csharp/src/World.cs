@@ -1750,6 +1750,7 @@ partial class Game
         (fx, fy) = WhiskCamera(fx, fy);
         (fx, fy) = RayCamera(fx, fy);
         (fx, fy) = TarponCamera(fx, fy);
+        if (mode == "photo") { fx += photoPanX; fy += photoPanY; }   // looking about in photo mode (Photo.cs)
         camX = sw <= W ? -(W - sw) / 2 : Math.Clamp((int)MathF.Round(fx) - W / 2, 0, sw - W);
         camY = sh <= H ? -(H - sh) / 2 : Math.Clamp((int)MathF.Round(fy) - H / 2, 0, sh - H);
         // Big impacts (Tidemane landing, charging into a palm, stomping) shake the view, unless that is turned off in Settings.

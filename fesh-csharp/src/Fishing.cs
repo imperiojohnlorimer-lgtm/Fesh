@@ -215,9 +215,10 @@ partial class Game
         int before = FishLevel;
         state.xp += n;
         if (FishLevel <= before) return;
-        Sfx.Play("rare");
         Floater($"Fishing level {FishLevel}!", player.X, player.Y - 26, "#f3c25b");
-        Toast($"Fishing level {FishLevel}! New perk: {PerkText[FishLevel]}.", 4.5f);
+        int now = FishLevel;
+        // A card of its own once you're free (Celebrate.cs).
+        CelebrateLevel(before, now, () => { Sfx.Play("rare"); Toast($"Fishing level {now}! New perk: {PerkText[now]}.", 4.5f); });
     }
 
     /* ---------- Chum ---------- */
@@ -523,6 +524,7 @@ partial class Game
             StartIronbill();
             return;
         }
+        StartTwist(reel, f);   // a move of its own, by its family (FightTwists.cs)
         string hint = reel.Style switch
         {
             "runner" => "This one runs! When it does, let go of the reel, or the line will snap.",
@@ -696,7 +698,7 @@ partial class Game
                 {
                     Dart();
                     r.RunT -= dt;
-                    if (r.RunT <= 0) { r.Running = Rand(0.8f, 1.3f) + r.Diff * 0.1f; Sfx.Play("splash"); }
+                    if (r.RunT <= 0 && !TwistBusy(r)) { r.Running = Rand(0.8f, 1.3f) + r.Diff * 0.1f; Sfx.Play("splash"); }
                     prompt = "Hold [<act>] to lift the bar. Let go when it runs.";
                 }
                 r.Tension += r.Running > 0 && hold ? dt * (0.75f + r.Diff * 0.08f) / LineMul : -dt * (r.Running > 0 ? 0.25f : 0.55f);
@@ -729,7 +731,7 @@ partial class Game
                 {
                     Dart();
                     r.LeapT -= dt;
-                    if (r.LeapT <= 0) { r.Leap = r.LeapLen; r.LeapMark = 0; r.LeapDone = false; Sfx.Play("splash"); }
+                    if (r.LeapT <= 0 && !TwistBusy(r)) { r.Leap = r.LeapLen; r.LeapMark = 0; r.LeapDone = false; Sfx.Play("splash"); }
                     prompt = "Hold [<act>] to lift the bar. Time a press when it leaps.";
                 }
                 break;
@@ -753,11 +755,15 @@ partial class Game
                 Dart();
                 break;
         }
+        // A twist of its own (FightTwists.cs) may steer it for a moment instead.
+        // (Whether it's leaping now: a jumper may have just started a leap this frame, Codex.)
+        if (StepTwist(r, dt, ref fs, r.Leap > 0) is string twistPrompt) { prompt = twistPrompt; urgent = true; }
         if (!leaping) r.FishY += Math.Clamp(r.FishTarget - r.FishY, -fs * dt, fs * dt);
         r.Inside = !leaping && r.FishY >= r.ZoneY && r.FishY <= r.ZoneY + r.ZoneH;
+        NoteTwist(r, dt);
         if (!leaping)
         {
-            float loss = (0.13f + r.Diff * 0.035f) * (Perk(9) ? 0.85f : 1) + (r.Digging ? 0.1f : 0);
+            float loss = ((0.13f + r.Diff * 0.035f) * (Perk(9) ? 0.85f : 1) + (r.Digging ? 0.1f : 0)) * r.LossMul;
             r.Progress += (r.Inside ? gain * ReelMul * r.Pull : -loss) * dt;
         }
         if (hold) { r.Tick += dt; if (r.Tick > 0.08f) { r.Tick = 0; Sfx.Reel(); } }
@@ -816,6 +822,7 @@ partial class Game
             return;
         }
         var f = Data.FishById[roll.Id];
+        catchNews = null;
         // A fish you let go here before may be back, grown (Release.cs).
         var back = f.Legend ? null : Returning(f.Id, spot);
         // Back grown: big, and a fifth again on what it weighed when you let it go.
@@ -838,23 +845,31 @@ partial class Game
         }
         heldItem = f.Id;
         heldT = 1.4f;
-        // A first catch points you at its Fish log card, which tells you about the real fish (FishFacts).
-        string firstNote = n == 1 ? " New in your Fesh-dex (<dex>): read about the real fish." : $" ({n} so far)";
-        if (f.Rare)
-        {
-            Sfx.Play("rare");
-            Toast($"Rare catch! A {f.Name.ToLowerInvariant()}, {Kg(kg)}!{firstNote}", n == 1 ? 4.5f : 3.5f);
-        }
-        else
-        {
-            Sfx.Play("catch");
-            Toast($"Caught a {f.Name.ToLowerInvariant()}, {Kg(kg)}!{firstNote}", n == 1 ? 4 : 2.6f);
-        }
-        if (Perk(10) && !f.Rare && rng.NextDouble() < 0.1)
+        bool twice = Perk(10) && !f.Rare && rng.NextDouble() < 0.1;
+        if (twice)
         {
             AddCatch(f);
+            Tick("doubles");
             Floater("Double catch!", player.X, player.Y - 34, "#7fd36b");
         }
+        // A first species, a first trophy, a real record or the day's biggest gets a banner with its own sting
+        // (Celebrate.cs); anything else is the usual toast.
+        if (!CelebrateCatch(f, catchNews, state.commons[f.Id]))
+        {
+            // A first catch points you at its Fish log card, which tells you about the real fish (FishFacts).
+            string firstNote = n == 1 ? " New in your Fesh-dex (<dex>): read about the real fish." : $" ({n} so far)";
+            if (f.Rare)
+            {
+                Sfx.Play("rare");
+                Toast($"Rare catch! A {f.Name.ToLowerInvariant()}, {Kg(kg)}!{firstNote}", n == 1 ? 4.5f : 3.5f);
+            }
+            else
+            {
+                Sfx.Play("catch");
+                Toast($"Caught a {f.Name.ToLowerInvariant()}, {Kg(kg)}!{firstNote}", n == 1 ? 4 : 2.6f);
+            }
+        }
+        catchNews = null;
         mode = "play";
         bool bagHint = !f.Rare && !state.Hinted("fishBag");
         if (bagHint)
@@ -889,9 +904,16 @@ partial class Game
         Give(f.Id);
         if (m >= 1.25f) state.big[f.Id] = state.big.GetValueOrDefault(f.Id) + 1;
         bool trophy = m >= 1.5f;
+        bool firstTrophy = trophy && state.trophies.GetValueOrDefault(f.Id) == 0;
         if (trophy) state.trophies[f.Id] = state.trophies.GetValueOrDefault(f.Id) + 1;
-        bool record = kg > state.records.GetValueOrDefault(f.Id);
+        float recordWas = state.records.GetValueOrDefault(f.Id);
+        bool record = kg > recordWas;
         if (record) state.records[f.Id] = kg;
+        // What happened, for the landing's banner (Celebrate.cs). A double catch's second fish adds to the first's news.
+        bool cotd = !f.Legend && NoteCatchOfDay(f.Id, m, kg);
+        var news = catchNews ??= new CatchNews { RecordWas = recordWas };
+        news.First |= first; news.Trophy |= trophy; news.FirstTrophy |= firstTrophy; news.Record |= record; news.Cotd |= cotd;
+        if (m >= news.M) { news.M = m; news.Kg = kg; }
         float fx = player.X, fy = player.Y - 26;
         Floater(Kg(kg), fx, fy, m >= 1.25f ? "#f3c25b" : "#ffffff");
         if (trophy) Floater("Trophy!", fx, fy - 7, "#f3c25b");

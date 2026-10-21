@@ -72,7 +72,7 @@ internal static class TouchSettings
 
     public static void Reset()
     {
-        FixedStick = false; StickScale = 1; ButtonScale = 1; Opacity = 0.8f; SwapSides = false; Haptics = true; Fps = 60; ShowDebug = false; TapWorld = false;
+        FixedStick = true; StickScale = 1; ButtonScale = 1; Opacity = 0.8f; SwapSides = false; Haptics = true; Fps = 60; ShowDebug = false; TapWorld = false;
         Pos.Clear();
         Save();
     }

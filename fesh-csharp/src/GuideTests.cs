@@ -61,9 +61,9 @@ partial class Game
         mode = "play"; StartGame(false); ClearSkies(); SetNight(false);
         while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 2; }
         TalkTomasWithRequests(); yield return 2;
-        bool intro = dlg?.Lines.Any(l => l.T.StartsWith("Ahoy there")) == true;
+        bool intro = dlg?.Lines.Any(l => l.T.StartsWith("Magandang araw")) == true;
         while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 2; }
-        Check("catching the Glowgill before meeting Tomas still gets his introduction (it used to skip it for good)", intro && state.flags.metTomas);
+        Check("catching the first creature before meeting Tomas still gets his introduction (it used to skip it for good)", intro && state.flags.metTomas);
         state.caught.Add("tidecrawler"); state.flags.tideOut = false; Save();
         state = SaveFile.Read(); mode = "play"; StartGame(false);
         while (mode == "dialogue") { Inp.Tap(KeyboardKey.E); yield return 2; }

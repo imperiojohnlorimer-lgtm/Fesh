@@ -100,6 +100,7 @@ partial class Game
         SoldFish(id, n);
         Take(id, n);
         state.coins += value;
+        if (Items.ById[id].Kind == "fish") { Tick("sold", n); Tick("earned", value); }
         Sfx.Play("coin");
         Toast($"Sold {Items.Amount(id, n)} for {value} coins.", 1.8f);
         Save();
@@ -117,6 +118,7 @@ partial class Game
         }
         if (count == 0) { Sfx.Play("nope"); Toast("No ordinary fish to sell. Rare fish are sold one at a time."); return; }
         state.coins += total;
+        Tick("sold", count); Tick("earned", total);
         Sfx.Play("coin");
         Toast($"Sold {count} fish for {total} coins.", 2.2f);
         Save();

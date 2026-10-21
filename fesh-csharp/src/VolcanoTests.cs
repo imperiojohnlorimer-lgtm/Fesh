@@ -463,7 +463,7 @@ partial class Game
         // A new game: all four stories on the board, the last three locked.
         TogglePanel("case"); yield return 3;
         Check($"a new game's Case board has all four stories, the tabs fitting beside Close ({lastCaseTabRight:0})",
-            new[] { "The Halcyon", "The vanishing moon", "The restless sea", "Beneath the clouds" }.All(n => Gfx.Seen.ContainsKey(n)) && lastCaseTabRight < 50 + 1180 - 13 - 24 - SmallW("Close") - 4);
+            new[] { "The guardian of the deep", "The vanishing moon", "The restless sea", "Beneath the clouds" }.All(n => Gfx.Seen.ContainsKey(n)) && lastCaseTabRight < 50 + 1180 - 13 - 24 - SmallW("Close") - 4);
         Check("stories 2, 3, 4 and 5 are locked", CaseStories().Count(s => !s.open) == 4 && CaseStories()[0].open);
         bool clicked = ClickButton("Beneath the clouds"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 2;
         Check($"a locked story's tab opens by a real click, to a locked note that fits ({caseTab}, {lastCaseBottom:0})", clicked && caseTab == "baga" && mode == "panel" && lastCaseBottom <= Gfx.LH);
@@ -473,7 +473,7 @@ partial class Game
         Check($"story 3 locked, with where to begin ({CaseStories()[2].hint})", caseTab == "amihan" && CaseStories()[2].hint.Contains("Ma'am Isay"));
         state.hinted["metIsay"] = true; yield return 2;
         Check($"after meeting Ma'am Isay, the hint moves on ({CaseStories()[2].hint})", CaseStories()[2].hint.Contains("later day"));
-        ClickButton("The Halcyon"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 2;
+        ClickButton("The guardian of the deep"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 2;
         Check("back to story 1, open", caseTab == "saltmere");
         state.hinted["mg:metMila"] = true; yield return 2;
         ClickButton("Beneath the clouds"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 2;

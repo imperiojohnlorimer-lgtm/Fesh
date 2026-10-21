@@ -92,6 +92,7 @@ partial class Game
         if (state.food >= 99.5f && state.hp >= 99.5f) { Toast("You're full."); Sfx.Play("nope"); return; }
         if (!Take(id)) return;
         Learned("eat");
+        Tick("eaten");
         float gain = Math.Min(d.Food, 100 - state.food), heal = Math.Min(d.Food / 2f, 100 - state.hp);
         state.food = Math.Min(100, state.food + d.Food);
         state.hp = Math.Min(100, state.hp + d.Food / 2f);
@@ -121,6 +122,7 @@ partial class Game
         }
         Give(r.Out, r.Count);
         Learned(r.Station is "fire" or "stove" ? "cook" : "craft");
+        Tick(r.Station is "fire" or "stove" ? "cooked" : "crafted");
         // Your first bar of a kind: Pip stocks them from now on (Chapters.cs).
         bool firstBar = r.Station == "furnace" && !state.Hinted("tut:smelted:" + r.Out) && !state.Hinted("pipBars") && Items.Shop.Any(s => s.id == r.Out);
         if (r.Station == "furnace") Learned("smelted:" + r.Out);
@@ -256,6 +258,7 @@ partial class Game
         };
         foreach (var (id, n) in drops) Give(id, n);
         Learned(k == 'R' ? "boulder" : "chop");
+        Tick("felled");
         state.felled[$"{x},{y}"] = state.day;
         stumps[(x, y)] = k;
         worldMap[y, x] = FelledGround(k, x, y);

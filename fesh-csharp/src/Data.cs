@@ -45,61 +45,65 @@ static class Data
 {
     public static readonly Creature[] Creatures =
     {
-        new("glowgill", "Glowgill", "lagoon", "night", null, "Uncommon", 1.8f,
-            "A lagoon fish whose gills pulse with soft blue light. It only rises after dark.",
+        // Story 1 (reworked in 1.44): the messengers from the Lalim, the deep channel off Pulo ng Asin (Saltmere on the charts).
+        // In Mang Tomas's lola's telling, built on the Visayan kugtong stories of a giant grouper, a great fish guards the
+        // deep, and its messengers come up into the shallows when the deep is hurt. The names are the game's own, with
+        // their meanings; the telling and the plot are fiction, not a recorded tradition.
+        new("glowgill", "Hasang-ilaw", "lagoon", "night", null, "Uncommon", 1.8f,
+            "\"Light-gill\": its gills pulse with soft blue light. It only rises after dark.",
             "Something glows in the lagoon, but only after dark.",
             TimeHint: "For a second, something glowed under the lagoon. Maybe it only comes up at night."),
-        new("tidecrawler", "Tidecrawler", "rocks", "day", "glowgill", "Uncommon", 2.2f,
-            "Half crab, half fish. It scuttles between tide pools and only swims when it has to.",
+        new("tidecrawler", "Gapang-alon", "rocks", "day", "glowgill", "Uncommon", 2.2f,
+            "\"Wave-crawler\": half crab, half fish. It scuttles between the tide pools.",
             "Clicking echoes from the rocky shore up north, in daylight.",
             TimeHint: "The rocks are quiet at night. Whatever clicks here must come out in daylight.",
             LockedHint: "Something clicked between the rocks and hid. Tomas said to start with the lagoon."),
-        new("hollow_eel", "Hollow Eel", "wreck", "any", "tidecrawler", "Rare", 2.8f,
-            "Its body is full of hollow chambers. It whistles faintly when it breathes.",
+        new("hollow_eel", "Palos ng Guho", "wreck", "any", "tidecrawler", "Rare", 2.8f,
+            "\"Eel of the ruins\": its hollow body whistles faintly when it breathes.",
             "Lives in the old wreck off the southwest shore. The tide blocks the way."),
-        new("mirror_ray", "Mirror Ray", "deep", "day", "hollow_eel", "Rare", 3.2f,
-            "Its skin reflects everything around it, so it almost disappears in open water.",
+        new("mirror_ray", "Paging Salamin", "deep", "day", "hollow_eel", "Rare", 3.2f,
+            "\"Mirror ray\": its skin reflects everything, so it almost vanishes in open water.",
             "Glides through the deep water past the old dock. The dock is broken.",
             TimeHint: "Something wide and silver flashed past, too quick to see in the dark. Better try in daylight."),
-        new("abyssal", "The Abyssal", "deep", "night", "mirror_ray", "Legendary", 4f,
-            "A gentle giant from the trench beneath Saltmere. Dozens of eyes, every one of them calm.",
-            "Only island legends mention it. Gather every other clue first.",
+        new("abyssal", "Bantay ng Lalim", "deep", "night", "mirror_ray", "Legendary", 4f,
+            "\"Guardian of the deep\". Tomas's lola called it the Kugtong: as big as a banca, with rows of calm lights.",
+            "Only Tomas's lola's story mentions it. Gather every other clue first.",
             TimeHint: "Something enormous moved far below, then stayed down. Maybe it waits for night.")
     };
     public static readonly Dictionary<string, Creature> ById = Creatures.ToDictionary(c => c.Id);
 
     public static readonly Dictionary<string, Clue> Clues = new()
     {
-        ["glowgill"] = new("Specimen tag",
-            "A metal tag clipped to the Glowgill's fin: \"Specimen 03. Property of R/V Halcyon, Deepwell Marine Co.\"",
-            "The creatures were cargo on a research ship called the Halcyon."),
-        ["tidecrawler"] = new("Torn logbook page",
-            "Wedged in the Tidecrawler's shell: \"Day 41. Deepwell wants the specimens sold to collectors. They don't belong in tanks, and I won't let it happen. M.I.\"",
-            "Someone aboard, M.I., refused to let the creatures be sold."),
-        ["hollow_eel"] = new("Key card",
-            "Tangled in the Hollow Eel's coils: a waterlogged key card. \"Dr. Mara Ilao. Chief Biologist, R/V Halcyon.\"",
-            "M.I. is Dr. Mara Ilao, the ship's chief biologist, and Tomas's daughter."),
+        ["glowgill"] = new("Shipping seal",
+            "A plastic seal clipped to the Hasang-ilaw's fin: \"Lot 03. LIVE. Declared: captive-bred guppies. Source: hatchery. To: Silverline Aquatics, overseas.\"",
+            "Someone was shipping live creatures from the deep off the island under a false label."),
+        ["tidecrawler"] = new("Notebook page",
+            "Wedged in the Gapang-alon's shell, a notebook page: \"Day 41. The lantsa was in the Lalim again, lights off, dragging a fine net along the bottom. Lola said the messengers come up when the deep is hurt. M.I.\"",
+            "Someone, M.I., saw a boat taking things from the Lalim, the deep channel, at night."),
+        ["hollow_eel"] = new("Bantay Dagat ID",
+            "Tangled in the Palos ng Guho's coils: a laminated card. \"Bantay Dagat volunteer, Pulo ng Asin. Dr. Mara Ilao, marine biologist.\"",
+            "M.I. is Dr. Mara Ilao, a sea warden and marine biologist, and Tomas's daughter."),
         ["mirror_ray"] = new("Waterproof recorder",
-            "Stuck to the Mirror Ray's underside. It crackles: \"If anyone finds this, I opened the hold valves myself. The Halcyon will sink, but they'll be free. Deepwell took them from the trench under Saltmere. I'm bringing them home.\"",
-            "Mara sank the Halcyon on purpose to return the creatures to their trench."),
+            "Stuck to the Paging Salamin's underside. It crackles: \"Tatay, it's Mara. I'm on their boat, and the storm won't let us turn back. We're sinking. I've cut their tanks open: the messengers are going home.\"",
+            "Mara got aboard the smugglers' boat in the storm and set the creatures free as it sank. The old wreck is that boat."),
         ["abyssal"] = new("Silver locket",
-            "Looped around one of the Abyssal's fins. Inside is a photo of a young woman and Tomas, standing on Saltmere's old dock.",
-            "The Abyssal kept Mara's locket safe until her father could see it again.")
+            "Hanging from one of the Bantay ng Lalim's fins. Inside is a photo of a young woman and Tomas, laughing on the island's old dock.",
+            "The guardian of the deep kept Mara's locket until her father could see it again.")
     };
 
     public static readonly string[] Theories =
     {
-        "No leads yet. Strange creatures, a sunken ship and a quiet island. Go fishing.",
-        "The creatures were cargo aboard a research ship, the R/V Halcyon.",
-        "Someone on the Halcyon, \"M.I.\", was protecting the creatures from being sold.",
-        "M.I. is Dr. Mara Ilao, the Halcyon's chief biologist and Tomas's daughter.",
-        "Mara sank the Halcyon on purpose so the creatures could return to the trench beneath Saltmere.",
-        "Case closed. Deepwell took the creatures from the trench, Mara set them free, and the Abyssal kept her locket."
+        "No leads yet. Strange fish in the shallows, an old wreck and a quiet island. Go fishing.",
+        "Someone was shipping live creatures from the deep off the island, labelled as farmed guppies.",
+        "Someone, \"M.I.\", saw a boat dragging the Lalim, the deep channel, at night with its lights off.",
+        "M.I. is Dr. Mara Ilao, a Bantay Dagat volunteer and marine biologist, and Tomas's daughter.",
+        "Mara got aboard the smugglers' boat in the storm and set the creatures free as it sank. The old wreck is that boat.",
+        "Case closed. Smugglers took the Lalim's creatures, Mara set them free, and the guardian of the deep kept her locket."
     };
 
     public static readonly Biome[] Biomes =
     {
-        new("saltmere", "Saltmere Island", "Temperate", "Back on Saltmere Island."),
+        new("saltmere", "Saltmere Island", "Temperate", "Back on Saltmere Island: Pulo ng Asin, to the families here."),
         new("frost", "Frostfang Isle", "Snow", "Frostfang Isle. Snow crunches underfoot."),
         new("dunes", "Sunscald Dunes", "Desert", "Sunscald Dunes. The air shimmers with heat."),
         new("mire", "Mirewood", "Jungle", "Mirewood. Everything here is green and dripping."),

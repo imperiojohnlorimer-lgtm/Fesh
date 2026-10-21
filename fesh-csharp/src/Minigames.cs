@@ -459,6 +459,6 @@ partial class Game
             return;
         }
         for (int i = 0; i < (Riding ? 4 : 2); i++)
-            particles.Add(new Particle { X = player.X + Rand(-2, 2), Y = player.Y, Vx = Rand(-10, 10), Vy = Rand(-22, -10), Life = Rand(0.18f, 0.3f), Color = col });
+            particles.Add(new Particle { X = player.X + FxRand(-2, 2), Y = player.Y, Vx = FxRand(-10, 10), Vy = FxRand(-22, -10), Life = FxRand(0.18f, 0.3f), Color = col });
     }
 }

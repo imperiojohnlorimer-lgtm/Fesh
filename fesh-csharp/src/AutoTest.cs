@@ -44,6 +44,12 @@ partial class Game
         tourOff = true;
         // Light and colour (Light.cs) are off for the old scripts, so their exact-pixel checks keep their colours; LightScript turns them on.
         EffectsOff = true;
+        // Banners and cards (Celebrate.cs) would change the old scripts' toasts and open cards mid-script; CelebrateScript turns them on.
+        OldCelebrate = true;
+        // Fight twists (FightTwists.cs) would change the old scripts' fights, which reel fish in by holding a key.
+        TwistsOff = true;
+        // The title's opening (Opening.cs) would hide the title's buttons for its first five seconds; IntroScript plays it.
+        introDone = true;
         // People's own blinking would make pixel checks on faces depend on the moment (the scenery shots keep it).
         LookData.AutoBlink = Environment.GetEnvironmentVariable("FESH_SCENIC") == "1";
         script = Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster2" ? Poster2Script().GetEnumerator()
@@ -70,6 +76,11 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_ACCESS_TEST") == "1" ? AccessScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_PARTICLE_TEST") == "1" ? ParticleScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_IMPACT_TEST") == "1" ? ImpactScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_CELEBRATE_TEST") == "1" ? CelebrateScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_LEDGER_TEST") == "1" ? LedgerScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_TWIST_TEST") == "1" ? TwistScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_PHOTO_TEST") == "1" ? PhotoScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_INTRO_TEST") == "1" ? IntroScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_WEATHER_TEST") == "1" ? WeatherFxScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_UILOOK_TEST") == "1" ? UiLookScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_LIGHT_TEST") == "1" ? LightScript().GetEnumerator()
@@ -288,7 +299,7 @@ partial class Game
         SnapWeather();
     }
 
-    void Check(string what, bool ok) => testLog.Add($"{(ok ? "PASS" : "FAIL")}  {what}");
+    void Check(string what, bool ok) { testLog.Add($"{(ok ? "PASS" : "FAIL")}  {what}"); Console.Error.WriteLine($"{(ok ? "PASS" : "FAIL")}  {what}"); }
     void Note(string what) => testLog.Add($"      {what}");
 
     static readonly System.Numerics.Vector2 Offscreen = new(-50, -50);

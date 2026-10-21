@@ -179,6 +179,24 @@ internal static unsafe class Gl
         else GLES20.GlDisable(GLES20.GlScissorTest);
     }
 
+    public static void FlushNow() => Flush();
+
+    // The game's part of the screen as RGBA rows from the top (GL reads from the bottom), for a photo (Photo.cs).
+    public static byte[] ReadScreen(out int rw, out int rh)
+    {
+        Flush();
+        rw = Width; rh = Height;
+        var buf = Java.Nio.ByteBuffer.AllocateDirect(rw * rh * 4).Order(Java.Nio.ByteOrder.NativeOrder());
+        GLES20.GlReadPixels(safeL, safeB, rw, rh, GLES20.GlRgba, GLES20.GlUnsignedByte, buf);
+        var raw = new byte[rw * rh * 4];
+        buf.Position(0);
+        buf.Get(raw);
+        var rows = new byte[raw.Length];
+        int stride = rw * 4;
+        for (int y = 0; y < rh; y++) Buffer.BlockCopy(raw, (rh - 1 - y) * stride, rows, y * stride, stride);
+        return rows;
+    }
+
     static void Flush()
     {
         if (count == 0) return;

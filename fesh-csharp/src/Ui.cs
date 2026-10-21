@@ -22,6 +22,7 @@ partial class Game
     void DrawUi()
     {
         if (mode == "create") { DrawCreator(); return; }
+        if (mode == "photo") { DrawPhotoUi(); if (shotReq == null) DrawToast(); return; }   // no HUD in a photo (Photo.cs)
         bool title = mode == "title";
         if (!title && !MatchActive) DrawTourSpotlight();
         if (!title) { if (MatchActive) DrawMatchHud(); else DrawHud(); }
@@ -37,13 +38,15 @@ partial class Game
         if (!title && HotbarShown) DrawHotbar();
         if (!title) DrawPrompt();
         if (!title) DrawToast();
+        if (!title && !MatchActive) DrawBanner();
         if (!title) DrawFishAttackWarning();
         if (mode == "dialogue" && dlg != null) DrawDialogue();
         if (title) { DrawTitle(); DrawToast(); }
-        if (mode == "ending") DrawEnd();
+        if (mode == "ending") { if (OldArt) DrawEnd(); else DrawEndCard(); }   // the new card (Opening.cs); FESH_OLDART shows the old one
         if (mode == "catch") DrawCatch();
         if (mode == "odd") DrawOdd();
         if (mode == "legend") DrawLegend();
+        if (mode == "celebrate") DrawCelebrationCard();
         if (mode == "tamed") DrawTamed();
         if (mode == "platejaw") DrawGuardianCard();
         if (mode == "seacard") DrawSeaCard();
@@ -62,6 +65,7 @@ partial class Game
         if (mode == "panel" && panel == "sungkalan") DrawSungkaLan();
         if (mode == "panel" && panel == "voyage") DrawVoyage();
         if (mode == "panel" && panel == "journal") DrawJournal();
+        if (mode == "panel" && panel == "ledger") DrawLedger();
         if (mode == "panel" && panel == "tides") DrawTides();
         if (mode == "panel" && panel == "quiz") DrawQuiz();
         if (mode == "panel" && panel == "sort") DrawSort();
@@ -409,6 +413,7 @@ partial class Game
 
     void DrawToast()
     {
+        lastToastBottom = 0;
         if (toastAlpha <= 0 || toastMsg == "") return;
         const float fs = 22, lh = 27;
         float a = toastAlpha;
@@ -418,6 +423,7 @@ partial class Game
         var lines = Gfx.Wrap(toastMsg, FontKind.Ui600, fs, right - left - 40);
         float w = lines.Max(l => Gfx.Measure(l, FontKind.Ui600, fs)) + 40, h = lines.Count * lh + 22;
         float cx = (left + right) / 2, x = cx - w / 2, y = (MatchActive ? 126 : 62) - 6 * (1 - a);
+        lastToastBottom = y + h;
         Gfx.Box(x, y, w, h, Pal.WithAlpha(Pal.Paper, a), Pal.WithAlpha(Pal.Ink, a), 2, 5);
         for (int i = 0; i < lines.Count; i++)
             Gfx.TextCenter(lines[i], cx, y + 11 + i * lh, FontKind.Ui600, fs, Pal.WithAlpha(Pal.PaperInk, a));
@@ -521,7 +527,7 @@ partial class Game
     {
         DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Pal.C("rgba(8,18,32,0.88)"));
         Gfx.Block(-5000, -5000, 10000, 10000);
-        var p = Gfx.Wrap("The creatures were taken from the trench beneath Saltmere and loaded onto the Halcyon. Dr. Mara Ilao sank the ship to bring them home, and the Abyssal kept her locket safe until her father could see it again.",
+        var p = Gfx.Wrap("Smugglers dragged the Lalim, the deep channel off Pulo ng Asin, and shipped what they caught abroad as farmed guppies. Mara Ilao of the Bantay Dagat got aboard in a storm and freed the creatures as the boat sank, and the guardian of the deep kept her locket for her father.",
             FontKind.Note, 23, 720);
         var stats = Gfx.Wrap(endStats, FontKind.Ui500, 23, 720);
         // Saltmere's case is only the start: there's a whole sea of islands still to go (and the journal knows where).
@@ -542,18 +548,24 @@ partial class Game
     }
 
     /* ---------- Catch card ---------- */
+    float lastCatchBottom;
     void DrawCatch()
     {
         Backdrop();
         var cr = Data.ById[catchId];
         var clue = Data.Clues[catchId];
-        const float cw = 500, pad = 17, iw = cw - pad * 2, artH = iw / 2;
+        const float cw = 500, pad = 17, iw = cw - pad * 2;
+        float artH = iw / 2;
         var desc = Gfx.Wrap(cr.Desc, FontKind.Note, 20, iw);
         var clueTitle = Gfx.Wrap($"New clue: {clue.Title}", FontKind.Ui700, 21, iw - 32);
         var clueText = Gfx.Wrap(clue.Text, FontKind.Note, 19, iw - 32);
         float clueH = 14 + clueTitle.Count * 26 + 4 + clueText.Count * 27 + 14;
         float h = pad + artH + 14 + 38 + 8 + 26 + 12 + desc.Count * 29 + 12 + clueH + 18 + 56 + pad + 8;
+        // A long clue (or the Clear font) takes a little of the picture's height rather than running off the screen.
+        float over = h - (Gfx.LH - 20);
+        if (over > 0) { float cut = MathF.Min(over, artH - 150); artH -= cut; h -= cut; }
         float x = (Gfx.LW - cw) / 2, y = Math.Max(10, (Gfx.LH - h) / 2);
+        lastCatchBottom = y + h;   // (checked against the screen for every creature, IntroTests)
         PanelBox(x, y, cw, h);
         float cy = y + pad;
         CardGlow(x + pad - 2, cy - 2, iw + 4, artH + 4);
@@ -1333,7 +1345,7 @@ partial class Game
     /* ---------- Case board ---------- */
     float lastCaseBottom;          // where the Case board last ended, checked against the screen
     float lastCaseTabRight;        // where the last case tab ended (checked against the Close button)
-    string caseTab = "saltmere";   // "saltmere" (the Halcyon), "habagat" (the vanishing moon, once you've found Habagat), "amihan" (the restless sea, once the ground has shaken) or "baga" (beneath the clouds, once you've met Manay Mila)
+    string caseTab = "saltmere";   // "saltmere" (the guardian of the deep), "habagat" (the vanishing moon, once you've found Habagat), "amihan" (the restless sea, once the ground has shaken) or "baga" (beneath the clouds, once you've met Manay Mila)
 
     // A tab per story, two lines each ("Story N" small, its name), greyed with a padlock until it begins. They shrink to fit
     // between the title and Close. True when a click has just changed the tab (the caller stops drawing this frame).
@@ -1392,7 +1404,7 @@ partial class Game
         "amihan" => "When the ground shakes, what should Amihan Village do about the sea?",
         "baga" => "Baga is stirring. How do we read its signs, and keep everyone safe?",
         "marilaya" => "Did Marilaya really rise from the sea? What does the island itself say?",
-        _ => "How did these creatures end up around Saltmere Island?"
+        _ => "Why are creatures from the deep turning up in the shallows round Pulo ng Asin?"
     };
 
     List<(string title, string finding, string source)> CaseClueTexts(string id)
@@ -1476,7 +1488,7 @@ partial class Game
     // it starts that gives nothing away (Codex's wording).
     (string id, int n, string name, bool open, string hint)[] CaseStories() => new[]
     {
-        ("saltmere", 1, "The Halcyon", true, ""),
+        ("saltmere", 1, "The guardian of the deep", true, ""),
         ("habagat", 2, "The vanishing moon", state.Hinted("habagat"), "Sail south and find the Habagat islands."),
         ("amihan", 3, "The restless sea", SeaStoryStarted, state.Hinted("metIsay") ? "Come back to Amihan Village on a later day, by daylight."
             : "Visit Amihan Village and introduce yourself to Ma'am Isay."),

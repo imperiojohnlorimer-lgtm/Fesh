@@ -211,7 +211,8 @@ partial class Game
         state.hinted["album:" + ch.Id] = true;
         int pay = 5 * ch.Fish.Length;
         state.coins += pay;
-        ToastLater($"Fish album: the \"{ch.Title}\" chapter is complete! {pay} coins for the collection.");
+        Celebrate(new Celeb { Kind = "album", Icon = "star", Sting = "badge", Tag = "Album chapter complete", Title = ch.Title, Sub = $"{pay} coins for the collection" },
+            () => ToastLater($"Fish album: the \"{ch.Title}\" chapter is complete! {pay} coins for the collection."));
     }
 
     // A save from before the album may have whole chapters caught already: they pay once, on loading.

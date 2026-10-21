@@ -67,6 +67,21 @@ static class Sfx
         Add("wrong", 0.3f, b => { Tone(b, 392, 0.12f, "triangle", 0.045f); Tone(b, 294, 0.18f, "triangle", 0.045f, -40, 0.11f); });
         Add("release", 0.5f, b => { Noise(b, 0.16f, 0.09f); Tone(b, 1319, 0.08f, "sine", 0.035f, 0, 0.2f); Tone(b, 1760, 0.14f, "sine", 0.03f, 0, 0.28f); });
         Add("clang", 0.25f, b => { Tone(b, 1250, 0.18f, "square", 0.02f, -80); Tone(b, 1900, 0.1f, "triangle", 0.025f); Noise(b, 0.05f, 0.1f); });
+        // The celebrations (Celebrate.cs, 1.44): each moment has its own sting, so a new species doesn't sound like a level.
+        // A new species: a bright rising three-note call with a sparkle on top.
+        Add("newfish", 0.7f, b => { var fs = new[] { 784f, 988, 1319 }; for (int i = 0; i < 3; i++) Tone(b, fs[i], 0.16f, "triangle", 0.055f, 0, i * 0.09f); Tone(b, 2637, 0.3f, "sine", 0.025f, 0, 0.3f); Tone(b, 1976, 0.3f, "sine", 0.025f, 0, 0.36f); });
+        // A new record: ding-ding-DING.
+        Add("record", 0.7f, b => { Tone(b, 1047, 0.08f, "square", 0.03f); Tone(b, 1047, 0.08f, "square", 0.03f, 0, 0.11f); Tone(b, 1568, 0.38f, "square", 0.034f, 0, 0.22f); Tone(b, 784, 0.38f, "triangle", 0.04f, 0, 0.22f); });
+        // A trophy: a short brass chord that swells, then a high note.
+        Add("trophy", 0.95f, b => { foreach (float f in new[] { 523f, 659, 784 }) Tone(b, f, 0.42f, "sawtooth", 0.018f); foreach (float f in new[] { 698f, 880, 1047 }) Tone(b, f, 0.5f, "sawtooth", 0.02f, 0, 0.36f); Tone(b, 2093, 0.3f, "triangle", 0.035f, 0, 0.6f); });
+        // A fishing level: a quick run up the scale and a held chord.
+        Add("levelup", 1.25f, b => { var fs = new[] { 523f, 587, 659, 698, 784, 880, 988 }; for (int i = 0; i < fs.Length; i++) Tone(b, fs[i], 0.09f, "square", 0.026f, 0, i * 0.055f); foreach (float f in new[] { 523f, 659, 784, 1047 }) Tone(b, f, 0.75f, "triangle", 0.04f, 0, 0.42f); });
+        // A Fish log page done: a page turning and a gentle chime.
+        Add("page", 1.1f, b => { Noise(b, 0.14f, 0.05f); var fs = new[] { 659f, 988, 1319, 1760 }; for (int i = 0; i < 4; i++) Tone(b, fs[i], 0.5f, "sine", 0.05f, 0, 0.12f + i * 0.12f); });
+        // The title's opening (Opening.cs): something enormous opening its eyes in the dark, a low swell of sound.
+        Add("deep", 1.5f, b => { Tone(b, 55, 1.3f, "sine", 0.22f, -12); Tone(b, 82, 1.0f, "triangle", 0.05f, -20, 0.12f); Noise(b, 0.5f, 0.02f); });
+        // A badge or an album chapter: a coin and a little bell.
+        Add("badge", 0.6f, b => { Tone(b, 1319, 0.06f, "square", 0.028f); Tone(b, 1760, 0.12f, "square", 0.028f, 0, 0.06f); Tone(b, 2637, 0.35f, "sine", 0.03f, 0, 0.18f); });
     }
 
     // A horse's whinny: a bright, wobbling cry that slides down and breaks into a snort.

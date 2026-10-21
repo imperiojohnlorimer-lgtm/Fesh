@@ -94,6 +94,7 @@ partial class Game
         if (r.Roll?.Id == WhiskersFish && whisk is { Ev: not "" } we) { DrawWhiskersCue(we, rx, Y); return; }
         if (r.Roll?.Id == RayFish && ray is { Ev: not "" } re) { DrawRayCue(re, rx, Y); return; }
         if (r.Roll?.Id == TarponFish && tarpon is { Ev: not "" } te) { DrawTarponCue(te, rx, Y); return; }
+        DrawTwistCue(r, rx, Y);
         if (r.Style == "bottom")
         {
             string s = r.Digging ? "Digging in!" : "Pump!";

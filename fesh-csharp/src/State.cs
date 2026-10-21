@@ -122,6 +122,14 @@ sealed class State
     public Dictionary<string, GusoLine> guso = new(); // farm line "0".."3" -> the cutting growing on it (no key: an empty line)
     public int festDay;                              // the Bangus Festival day your best bangus below was caught on...
     public float festKg;                             // ...and how heavy it was (Festival.cs)
+    // The catch of the day (1.44, Celebrate.cs): the biggest fish for its kind since 06:00 (size against the usual).
+    public int cotdDay;                              // the day it was caught on (0: none yet)
+    public string cotdId;                            // which fish
+    public float cotdM, cotdKg;                      // its size against the usual, and its weight
+    // The Angler's Ledger (1.44, Ledger.cs): achievements are in hinted ("ach:<id>"); these count what the save didn't before.
+    public Dictionary<string, int> tally = new();    // "sold", "earned", "eaten", "cooked", "crafted", "felled", "mined", "monsters", "doubles"
+    public double sailed;                            // how far you've steered the boat, in pixels
+    public string title = "";                        // the title you chose to wear ("" none)
 
     // The guide (1.16, Guide.cs): the goal you chose to follow ("" follows the story, then requests, by itself).
     // The "Getting started" checklist is in hinted ("tut:sell", "tut:eat"...).

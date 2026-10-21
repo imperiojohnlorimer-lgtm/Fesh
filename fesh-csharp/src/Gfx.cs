@@ -13,6 +13,7 @@ static class Inp
     static readonly List<KeyboardKey> framePressed = new();
     public static Vector2? ScriptMouse;
     public static bool ScriptClick;
+    public static bool ScriptMouseDown;                // the autotest holds the mouse button (a drag)
     public static bool ScriptClickNext { get; set; }   // the autotest clicks: it lands next frame, when Gfx works out the mouse
     public static bool? ScriptFocused { get; set; }    // the autotest decides whether the window has focus
     public static bool Focused => ScriptFocused ?? IsWindowFocused();
@@ -189,7 +190,7 @@ static class Gfx
         MouseMoved = logical != Mouse;
         Mouse = logical;
         Pressed = IsMouseButtonPressed(MouseButton.Left) || Inp.ScriptClick || Inp.PadClick;
-        Down = IsMouseButtonDown(MouseButton.Left) || Inp.PadHold;
+        Down = IsMouseButtonDown(MouseButton.Left) || Inp.PadHold || Inp.ScriptMouseDown;
         (prev, now) = (now, prev);
         now.Clear();
         OverUiPrev = prev.Any(r => Mouse.X >= r.X && Mouse.X < r.X + r.Width && Mouse.Y >= r.Y && Mouse.Y < r.Y + r.Height);

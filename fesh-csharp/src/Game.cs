@@ -24,6 +24,9 @@ sealed class ReelState
     public bool Exotic, Inside, Perfect, LeapDone, Digging; public Catchable Roll;
     public string Style = "dart"; public float Tension, RunT, Running, LeapT, Leap, LeapLen = 1, LeapMark, HoldT, StyleT, Pull = 1;
     public float AttackTimer = 2.5f, AttackWarning, DuckTime;
+    // A fight twist (FightTwists.cs): which, the wait for the next, its warning and how long it has left, where the fish
+    // was when it began, the zone's height before a roll, time inside and in all, the loss multiplier, and twists held.
+    public string Twist; public float TwistT, TwistWarnT, TwistOn, TwistC, TwistZone, TwistIn, TwistAll, LossMul = 1; public int TwistsHeld; public bool TwistLive;
 }
 sealed record Say(string S, string T);
 sealed class DialogueState { public List<Say> Lines; public int I; public float Shown; public string Full = ""; public Action OnDone; }
@@ -123,7 +126,7 @@ partial class Game
         {
             Prof.FrameStart();
             float dt = Math.Min(0.05f, GetFrameTime());
-            if (Settings.Data.zoom != ViewK) ApplyZoom();
+            if (WantZoom != ViewK) ApplyZoom();
             // Menus, panels and the title take a gamepad pointer (see Inp).
             Inp.BeginFrame(dt, mode is "title" or "pause" or "panel" or "create" or "ending");
             Gfx.BeginFrame();
@@ -156,6 +159,7 @@ partial class Game
             Prof.End(Pass.Ui);
             DrawPadPointer();
             DrawProfOverlay();
+            TakeShotAfterDraw();   // a photo or a card saved as an image (Photo.cs)
             AutoTestAfterDraw();
             UpdateQuality();   // the frame's work is done; what follows (EndDrawing) waits for the screen
             EndDrawing();
@@ -222,6 +226,7 @@ partial class Game
     {
         int k = Settings.Data.zoom is >= 2 and <= 5 ? Settings.Data.zoom : 4;
         Settings.Data.zoom = k;
+        if (mode == "photo" && photoZoom is >= 2 and <= 5) k = photoZoom;   // photo mode's own zoom, never saved (Photo.cs)
         ViewK = k;
         ViewW = (int)Math.Ceiling(Gfx.LW / k);
         ViewH = (int)Math.Ceiling(Gfx.LH / k);
@@ -288,6 +293,7 @@ partial class Game
     {
         mlFreshPanel = false;
         if (rebind != null) { CaptureRebind(); return; }
+        if (mode == "title" && SkipIntro()) return;   // any key skips the opening, and does nothing else (Opening.cs)
         if (Inp.Pressed(KeyboardKey.F3)) Prof.Overlay = !Prof.Overlay;
         // While you type your fisher's name, a letter bound to fullscreen types the letter instead.
         if (mode == "create" || mode == "title" && renameSlot > 0 ? Bind.PressedNotTyping("fullscreen") : Bind.Pressed("fullscreen")) ToggleFullscreen();
@@ -295,6 +301,7 @@ partial class Game
         if (mode == "title") { TitleKeys(); return; }
         if (mode == "ending") { if (Inp.Pressed(KeyboardKey.Enter)) KeepFishing(); return; }
         if (mode == "pause") { if (BackPressed()) ClosePause(); return; }
+        if (mode == "photo") { PhotoKeys(); return; }
         if (mode == "matchresult") { MatchResultKeys(); return; }
         if (MatchActive) { MatchKeys(); return; }
         if (Inp.PadPressed(GamepadButton.MiddleRight) && ActiveModes.Contains(mode)) { OpenPause(anyMode: true); return; }
@@ -339,6 +346,7 @@ partial class Game
             else if (mode == "catch") CloseCatch();
             else if (mode == "odd") CloseOdd();
             else if (mode == "legend") CloseLegend();
+            else if (mode == "celebrate") CloseCelebration();
             else if (mode == "tamed") CloseTamed();
             else if (mode == "moon") CloseMoon();
             else if (mode == "platejaw") CloseGuardianCard();
@@ -511,7 +519,7 @@ partial class Game
         Say Tm(string t) => new("Tomas", t);
         if (state.flags.ended)
         {
-            Talk(new() { Tm("The water feels calmer now. Fish as long as you like, friend.") });
+            Talk(new() { Tm("The water's calm again, and the fish are coming back. Salamat, friend. Fish as long as you like.") });
         }
         // The first conversation is always the introduction, even if you've already caught something strange
         // (before 1.16 an early Glowgill skipped it, and Tomas never asked for anything).
@@ -531,8 +539,9 @@ partial class Game
         Save();
         Talk(new()
         {
-            Tm($"Ahoy there. You must be {state.look.name}, the new fisher. I'm Tomas, I keep the camp on Saltmere."),
-            Tm("Fair warning: the fish here have been strange since the storm three years back. The night the Halcyon went down."),
+            Tm($"Magandang araw! You must be {state.look.name}, the new fisher. I'm Tomas. Mang Tomas, to the kids. I keep the camp here on Pulo ng Asin. Saltmere, on the old charts."),
+            Tm("Fair warning: the fish have been strange since the storm two years back. Things from the deep channel off the point turning up in the shallows. We call that channel the Lalim."),
+            Tm("My lola used to say that when the deep is hurt, its messengers come up to tell us. I never believed her. Now I'm not so sure."),
             Tm(state.Caught("glowgill") ? "And you've already hooked one of the strange ones, I hear. Come and tell me what you find." : "Folks say something glows in the lagoon after dark. Rest by my campfire if you want to wait for night."),
             Tm("And my hut's open, if you need the workbench or the stove. Keep yourself fed out there."),
             Tm("Pip has a stall just east of here, too. Pip pays good coin for fish.")
@@ -631,18 +640,18 @@ partial class Game
         switch (id)
         {
             case "glowgill":
-                Talk(new() { Y("A tag on its fin: \"Property of R/V Halcyon.\" Tomas might know about that ship.") });
+                Talk(new() { Y("A seal on its fin: \"LIVE. Declared: captive-bred guppies.\" That's no guppy. Tomas should see this.") });
                 break;
             case "tidecrawler":
-                Talk(new() { Y("A logbook page signed \"M.I.\" Someone on that ship was protecting these creatures."), new Say("", "The water around the island starts to drain away. The tide is going out.") },
+                Talk(new() { Y("A notebook page signed \"M.I.\" Someone saw a boat taking things from the deep channel at night."), new Say("", "The water draws back from the old wreck, and this time it stays back.") },
                     () => FadeThrough(() => { state.flags.tideOut = true; BuildMap(); Save(); },
                         () => Talk(new() { Y("The tide pulled back. There's a path to the old wreck now, off the southwest shore.") })));
                 break;
             case "hollow_eel":
-                Talk(new() { Y("A key card: \"Dr. Mara Ilao, Chief Biologist.\" I should show this to Tomas.") });
+                Talk(new() { Y("A Bantay Dagat card: \"Dr. Mara Ilao, marine biologist.\" I should show this to Tomas.") });
                 break;
             case "mirror_ray":
-                Talk(new() { Y("She opened the valves herself... she sank the Halcyon on purpose. Tomas needs to hear this.") });
+                Talk(new() { Y("She got aboard their boat in the storm, and set them free as it sank... Tomas needs to hear this.") });
                 break;
             case "abyssal":
                 Ending();
@@ -658,12 +667,12 @@ partial class Game
         tomasX = 270; tomasY = 95;
         Talk(new()
         {
-            new("", "The Abyssal rests at the surface, watching you with dozens of soft, glowing eyes."),
+            new("", "The guardian of the deep rests at the surface, huge and calm, rows of soft lights glowing along its sides."),
             new("", "Boards creak behind you. Tomas has followed the light down the dock."),
-            new("Tomas", "That locket... I gave it to Mara the day she left."),
-            new("Tomas", "She always said the sea keeps what it loves. Looks like it kept her promise too."),
-            new("Tomas", "Let it go home, friend."),
-            new("", "You release the Abyssal. It sinks toward the trench, and one by one, small lights rise from the deep to follow it.")
+            new("Tomas", "That locket... I gave it to Mara the day she joined the patrol."),
+            new("Tomas", "Lola said the Kugtong guards the way home. It brought something of hers home, at least."),
+            new("Tomas", "Let it go back to the Lalim, anak. We'll keep watch from up here now, you and me."),
+            new("", "You let the guardian go. It sinks into the deep channel, and one by one, small lights rise from the Lalim to follow it.")
         }, () =>
         {
             state.flags.ended = true;
@@ -973,6 +982,7 @@ partial class Game
             case "catch": CloseCatch(); return;
             case "odd": CloseOdd(); return;
             case "legend": CloseLegend(); return;
+            case "celebrate": CloseCelebration(); return;
             case "tamed": CloseTamed(); return;
             case "moon": CloseMoon(); return;
             case "platejaw": CloseGuardianCard(); return;
@@ -1095,13 +1105,15 @@ partial class Game
         UpdateWhiskers(dt);   // and Old Whiskers' (WhiskersBoss.cs)
         UpdateRay(dt);    // and a Starfall ray fight (RayBoss.cs)
         UpdateTarpon(dt); // and Haring Buan-buan's (TarponBoss.cs)
+        UpdatePhoto(dt);
         if (toastTimer > 0) toastTimer -= dt;
         toastAlpha = Math.Clamp(toastAlpha + (toastTimer > 0 ? dt : -dt) / 0.25f, 0, 1);
         if (MatchActive) UpdateMatch(dt);
         UpdateDockNet(dt);
         UpdateFloaters(dt);
         UpdateTitleTour(dt);
-        if (!MatchActive) { UpdateGuide(dt); TellBadgeNews(); }
+        UpdateTitleIntro(dt);
+        if (!MatchActive) { UpdateGuide(dt); TellBadgeNews(); UpdateLedger(dt); UpdateCelebrations(dt); }
         HoldMount();
         if (mode is not ("pause" or "panel" or "title" or "create"))
         {
@@ -1212,8 +1224,11 @@ partial class Game
                 float sp = speed * push * dt * (Starving ? 0.6f : 1f) * (Shaking ? 0.45f : 1f);
                 float mx = dx / len * sp, my = dy / len * sp;
                 // Somewhere closed (Baga's danger zone, the lahar channel, Baga while it's evacuated) stops you first (Magayon.cs).
+                float bx0 = player.X, by0 = player.Y;
                 if ((Aboard ? BoatCanStand(player.X + mx, player.Y) : CanStand(player.X + mx, player.Y, Wading, flats: true)) && StepAllowed(player.X + mx, player.Y)) player.X += mx;
                 if ((Aboard ? BoatCanStand(player.X, player.Y + my) : CanStand(player.X, player.Y + my, Wading, flats: true)) && StepAllowed(player.X, player.Y + my)) player.Y += my;
+                // How far you've steered (the Angler's Ledger): only the boat's own steps, never a jump or a voyage.
+                if (Aboard && !MatchActive) state.sailed += MathF.Sqrt((player.X - bx0) * (player.X - bx0) + (player.Y - by0) * (player.Y - by0));
                 player.Face = MathF.Abs(dx) > MathF.Abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
                 if (Aboard) boatFace = player.Face;
                 int frameBefore = (int)(player.WalkT * 9);
@@ -1334,6 +1349,8 @@ partial class Game
         landed = null; releaseFx = null; sorting = null; quiz = null; riddle = null; warnedTide = int.MinValue;
         dexFish = null; dexExtra = null; atlasZoom = false;
         badgeNews = null; lessonPrizes = null;
+        ClearCelebrations(); catchNews = null;   // banners and cards waiting from the other game (Celebrate.cs)
+        ledgerCheckT = 0; ledgerTab = "Catching";
         albumPages = null;
         state.know ??= new(); state.letGo ??= new(); state.missed ??= new();
         goals.Clear(); tracked = null; guideWay = null; lastTrackedId = lastTrackedTitle = goalDoneTitle = null; goalDoneT = 0;
@@ -1407,6 +1424,10 @@ partial class Game
         else if (rescued > 0)
             Toast($"New islands have risen in the south since you were last out there. Your boat was found and tied up at {(state.boatAt == "atoll" ? "the atoll's jetty" : "Pip's jetty")}.", 7);
         else Toast($"Welcome back to {(InMarilaya ? "Marilaya" : InAmihan ? "Amihan" : InHabagat ? "Habagat" : "Saltmere")}. Day {state.day}, {ClockText(state.clock, 10)}.");
+        // The Angler's Ledger (Ledger.cs): a save from before it gets what it had already done now, in one card,
+        // before any catch could count as new; a new game is stamped with nothing to give.
+        state.tally ??= new(); state.title ??= "";
+        CheckLedger();
         hasSave = true;
         Save();
     }

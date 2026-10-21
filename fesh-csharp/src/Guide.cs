@@ -117,10 +117,10 @@ partial class Game
             list.Add(Night ? AtFire(G("mirror_ray", "Wait for morning", "Something wide and silver glides past the end of the old dock, but only in daylight. Rest by the campfire (<act>) until morning."))
                 : AtSpot(G("mirror_ray", "Fish off the end of the dock", "Tomas mended the old dock east of camp. Walk to its end and cast into the deep water by day."), "deep"));
         else if (!RecordingHeard)
-            list.Add(AtTomas(G("recording", "Play Tomas the recording", "Mara's waterproof recorder still crackles. Tomas needs to hear what she said.")));
+            list.Add(AtTomas(G("recording", "Play Tomas the recording", "Mara's waterproof recorder still crackles. Her last message is for her father: Tomas needs to hear it.")));
         else if (!C("abyssal"))
             list.Add(Night ? AtSpot(G("abyssal", "The end of the dock, at night", "The deepest things only rise at night. Fish off the end of the old dock after dark."), "deep")
-                : AtFire(G("abyssal", "Wait for night", "Whatever is left down there only rises at night. Rest by the campfire (<act>) until dark, then fish off the end of the dock.")));
+                : AtFire(G("abyssal", "Wait for night", "In Lola's story, the guardian of the deep only rises at night. Rest by the campfire (<act>) until dark, then fish off the end of the dock.")));
     }
 
     // People waiting on you for something. Only ones they've already asked for: nothing here gives a quest away early.
@@ -833,6 +833,9 @@ partial class Game
             Settings.Save();
             Sfx.Play("ui");
         }
+        // The Angler's Ledger (Ledger.cs).
+        const string ledger = "Angler's Ledger";
+        if (SmallButton(ledger, PanelCloseX - 24 - SmallW(toggle) - SmallW(ledger), y + pad - 6)) { OpenLedger(); return; }
 
         // Goals, a page at a time.
         float lx = x + pad, ly = y + pad + 84, lw = 700;

@@ -23,12 +23,12 @@ partial class Game
     // m mangrove mud, l volcanic rock, c coral, b salt beds, q seagrass, j jungle, d dunes, u sea floor.
     public static readonly RegionInfo[] Regions =
     {
-        new("saltmere", "Saltmere Island", "Temperate island",
+        new("saltmere", "Saltmere Island (Pulo ng Asin)", "Temperate island",
             "Low and green: grassy slopes and oak woods rise a few metres above the sea, with berry bushes, sandy beaches, and a rocky shore along the north. The old wreck lies in the shallows to the southwest.",
             new[] { Wb("The lagoon: a freshwater pond in the middle of the island", "fresh"), Wb("Tide pools on the rocky north shore", "salt"), Wb("The shallows round the wreck", "salt"), Wb("Deep water off the end of the old dock", "salt") },
             "Temperate: mild, with sunny days, rain and the odd storm coming in off the sea.",
             "Oaks and wildflowers, berry bushes, gulls over the beach, chickens, and Biscuit the dog.",
-            "Temperate islands, like many off the coasts of northern Europe, have mild summers and cool, wet winters. An island pond can stay fresh when rain keeps it topped up and the sea stays out; many coastal lagoons are brackish or salty instead.",
+            "The island's deep channel is made up, but deep water is close: east of the Philippines the Philippine Trench drops past 10,000 m at the Emden Deep, and in March 2021 the oceanographer Deo Florence Onda became the first Filipino to dive to it. The guardian of the deep and its messengers are Fesh's own story, drawn from Visayan tales of giant groupers called kugtong; the creatures' names are made up.",
             new[] { P(0, -25, 'u'), P(12, -6, 'r'), P(18, 0, 'r'), P(22, 5, 'g'), P(28, 9, 'f'), P(40, 6, 'g'), P(47, 1.5f, 'g'), P(50, -2, 'u'), P(57, -3, 'u'), P(64, -1, 'g'), P(67, 2, 'g'), P(76, 4, 'f'), P(84, 1, 's'), P(88, 0, 's'), P(92, -3, 'u'), P(100, -20, 'u') },
             new[] { (47f, 66f, 1.5f, false) }, new[] { (18f, "Rocky shore"), (31f, "Oak woods"), (57f, "Freshwater lagoon"), (86f, "Beach"), (97f, "Deep water") }, new (float, string)[0]),
         new("frost", "Frostfang Isle", "Snowy island with a glacier",

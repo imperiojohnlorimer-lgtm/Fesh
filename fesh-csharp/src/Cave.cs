@@ -416,6 +416,7 @@ partial class Game
         Give(ore.Item, count);
         Give("stone");
         Learned("ore:" + n.Kind);
+        Tick("mined");
         n.Mined = true;
         chopTile = (-1, -1);
         Sfx.Play("pickup");
@@ -596,6 +597,7 @@ partial class Game
         Burst(m.X, m.Y - 4, "#ffffff", 4);
         if (m.Hp > 0) return;
         m.Dead = true;
+        Tick("monsters");
         var k = MonsterKinds[m.Kind];
         Burst(m.X, m.Y - 3, k.Color, 14);
         string got = "";

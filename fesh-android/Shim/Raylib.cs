@@ -220,6 +220,44 @@ public static unsafe class Raylib
     }
     public static void UnloadImage(Image image) { if (image.Data != null) NativeMemory.Free(image.Data); }
 
+    // Photos (Photo.cs): the screen read back, cut to a box, and written as a PNG.
+    public static Image LoadImageFromScreen()
+    {
+        var rows = Gl.ReadScreen(out int w, out int h);
+        var data = NativeMemory.Alloc((nuint)rows.Length);
+        Marshal.Copy(rows, 0, (IntPtr)data, rows.Length);
+        return new Image { Data = data, Width = w, Height = h, Mipmaps = 1, Format = PixelFormat.UncompressedR8G8B8A8 };
+    }
+    public static void ImageCrop(ref Image image, Rectangle crop)
+    {
+        int x0 = Math.Clamp((int)crop.X, 0, image.Width), y0 = Math.Clamp((int)crop.Y, 0, image.Height);
+        int cw = Math.Clamp((int)crop.Width, 0, image.Width - x0), ch = Math.Clamp((int)crop.Height, 0, image.Height - y0);
+        if (image.Data == null || cw == 0 || ch == 0) return;
+        var src = (Color*)image.Data;
+        var dst = (Color*)NativeMemory.Alloc((nuint)(cw * ch * 4));
+        for (int y = 0; y < ch; y++)
+            for (int x = 0; x < cw; x++) dst[y * cw + x] = src[(y0 + y) * image.Width + x0 + x];
+        NativeMemory.Free(image.Data);
+        image.Data = dst; image.Width = cw; image.Height = ch;
+    }
+    public static bool ExportImage(Image image, string fileName)
+    {
+        if (image.Data == null) return false;
+        try
+        {
+            int n = image.Width * image.Height * 4;
+            var bytes = new byte[n];
+            Marshal.Copy((IntPtr)image.Data, bytes, 0, n);
+            using var bmp = Android.Graphics.Bitmap.CreateBitmap(image.Width, image.Height, Android.Graphics.Bitmap.Config.Argb8888!)!;
+            bmp.CopyPixelsFromBuffer(Java.Nio.ByteBuffer.Wrap(bytes));   // ARGB_8888 is RGBA in memory
+            using var fs = System.IO.File.Create(fileName);
+            bool ok = bmp.Compress(Android.Graphics.Bitmap.CompressFormat.Png!, 100, fs);
+            bmp.Recycle();
+            return ok;
+        }
+        catch { return false; }
+    }
+
     // ---------- Text ----------
     public static Font LoadFontFromMemory(string fileType, byte[] fileData, int fontSize, int[] codepoints, int codepointCount) =>
         FontBackend.Load(fileData, fontSize, codepoints, codepointCount);
@@ -245,4 +283,10 @@ public static unsafe class Raylib
     public static void StopSound(Sound sound) => AudioBackend.Stop(sound);
     public static bool IsSoundPlaying(Sound sound) => AudioBackend.IsPlaying(sound);
     public static void SetSoundVolume(Sound sound, float volume) => AudioBackend.SetVolume(sound, volume);
+}
+
+// Raylib's low-level layer: only what the game calls (sending the drawing so far to the screen before a photo reads it).
+public static class Rlgl
+{
+    public static void DrawRenderBatchActive() => Gl.FlushNow();
 }

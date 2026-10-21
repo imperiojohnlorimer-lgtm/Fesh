@@ -27,6 +27,9 @@ public class MainActivity : Activity, ISurfaceHolderCallback
         // Tell the game it is on a phone (its Settings then shows the Touch tab), and let its Settings drive our controls.
         Platform.Touch = true;
         TouchSettings.Load(FilesDir.AbsolutePath);
+        // Photos (Photo.cs) are written to the app's own pictures folder, then copied into the gallery (Pictures/Fesh).
+        Fesh.Platform.PhotoDir = System.IO.Path.Combine(GetExternalFilesDir(Android.OS.Environment.DirectoryPictures)?.AbsolutePath ?? FilesDir.AbsolutePath, "Fesh");
+        Fesh.Platform.PhotoSaved = CopyToGallery;
         Platform.Changed = TouchSettings.Save;
         Platform.ResetTouch = TouchSettings.Reset;
         Platform.EditLayout = TouchHud.StartEditing;
@@ -262,6 +265,27 @@ public class MainActivity : Activity, ISurfaceHolderCallback
         game.Start();
     }
     public void SurfaceDestroyed(ISurfaceHolder holder) => Gl.SurfaceLost();
+
+    // A photo the game wrote (Photo.cs), copied into the phone's gallery under Pictures/Fesh (Android 10 and later; earlier
+    // phones keep it in the app's own pictures folder).
+    bool CopyToGallery(string path)
+    {
+        if (global::Android.OS.Build.VERSION.SdkInt < BuildVersionCodes.Q) return false;
+        try
+        {
+            var values = new global::Android.Content.ContentValues();
+            values.Put(global::Android.Provider.MediaStore.IMediaColumns.DisplayName, System.IO.Path.GetFileName(path));
+            values.Put(global::Android.Provider.MediaStore.IMediaColumns.MimeType, "image/png");
+            values.Put(global::Android.Provider.MediaStore.IMediaColumns.RelativePath, "Pictures/Fesh");
+            var uri = ContentResolver?.Insert(global::Android.Provider.MediaStore.Images.Media.ExternalContentUri!, values);
+            if (uri == null) return false;
+            using var output = ContentResolver.OpenOutputStream(uri);
+            using var input = System.IO.File.OpenRead(path);
+            input.CopyTo(output);
+            return true;
+        }
+        catch (Exception ex) { Log.Warn("Fesh", "Couldn't put the photo in the gallery: " + ex.Message); return false; }
+    }
 
     // A crash on the game thread would otherwise just close the app. Until it has been tested on many phones, show what went
     // wrong on the screen (and keep a copy in the app folder), so a bug report can be a screenshot.

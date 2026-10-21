@@ -8,7 +8,7 @@ static class Platform
     public static bool Touch;                  // running on a phone or tablet: no keyboard rebinding, no fullscreen or background-pause settings
 
     // The on-screen controls (Settings, "Touch" tab).
-    public static bool FixedStick;             // the stick stays where it is drawn instead of appearing under the thumb
+    public static bool FixedStick = true;      // the stick stays where it is drawn instead of appearing under the thumb
     public static float StickScale = 1f;       // 0.6 to 1.6
     public static float ButtonScale = 1f;      // 0.6 to 1.6
     public static float Opacity = 0.8f;        // 0.25 to 1
@@ -17,6 +17,11 @@ static class Platform
     public static int Fps = 60;                // 30 or 60
     public static bool ShowDebug;              // a line of build information at the bottom of the screen
     public static bool TapWorld;               // a tap on the world itself acts like E (off: only the round buttons act)
+
+    // Photos (Photo.cs): where they are saved (null: Pictures\Fesh), and what the app does with one once it's written
+    // (the phone puts it in the gallery).
+    public static string PhotoDir;
+    public static Func<string, bool> PhotoSaved;   // true when it went where the player will look for it
 
     public static Action Changed;              // a touch setting changed: the app saves it
     public static Action EditLayout;           // the app lets you drag the controls where you want them

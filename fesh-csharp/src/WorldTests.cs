@@ -151,7 +151,7 @@ partial class Game
         /* ---------- The case board's tabs are one size ---------- */
         {
             TogglePanel("case"); yield return 4;
-            var names = new[] { "The Halcyon", "The vanishing moon", "The restless sea", "Beneath the clouds", "The heart that rose" };
+            var names = new[] { "The guardian of the deep", "The vanishing moon", "The restless sea", "Beneath the clouds", "The heart that rose" };
             var ws = names.Select(n => Gfx.Seen.TryGetValue(n, out var r) ? r.Width : -1).ToList();
             var hs = names.Select(n => Gfx.Seen.TryGetValue(n, out var r) ? r.Height : -1).ToList();
             Check($"the case board's five tabs are the same size ({string.Join(", ", ws.Select(w => w.ToString("0")))})", ws.All(w => w > 0 && Math.Abs(w - ws[0]) < 0.5f) && hs.All(h => Math.Abs(h - hs[0]) < 0.5f));

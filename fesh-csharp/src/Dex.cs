@@ -51,8 +51,7 @@ partial class Game
         if (state.Hinted("dexdone:" + b.Id) || PageFish(page).Any(f => state.commons.GetValueOrDefault(f.Id) == 0)) return;
         state.hinted["dexdone:" + b.Id] = true;
         state.coins += PageReward;
-        Sfx.Play("rare");
-        Toast($"Fish log: every fish of {b.Name} caught! Pip sends {PageReward} coins for the collection.", 5);
+        CelebratePage(b, page, () => { Sfx.Play("rare"); Toast($"Fish log: every fish of {b.Name} caught! Pip sends {PageReward} coins for the collection.", 5); });
     }
 
     bool PassesFilter(CommonFish f, string filter) => filter switch
@@ -89,9 +88,10 @@ partial class Game
         const float w = DexCardW, h = DexCardH, pad = DexCardPad, picW = DexPicW, picH = DexPicH;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
         PanelBox(x, y, w, h);
-        if (SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { dexFish = null; return; }
+        if (shotReq == null && SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { dexFish = null; return; }   // (left out of a saved image)
         // Its page in the fish album, once you've caught one (not from the album itself: Back goes there).
-        if (panel != "album" && n > 0 && SmallButton("Album page", x + w - pad - SmallW("Back") - 12 - SmallW("Album page"), y + pad - 6)) { OpenAlbum(dexFish); dexFish = null; return; }
+        if (shotReq == null && panel != "album" && n > 0 && SmallButton("Album page", x + w - pad - SmallW("Back") - 12 - SmallW("Album page"), y + pad - 6)) { OpenAlbum(dexFish); dexFish = null; return; }
+        if (n > 0) CardImageButton(x, y, w, h, "card-" + f.Id);
 
         // The picture: its own (a silhouette if you've only seen it), or the legend's portrait.
         float px = x + pad, py = y + pad + 50;

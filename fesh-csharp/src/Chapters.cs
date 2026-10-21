@@ -4,9 +4,10 @@ namespace Fesh;
 
 // The Saltmere mystery's chapters between its five creatures (1.22). It used to be five catches back to back; now
 // Tomas sets you up between them, and the crafting basics are the story: an axe and a pickaxe to clear the rocks fallen
-// over the tide pools (before the Tidecrawler), a home of your own with a workbench and a furnace, and copper from
-// Frostfang Caverns for a pickaxe that opens the wreck's rusted hatch (before the Hollow Eel), then iron from deeper
-// down to mend the dock (before the Mirror Ray), and Mara's recording played to Tomas (before the Abyssal).
+// over the tide pools (before the Gapang-alon, id tidecrawler), a home of your own with a workbench and a furnace, and
+// copper from Frostfang Caverns for a pickaxe that opens the wreck's rusted hatch (before the Palos ng Guho, hollow_eel),
+// then iron from deeper down to mend the patrol's old landing, the dock (before the Paging Salamin, mirror_ray), and
+// Mara's recording played to Tomas (before the Bantay ng Lalim, abyssal). (Ids and flags kept from before 1.44's rework.)
 // Every step is worked out from the save, so tools, a shack or bars you already had count, and a chapter the story
 // has moved past counts as done (saves from before 1.22). Flags in state.hinted: ch:toolsAsked, ch:rocks,
 // ch:hatchSeen, ch:homeAsked, ch:hatch, ch:ironAsked, ch:recording; tut:smelted:<bar> (Pip stocks that bar from then
@@ -89,7 +90,7 @@ partial class Game
     Goal RocksGoal()
     {
         if (PickTier == 0 && !state.Hinted("ch:toolsAsked"))
-            return AtTomas(StoryStep("tag", "Show Tomas the tag", "The Glowgill had a metal tag on its fin: \"Property of R/V Halcyon.\" Tomas might know that ship."));
+            return AtTomas(StoryStep("tag", "Show Tomas the seal", "The Hasang-ilaw had a shipping seal on its fin, calling it a farmed guppy. It's nothing of the kind. Tomas should see it."));
         if (PickTier == 0) return ToolsGoal();
         return At(StoryStep("rocks", "Clear the fallen rocks", "Rocks from the storm cover the tide pools at the east end of the rocky shore. Face them and press <act> to break them up with your pickaxe."
             + (Has("axe") == 0 ? " Make a stone axe at a workbench too: you'll want timber before long." : "")),
@@ -166,7 +167,7 @@ partial class Game
     Goal DockGoal()
     {
         if (!state.Hinted("ch:ironAsked"))
-            return AtTomas(StoryStep("keycard", "Show Tomas the key card", "The Hollow Eel was tangled up with a key card for Dr. Mara Ilao. Talk to Tomas about it."));
+            return AtTomas(StoryStep("keycard", "Show Tomas the card", "The Palos ng Guho was tangled up with a Bantay Dagat card for Dr. Mara Ilao. Talk to Tomas about it."));
         if (Has("iron_bar") >= 2)
         {
             var g = StoryStep("dock", "Bring Tomas 2 iron bars", "You have them. Tomas will mend the old dock with them.");
@@ -242,8 +243,9 @@ partial class Game
             Save();
             var lines = new List<Say>
             {
-                Tm("A tag? \"Property of R/V Halcyon\"..."),
-                Tm("So that ship was carrying more than research gear."),
+                Tm("\"LIVE. Declared: captive-bred guppies. Source: hatchery\"..."),
+                Tm("That's no hatchery guppy. That's from the Lalim. Somebody's been taking what lives down there and shipping it abroad as pets, under a false label."),
+                Tm("You can't just take wildlife like that, you know. Even scientists need permission to collect animals like these, and a permit to collect them for research doesn't let anyone sell them."),
                 Tm("Something's been clicking around the rocky shore up north. Only in daylight."),
                 Tm("Trouble is, the storm brought rocks down over the tide pools at its east end. You'll need a pickaxe to shift them.")
             };
@@ -271,7 +273,7 @@ partial class Game
         {
             Talk(new()
             {
-                Tm("M.I.? Those initials..."),
+                Tm("M.I.? That handwriting..."),
                 Tm("Never mind me. The tide's out, and that hatch is open. Whatever lives in that hull, go gently with it.")
             });
             return;
@@ -284,8 +286,9 @@ partial class Game
             Save();
             Talk(new()
             {
-                Tm("M.I.? Those initials... Never mind me."),
-                Tm(state.Hinted("ch:hatchSeen") ? "That hatch on the wreck? Rusted shut since before the Halcyon ever sailed." : "The tide's out, so you can walk to the old wreck off the southwest shore. Its hatch rusted shut years ago, mind."),
+                Tm("M.I.? That handwriting... Never mind me."),
+                Tm("A boat in the Lalim with its lights off, dragging the bottom. The Bantay Dagat went after one like that, the night of the storm. That wreck off the southwest shore is the boat they chased."),
+                Tm(state.Hinted("ch:hatchSeen") ? "Its hatch? Two years under salt water rusts anything shut." : "The tide's out, so you can walk out to it now. Its hatch has rusted shut in the salt, mind."),
                 Tm("A stone pick will just bounce off it. Copper, though. A copper pickaxe would pry it open."),
                 Tm("There's copper in Frostfang Caverns, across the bridge east. You'll need a furnace to smelt it, and a furnace wants a roof over it."),
                 HasHome ? Tm("And you've built yourself a shack already. Good. Put your own workbench and a furnace in it.")
@@ -317,7 +320,7 @@ partial class Game
         Say Tm(string t) => new("Tomas", t);
         if (state.flags.dockFixed)
         {
-            Talk(new() { Tm("The dock should hold now. Something wide and silver glides past the end of it, mostly in daylight.") });
+            Talk(new() { Tm("The landing should hold now. Something wide and silver glides past the end of it, mostly in daylight.") });
             return;
         }
         var lines = new List<Say>();
@@ -329,8 +332,9 @@ partial class Game
             {
                 Tm("Let me see that card."),
                 Tm("Dr. Mara Ilao..."),
-                Tm("Mara is my daughter. She signed on with the Halcyon three years ago. She never came home."),
-                Tm("If she left something out there, I want to know. I'll mend the old dock so you can reach the deep water."),
+                Tm("Mara is my daughter. She studied the sea in Manila and came home to help the Bantay Dagat watch our waters."),
+                Tm("The night of the storm she went out after that boat. She never came home."),
+                Tm("If she left something out there, I want to know. The old dock was the patrol's landing. I'll mend it, so you can reach the deep water."),
                 Tm("But its iron brackets rusted through in the storm. Bring me two iron bars and I'll do the rest."),
                 Tm("Iron lies deeper in Frostfang Caverns than copper: the third floor down and below. Your copper pick will cut it, and your furnace will smelt it.")
             });
@@ -365,10 +369,10 @@ partial class Game
         Save();
         Talk(new()
         {
-            Tm("Play that recording again..."),
-            Tm("She sank the ship herself. To send them home."),
+            Tm("Play it again..."),
+            Tm("She got aboard. In that storm. And with the boat going down, she opened their tanks to send them home."),
             Tm("That's my Mara. Stubborn as the tide."),
-            Tm("There's an old island saying: the deepest things only rise at night. Try the end of the dock after dark.")
+            Tm("Lola's story says the guardian of the Lalim only rises at night. Try the end of the dock after dark.")
         });
     }
 

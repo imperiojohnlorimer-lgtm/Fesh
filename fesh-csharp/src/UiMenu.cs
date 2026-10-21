@@ -96,7 +96,7 @@ partial class Game
     // Starwell's secret glade.
     static readonly (float x, float y, string name, string where)[] TitleStops =
     {
-        (160, 115, "Saltmere Island", "Where it all starts"),
+        (160, 115, "Saltmere Island", "Pulo ng Asin, where it all starts"),
         (935, 262, "Starfall Atoll", "A ring of coral far to the east"),
         (1625, 192, "Amihan Village", "The Amihan Archipelago"),
         (2040, 138, "Luntian Karsts", "The Amihan Archipelago"),
@@ -157,7 +157,9 @@ partial class Game
     void DrawTitle()
     {
         DrawRectangleGradientV(0, 0, GetScreenWidth(), GetScreenHeight(), Pal.C("rgba(16,36,58,0.05)"), Pal.C("rgba(16,36,58,0.78)"));
-        if (titleView == "main") DrawTitleCaption();
+        // The opening (Opening.cs): what has arrived so far. (With Reduce motion everything is there once the fade is done.)
+        float at = Calm ? (introDone ? 99 : 0) : IntroAt;
+        if (titleView == "main" && at >= ButtonsAt) DrawTitleCaption();
         if (slotInfo == null) RefreshSlots();
         if (titleView == "slots") { DrawSlots(); return; }
         if (titleView == "settings") { DrawMenu(); return; }
@@ -169,18 +171,21 @@ partial class Game
         float total = 160 + 40 + tag.Count * tlh + 26 + 56 + 14 + 44 + (newest > 0 ? 30 : 0);
         float y = (Gfx.LH - total) / 2 - 10;
         float cx = Gfx.LW / 2;
-        Gfx.TextCenter("Fesh", cx, y + 21, FontKind.Ui700, logo, Pal.C("rgba(0,0,0,0.22)"));
-        Gfx.TextCenter("Fesh", cx, y + 10, FontKind.Ui700, logo, Pal.Ink);
-        Gfx.TextCenter("Fesh", cx, y, FontKind.Ui700, logo, Pal.Sand);
+        DrawIntroCover();
         // The waves lie along the foot of the letters (the scene's surface is 24 rows down, 6 px each).
-        PixelScene(cx - WavesW * 3, y + 150 - WavesSurf * 6, WavesW, WavesH, 6, p => PaintTitleWaves(p, time), 60);
+        if (at >= WavesAt) PixelScene(cx - WavesW * 3, y + 150 - WavesSurf * 6, WavesW, WavesH, 6, p => PaintTitleWaves(p, time), 60);
+        DrawTitleLetters(cx, y, logo);
         y += 160 + 40;
-        for (int i = 0; i < tag.Count; i++)
+        float tagA = Calm ? (introDone ? 1 : 0) : IntroK(TagAt, 0.6f);
+        for (int i = 0; i < tag.Count && tagA > 0; i++)
         {
-            Gfx.TextCenter(tag[i], cx, y + i * tlh + 2, FontKind.Note, tfs, Pal.C("rgba(0,0,0,0.45)"));
-            Gfx.TextCenter(tag[i], cx, y + i * tlh, FontKind.Note, tfs, Pal.Paper);
+            Gfx.TextCenter(tag[i], cx, y + i * tlh + 2, FontKind.Note, tfs, Pal.WithAlpha(Pal.C("rgba(0,0,0,0.45)"), tagA));
+            Gfx.TextCenter(tag[i], cx, y + i * tlh, FontKind.Note, tfs, Pal.WithAlpha(Pal.Paper, tagA));
         }
         y += tag.Count * tlh + 26;
+        if (at < ButtonsAt) return;   // the buttons arrive last
+        if (introJustSkipped) { introJustSkipped = false; return; }   // (not in the frame of the press that skipped)
+        y += Calm ? 0 : (1 - IntroK(ButtonsAt, 0.5f)) * 24;
         var row = hasSave ? new[] { "Continue", "Load game", "New game" } : new[] { "New game" };
         float w = row.Sum(BigW) + 13 * (row.Length - 1), x = cx - w / 2;
         foreach (var label in row)
@@ -262,6 +267,12 @@ partial class Game
             return;
         }
         Gfx.Text(SlotTitle(s), tx, ty + 24, FontKind.Ui700, 27, Pal.PaperInk);
+        // The title the fisher wears (the Angler's Ledger), after the name, if it's one they've earned.
+        if (s.title is { Length: > 0 } && Achievements.Any(a => a.Title == s.title && AchEarned(s, a)))
+        {
+            float nx = tx + Gfx.Measure(SlotTitle(s), FontKind.Ui700, 27) + 12;
+            if (bx - 12 - nx > 60) Gfx.Text(Gfx.Ellipsize(s.title, FontKind.Ui600, 17, bx - 12 - nx), nx, ty + 32, FontKind.Ui600, 17, Pal.C("#9a6a1a"));
+        }
         string where = s.scene == "cave" ? "Frostfang Caverns" : s.scene.StartsWith("house:") ? (s.scene == "house:tomas" ? "Tomas's hut" : s.scene == "house:school" ? "The school, Amihan Village" : s.scene == MlCaveKey ? "The cave, Marilaya" : "Your shack")
             : Data.Biomes[BiomeAt((int)(s.px / T), (int)((s.py - 1.5f) / T))].Name;
         Gfx.Text($"Day {s.day}, {ClockText(s.clock, 10)}  ·  {where}", tx, ty + 60, FontKind.Ui500, 18, Pal.PaperInk);
@@ -424,10 +435,10 @@ partial class Game
     void DrawGameTab(float x, float y, float w, float bottom)
     {
         float bx = x, by = y + 4;
-        foreach (var label in new[] { "Resume", "Journal", "Matches", "Save game", "Change your look", "Quit to title", "Quit game" })
+        foreach (var label in new[] { "Resume", "Journal", "Matches", "Photo mode", "Save game", "Change your look", "Quit to title", "Quit game" })
         {
             // Changing your look, or the journal, waits until you're not in the middle of fishing (the menu can open mid-cast).
-            bool live = label is not ("Change your look" or "Journal" or "Matches") || pausedFrom == "play";
+            bool live = label is not ("Change your look" or "Journal" or "Matches" or "Photo mode") || pausedFrom == "play" && !MatchActive;
             if (Button(label, bx, by, 300, 52, FontKind.Ui700, 22, label == "Resume" ? Pal.Buoy : live ? Pal.Sand : Pal.C("#d8cbb0"), label == "Resume" ? White : live ? Pal.Ink : Muted, 4, 3, 6, live))
             {
                 switch (label)
@@ -436,6 +447,7 @@ partial class Game
                     // The way into the journal on a gamepad (Guide.cs).
                     case "Journal": ClosePause(); if (mode == "play") TogglePanel("journal"); break;
                     case "Matches": ClosePause(); if (mode == "play") OpenMatches(); break;
+                    case "Photo mode": ClosePause(); if (mode == "play") OpenPhoto(); break;   // Photo.cs
                     case "Save game":
                         Sfx.Play("ui");
                         Toast(Save() ? $"Saved to slot {SaveFile.Slot}." : "Couldn't save the game! Check there's space on the disk.");
@@ -446,7 +458,7 @@ partial class Game
                 }
                 return;
             }
-            by += 52 + 12;
+            by += 52 + 8;
         }
 
         // What's going on in this game: the slot, the time and weather, the moon.

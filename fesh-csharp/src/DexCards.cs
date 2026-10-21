@@ -112,7 +112,8 @@ partial class Game
         const float w = DexCardW, h = DexCardH, pad = DexCardPad, picW = DexPicW, picH = DexPicH;
         float x = (Gfx.LW - w) / 2, y = (Gfx.LH - h) / 2;
         PanelBox(x, y, w, h);
-        if (SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { dexExtra = null; return; }
+        if (shotReq == null && SmallButton("Back", x + w - pad - SmallW("Back"), y + pad - 6)) { dexExtra = null; return; }   // (left out of a saved image)
+        if (got) CardImageButton(x, y, w, h, "card-" + id);
         Gfx.Text(name, x + pad, y + pad - 2, FontKind.Ui700, 34, dexExtra is "tidemane" or "bakunawa" or "platejaw" && got ? Pal.C("#9a6a1a") : Pal.PaperInk);
 
         // The picture, and under it the real animal (or story).
