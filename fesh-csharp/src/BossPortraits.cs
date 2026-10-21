@@ -28,7 +28,7 @@ partial class Game
             "platejaw" => (PlatejawPixels(2, 4, 1, false), PjW, PjH),
             "tidemane" => TidemaneSprite(),
             "bakunawa" => BakunawaSprite(),
-            _ => null
+            _ => StoryPortraitArt.All.TryGetValue(artId, out var story) ? PortraitPixels(story.Palette, story.Rows) : null
         };
         if (s is var (px, w, h)) s = Crop(px, w, h);
         bossSprites[artId] = s;

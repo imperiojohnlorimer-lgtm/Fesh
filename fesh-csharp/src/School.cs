@@ -940,6 +940,7 @@ partial class Game
     Texture2D isayTex;
     void DrawIsayPortrait(float x, float y)
     {
+        if (!OldArt && DrawFolkPortrait("Ma'am Isay", x, y)) return;
         if (isayTex.Id == 0)
         {
             var p = new Pix(16, 18);

@@ -436,6 +436,9 @@ partial class Game
         var lines = Gfx.Wrap(dlg.Full, FontKind.Ui500, fs, w - 2 * padX);
         float h = Math.Max(173, padTop + lines.Count * lh + padBot);
         float y = Gfx.LH - 29 - h;
+        // The portrait sits above the right corner, leaving the full dialogue width available to long lines.
+        // A very tall conversation uses all the screen; leave the picture out rather than cover its words.
+        if (y >= 140) DrawFolkPortrait(dlg.Lines[dlg.I].S, x + w - 110, y - 124);
         Gfx.Box(x, y, w, h, Pal.Paper, Pal.Ink, 3, 6, 4);
         int left = (int)dlg.Shown;
         for (int i = 0; i < lines.Count && left > 0; i++)
