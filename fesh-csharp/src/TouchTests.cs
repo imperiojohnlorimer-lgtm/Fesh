@@ -131,6 +131,11 @@ partial class Game
         Inp.Tap(KeyboardKey.I); yield return 3;
         Check("and its key still does", mode == "panel" && panel == "bag");
         ClosePanels(); yield return 3;
+        // The journal, an eighth box beside the bag (1.45).
+        Check("the journal is the eighth box, right of the bag", Gfx.Seen.TryGetValue("hotbar:journal", out var jb) && jb.X > Gfx.Seen["Bag"].X + Gfx.Seen["Bag"].Width && jb.Width == 50 && jb.X + jb.Width < Gfx.LW);
+        ClickButton("hotbar:journal"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 2;
+        Check($"a click on it opens the journal ({mode}, {panel})", mode == "panel" && panel == "journal");
+        ClosePanels(); yield return 3;
         pendingShot = "bag-slot"; yield return 2;
     }
 }

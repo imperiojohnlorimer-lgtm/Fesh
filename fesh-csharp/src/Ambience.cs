@@ -313,6 +313,7 @@ partial class Game
             Bahay(SelaX, SelaY - 5);
             foreach (var (hx, hy, _) in MlHouses) Bahay(hx, hy - 5);
         }
+        BoardShadows();
         if (Near(160, 68)) BuildingShadow((int)(160 - 10 * HouseS), 68, (int)(21 * HouseS), (int)(14 * HouseS));
         foreach (var b in state.builds)
             if (b.id is "shack" or "kubo" && Near(b.x * T, b.y * T)) BuildingShadow((int)(b.x * T + 10 - 10 * HouseS), b.y * T + 9, (int)(20 * HouseS), (int)((b.id == "kubo" ? 16 : 14) * HouseS));

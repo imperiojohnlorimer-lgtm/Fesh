@@ -406,4 +406,39 @@ static class LandmarkArt
         "....................................................................................",
         "....................................................................................",
     };
+    public static readonly string[] HarbourBoardPalette = { "#6b4a2b", "#7a5230", "#7e4030", "#8a6038", "#8a7448", "#a87a3a", "#b49a64", "#c0392b", "#c89a58", "#d2bc86", "#d8d0b0", "#e9e0c6" };
+    public const int HarbourBoardAnchorX = 11, HarbourBoardAnchorY = 26;
+    public static readonly string[] HarbourBoard =
+    {
+        "......................",
+        "......................",
+        "......................",
+        "......................",
+        ".cccccccccccccccccccc.",
+        ".cccccccccccccccccccc.",
+        "...aa............aa...",
+        "...aabbbbbbbbbbbbaa...",
+        "..daadddddbbbbdddaad..",
+        "..daalllddkhkkdddaad..",
+        "..baallllkkkkkbbbaab..",
+        "..daallllkkkkkdddaad..",
+        "..daalllddkkkkdddaad..",
+        "..baallllbbbbbblhaab..",
+        "..daaddddddddddllaad..",
+        "..daadkkkkdddddllaad..",
+        "..baakkkkkkbbbbllaab..",
+        "..daadkkkkdddddddaad..",
+        "...aaddddddddddddaa...",
+        "...aa...........jaag..",
+        "...aa...........jjge..",
+        "iiiaa...........ggee..",
+        "iiiia............aa...",
+        "ffffa............aa...",
+        "ffffa............aa...",
+        "ffffa............aa...",
+        "......................",
+        "......................",
+        "......................",
+        "......................",
+    };
 }

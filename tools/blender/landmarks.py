@@ -354,6 +354,27 @@ for x, z in ((-29, 20), (-17, 16), (-3, 21), (14, 15), (-8, 33), (24, 22)):
 r.aim((0, 4, 21))
 finish("Cliff", r)
 
+# ---- The harbour board (Bounties.cs DrawHarbourBoard, 1.45). Anchor: between its two posts on the ground. Two weathered
+# posts, a plank board leaning back a little under a small shingled roof, three notices pinned to it (the game paints a
+# gold dot over one when something is ready), a coil of rope on a post and a crate at its foot.
+r = Renderer(22, 30, pitch=PITCH, tones={**WOOD, "board": ("#6b4a2b", "#8a6038", "#a87a48"),
+    "roof": ("#5a2e22", "#7e4030", "#9c5a40"), "paper": ("#b9ad8e", "#e9e0c6", "#fbf6e6"),
+    "paper2": ("#a8a080", "#d8d0b0", "#efe8cc"), "pin": ("#8e2a20", "#c0392b", "#e05a48"),
+    "rope": ("#8a7448", "#b49a64", "#d2bc86"), "crate": ("#7a5a2a", "#a87a3a", "#c89a58")}, lit_at=(0.66, 0.0))
+M = r.ids
+for x in (-8, 6):
+    box(r, x, x + 2, 0, 2, 0, 20, M["post"])
+box(r, -8.5, 8.5, 0.6, 1.6, 7, 18, r.banded("boardplanks", "Z", r.Z(2.8), "board", "seam", 0.7), rot=(-6, 0, 0))
+box(r, -10, 10, -1.5, 3.5, 19.5, 20.6, M["roof"], rot=(-18, 0, 0))
+box(r, -9.5, 9.5, -1.0, 3.0, 20.6, 21.6, M["roof"], rot=(-18, 0, 0))
+for (x0, x1, z0, z1, mat) in ((-7, -2.5, 11.5, 16.5, "paper"), (-1.5, 3, 12.5, 17, "paper2"), (3.6, 7.4, 8.5, 13, "paper"), (-5.5, -0.5, 8, 10.6, "paper2")):
+    box(r, x0, x1, 0.2, 0.55, z0, z1, M[mat], rot=(-6, 0, 0))
+    r.cylinder((x0 + x1) / 2, 0.0, z1 - 1.0, z1 - 0.4, 0.5, 0.5, M["pin"], verts=8)
+r.cylinder(7, 1, 4, 6.5, 1.6, 1.6, M["rope"], verts=12)
+box(r, -11, -6.5, -1.5, 2.5, 0, 4, M["crate"])
+r.aim((0, 0, 11))
+finish("HarbourBoard", r)
+
 
 if CS:
     lines = [

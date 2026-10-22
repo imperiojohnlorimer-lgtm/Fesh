@@ -932,7 +932,7 @@ partial class Game
         FadeThrough(() =>
         {
             for (int i = 0; i < 60 && !SunReady; i++) { Advance(30, quiet: true); waited += 30; }
-            state.food = Math.Max(0, state.food - Math.Min(10, waited / 60));
+            SpendFood(Math.Min(10, waited / 60));
             Save();
         }, () => Toast(!SunReady ? "Still no sun. Try again later." : MirrorFlashing ? $"You wait {(int)(waited / 60)} h {(int)(waited % 60)} min. The sun's out: Jun's mirror is flashing."
             : $"You wait {(int)(waited / 60)} h {(int)(waited % 60)} min. It's light enough to sight now.", 5));

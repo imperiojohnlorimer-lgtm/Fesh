@@ -306,7 +306,7 @@ partial class Game
         while (m < 1500 && (want == "low" ? TideAt(now + m + 2) < TideAt(now + m) : TideAt(now + m + 2) > TideAt(now + m))) m += 2;
         if (m <= 0) { OpenTidePost(); return; }
         int food = (int)Math.Min(10, MathF.Ceiling(m / 60));
-        FadeThrough(() => { Advance(m, quiet: true); state.food = Math.Max(0, state.food - food); Save(); }, () =>
+        FadeThrough(() => { Advance(m, quiet: true); SpendFood(food); Save(); }, () =>
         {
             Toast($"You wait on the sand by the post ({(int)(m / 60)} h {(int)(m % 60)} min, and some of your food). It's {want} tide now ({ClockText(state.clock, 10)}).", 5);
         });

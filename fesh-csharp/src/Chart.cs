@@ -310,6 +310,8 @@ partial class Game
         if (Charted("frost")) PlaceG("Frostfang Caverns", MouthDoorX, MouthDoorY - 26, 3, new() { "Frostfang Caverns", state.caveDeepest > 0 ? $"Deepest floor reached: {state.caveDeepest}" : "Twelve floors down, they say." });
         PlaceG("Pip's stall", PipX, PipY - 6, 1, new() { "Pip's stall", PipOpen ? $"Open until {HourText(21 * 60)}" : $"Closed. Opens at {HourText(7 * 60)}" });
         PlaceG("Pip's jetty", SaltJettyX, SaltJettyY, 2, new() { "Pip's jetty", Has("boat") > 0 ? "E sails to Starfall Atoll; F takes the helm" : "You'll need a boat" });
+        BoardChartMarks((l, bx, by, g, tip, p) => PlaceG(l, bx, by, g, tip, p));
+        EventChartMarks((l, bx, by, g, tip, p) => PlaceG(l, bx, by, g, tip, p));
         if (chartEast)
         {
             PlaceG("Village landing", 1495, 217, 2, new() { "Village landing", "Moor here for Amihan Village" });

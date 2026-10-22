@@ -73,6 +73,7 @@ partial class Game
         if (fish?.Spill == true) l++;
         if (Night && Wears("moon_charm")) l++;
         if (Wears("gold_star_pin")) l++;
+        if (MeteorNow) l++;   // shooting stars (Events.cs)
         return l;
     }
 
@@ -368,7 +369,8 @@ partial class Game
         bool spill = scene == "world" && InSpillover(lx, ly);
         float wait = (baitBox ? Rand(0.5f, 1.2f) : MatchActive ? MatchWait(matchN) : Rand(1.6f, 3.6f)) * Rod.Bite * WeatherBite * (bait != null ? Items.Baits[bait].Bite : 1)
             * (Perk(3) ? 0.9f : 1) * (Chummed(spotId) && !MatchActive ? 0.5f : 1) * (onShadow ? 0.55f : 1) * (spotId == "icehole" ? 1.6f : 1)
-            * (s.Biome == "saltmere" && s.Scene != "sea" && SetActive("saltmere") ? 0.85f : 1) * (spill ? 0.8f : 1);
+            * (s.Biome == "saltmere" && s.Scene != "sea" && SetActive("saltmere") ? 0.85f : 1) * (spill ? 0.8f : 1)
+            * (FishRunAt(spotId) && !MatchActive ? 0.5f : 1);   // a fish run (Events.cs)
         fish = new FishCast
         {
             Spot = spotId, Sx = tip.X, Sy = tip.Y, Tx = lx, Ty = ly, Bx = tip.X, By = tip.Y, Bait = bait, Power = power,
@@ -827,6 +829,7 @@ partial class Game
         var back = f.Legend ? null : Returning(f.Id, spot);
         // Back grown: big, and a fifth again on what it weighed when you let it go.
         float kg = AddCatch(f, bonus, perfect, back != null ? MathF.Max(1.3f, back.kg / f.Kg * 1.2f) : 0);
+        if (f.Rare || lastM >= 1.5f) PetCheers();   // your pet is pleased too (Pet.cs)
         float landedM = lastM;
         int n = state.commons[f.Id];
         NoteCatch(f.Id, CatchTierOf(f.Rare, f.Legend, landedM, perfect), landedM, waterX, waterY, perfect);
@@ -921,6 +924,7 @@ partial class Game
         GainXp(4 + (int)MathF.Round(f.Difficulty * 4) + (f.Rare ? 8 : 0) + (f.Legend ? 60 : 0) + (perfect ? 3 : 0) + (trophy ? 5 : 0));
         DerbyCatch(f, kg);
         FestivalCatch(f, kg);
+        BoardCatch(f, m);
         if (first) { CheckPageDone(f.Id); CheckAlbum(f.Id); }
         // The fish album, mentioned once you've a few pages in it.
         if (first && !state.Hinted("albumHint") && AlbumChapters.Sum(ch => ch.Fish.Count(InAlbum)) >= 5)

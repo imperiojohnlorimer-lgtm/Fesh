@@ -539,6 +539,9 @@ partial class Game
         d.shake = Pair("Screen shake", d.shake, !Platform.Touch) == 0;
         if (!Platform.Touch) d.pauseUnfocused = Pair("Pause in the background", d.pauseUnfocused, false) == 0;
         d.guide = Pair("Goal and arrow", d.guide, true) == 0;
+        // Off: no food meter and no going hungry; food still heals (Survival.cs, HungerOn).
+        d.hunger = Pair("Hunger", d.hunger, false) == 0;
+        y += rowH;
         var lengths = Settings.DayLengths;
         int li = Array.IndexOf(lengths, d.dayLength);
         d.dayLength = lengths[Pick("Length of a day", lengths.Select(m => m > 0 ? $"{m} min" : "Stopped").ToArray(), li < 0 ? 1 : li)];

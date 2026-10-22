@@ -1427,6 +1427,8 @@ partial class Game
         if (Visible(MouthX * T, MouthY * T)) list.Add(((MouthY + 2) * T, DrawCaveMouth));
         if (Visible(PipX, PipY)) { if (PipOpen) list.Add((PipY, DrawPip)); list.Add((PipY + 9, () => DrawStall(t))); }
         AddArchipelagoObjects(list);
+        AddBoardObjects(list);
+        AddEventObjects(list);
         AddRestlessSeaObjects(list);
         AddMagayonObjects(list);
         if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
@@ -1690,6 +1692,7 @@ partial class Game
             DrawGlowingSurf(t, k);
             DrawGlowTrail(t, k);
             DrawFireflies(t, k);
+            DrawMeteors(t);
             GlowBaga(t, k);
             GlowMire(k);
             GlowRay(t, k);
@@ -1795,6 +1798,7 @@ partial class Game
             DrawOasisMud();
             DrawBugs(t);
             DrawSpots(t);
+            DrawFishRun(t);
             DrawSchools(t);
             DrawIronbillUnder(t);
             DrawMireUnder(t);

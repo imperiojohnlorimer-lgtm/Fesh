@@ -163,7 +163,7 @@ partial class Game
 partial class Game
 {
     readonly Dictionary<string, Rectangle> tourBtn = new();
-    string TourButton => TourActive ? state.tour switch { 3 => "Bag", 5 => "Map", _ => null } : null;
+    string TourButton => TourActive ? state.tour switch { 3 => "Bag", 5 => "Map", 6 => "Journal", _ => null } : null;
 
     // Drawn first in DrawUi, so the HUD, the prompt and the toasts stay bright over it.
     void DrawTourSpotlight()

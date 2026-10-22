@@ -293,11 +293,12 @@ partial class Game
     bool HotbarShown => state?.hotbar != null && !MatchActive && mode != "build" && ActiveModes.Contains(mode) && eclipse == null;
 
     // Six slots along the bottom: the one in your hands lit up, each with its key; hovering one names it. A seventh box at the
-    // right end is the bag (click it, or its key), set a little apart because it isn't something you hold.
+    // right end is the bag (click it, or its key), set a little apart because it isn't something you hold, and an eighth beside
+    // it the journal (1.45).
     void DrawHotbar()
     {
         const float s = 50, gap = 6, m = 12, bagGap = 14;
-        float w = HotbarSlots * s + (HotbarSlots - 1) * gap + bagGap + s, x0 = (Gfx.LW - w) / 2, y = Gfx.LH - m - s;
+        float w = HotbarSlots * s + (HotbarSlots - 1) * gap + bagGap + s + gap + s, x0 = (Gfx.LW - w) / 2, y = Gfx.LH - m - s;
         lastHotbarTop = y;
         string tip = null;
         for (int i = 0; i < HotbarSlots; i++)
@@ -333,12 +334,40 @@ partial class Game
             if (Gfx.Click(bx, y, s, s) && mode == "play") { Sfx.Play("ui"); TogglePanel("bag"); }
             if (over) tip = Bind.Fix("Bag (<bag>)");
         }
+        // The journal, beside the bag (1.45): click it, or its key.
+        {
+            float jx = x0 + HotbarSlots * (s + gap) - gap + bagGap + s + gap;
+            bool over = Gfx.Hover(jx, y, s, s);
+            Gfx.Box(jx, y, s, s, over ? Pal.WithAlpha(Lighten(Navy, 0.12f), 0.95f) : Pal.WithAlpha(Navy, 0.88f), Pal.C("rgba(241,230,200,0.35)"), 2, 6);
+            DrawJournalGlyph(jx + 9, y + 8, 32);
+            Gfx.Text(Bind.Name("journal"), jx + 5, y + 2, FontKind.Ui700, 13, Pal.WithAlpha(Pal.Paper, 0.8f));
+            tourBtn["Journal"] = new Rectangle(jx, y, s, s);
+#if DEBUG
+            Gfx.Seen["hotbar:journal"] = new Rectangle(jx, y, s, s);
+#endif
+            if (Gfx.Click(jx, y, s, s) && mode == "play") { Sfx.Play("ui"); TogglePanel("journal"); }
+            if (over) tip = Bind.Fix("Journal (<journal>)");
+        }
         // What's in your hands, for a moment after you pick it (or the slot you point at), to the right of the bar.
         if (tip == null && hotbarTipT > 0) tip = HeldItem != null ? Items.ById[HeldItem].Name : "Hands free";
         if (tip == null) return;
         float tw = Gfx.Measure(tip, FontKind.Ui600, 16) + 20, tx = Math.Min(x0 + w + 10, Gfx.LW - 8 - tw);
         Gfx.Rect(tx, y + 12, tw, 26, NavyStrong, 5);
         Gfx.Text(tip, tx + 10, y + 16, FontKind.Ui600, 16, Pal.Paper);
+    }
+
+    // A little journal: a dark outline, a brown cover with a spine, cream page edges and a gold ribbon marking a page.
+    static void DrawJournalGlyph(float x, float y, float size)
+    {
+        float u = size / 16;
+        void R(float rx, float ry, float rw, float rh, string c) => Gfx.Rect(x + rx * u, y + ry * u, rw * u, rh * u, Pal.C(c));
+        R(2.5f, 1.5f, 11.5f, 13.5f, "#10243a");
+        R(3, 2, 10.5f, 12.5f, "#7a4a2a");
+        R(3, 2, 2, 12.5f, "#5a3420");
+        R(12, 3, 1.5f, 10.5f, "#efe4c6");
+        R(6.5f, 4.5f, 4.5f, 3, "#c98f55");
+        R(7, 5.2f, 3.5f, 0.6f, "#5a3420"); R(7, 6.4f, 2.6f, 0.6f, "#5a3420");
+        R(9.5f, 12, 1.3f, 4, "#f3c25b"); R(9.5f, 15.4f, 0.6f, 0.6f, "#c99a2e"); R(10.2f, 15.4f, 0.6f, 0.6f, "#c99a2e");
     }
 
     // A little satchel drawn from rectangles: a handle, a flap with a gold buckle, side pockets, in the tools' browns.

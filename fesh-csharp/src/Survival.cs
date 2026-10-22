@@ -73,12 +73,18 @@ partial class Game
             return 0;
         }
     }
-    bool Starving => state.food <= 0;
+    bool Starving => HungerOn && state.food <= 0;
 
     /* ---------- Food ---------- */
+    // Hunger can be switched off in Settings (1.45): then the meter is gone, nothing makes you hungry and food only heals.
+    // The food you had is kept, so switching it back on carries on from there.
+    static bool HungerOn => Settings.Data.hunger;
+    void SpendFood(float n) { if (HungerOn) state.food = Math.Max(0, state.food - n); }
+
     // The food meter drops about one point every seven seconds of play.
     void TickFood(float dt)
     {
+        if (!HungerOn) return;
         float before = state.food;
         state.food = Math.Max(0, state.food - dt / 7f);
         if (before >= 25 && state.food < 25) Toast("You're getting hungry. Open your bag (<bag>) and eat something.", 4);
@@ -89,15 +95,15 @@ partial class Game
     {
         var d = Items.ById[id];
         if (d.Food <= 0) return;
-        if (state.food >= 99.5f && state.hp >= 99.5f) { Toast("You're full."); Sfx.Play("nope"); return; }
+        if ((state.food >= 99.5f || !HungerOn) && state.hp >= 99.5f) { Toast("You're full."); Sfx.Play("nope"); return; }
         if (!Take(id)) return;
         Learned("eat");
         Tick("eaten");
         float gain = Math.Min(d.Food, 100 - state.food), heal = Math.Min(d.Food / 2f, 100 - state.hp);
-        state.food = Math.Min(100, state.food + d.Food);
+        if (HungerOn) state.food = Math.Min(100, state.food + d.Food);
         state.hp = Math.Min(100, state.hp + d.Food / 2f);
         Sfx.Play("eat");
-        string what = $"(+{gain:0} food{(heal >= 1 ? $", +{heal:0} health" : "")})";
+        string what = !HungerOn ? (heal >= 1 ? $"(+{heal:0} health)" : "") : $"(+{gain:0} food{(heal >= 1 ? $", +{heal:0} health" : "")})";
         Toast(d.Kind == "fish" ? $"You eat the {d.Name.ToLowerInvariant()} raw. Not great, but it helps. {what}" : $"You eat the {d.Name.ToLowerInvariant()}. {what}");
         Save();
     }
@@ -305,6 +311,7 @@ partial class Game
             if (at is not (float ax, float ay)) continue;
             animals.Add(new Animal { Kind = kind, Key = $"{kind}{i}", X = ax, Y = ay, HomeX = ax, HomeY = ay, Timer = Rand(0.2f, 2f) });
         }
+        PlacePet();
     }
 
     // Animals wander near home: walk a little, stand around, walk again.
@@ -326,6 +333,7 @@ partial class Game
         if (scene != "world") return;
         foreach (var a in animals)
         {
+            if (IsPet(a)) { UpdatePet(a, dt); continue; }   // your pet follows you instead (Pet.cs)
             a.Hearts = Math.Max(0, a.Hearts - dt);
             bool bedtime = SleepsAtNight(a) && AnimalBedtime(a);
             // Asleep, it stays put until morning (or until you wake it by petting it): no more wandering a few steps and
@@ -362,7 +370,7 @@ partial class Game
     {
         if (scene != "world") return null;
         float fx = player.Face == "left" ? -1 : player.Face == "right" ? 1 : 0, fy = player.Face == "up" ? -1 : player.Face == "down" ? 1 : 0;
-        return animals.Where(a =>
+        return animals.Where(a => !IsPet(a)).Where(a =>
         {
             float dx = a.X - player.X, dy = a.Y - player.Y, d = MathF.Sqrt(dx * dx + dy * dy);
             return d < 16 && (d < 4 || (dx * fx + dy * fy) / d > 0.5f);
@@ -379,6 +387,7 @@ partial class Game
         a.Hearts = 1.5f;
         a.Flip = player.X < a.X;
         Sfx.Play("pet");
+        NotePetted(a);   // three days of this and it can come home with you (Pet.cs)
         // The tarsier and the hornbill are only watched, and Tala keeps count of them (Bakawan.cs).
         if (a.Kind is "tarsier" or "hornbill") { RecordSighting(a.Kind, a.X, a.Y - 8, k.Pet); return; }
         if (k.Gift != null && state.gifts.GetValueOrDefault(a.Key) != state.day)

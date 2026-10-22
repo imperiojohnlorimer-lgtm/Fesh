@@ -29,7 +29,7 @@ partial class Game
     List<Box> Solids()
     {
         var list = StaticSolids();
-        if (scene == "world") { list.AddRange(IslandSolids()); list.AddRange(HabagatSolids()); list.AddRange(MlSolids()); }
+        if (scene == "world") { list.AddRange(IslandSolids()); list.AddRange(HabagatSolids()); list.AddRange(MlSolids()); list.AddRange(BoardSolids()); }
         foreach (var b in SceneBuilds()) if (BuildBox(b) is Box r) list.Add(r);
         list.AddRange(SchoolRoomSolids());
         list.AddRange(MlCaveSolids());
@@ -128,6 +128,8 @@ partial class Game
         if (scene == "world" && Islanders.Any(n => area.Overlaps(new Box(n.x - 26, n.y - 38, 52, 62)))) return "Keep the village paths clear";
         if (scene == "world" && HabagatFolk.Any(n => area.Overlaps(new Box(n.x - 26, n.y - 38, 52, 62)))) return "Keep the village paths clear";
         if (scene == "world" && area.Overlaps(new Box(JoyX - 12, JoyY - 14, 24, 20))) return "Keep the warden's platform clear";
+        if (scene == "world" && state.dayEvent is { kind: "trader" } te && te.day == state.day && area.Overlaps(TraderBox(te.x, te.y))) return "The travelling trader is set up there today";
+        if (scene == "world" && HarbourBoards.Any(h => area.Overlaps(new Box(h.x - 14, h.y - 6, 28, 18)))) return "Keep the harbour board clear";
         if (scene == "world" && d.Water && InSanctuary(tx * T + 5, ty * T + 5)) return "No traps inside the marine sanctuary";
         // Baga's permanent danger zone, the lahar channel, and Baga while it's evacuated (Magayon.cs).
         // Every tile of the piece, not just the first (Codex: a shack could stand half inside the zone).

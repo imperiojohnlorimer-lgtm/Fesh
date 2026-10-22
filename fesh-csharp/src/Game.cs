@@ -480,6 +480,7 @@ partial class Game
     void Talk(List<Say> lines, Action onDone = null)
     {
         dlg = new DialogueState { Lines = lines, OnDone = onDone };
+        NoteTalkLines(lines);   // a conversation with a villager (Friends.cs)
         mode = "dialogue";
         SetPrompt("");
         ShowLine();
@@ -553,6 +554,8 @@ partial class Game
     {
         // The story comes first: meeting him, the dock, and the start of each chapter (Chapters.cs).
         if (!state.flags.metTomas || (state.Caught("hollow_eel") && !state.flags.dockFixed) || ChapterTalkDue) { TalkTomas(); return; }
+        // A stranded turtle to report comes before anything else he'd say (Events.cs).
+        if (TurtleToReport) { ReportTurtle(); return; }
         if (CanHandIn) { HandIn(); return; }
         TalkTomas();
         if (dlg != null && RequestLine() is Say line) dlg.Lines.Add(line);
@@ -867,6 +870,8 @@ partial class Game
         if (Dist(x, y, tomasX, tomasY) < 16)
             return TomasInBed ? new Target { Type = "info", Label = "Tomas has gone to bed in his hut" }
                 : new Target { Type = "npc", Label = CanHandIn ? $"Give Tomas the {Items.Amount(state.req.item, state.req.count)}" : "Talk to Tomas" };
+        if (EventTarget() is Target eventTarget) return eventTarget;   // a day's event first: it's only there today
+        if (BoardTarget() is Target boardTarget) return boardTarget;
         if (Dist(x, y, PipX, PipY + 14) < 12)
             return PipOpen ? new Target { Type = "pip", Label = "Trade with Pip" } : new Target { Type = "info", Label = $"Pip's stall is closed for the night. Pip opens at {HourText(7 * 60)}" };
         if (Dist(x, y, SaltJettyX, SaltJettyY) < 10)
@@ -917,6 +922,8 @@ partial class Game
         if (BridgeClosed(fx, fy)) return new Target { Type = "info", Label = Stormy ? "The bridge is closed until the storm passes" : "The bridge is roped off until you have finished your first steps" };
         foreach (var s in Data.Spots)
             if (s.Scene == "world" && SpotOpen(s.Id) && Dist(x, y, s.X, s.Y) < s.R) return SpotTarget(s);
+        // Your pet, after everything else (Pet.cs).
+        if (PetTarget() is Target petTarget) return petTarget;
         // A moored boat comes last: it mustn't hide anything else, and <ride> boards it from beside them anyway.
         // In a storm it stays tied up, which leaves the shelter.
         if (!Stormy && BoatInReach()) return new Target { Type = "boat", Label = "Board your boat" };
@@ -939,7 +946,7 @@ partial class Game
         FadeThrough(() =>
         {
             SkipTo(to);
-            state.food = Math.Max(0, state.food - 10);
+            SpendFood(10);
             state.hp = Math.Min(100, state.hp + 50);
             SnapWeather();
             Save();
@@ -948,7 +955,7 @@ partial class Game
             string msg = state.day != day0 ? $"Morning of day {state.day}." + SeasonTurn() + WeatherNews() + FestivalNews()
                 : shelter ? $"You wait out the storm. It's {ClockText(state.clock, 10)}." + WeatherNews()
                 : FullMoon ? "Night falls. The moon is full tonight." : "Night falls.";
-            Toast(msg + (state.food < 25 ? " You wake up hungry." : ""), state.day != day0 && SeasonTurn() != "" ? 7 : 4);
+            Toast(msg + (HungerOn && state.food < 25 ? " You wake up hungry." : ""), state.day != day0 && SeasonTurn() != "" ? 7 : 4);
         });
     }
 
@@ -957,6 +964,9 @@ partial class Game
         if (mode != "play") return;
         if (target?.AltType == "release") ReleaseCatch();
         else if (target?.AltType == "riddle") AskRiddle();
+        else if (target?.AltType == "gift" && giftTo != null) GiveGift(giftTo);
+        else if (target?.AltType == "adopt" && target.Ref is Animal adoptee) StartAdopt(adoptee);
+        else if (target?.AltType == "petstay") TogglePetStay();
         else if (target?.AltType == "cook") OpenCraft("fire");
         else if (target?.AltType == "chum") ThrowChum(target.Id);
         else if (target?.AltType == "launch") LaunchBoat();
@@ -993,6 +1003,7 @@ partial class Game
             case "play":
                 // Nothing in front of you: use what you're holding (Hotbar.cs).
                 if (target == null) { UseHeld(); return; }
+                talkingTo = FriendOf(target);   // only a conversation you start with them counts (Friends.cs)
                 switch (target.Type)
                 {
                     case "npc":
@@ -1000,6 +1011,8 @@ partial class Game
                         else { FaceToward(tomasX, tomasY); TalkTomasWithRequests(); }
                         break;
                     case "pip": FaceToward(PipX, PipY); TalkPip(); break;
+                    case "board": OpenBoard(); break;
+                    case "event": UseEvent(target); break;
                     case "sail":
                         if (Has("boat") > 0 && (VoyageChoice || Dist(player.X, player.Y, AsinanJettyX, AsinanJettyY) < 12 || Dist(player.X, player.Y, MlJettyX, MlJettyY) < 12)) OpenVoyage();
                         else Sail(target.Id);
@@ -1095,6 +1108,7 @@ partial class Game
     /* ---------- Update loop ---------- */
     void Update(float dt)
     {
+        talkingTo = null;   // set by this frame's OnAction, read by its Talk (Friends.cs)
         // A match keeps to one timeline: its clock, the bite waits and the fight all move by the same capped step.
         if (MatchActive) dt = MathF.Min(dt, MatchMaxDt);
         time += dt;
@@ -1113,7 +1127,7 @@ partial class Game
         UpdateFloaters(dt);
         UpdateTitleTour(dt);
         UpdateTitleIntro(dt);
-        if (!MatchActive) { UpdateGuide(dt); TellBadgeNews(); UpdateLedger(dt); UpdateCelebrations(dt); }
+        if (!MatchActive) { UpdateGuide(dt); TellBadgeNews(); UpdateLedger(dt); UpdateBoard(dt); UpdateEvents(); UpdateCelebrations(dt); }
         HoldMount();
         if (mode is not ("pause" or "panel" or "title" or "create"))
         {
@@ -1271,6 +1285,11 @@ partial class Game
             else
             {
                 target = FindTarget();
+                // A gift for the person in front of you (Friends.cs), when nothing else is on <alt>.
+                AddGiftAlt();
+                // A dog or cat you've made friends with on three days can come home with you (Pet.cs).
+                if (target?.Type == "animal" && target.AltType == null && target.Ref is Animal adoptable && CanAdopt(adoptable))
+                { target.AltType = "adopt"; target.AltLabel = adoptable.Kind == "dog" ? "Take the dog home" : "Take the cat home"; }
                 // Just after landing a fish, F lets it go (Release.cs), over whatever F would do here.
                 if (CanRelease)
                 {

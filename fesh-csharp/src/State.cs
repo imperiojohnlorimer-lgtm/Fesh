@@ -130,6 +130,16 @@ sealed class State
     public Dictionary<string, int> tally = new();    // "sold", "earned", "eaten", "cooked", "crafted", "felled", "mined", "monsters", "doubles"
     public double sailed;                            // how far you've steered the boat, in pixels
     public string title = "";                        // the title you chose to wear ("" none)
+    // The harbour board (1.45, Bounties.cs): today's three bounties, and the run of days with at least one done.
+    public BoardDay board;                           // null until first read (older saves too)
+    public int boardStreak, boardBest, boardLastDay, boardDone, boardSeen;   // days in a row, the best run, the last day credited, bounties done, the day it was last read
+    // The events deck (1.45, Events.cs): today's event, a bottle's X still to dig, and how many days had one.
+    public DayEvent dayEvent;
+    public Hunt hunt;
+    public int eventsHad;
+    // Friendship (1.45, Friends.cs): villager id -> points, the days you last talked and gave a gift, presents given.
+    public Dictionary<string, Friendship> friends = new();
+    public PetData pet;                              // your pet (1.45, Pet.cs), or null
 
     // The guide (1.16, Guide.cs): the goal you chose to follow ("" follows the story, then requests, by itself).
     // The "Getting started" checklist is in hinted ("tut:sell", "tut:eat"...).
@@ -269,6 +279,16 @@ static class SaveFile
             s.tackle ??= new(); s.records ??= new(); s.trophies ??= new(); s.big ??= new(); s.pots ??= new();
             s.yards = (s.yards ?? new()).Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => new Yard { stage = Math.Clamp(kv.Value.stage, 0, 5), paid = kv.Value.paid && kv.Value.stage < 5, work = Math.Clamp(kv.Value.work, 0, 2.5f) });
             s.racks ??= new(); s.sightings ??= new(); s.gleanTide ??= "";
+            // A damaged board is rolled again (Bounties.cs): only whole entries are kept, with their lists filled in.
+            if (s.board != null)
+            {
+                s.board.list = (s.board.list ?? new()).Where(b => b?.kind != null && b.need > 0).ToList();
+                foreach (var b in s.board.list) b.ids ??= new();
+                if (s.board.list.Count == 0) s.board = null;
+            }
+            if (s.dayEvent != null) { s.dayEvent.kind ??= "none"; s.dayEvent.offers = (s.dayEvent.offers ?? new()).Where(o => o?.item != null && Items.ById.ContainsKey(o.item)).ToList(); }
+            s.friends = (s.friends ?? new()).Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value);
+            if (s.hunt != null && (s.hunt.item == null || !Items.ById.ContainsKey(s.hunt.item))) s.hunt = null;
             s.guso = (s.guso ?? new()).Where(kv => kv.Value != null && kv.Key is "0" or "1" or "2" or "3").ToDictionary(kv => kv.Key, kv => kv.Value);
             foreach (var key in s.racks.Keys.ToList())
                 if (s.racks[key] == null) s.racks.Remove(key);

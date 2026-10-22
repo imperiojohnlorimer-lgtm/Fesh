@@ -48,6 +48,14 @@ partial class Game
         OldCelebrate = true;
         // Fight twists (FightTwists.cs) would change the old scripts' fights, which reel fish in by holding a key.
         TwistsOff = true;
+        // The harbour board (Bounties.cs) would pay coins and add a goal in the old scripts; BoardScript turns it on.
+        BoardOff = true;
+        // ...and the events deck (Events.cs) would put turtles, traders and fish runs into them; EventScript turns it on.
+        EventsOff = true;
+        // ...and friendship (Friends.cs) would add hearts, presents and a gift key to their conversations; FriendScript turns it on.
+        FriendsOff = true;
+        // ...and a pet (Pet.cs) would change Biscuit; PetScript turns it on.
+        PetsOff = true;
         // The title's opening (Opening.cs) would hide the title's buttons for its first five seconds; IntroScript plays it.
         introDone = true;
         // People's own blinking would make pixel checks on faces depend on the moment (the scenery shots keep it).
@@ -78,6 +86,10 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_IMPACT_TEST") == "1" ? ImpactScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_CELEBRATE_TEST") == "1" ? CelebrateScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_LEDGER_TEST") == "1" ? LedgerScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_BOARD_TEST") == "1" ? BoardScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_EVENT_TEST") == "1" ? EventScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_FRIEND_TEST") == "1" ? FriendScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_PET_TEST") == "1" ? PetScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_TWIST_TEST") == "1" ? TwistScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_PHOTO_TEST") == "1" ? PhotoScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_INTRO_TEST") == "1" ? IntroScript().GetEnumerator()

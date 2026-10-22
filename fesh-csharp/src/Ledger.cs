@@ -112,6 +112,18 @@ partial class Game
         new("sungka", "Home & boat", "Sungka", "Beat Lola Pacing at sungka.", g => g.state.sungkaWins, 1, 40),
         new("cooked", "Home & boat", "Island cook", "Cook 10 dishes.", g => g.Tally("cooked"), 10, 40, "Island cook"),
         new("monsters", "Home & boat", "Cave clearer", "Beat 15 cave monsters.", g => g.Tally("monsters"), 15, 60),
+        // The harbour board (1.45, Bounties.cs).
+        new("board", "Home & boat", "Notice taker", "Finish a bounty from the harbour board.", g => g.state.boardDone, 1, 10),
+        new("board25", "Home & boat", "Board regular", "Finish 25 harbour board bounties.", g => g.state.boardDone, 25, 80, "Board regular"),
+        new("streak3", "Home & boat", "Three days running", "Finish a bounty three days in a row.", g => g.state.boardBest, 3, 30),
+        new("streak7", "Home & boat", "A week of notices", "Finish a bounty seven days in a row.", g => g.state.boardBest, 7, 80, "Harbour regular"),
+        new("streak14", "Home & boat", "Pillar of the harbour", "Finish a bounty fourteen days in a row.", g => g.state.boardBest, 14, 150, "Pillar of the harbour"),
+        // Friendship (1.45, Friends.cs).
+        new("friend3", "Home & boat", "A friend", "Reach three hearts with someone.", g => g.FriendsAt(3), 1, 30),
+        new("friend5", "Home & boat", "Best friends", "Reach five hearts with someone.", g => g.FriendsAt(5), 1, 80, "Good neighbour"),
+        new("friends10", "Home & boat", "Everybody's friend", "Reach three hearts with ten people.", g => g.FriendsAt(3), 10, 200, "Islander"),
+        // A pet (1.45, Pet.cs).
+        new("pet", "Home & boat", "A friend for life", "Take a dog or a cat home.", g => g.state.pet != null ? 1 : 0, 1, 40),
     };
 
     static bool AchEarned(State s, Ach a) => s.Hinted("ach:" + a.Id);
@@ -305,6 +317,8 @@ partial class Game
             ("Ore mined", Tally("mined").ToString()),
             ("Derby wins", state.derbyWins.ToString()),
             ("Best regatta", state.regattaBest > 0 ? RaceTime(state.regattaBest) : "not yet"),
+            ("Bounties done", state.boardDone.ToString()),
+            ("Best run of bounty days", state.boardBest.ToString()),
         };
     }
 

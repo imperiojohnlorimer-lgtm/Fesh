@@ -11,6 +11,7 @@ partial class Game
         Say P(string t) => new("Pip", t);
         if (TourBlocked(4, "Pip's stall opens once you've caught a fish and looked in your bag.")) return;
         if (!PipOpen) { Sfx.Play("nope"); Toast("Pip's stall has just closed for the night."); return; }
+        NoteTalk("pip");   // a chat over the counter (Friends.cs)
         if (!state.Hinted("metPip"))
         {
             state.hinted["metPip"] = true;

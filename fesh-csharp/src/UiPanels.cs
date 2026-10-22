@@ -22,10 +22,14 @@ partial class Game
         // Food and the rod in use.
         float fx = bx + 140, fy = by + pad + 6;
         DrawIcon("grilled_fish", fx, fy, 28);
-        Gfx.Rect(fx + 36, fy + 8, 160, 14, Pal.C("rgba(0,0,0,0.15)"), 3);
-        float f = state.food / 100f;
-        if (f > 0) Gfx.Rect(fx + 36, fy + 8, Math.Max(6, 160 * f), 14, f > 0.5f ? Pal.C("#5fb04f") : f > 0.25f ? Pal.Lantern : Pal.Buoy, 3);
-        Gfx.Text($"Food {state.food:0}/100", fx + 206, fy + 5, FontKind.Ui600, 18, Pal.PaperInk);
+        if (HungerOn)
+        {
+            Gfx.Rect(fx + 36, fy + 8, 160, 14, Pal.C("rgba(0,0,0,0.15)"), 3);
+            float f = state.food / 100f;
+            if (f > 0) Gfx.Rect(fx + 36, fy + 8, Math.Max(6, 160 * f), 14, f > 0.5f ? Pal.C("#5fb04f") : f > 0.25f ? Pal.Lantern : Pal.Buoy, 3);
+            Gfx.Text($"Food {state.food:0}/100", fx + 206, fy + 5, FontKind.Ui600, 18, Pal.PaperInk);
+        }
+        else Gfx.Text("Hunger is off: food heals", fx + 36, fy + 5, FontKind.Ui600, 18, Muted);
         string rod = BestRod();
         DrawIcon(rod, fx + 360, fy, 28);
         Gfx.Text($"Fishing with: {Items.ById[rod].Name}", fx + 396, fy + 5, FontKind.Ui600, 18, Pal.PaperInk);

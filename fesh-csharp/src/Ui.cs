@@ -66,6 +66,10 @@ partial class Game
         if (mode == "panel" && panel == "voyage") DrawVoyage();
         if (mode == "panel" && panel == "journal") DrawJournal();
         if (mode == "panel" && panel == "ledger") DrawLedger();
+        if (mode == "panel" && panel == "board") DrawBoard();
+        if (mode == "panel" && panel == "trader") DrawTrader();
+        if (mode == "panel" && panel == "friends") DrawFriends();
+        if (mode == "panel" && panel == "petname") DrawPetName();
         if (mode == "panel" && panel == "tides") DrawTides();
         if (mode == "panel" && panel == "quiz") DrawQuiz();
         if (mode == "panel" && panel == "sort") DrawSort();
@@ -225,9 +229,9 @@ partial class Game
         Gfx.Rect(x + 12, y + 37, w - 24, 1, Pal.C("rgba(255,255,255,0.12)"));
         DrawPin(x + 21, y + 49);
         Gfx.Text(Gfx.Ellipsize(AreaName(), FontKind.Ui600, 16, w - 52), x + 38, y + 41, FontKind.Ui600, 16, CardText("#cfe3ea"));
-        // Health and food, side by side.
-        DrawHealthMeter(x, y + 62, w / 2, 36);
-        DrawFoodMeter(x + w / 2, y + 62, w / 2, 36);
+        // Health and food, side by side; with hunger off (Settings), health has the row.
+        if (HungerOn) { DrawHealthMeter(x, y + 62, w / 2, 36); DrawFoodMeter(x + w / 2, y + 62, w / 2, 36); }
+        else DrawHealthMeter(x, y + 62, w, 36);
         Gfx.Block(x, y, w, HudH);
         // The goal you're following goes under it (Guide.cs), then a meter's reading over both.
         DrawGuideCard();
@@ -1350,40 +1354,45 @@ partial class Game
     float lastCaseTabRight;        // where the last case tab ended (checked against the Close button)
     string caseTab = "saltmere";   // "saltmere" (the guardian of the deep), "habagat" (the vanishing moon, once you've found Habagat), "amihan" (the restless sea, once the ground has shaken) or "baga" (beneath the clouds, once you've met Manay Mila)
 
-    // A tab per story, two lines each ("Story N" small, its name), greyed with a padlock until it begins. They shrink to fit
-    // between the title and Close. True when a click has just changed the tab (the caller stops drawing this frame).
+    // A tab per story, all one width and never wider than their share of the room between the title and Close: a padlock
+    // (until it begins) and "N. its name" on up to two lines, the letters as big as lets every name fit (1.45: with five
+    // stories the old one-line names shrank to 13 px and still ran under Close). True when a click has just changed the tab
+    // (the caller stops drawing this frame).
     bool DrawCaseTabs(float x, float y, float right)
     {
         var stories = CaseStories();
-        float tabX = x + Gfx.Measure("Case board", FontKind.Ui700, 40) + 28, room = right - tabX, fs = 19, pad = 30;
-        float TabW((string id, int n, string name, bool open, string hint) s) =>
-            Math.Max(Gfx.Measure(s.name, FontKind.Ui700, fs), Gfx.Measure($"Story {s.n}", FontKind.Ui600, 13) + (s.open ? 0 : 16)) + pad;
-        // Every tab is as wide as the widest, so the row reads as one set (they used to differ with their names).
-        float Common() => stories.Max(TabW);
-        while (fs > 13 && (Common() + 8) * stories.Length > room) { fs -= 1; pad = Math.Max(16, pad - 3); }
-        float common = Common();
+        const float h = 48, gap = 8;
+        float tabX = x + Gfx.Measure("Case board", FontKind.Ui700, 40) + 24, room = right - tabX;
+        float w = (room - gap * (stories.Length - 1)) / stories.Length;
+        string Label((string id, int n, string name, bool open, string hint) s) => $"{s.n}. {s.name}";
+        // The biggest size where every name fits in two lines (the padlock takes a little of a locked tab's first line).
+        float fs = 17;
+        while (fs > 11 && stories.Any(s => Gfx.Wrap(Label(s), FontKind.Ui700, fs, w - 16 - (s.open ? 0 : 14)).Count > 2)) fs -= 1;
         foreach (var s in stories)
         {
-            float w = common;
             bool sel = caseTab == s.id;
             var fill = sel ? Pal.Lantern : s.open ? Pal.Sand : Pal.C("#b9a98a");
-            if (!sel && Gfx.Hover(tabX, y, w, 48)) fill = Lighten(fill, 0.14f);
-            Gfx.Box(tabX, y, w, 48, fill, Pal.Ink, 3, 6, 4);
+            if (!sel && Gfx.Hover(tabX, y, w, h)) fill = Lighten(fill, 0.14f);
+            Gfx.Box(tabX, y, w, h, fill, Pal.Ink, 3, 6, 4);
             var ink = s.open ? Pal.Ink : Pal.C("#5a4e3e");
-            string tag = $"Story {s.n}";
-            float sx = tabX + w / 2 - Gfx.Measure(tag, FontKind.Ui600, 13) / 2 + (s.open ? 0 : 8);
-            if (!s.open) DrawPadlock(sx - 15, y + 5, 1, ink);
-            Gfx.Text(tag, sx, y + 4, FontKind.Ui600, 13, ink);
-            Gfx.TextCenter(s.name, tabX + w / 2, y + 20, FontKind.Ui700, fs, ink);
+            float lock_ = s.open ? 0 : 14;
+            var lines = Gfx.Wrap(Label(s), FontKind.Ui700, fs, w - 16 - lock_);
+            if (lines.Count > 2) lines = new() { lines[0], Gfx.Ellipsize(string.Join(" ", lines.Skip(1)), FontKind.Ui700, fs, w - 16 - lock_) };
+            float lh = fs + 3, ty = y + (h - lines.Count * lh) / 2 - 1;
+            float lw = lines.Max(l => Gfx.Measure(l, FontKind.Ui700, fs)) + lock_, lx = tabX + (w - lw) / 2;
+            if (!s.open) DrawPadlock(lx, ty + lh / 2 - 6, 1, ink);
+            for (int i = 0; i < lines.Count; i++) Gfx.Text(lines[i], lx + lock_, ty + i * lh, FontKind.Ui700, fs, ink);
 #if DEBUG
-            Gfx.Seen[s.name] = new Rectangle(tabX, y, w, 48);   // the autotest clicks a tab by its story's name
+            Gfx.Seen[s.name] = new Rectangle(tabX, y, w, h);   // the autotest clicks a tab by its story's name
 #endif
-            if (Gfx.Click(tabX, y, w, 48) && !sel) { caseTab = s.id; Sfx.Play(s.open ? "blip" : "nope"); return true; }
+            if (Gfx.Click(tabX, y, w, h) && !sel) { caseTab = s.id; Sfx.Play(s.open ? "blip" : "nope"); return true; }
             lastCaseTabRight = tabX + w;
-            tabX += w + 8;
+            lastCaseTabFs = fs;
+            tabX += w + gap;
         }
         return false;
     }
+    float lastCaseTabFs;
 
     // A small padlock (the fonts have no symbol for one): an arched shackle over a body with a keyhole.
     static void DrawPadlock(float x, float y, float k, Color c)

@@ -15,6 +15,7 @@ sealed class SettingsData
     public int dayLength = 24;                 // real minutes for a whole day and night; 0 stops the clock (only resting moves it)
     public bool clock24;                       // 14:30 instead of 2:30 PM
     public bool guide = true;                  // the goal card and the arrow to it (Guide.cs); the journal works either way
+    public bool hunger = true;                 // the food meter (1.45): off, you never get hungry, and food only heals
     public int zoom = 4;                       // game pixels shown this many screen pixels wide: 5 closer, 4 normal, 3 wider, 2 widest (Game.ZoomLevels)
     public bool clearFont;                     // Atkinson Hyperlegible in place of the pixel and typewriter fonts (Gfx.Clear)
     public int light = -1;                     // light and colour (Light.cs): -1 automatic (Full on a PC, Soft on a phone), 0 off, 1 soft, 2 full

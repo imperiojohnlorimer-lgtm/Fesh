@@ -886,7 +886,7 @@ partial class Game
     // Health comes back slowly while you're fed and out of danger; starving wears it down (but never below 10).
     void TickHealth(float dt)
     {
-        if (state.food > 30 && time - lastHitT > 4 && state.hp < 100) state.hp = Math.Min(100, state.hp + dt * 0.5f);
+        if ((state.food > 30 || !HungerOn) && time - lastHitT > 4 && state.hp < 100) state.hp = Math.Min(100, state.hp + dt * 0.5f);
         if (Starving && state.hp > 10) state.hp = Math.Max(10, state.hp - dt / 8f);
     }
 

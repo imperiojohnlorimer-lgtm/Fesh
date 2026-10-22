@@ -53,6 +53,8 @@ partial class Game
         MarilayaGoals(list);
         SchoolGoals(list);
         ExploreGoals(list);
+        BoardGoals(list);
+        EventGoals(list);
         NoteSleepers(list);
         return list;
     }
@@ -780,7 +782,8 @@ partial class Game
             ("Catch a fish", "Face the water, hold <act> to power up a cast, then let go.", state.commons.Values.Sum() > 0 || state.caught.Count > 0, 0),
             ("Sell fish to Pip", "Pip's stall is just east of Tomas's camp.", H("sell"), 0),
             ("Buy bait from Pip", "Bait makes fish bite sooner. One goes on each cast.", H("buy"), 0),
-            ("Eat something", "Open your bag (<bag>) and eat when the food bar runs low.", H("eat"), 0),
+            // With hunger off (Settings) there's no food bar to run low: nothing to learn here (Codex).
+            ("Eat something", "Open your bag (<bag>) and eat when the food bar runs low.", H("eat") || !HungerOn, 0),
             ("Cook a fish", "Face a campfire and press <alt> to cook.", H("cook"), 0),
             ("Rest until night", "Press <act> by a campfire or a bed to skip ahead.", H("rest"), 0),
             ("Look at your Fesh-dex", "Press <dex> for the creatures and every fish you've found.", H("dex"), 0),
@@ -836,6 +839,11 @@ partial class Game
         // The Angler's Ledger (Ledger.cs).
         const string ledger = "Angler's Ledger";
         if (SmallButton(ledger, PanelCloseX - 24 - SmallW(toggle) - SmallW(ledger), y + pad - 6)) { OpenLedger(); return; }
+        // Today's harbour board (Bounties.cs), readable from anywhere once you've found one.
+        const string board = "Harbour board";
+        if (!BoardOff && SmallButton(board, PanelCloseX - 36 - SmallW(toggle) - SmallW(ledger) - SmallW(board), y + pad - 6)) { OpenBoard(); return; }
+        const string friends = "Friends";
+        if (!FriendsOff && SmallButton(friends, PanelCloseX - 48 - SmallW(toggle) - SmallW(ledger) - SmallW(board) - SmallW(friends), y + pad - 6)) { OpenFriends(); return; }
 
         // Goals, a page at a time.
         float lx = x + pad, ly = y + pad + 84, lw = 700;

@@ -84,7 +84,7 @@ partial class Game
         if (quiet) return;
         Save();
         string turn = SeasonTurn();
-        Toast($"Morning of day {state.day}." + turn + WeatherNews() + FestivalNews() + (state.food < 25 ? " You're getting hungry." : ""), turn != "" ? 7 : 4.5f);
+        Toast($"Morning of day {state.day}." + turn + WeatherNews() + FestivalNews() + (HungerOn && state.food < 25 ? " You're getting hungry." : ""), turn != "" ? 7 : 4.5f);
     }
 
     // Chopped trees and broken boulders whose time is up grow back, one tile at a time (rebuilding the whole map would

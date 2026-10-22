@@ -40,6 +40,8 @@ partial class Game
 
     static string WhenText(string iso) => DateTime.TryParse(iso, null, System.Globalization.DateTimeStyles.RoundtripKind, out var d) ? d.ToString("MMM d") : "";
 
+    float lastNameLeft, lastMatchTabsRight;   // where the name picker started and the tabs ended (checked: they never overlap)
+
     void DrawMatches()
     {
         var (px, py, pw, ph) = PanelFrame("Matches", "Short head-to-head runs. Both sides get the same seeded water or the same board, so skill decides.");
@@ -55,14 +57,21 @@ partial class Game
             tx += bw + 10;
         }
         // Your name for matches: pick each word from its list (there is no typing a name), or let chance choose.
+        // The two words and the label share what the tabs leave: the words narrow, then the label goes, rather than
+        // running over the Leaderboards tab (1.45).
         float nx = px + pw - PanelPad - SmallW("Random");
         if (SmallButton("Random", nx, ty)) { var rn = new Random(); Leaderboards.SetName(rn.Next(1000), rn.Next(1000)); Sfx.Play("ui"); }
-        float pickW = 150;
+        float labelW = Gfx.Measure("Your name", FontKind.Ui600, 18), free = nx - tx - 12;
+        bool showLabel = true;
+        float pickW = MathF.Min(150, (free - 12 - 14 - 160 - labelW - 12) / 2);
+        if (pickW < 110) { showLabel = false; pickW = Math.Clamp((free - 12 - 14 - 160) / 2, 70, 150); }
         nx -= 12 + 40 + pickW + 40;
         if (NamePicker("noun", nx, ty, pickW, Leaderboards.NounAt(board.noun), d => Leaderboards.SetName(board.adj, board.noun + d))) { }
         nx -= 14 + 40 + pickW + 40;
         NamePicker("adj", nx, ty, pickW, Leaderboards.AdjectiveAt(board.adj), d => Leaderboards.SetName(board.adj + d, board.noun));
-        Gfx.Text("Your name", nx - 12 - Gfx.Measure("Your name", FontKind.Ui600, 18), ty + 11, FontKind.Ui600, 18, Muted);
+        if (showLabel) Gfx.Text("Your name", nx - 12 - labelW, ty + 11, FontKind.Ui600, 18, Muted);
+        lastNameLeft = showLabel ? nx - 12 - labelW : nx;
+        lastMatchTabsRight = tx - 10;
 
         float top = ty + 62, gap = 20;
         float cw = (pw - PanelPad * 2 - gap * 2) / 3, ch = ph - (top - py) - PanelPad;
@@ -120,7 +129,7 @@ partial class Game
 #endif
         }
         Gfx.Box(x + 40, y, w, 44, CardBg, Pal.Ink, 3, 6);
-        Gfx.TextCenter(word, x + 40 + w / 2, y + 10, FontKind.Ui700, 20, Pal.PaperInk);
+        Gfx.TextCenter(Gfx.Ellipsize(word, FontKind.Ui700, 20, w - 12), x + 40 + w / 2, y + 10, FontKind.Ui700, 20, Pal.PaperInk);
         return hit;
     }
 
