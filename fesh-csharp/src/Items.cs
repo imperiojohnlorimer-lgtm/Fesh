@@ -73,6 +73,8 @@ static class Items
         new("headlamp", "Headlamp", "accessory", "A much bigger circle of light at night and in the caves.", Icon: "headlamp"),
         new("cooler", "Cooler", "accessory", "Keeps your catch fresh: Pip pays 25% more for fish.", Icon: "cooler"),
         new("big_sail", "Big sail", "accessory", "A taller sail for your boat. It sails a third faster (trolling stays slow).", Icon: "bigsail"),
+        new("boat_lantern", "Boat lantern", "accessory", "A lantern for your banca's mast. It glows warmly on the water after dark. (Looks only.)", Icon: "boatlantern"),
+        new("boat_bunting", "Festival bunting", "accessory", "A string of little flags for the rigging, the way Dado's crew dresses a paraw for the regatta. (Looks only.)", Icon: "bunting"),
         new("painted_sail", "Painted paraw sail", "accessory", "Dado's family colours, from the regatta: red, gold, blue and green panels. Your boat's sail wears them.", Icon: "paintedsail"),
         new("echo_sounder", "Echo sounder", "accessory", "For your boat: it pings feeding frenzies further out, points to them from the edge of the view, and marks them on the sea chart.", Icon: "sonar"),
         new("bait", "Bait", "gear", "One is used each time you cast. Fish bite much faster, and rare ones a little more often.", Icon: "bait"),
@@ -332,6 +334,8 @@ static class Items
         new("fish_finder", 1, "workbench", N(("copper_bar", 2), ("iron_bar", 1), ("crystal", 1))),
         new("big_sail", 1, "workbench", N(("sailcloth", 2), ("wood", 4), ("iron_bar", 1))),
         new("echo_sounder", 1, "workbench", N(("copper_bar", 2), ("gold_bar", 1), ("crystal", 1))),
+        new("boat_lantern", 1, "workbench", N(("copper_bar", 1), ("slime_gel", 1), ("wood", 1))),
+        new("boat_bunting", 1, "workbench", N(("wool", 2), ("wood", 1))),
         new("waders", 1, "workbench", N(("slime_gel", 3), ("wool", 2))),
         new("lucky_charm", 1, "workbench", N(("abyssite", 2), ("gold_bar", 1))),
         new("headlamp", 1, "workbench", N(("copper_bar", 2), ("crystal", 1))),
@@ -801,6 +805,14 @@ static class ItemArt
             case "urchin":
                 p.Rect(3, 4, 6, 5, "#3a2a4a"); p.Rect(4, 3, 4, 7, "#3a2a4a"); p.Rect(5, 5, 2, 2, "#5a4a6e");
                 foreach (var (ux, uy) in new[] { (1, 6), (10, 6), (6, 1), (6, 11), (2, 2), (10, 2), (2, 10), (10, 10) }) p.Rect(ux, uy, 1, 1, "#4a3a5e");
+                break;
+            case "boatlantern":
+                p.Rect(5, 0, 1, 2, "#6c4c32"); p.Rect(3, 2, 5, 1, "#3b2a1d"); p.Rect(3, 3, 5, 6, "#e8b84a"); p.Rect(4, 4, 3, 4, "#ffe9a8");
+                p.Rect(3, 9, 5, 1, "#3b2a1d"); p.Rect(5, 5, 1, 2, "#ffffff"); p.Rect(3, 3, 1, 6, "#c8902c"); p.Rect(7, 3, 1, 6, "#c8902c");
+                break;
+            case "bunting":
+                p.Line(0, 2, 11, 2, "#6c4c32");
+                for (int i = 0; i < 4; i++) { int fx = 1 + i * 3; string c = i % 2 == 0 ? "#e04b3a" : i == 1 ? "#f3c25b" : "#2f7fa3"; p.Rect(fx, 3, 3, 1, c); p.Rect(fx, 4, 3, 1, c); p.Rect(fx + 1, 5, 1, 1, c); }
                 break;
             case "paintedsail":
                 // A triangle of coloured panels on a mast.

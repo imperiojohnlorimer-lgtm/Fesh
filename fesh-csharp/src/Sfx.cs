@@ -23,6 +23,7 @@ static class Sfx
         Add("cast", 0.2f, b => Tone(b, 650, 0.16f, "triangle", 0.04f, -420));
         Add("splash", 0.3f, b => Noise(b, 0.28f, 0.14f));
         // The Mire leviathan gulping air at the surface (MireBoss.cs): a deep hollow gloop, a splash, a bubble popping.
+        Add("whale", 2.2f, b => { Tone(b, 78, 1.1f, "sine", 0.3f, 95); Tone(b, 156, 1.0f, "sine", 0.1f, 190, 0.05f); Tone(b, 150, 0.95f, "sine", 0.26f, -70, 1.15f); });
         Add("gulp", 0.6f, b => { Tone(b, 150, 0.32f, "sine", 0.32f, -85); Noise(b, 0.2f, 0.08f); Tone(b, 420, 0.08f, "sine", 0.12f, 260, 0.36f); });
         Add("bite", 0.25f, b => { Tone(b, 880, 0.08f, "square", 0.05f); Tone(b, 1175, 0.1f, "square", 0.05f, 0, 0.09f); });
         for (int i = 0; i < 4; i++) { float f = 260 + i * 30; reels.Add(Make(0.05f, b => Tone(b, f, 0.03f, "square", 0.012f))); }

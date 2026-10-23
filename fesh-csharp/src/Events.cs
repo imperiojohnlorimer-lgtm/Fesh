@@ -32,7 +32,7 @@ partial class Game
 {
     internal static bool EventsOff;   // the old scripts never see events (AutoTestStart); EventScript turns them on
     const int EventVersion = 1;
-    static readonly string[] EventKinds = { "run", "trader", "bottle", "meteor", "turtle" };
+    static readonly string[] EventKinds = { "run", "trader", "bottle", "meteor", "turtle", "whale", "market", "kite" };
 
     DayEvent TodayEvent()
     {
@@ -44,6 +44,8 @@ partial class Game
             waiting.announced = true;
             return waiting;
         }
+        // A kite you are carrying home waits for you across the dawn, too.
+        if (state.dayEvent is { kind: "kite", stage: 1 } carrying) { carrying.day = state.day; carrying.announced = true; return carrying; }
         // Places are worked out on the outdoor map: indoors or underground, today has nothing until you're back out.
         if (scene != "world") return new DayEvent { day = state.day, announced = true };
         state.dayEvent = RollEvent(state.day);
@@ -97,6 +99,24 @@ partial class Game
                 (ev.x, ev.y) = (tx * T + 5, ty * T + 7);
                 break;
             }
+            case "whale":
+            {
+                var beaches = BeachTiles(PlayerIsland());
+                var (tx, ty) = beaches[(int)(rng.NextDouble() * beaches.Count) % beaches.Count];
+                (ev.x, ev.y) = (tx * T + 5, ty * T + 7);
+                break;
+            }
+            case "market":
+                (ev.x, ev.y) = MarketSpot().Value;
+                ev.offers = MarketOffers(rng);
+                break;
+            case "kite":
+            {
+                var beaches = BeachTiles(VillageRegion);
+                var (tx, ty) = beaches[(int)(rng.NextDouble() * beaches.Count) % beaches.Count];
+                (ev.x, ev.y) = (tx * T + 5, ty * T + 7);
+                break;
+            }
             case "turtle":
             {
                 var beaches = BeachTiles("saltmere");
@@ -116,6 +136,10 @@ partial class Game
         // Only on a night the forecast keeps clear (the stars must show), and the forecast is only known for today.
         "meteor" => day == state.day && ClearFromAfternoon(),
         "turtle" => BeachTiles("saltmere").Count > 0,
+        // Only while the listening window (06:00-10:00) has at least an hour left: not for someone who comes outdoors at 11:00.
+        "whale" => day == state.day && state.clock >= 6 * 60 && state.clock < 9 * 60 && !Night && BeachTiles(PlayerIsland()).Count > 0,
+        "market" => Charted(VillageRegion) && MarketSpot() != null,
+        "kite" => Charted(VillageRegion) && state.Hinted("metIsay") && BeachTiles(VillageRegion).Count > 0,
         _ => false
     };
 
@@ -197,7 +221,7 @@ partial class Game
         "bottle" => $"Something glints on a beach of {IslandName(RegionOf(ev.x, ev.y))}: a bottle washed up.",
         "meteor" => "Clear skies tonight: watch for shooting stars after dark. Rare fish rise while they fall.",
         "turtle" => "A sea turtle is stranded on a Saltmere beach. Keep back, keep dogs away, and tell Tomas.",
-        _ => ""
+        _ => MoreEventNews(ev)
     };
 
     string SpotName(string id) => Data.SpotById.TryGetValue(id ?? "", out var s) ? s.Label : "a fishing spot";
@@ -233,6 +257,7 @@ partial class Game
             return new Target { Type = "event", Id = "turtle", Label = ev.stage == 0 ? "Look at the stranded turtle (from a distance)" : "The turtle needs help: tell Tomas" };
         if (TraderHere && Dist(x, y, ev.x, ev.y + 8) < 13) return new Target { Type = "event", Id = "trader", Label = "Trade with the travelling trader" };
         if (state.hunt is Hunt h && Dist(x, y, h.x, h.y) < 12) return new Target { Type = "event", Id = "dig", Label = "Dig where the X is" };
+        if (MoreEventTarget(ev) is Target moreTarget) return moreTarget;
         return null;
     }
 
@@ -245,6 +270,7 @@ partial class Game
             case "turtle": LookAtTurtle(ev); break;
             case "trader": FaceToward(ev.x, ev.y); Sfx.Play("ui"); panel = "trader"; mode = "panel"; SetPrompt(""); break;
             case "dig": DigHunt(); break;
+            default: UseMoreEvent(t.Id, ev); break;
         }
     }
 
@@ -332,9 +358,10 @@ partial class Game
     void DrawTrader()
     {
         var ev = TodayEvent();
-        var (x, y, w, h) = PanelFrame("Travelling trader", "Here until " + HourText(18 * 60) + ". Things you won't find at Pip's.", 760, 420);
+        var market = ev.kind == "market";
+        var (x, y, w, h) = PanelFrame(market ? "Market day" : "Travelling trader", market ? "Local goods until " + HourText(16 * 60) + ", from the stalls of the village." : "Here until " + HourText(18 * 60) + ". Things you won't find at Pip's.", 760, market ? 540 : 420);
         if (PanelClose()) { ClosePanels(); return; }
-        if (!TraderHere) { Gfx.Text("The trader has packed up and gone.", x + PanelPad, y + 120, FontKind.Note, 20, Muted); return; }
+        if (!TradeOpen) { Gfx.Text(ev.kind == "market" ? "The market has packed up for the day." : "The trader has packed up and gone.", x + PanelPad, y + 120, FontKind.Note, 20, Muted); return; }
         float ry = y + 112;
         for (int i = 0; i < ev.offers.Count; i++)
         {
@@ -378,6 +405,7 @@ partial class Game
         if (ev.kind == "turtle" && ev.stage < 3 && Near(ev.x, ev.y)) list.Add((ev.y, () => DrawStrandedTurtle(ev)));
         if (TraderHere && Near(ev.x, ev.y)) list.Add((ev.y, () => DrawTraderFigure(ev.x, ev.y)));
         if (state.hunt is Hunt h && Near(h.x, h.y)) list.Add((h.y - 6, () => DrawX(h.x, h.y)));
+        MoreEventObjects(ev, list, Near);
     }
 
     void DrawBottle(float x, float y)
@@ -482,6 +510,9 @@ partial class Game
         if (ev.kind == "run" && Data.SpotById.TryGetValue(ev.arg, out var s)) place("Fish run", s.X, s.Y, 5, new() { "Fish run", "Bites twice as fast here today" }, 4);
         if (ev.kind == "trader") place("Trader", ev.x, ev.y, 1, new() { "Travelling trader", $"{HourText(9 * 60)} to {HourText(18 * 60)}" }, 4);
         if (ev.kind == "turtle" && ev.stage < 2) place("Turtle", ev.x, ev.y, 5, new() { "Stranded sea turtle", "Keep back, and tell Tomas" }, 4);
+        if (ev.kind == "whale" && WhaleOpen && ev.stage == 0) place("Whale song", ev.x, ev.y, 5, new() { "Whale song", $"Listen here, {HourText(6 * 60)} to {HourText(10 * 60)}" }, 4);
+        if (MarketHere) place("Market", ev.x, ev.y, 1, new() { "Market day", $"{HourText(8 * 60)} to {HourText(16 * 60)}" }, 4);
+        if (ev.kind == "kite" && ev.stage == 0) place("Kite", ev.x, ev.y, 5, new() { "A lost kite", "Pick it up, then see Ma'am Isay" }, 4);
     }
 
     void EventGoals(List<Goal> list)
@@ -498,6 +529,7 @@ partial class Game
             "turtle" when ev.stage == 0 => At(NewGoal("event:turtle", "daily", "A stranded sea turtle", "Look from a distance, then tell Tomas."), ev.x, ev.y, "The turtle"),
             "turtle" when ev.stage == 1 => AtTomas(NewGoal("event:turtle", "daily", "Tell Tomas about the turtle", "He'll call the trained responders. Don't move it yourself.")),
             "meteor" => NewGoal("event:meteor", "daily", "Shooting stars tonight", "After dark on a clear night, rare fish rise while they fall."),
+            "whale" or "market" or "kite" => MoreEventGoal(ev),
             _ => null
         };
         if (g != null) list.Add(g);

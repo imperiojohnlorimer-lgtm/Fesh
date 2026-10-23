@@ -35,7 +35,7 @@ partial class Game
         var today = DateTime.Now;
         int seed = MatchRules.DailySeed(today);
         bool race = matchRaceBest && Leaderboards.BestOn("daily", seed)?.log != null;
-        return new MatchSpec { Mode = "daily", Seed = seed, Rival = race ? "best" : null, Label = $"Daily Challenge · {MatchRules.DailyLabel(today)}" };
+        return new MatchSpec { Mode = "daily", Seed = seed, Rival = race ? "best" : null, Label = $"Daily Challenge · {MatchRules.DailyLabel(today)}", Day = MatchRules.DailyLabel(today) };
     }
 
     static string WhenText(string iso) => DateTime.TryParse(iso, null, System.Globalization.DateTimeStyles.RoundtripKind, out var d) ? d.ToString("MMM d") : "";
@@ -178,9 +178,17 @@ partial class Game
         int seed = MatchRules.DailySeed(today);
         MatchCard(x, y, w, h, "Daily Challenge", $"{MatchRules.DailyLabel(today)} · 3 minutes");
         float iy = y + 84;
-        var text = Gfx.Wrap("One seeded run a day: the same fish in the same order for everyone on this date. Play as often as you like; your best counts. Race your best run to beat it.", FontKind.Note, 17, w - 40);
+        var text = Gfx.Wrap("One seeded run a day: the same fish for everyone on this date. Your best counts; race it to beat it.", FontKind.Note, 17, w - 40);
         Lines(text, x + 20, iy, 23, FontKind.Note, 17, Pal.PaperInk);
         iy += text.Count * 23 + 14;
+        // The streak: days in a row with a finished run, and what comes next (DailyStreak.cs).
+        var (streak, playedToday, _) = MatchRules.DailyStreak(state.dailyDays, today);
+        string streakLine = streak == 0 ? "No streak yet: finish a run today to start one." : $"Streak: {DaysWord(streak)}" + (playedToday ? "" : " · play today to keep it");
+        Gfx.Text(streakLine, x + 20, iy, FontKind.Ui700, 17, Pal.C("#9a6a1a"));
+        var nextMile = MatchRules.NextMilestone(streak) is int nextMs and > 0 ? MatchRules.DailyMilestone(nextMs) : default;
+        var prizeLines = Gfx.Wrap($"Each day pays {MatchRules.DailyPlayCoins} coins" + (nextMile.coins > 0 ? $"; {DaysWord(MatchRules.NextMilestone(streak))} in a row pays {DailyPrizeText(nextMile.coins, nextMile.item, nextMile.n)}." : "."), FontKind.Note, 15, w - 40);
+        Lines(prizeLines, x + 20, iy + 24, 19, FontKind.Note, 15, Muted);
+        iy += 30 + prizeLines.Count * 19;
         var best = Leaderboards.BestOn("daily", seed);
         Gfx.Text("Today's best", x + 20, iy, FontKind.Ui700, 17, Muted);
         iy += 28;
@@ -221,7 +229,7 @@ partial class Game
         if (BigButtonLive("Find a dock", bx, by, why == null) && why == null) { StartDockFind(); return; }
         string line = why ?? dockMsg;
         if (line != "") Gfx.Text(Gfx.Ellipsize(line, FontKind.Note, 16, w - 40), x + 20, by + 70, FontKind.Note, 16, Rust);
-        var tip = Gfx.Wrap("The first time, Windows may ask whether Fesh can use the network: choose Private networks.", FontKind.Note, 17, w - 40);
+        var tip = Gfx.Wrap(LanNetworkTip, FontKind.Note, 17, w - 40);
         Lines(tip, x + 20, y + h - 20 - tip.Count * 24, 24, FontKind.Note, 17, Muted);
     }
 
@@ -333,26 +341,32 @@ partial class Game
     int boardPage;                              // 0: Derby, Daily, Sungka   1: Regatta, Sea School Duel, Spearfishing
 
     // The leaderboards, three at a time, with the adventure's own times under them and a button for the other page.
-    void DrawBoardPages(float x, float top, float w, float ch)
+    void DrawBoardPages(float x, float top, float w, float ch, bool dock = false)
     {
         const float gap = 20;
         float cw = (w - gap * 2) / 3;
         float c1 = x + cw + gap, c2 = c1 + cw + gap;
+        if (!dock && boardPage > 1) boardPage = 0;
         if (boardPage == 0)
         {
             DrawBoardColumn(x, top, cw, ch - 72, "derby", "Derby Duel");
             DrawBoardColumn(c1, top, cw, ch - 72, "daily", "Daily Challenge");
             DrawBoardColumn(c2, top, cw, ch - 72, "sungka", "Sungka (LAN)");
         }
-        else
+        else if (boardPage == 1)
         {
             DrawBoardColumn(x, top, cw, ch - 72, "regatta", "Regatta");
             DrawBoardColumn(c1, top, cw, ch - 72, "quiz", "Sea School Duel");
             DrawBoardColumn(c2, top, cw, ch - 72, "spear", "Spearfishing");
         }
-        string label = boardPage == 0 ? "More boards" : "First boards";
+        else { lastShowroomBottom = 0; DrawShowroom(x, top, w, ch - 72); }
+        // The dock's board has a third page, the showroom (DockShowroom.cs): boards 0, boards 1 and who is here.
+        string label = boardPage == 0 ? "More boards" : boardPage == 1 ? "First boards" : "Back to boards";
         float bw = BigW(label);
-        DrawTimeAttacks(x, top + ch - 62, w - bw - 14);
-        if (BigButton(label, x + w - bw, top + ch - 59, false)) { boardPage = 1 - boardPage; Sfx.Play("ui"); }
+        string showLabel = "Showroom";
+        float sw = dock && boardPage == 1 ? BigW(showLabel) + 14 : 0;
+        DrawTimeAttacks(x, top + ch - 62, w - bw - sw - 14);
+        if (BigButton(label, x + w - bw, top + ch - 59, false)) { boardPage = boardPage == 0 ? 1 : boardPage == 1 ? 0 : 1; Sfx.Play("ui"); return; }
+        if (sw > 0 && BigButton(showLabel, x + w - bw - sw, top + ch - 59, false)) { boardPage = 2; Sfx.Play("ui"); }
     }
 }

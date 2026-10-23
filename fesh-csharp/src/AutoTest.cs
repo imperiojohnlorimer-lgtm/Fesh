@@ -56,6 +56,8 @@ partial class Game
         FriendsOff = true;
         // ...and a pet (Pet.cs) would change Biscuit; PetScript turns it on.
         PetsOff = true;
+        // ...and bubbles to cast into (CastSkill.cs) would change a cast's bite time; CastSkillScript turns them on.
+        CastSkillOff = true;
         // The title's opening (Opening.cs) would hide the title's buttons for its first five seconds; IntroScript plays it.
         introDone = true;
         // People's own blinking would make pixel checks on faces depend on the moment (the scenery shots keep it).
@@ -90,6 +92,17 @@ partial class Game
             : Environment.GetEnvironmentVariable("FESH_EVENT_TEST") == "1" ? EventScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_FRIEND_TEST") == "1" ? FriendScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_PET_TEST") == "1" ? PetScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_CAST_TEST") == "1" ? CastSkillScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_SHOWROOM_TEST") == "1" ? ShowroomNetScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_BOATCOS_TEST") == "1" ? BoatCosmeticsScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_TROPHY_TEST") == "1" ? TrophyScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_WARDROBE_TEST") == "1" ? WardrobeScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_ANIMAL_TEST") == "1" ? AnimalMotionScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_DETAIL_TEST") == "1" ? StoryDetailScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_WEEKLY_TEST") == "1" ? WeeklyScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_EVENT2_TEST") == "1" ? EventMoreScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_MOON_TEST") == "1" ? MoonScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_STREAK_TEST") == "1" ? DailyStreakScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_TWIST_TEST") == "1" ? TwistScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_PHOTO_TEST") == "1" ? PhotoScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_INTRO_TEST") == "1" ? IntroScript().GetEnumerator()

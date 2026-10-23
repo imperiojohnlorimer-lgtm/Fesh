@@ -11,6 +11,7 @@ sealed class MatchSpec
     public float Duration = MatchRules.DerbySecs;
     public string Rival;                                // a MatchRules.Rivals id, "best" (your best run of this seed) or null
     public string Label = "";
+    public string Day;                                  // the daily challenge's date (MatchRules.DailyLabel): only a real one counts for the streak and its prizes
 }
 
 sealed class MatchOutcome
@@ -20,6 +21,7 @@ sealed class MatchOutcome
     public MatchScore Me, Rival;
     public bool NewBest;
     public int Rank;                                    // among your best runs of this mode
+    public string DailyLine = "";                       // the daily challenge: your streak and what it pays (1.45.1)
     public string Prize = "", PrizeNote = "";           // Pip's prize for beating a rival, and why there isn't one
 }
 
@@ -49,6 +51,7 @@ sealed class MatchRun
     public Random RealRng;
     public double RealPlay;
     public readonly HashSet<string> Won = new();         // rivals beaten this time that Pip pays for when you are back
+    public string DailyToast;                           // what the daily challenge paid into the real save, told when you are back (DailyStreak.cs)
 }
 
 partial class Game
@@ -166,6 +169,7 @@ partial class Game
         state.playSecs = m.RealPlay + Math.Min(fished, 3600);
         if (stampDock) { stampDock = false; BuildMap(); }
         PayDuelPrizes(m);
+        PayDailyPrizes(m);
         rng = m.RealRng;
         fish = null; reel = null; pointerHold = false; chargeSpot = null; charge = 0; heldItem = null; heldT = 0; landed = null;
         floaters.Clear();
@@ -235,7 +239,7 @@ partial class Game
     void RestartMatch()
     {
         var old = match.Spec;
-        var spec = new MatchSpec { Mode = old.Mode, Seed = old.Mode == "daily" ? old.Seed : MatchRules.Mix(Environment.TickCount, (int)(DateTime.Now.Ticks & 0x7fffffff)), Duration = old.Duration, Rival = old.Rival, Label = old.Label };
+        var spec = new MatchSpec { Mode = old.Mode, Seed = old.Mode == "daily" ? old.Seed : MatchRules.Mix(Environment.TickCount, (int)(DateTime.Now.Ticks & 0x7fffffff)), Duration = old.Duration, Rival = old.Rival, Label = old.Label, Day = old.Day };
         match.Spec = spec;
         match.RivalEvt = 0;
         match.Me = default; match.Log.Clear(); match.Casts = 0; match.Lost = 0; match.T = 0; match.ReelAcc = 0; match.LeaveAsk = false; match.Result = null;
@@ -299,6 +303,7 @@ partial class Game
         }
         m.Result = o;
         RecordMatch(o);
+        PlanDailyPrize(m, o);
         Sfx.Play(o.Result == "win" ? "rare" : o.Result == "loss" ? "fail" : "coin");
         mode = "matchresult";
         SetPrompt("");
@@ -529,7 +534,8 @@ partial class Game
         Gfx.TextCenter(sub, x + w / 2, y + 80, FontKind.Ui600, 20, Muted);
         if (o.Prize != "") Gfx.TextCenter($"Pip's prize when you are back on the island: {o.Prize}", x + w / 2, y + 108, FontKind.Ui700, 19, Pal.C("#9a6a1a"));
         else if (o.PrizeNote != "") Gfx.TextCenter(o.PrizeNote, x + w / 2, y + 108, FontKind.Ui600, 17, Muted);
-        if (o.NewBest) Gfx.TextCenter(o.Rank == 1 ? "A new best on your board!" : $"On your board: number {o.Rank}", x + w / 2, y + 108, FontKind.Ui700, 20, Pal.C("#9a6a1a"));
+        if (o.NewBest) Gfx.TextCenter(o.Rank == 1 ? "A new best on your board!" : $"On your board: number {o.Rank}", x + w / 2, o.DailyLine != "" ? y + 102 : y + 108, FontKind.Ui700, o.DailyLine != "" ? 18 : 20, Pal.C("#9a6a1a"));
+        if (o.DailyLine != "") Gfx.TextCenter(Gfx.Ellipsize(o.DailyLine, FontKind.Ui600, 16, w - 40), x + w / 2, y + 126, FontKind.Ui600, 16, Pal.C("#9a6a1a"));
 
         // Two score cards.
         float cw = m.RivalRun != null ? 360 : 460, cy = y + 146, ch = 110, gap = 20;

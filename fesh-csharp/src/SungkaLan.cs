@@ -220,7 +220,7 @@ partial class Game
         if (BigButton("Host a game", x + pad, by, true)) { StartHosting(); return; }
         if (BigButton("Find a game", x + pad + BigW("Host a game") + 18, by, false)) { StartFinding(); return; }
         if (lanMsg != "") Gfx.Text(Gfx.Ellipsize(lanMsg, FontKind.Ui600, 18, w - pad * 2), x + pad, by + 80, FontKind.Ui600, 18, Rust);
-        var tip = Gfx.Wrap("The first time, Windows may ask whether Fesh can use the network: choose Private networks.", FontKind.Note, 18, w - pad * 2);
+        var tip = Gfx.Wrap(LanNetworkTip, FontKind.Note, 18, w - pad * 2);
         Lines(tip, x + pad, y + h - pad - tip.Count * 25, 25, FontKind.Note, 18, Muted);
     }
 
@@ -329,4 +329,12 @@ partial class Game
         if (BigButton("Keep playing", x + 30, by, true)) { lanLeaveAsk = false; return; }
         if (BigButton("Leave", x + w - 30 - BigW("Leave"), by, false)) { lanLeaveAsk = false; CloseSungkaView(); return; }
     }
+}
+
+partial class Game
+{
+    // The note on every LAN card: a PC may ask about the firewall once; a phone needs to be on the same Wi-Fi.
+    static string LanNetworkTip => Platform.Touch
+        ? "Everyone needs to be on the same Wi-Fi (or one phone's hotspot). If Find shows nobody, type the host's address."
+        : "The first time, Windows may ask whether Fesh can use the network: choose Private networks.";
 }

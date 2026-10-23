@@ -242,13 +242,14 @@ static class AnimalArt
     public static (int w, int h) Size(string id, int pose) => (RowsFor(id, pose)[0].Length, RowsFor(id, pose).Length - (pose == 3 && id != "carabao" ? 2 : 0));
 
     // Draws the animal in the world with its feet at (x, y). Frame 1 bobs it up a pixel, for a trotting look.
-    // Pose 1 dips the head (grazing, pecking); pose 2 lifts the tail (a wag or a flick).
+    // Pose 1 dips the head (grazing, pecking); pose 2 lifts the tail (a wag or a flick); 4 lifts the head (alert: it has noticed
+    // you); 5 twitches an ear (the top of the head shifts a pixel back).
     public static void Draw(Pix p, string id, float x, float y, bool flip, int frame, int pose = 0)
     {
         var s = Sprites[id];
         bool big = id == "carabao";
         // A big animal doesn't dip its head or flick its tail (its horns are part of the drawing); it lies down in a drawing of its own.
-        if (big && pose is 1 or 2) pose = 0;
+        if (big && pose is 1 or 2 or 4 or 5) pose = 0;
         var rows = RowsFor(id, pose);
         int w = rows[0].Length, h = rows.Length;
         // Frame 0 stands; 1 to 4 is a walk: a step (the legs apart, alternate feet a pixel forward and back), the body
@@ -260,6 +261,9 @@ static class AnimalArt
         for (int c = 0, n = -1; c < w; c++)
             if (rows[h - 1][c] != '.') { if (c == 0 || rows[h - 1][c - 1] == '.') n++; legOf[c] = n; }
         int headCol = w <= 8 ? 4 : w - 6;
+        // The top row of the head, where an ear twitch moves (the first row with a pixel in the head columns).
+        int earRow = 0;
+        for (int r = 0; r < h; r++) if (Enumerable.Range(headCol, w - headCol).Any(c => rows[r][c] != '.')) { earRow = r; break; }
         p.Rect(left + 1, (int)MathF.Round(y) + 1, w - 2, 1, "rgba(0,0,0,0.2)");
         // Pose 3 is lying down asleep: the legs tucked under (the bottom two rows go) and the body lowered onto them, the
         // head resting a row lower still.
@@ -269,10 +273,12 @@ static class AnimalArt
             {
                 char ch = rows[r][c];
                 if (ch == '.') continue;
-                int dr = !big && (pose is 1 or 3) && c >= headCol && r <= 3 ? 1 : pose == 2 && c <= 1 && r <= 3 ? -1 : 0;
+                int dr = !big && (pose is 1 or 3) && c >= headCol && r <= 3 ? 1 : pose == 2 && c <= 1 && r <= 3 ? -1 : pose == 4 && c >= headCol && r <= 3 ? -1 : 0;
                 // On a step the feet swing: every other leg forward, the rest back.
-                int dc = stride != 0 && r == h - 1 && pose != 3 ? (legOf[c] % 2 == 0 ? stride : -stride) : 0;
+                int dc = stride != 0 && r == h - 1 && pose != 3 ? (legOf[c] % 2 == 0 ? stride : -stride) : pose == 5 && c >= headCol && r == earRow ? -1 : 0;
                 p.Rect(left + (flip ? w - 1 - c - dc : c + dc), top + r + dr, 1, 1, Lit(rows, r, c, s.Colors[ch], flip ? 1 : -1));
+                // Head up: the neck stretches a row, so the head isn't left floating above the body.
+                if (pose == 4 && !big && c >= headCol && r == 3) p.Rect(left + (flip ? w - 1 - c : c), top + r, 1, 1, Lit(rows, r, c, s.Colors[ch], flip ? 1 : -1));
             }
     }
 

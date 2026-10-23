@@ -161,6 +161,7 @@ partial class Game
                         : n.id == "lira" && SupperDish() is string dish ? $"Give Lira the {Items.ById[dish].Name.ToLowerInvariant()}"
                         : n.id == "lira" && LiraSeaLabel() is string liraSea ? liraSea
                         : n.id == "niko" && NikoSeaLabel() is string nikoSea ? nikoSea
+                        : n.id == "isay" && KiteHeld ? "Give Ma'am Isay the kite"
                         : n.id == "isay" && IsaySeaLabel() is string isaySea ? isaySea
                         : n.id == "niko" && state.Hinted("niko_request") && !state.Hinted("niko_asohos") && Has("asohos") >= NikoAsohos ? $"Give Niko {NikoAsohos} asohos" : n.id == "tala" && TalaListDone && !state.Hinted("talaReward") ? "Tell Tala what you've seen"
                         : n.id == "isay" && state.Hinted("metIsay") ? (LessonToday ? "Today's lesson with Ma'am Isay" : "Practise with Ma'am Isay")

@@ -86,6 +86,10 @@ partial class Game
         var p = state.pet;
         a.Hearts = Math.Max(0, a.Hearts - dt);
         bool onFoot = scene == "world" && !Aboard && !Riding && mode != "title";
+        // Aboard, it rides in the bow with you and looks out over the water (1.45.1).
+        if (scene == "world" && Aboard && p.follow) { PetOnBoat(a); lastPetWalk = player.WalkT; return; }
+        // Ashore again from the boat it is standing on the water: it steps out beside you.
+        if (onFoot && !CanStand(a.X, a.Y) && PetSpotNear() is (float ex, float ey)) { a.X = ex; a.Y = ey; a.Vx = a.Vy = 0; }
         // Far from you (you sailed or rode off, or came out of a door elsewhere): it turns up beside you, like it came along.
         if (onFoot && p.follow && Dist(a.X, a.Y, player.X, player.Y) > PetFar && PetSpotNear() is (float sx, float sy))
         {
@@ -185,5 +189,30 @@ partial class Game
         if (p.x != 0 && CanStand(p.x, p.y)) { a.X = p.x; a.Y = p.y; }
         else if (PetSpotNear() is (float sx, float sy)) { a.X = sx; a.Y = sy; }
         a.HomeX = a.X; a.HomeY = a.Y;
+    }
+}
+
+partial class Game
+{
+    // In the bow of the banca, facing where it's going and bobbing with the hull; the saved spot stays where it came aboard.
+    void PetOnBoat(Animal a)
+    {
+        int dir = BoatDir;
+        int bob = BoatBobAt(time, player.X, player.Y, BoatUnderWay);
+        (float dx, float dy) = boatFace switch { "up" => (6f, 1f), "down" => (6f, -3f), _ => (7f * dir, 2f) };
+        a.X = player.X + dx; a.Y = player.Y + dy + bob;
+        a.Vx = a.Vy = 0; a.Asleep = false;
+        a.Flip = boatFace == "left";
+    }
+
+    // The call key: the pet comes if it was told to stay, and answers either way (indoors it waits outside).
+    void CallPet()
+    {
+        if (!HasPet || mode != "play" || MatchActive) return;
+        if (scene != "world") { Toast($"{PetName} is waiting outside.", 2.5f); return; }
+        var a = PetAnimal;
+        if (!state.pet.follow) { state.pet.follow = true; Sfx.Play("pet"); Toast($"{PetName} trots over, tail up.", 2.5f); Save(); }
+        else if (a != null) { Sfx.Play("pet"); a.Hearts = 1.2f; Floater(state.pet.kind == "dog" ? "Woof!" : "Mrrp!", a.X, a.Y - 14, "#ffd6d0"); }
+        if (a != null && Aboard == false && Dist(a.X, a.Y, player.X, player.Y) > PetFar && PetSpotNear() is (float sx, float sy)) { a.X = sx; a.Y = sy; a.Vx = a.Vy = 0; }
     }
 }

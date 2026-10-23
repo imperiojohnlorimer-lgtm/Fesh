@@ -247,7 +247,7 @@ partial class Game
     {
         creatorFor = kind;
         var src = kind == "new" ? new Look() : state.look;
-        editLook = new Look { name = src.name, skin = src.skin, hair = src.hair, hairColor = src.hairColor, hat = src.hat, shirt = src.shirt, pants = src.pants };
+        editLook = new Look { name = src.name, skin = src.skin, hair = src.hair, hairColor = src.hairColor, hat = src.hat, shirt = src.shirt, pants = src.pants, shirtId = src.shirtId, pantsId = src.pantsId, hairId = src.hairId, hatId = src.hatId };
         if (kind == "new") editLook.name = "";
         previewFace = "down";
         mode = "create";
@@ -357,16 +357,16 @@ partial class Game
         if ((r = Choices(LookData.Hairs, editLook.hair, ox + lw, oy)) >= 0) editLook.hair = r;
         oy += 54;
         Gfx.Text("Hair colour", ox, oy + 10, FontKind.Ui700, 20, Pal.PaperInk);
-        if ((r = Swatches(LookData.HairColors, editLook.hairColor, ox + lw, oy)) >= 0) editLook.hairColor = r;
+        if ((r = Swatches(LookData.HairColors, editLook.hairColor, ox + lw, oy)) >= 0) { editLook.hairColor = r; editLook.hairId = null; }
         oy += 56;
         Gfx.Text("Hat", ox, oy + 10, FontKind.Ui700, 20, Pal.PaperInk);
-        if ((r = Choices(LookData.Hats, editLook.hat, ox + lw, oy)) >= 0) editLook.hat = r;
+        if ((r = Choices(LookData.CreatorHats, editLook.hat, ox + lw, oy)) >= 0) { editLook.hat = r; editLook.hatId = null; }
         oy += 54;
         Gfx.Text("Shirt", ox, oy + 10, FontKind.Ui700, 20, Pal.PaperInk);
-        if ((r = Swatches(LookData.Shirts, editLook.shirt, ox + lw, oy)) >= 0) editLook.shirt = r;
+        if ((r = Swatches(LookData.Shirts, editLook.shirt, ox + lw, oy)) >= 0) { editLook.shirt = r; editLook.shirtId = null; }
         oy += 56;
         Gfx.Text("Trousers", ox, oy + 10, FontKind.Ui700, 20, Pal.PaperInk);
-        if ((r = Swatches(LookData.Pants, editLook.pants, ox + lw, oy)) >= 0) editLook.pants = r;
+        if ((r = Swatches(LookData.Pants, editLook.pants, ox + lw, oy)) >= 0) { editLook.pants = r; editLook.pantsId = null; }
 
         float byy = y + ch - pad - 56;
         string done = creatorFor switch { "new" => "Start", "continue" => "Continue", _ => "Done" };

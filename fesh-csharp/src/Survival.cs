@@ -353,9 +353,18 @@ partial class Game
                 {
                     float ang = Rand(0, MathF.Tau);
                     if (Dist(a.X, a.Y, a.HomeX, a.HomeY) > 45) ang = MathF.Atan2(a.HomeY - a.Y, a.HomeX - a.X);
+                    // A flock moves together: chickens, sheep and goats set off the way a walking neighbour is going.
+                    if (a.Kind is "chicken" or "sheep" or "goat" && Dist(a.X, a.Y, a.HomeX, a.HomeY) <= 45)
+                    {
+                        var mate = animals.FirstOrDefault(m => m != a && m.Kind == a.Kind && !IsPet(m) && !m.Asleep && (m.Vx != 0 || m.Vy != 0) && Dist(m.X, m.Y, a.X, a.Y) < 36);
+                        if (mate != null) ang = MathF.Atan2(mate.Vy, mate.Vx) + Rand(-0.35f, 0.35f);
+                    }
                     float sp = Items.Animals[a.Kind].Speed;
                     a.Vx = MathF.Cos(ang) * sp; a.Vy = MathF.Sin(ang) * sp;
                     a.Timer = Rand(0.6f, 1.8f);
+                    // ...and its neighbours notice and follow in a moment.
+                    if (a.Kind is "chicken" or "sheep" or "goat")
+                        foreach (var m in animals) if (m != a && m.Kind == a.Kind && !IsPet(m) && !m.Asleep && m.Vx == 0 && m.Vy == 0 && m.Pause <= 0 && m.Timer > 0.5f && Dist(m.X, m.Y, a.X, a.Y) < 36) m.Timer = Rand(0.15f, 0.5f);
                 }
             }
             float nx = a.X + a.Vx * dt, ny = a.Y + a.Vy * dt;

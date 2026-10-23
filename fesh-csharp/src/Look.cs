@@ -8,13 +8,21 @@ static class LookData
     public static readonly string[] HairColors = { "#2b1d14", "#6b4a2b", "#c98b3a", "#e8d27a", "#b5523b", "#e8e8e8" };
     public static readonly string[] Shirts = { "#e04b3a", "#2f7fa3", "#4c9a45", "#f3c25b", "#8a5fb5", "#2b3a4a", "#e8e8e8" };
     public static readonly string[] Pants = { "#2b3a4a", "#5b3a24", "#3f5d8a", "#5e6468", "#1b1b1b" };
-    public static readonly string[] Hats = { "No hat", "Straw hat", "Beanie", "Cap" };
+    // The creator offers the first four hats; the rest are wardrobe cosmetics (Wardrobe.cs), drawn for anyone wearing them.
+    public static readonly string[] Hats = Wardrobe.HatNames;
+    public static readonly string[] CreatorHats = Hats.Take(4).ToArray();
     public static readonly string[] Hairs = { "Short", "Long" };
 
+    // What a person actually wears: a wardrobe cosmetic if they have one on (and it is the right kind), else the creator's colour.
+    public static string ShirtHex(Look l) => Wardrobe.Find(l.shirtId) is { Slot: "shirt" } c ? c.Value : Shirts[l.shirt % Shirts.Length];
+    public static string PantsHex(Look l) => Wardrobe.Find(l.pantsId) is { Slot: "pants" } c ? c.Value : Pants[l.pants % Pants.Length];
+    public static string HairHex(Look l) => Wardrobe.Find(l.hairId) is { Slot: "hair" } c ? c.Value : HairColors[l.hairColor % HairColors.Length];
+    // A hat's own colour (hats 4 to 6 only; the creator's three take the shirt's or the cap's).
+    public static string CapHex(Look l) => l.hat is >= 4 and < 7 ? (Wardrobe.Find(l.hatId) is { Slot: "hat" } c ? c.Value : Wardrobe.HatDefault[l.hat]) : null;
     public static Look Random(Random r) => new()
     {
         skin = r.Next(Skins.Length), hair = r.Next(Hairs.Length), hairColor = r.Next(HairColors.Length),
-        hat = r.Next(Hats.Length), shirt = r.Next(Shirts.Length), pants = r.Next(Pants.Length)
+        hat = r.Next(CreatorHats.Length), shirt = r.Next(Shirts.Length), pants = r.Next(Pants.Length)
     };
 
     // A shade of a colour: darker, and pulled a little towards deep blue, the way the world's own shadows are (the oaks' shade is
@@ -38,8 +46,8 @@ static class LookData
     public static void DrawPerson(Pix p, Look look, int x, int y, string face, int step, bool shadow = true, int bob = 0,
         bool blink = false, int arms = 0, int swing = 0, int lean = 0, string head = null,
         (int x, int y)? hand = null, (int x, int y)? hand2 = null, bool armsBehind = false, bool idle = true, bool seated = false) =>
-        DrawFigure(p, Skins[look.skin % Skins.Length], HairColors[look.hairColor % HairColors.Length], Shirts[look.shirt % Shirts.Length],
-            Pants[look.pants % Pants.Length], look.hair == 1, look.hat % Hats.Length, null, x, y, face, step, shadow, bob, blink, arms, swing, lean, head,
+        DrawFigure(p, Skins[look.skin % Skins.Length], HairHex(look), ShirtHex(look),
+            PantsHex(look), look.hair == 1, look.hat % Hats.Length, CapHex(look), x, y, face, step, shadow, bob, blink, arms, swing, lean, head,
             hand, hand2, armsBehind, idle, seated);
 
     // Where the shoulders are for an upper body at (ux, uy): the near and far one in a side view, the right and left
@@ -232,7 +240,7 @@ static class LookData
         Tex(p, hx - 2 + fo, uy - 9, 4, 1, hf == "up" ? hair : Blend(skin, "#d08a70", 0.12f), 0.04f, 0.05f);
         if (hf is "left" or "right") p.Rect(hf == "right" ? hx - 1 : hx, uy - 10, 1, 1, skinShade);   // a hint of ear
         // A brim or a cap's peak shades the top of the face.
-        if (hat is 1 or 3 && hf != "up") Tex(p, hx - 2 + fo, uy - 10, 4, 1, SkinShade(skin, 0.93f), 0.03f);
+        if (hat is 1 or 3 or 5 or 6 && hf != "up") Tex(p, hx - 2 + fo, uy - 10, 4, 1, SkinShade(skin, 0.93f), 0.03f);
 
         switch (hat)
         {
@@ -246,6 +254,35 @@ static class LookData
                 Tex(p, hx - 3, uy - 11, 6, 1, Shade(shirt, 0.72f), 0.06f);
                 p.Rect(hx, uy - 15, 1, 1, "#efe9dc");
                 break;
+            case 4: // bandana: cloth knotted round the head, a pale pattern, its tails trailing behind
+            {
+                string c = cap ?? "#c0392b", d = Shade(c, 0.72f);
+                Tex(p, hx - 3, uy - 13, 6, 1, c, 0.06f); Tex(p, hx - 3, uy - 12, 6, 1, c, 0.06f, 0.1f);
+                Tex(p, hx - 3, uy - 11, 6, 1, d, 0.05f);   // the band across the brow
+                p.Rect(hx - 1, uy - 12, 1, 1, "#f3eedd"); p.Rect(hx + 1, uy - 13, 1, 1, "#f3eedd");
+                if (hf == "right") { p.Rect(hx - 4, uy - 11, 1, 2, d); p.Rect(hx - 5, uy - 10, 1, 1, c); }
+                else if (hf == "left") { p.Rect(hx + 3, uy - 11, 1, 2, d); p.Rect(hx + 4, uy - 10, 1, 1, c); }
+                else if (hf == "up") { p.Rect(hx - 1, uy - 11, 2, 2, d); p.Rect(hx - 2, uy - 9, 1, 1, c); p.Rect(hx + 1, uy - 9, 1, 1, c); }
+                break;
+            }
+            case 5: // bucket hat: a soft round crown and a short brim all round
+            {
+                string c = cap ?? "#b8a574", d = Shade(c, 0.74f);
+                Tex(p, hx - 2, uy - 14, 4, 1, c, 0.06f); Tex(p, hx - 3, uy - 13, 6, 1, c, 0.06f, 0.1f);
+                Tex(p, hx - 4, uy - 12, 8, 1, d, 0.05f);
+                p.Rect(hx - 4, uy - 11, 1, 1, d); p.Rect(hx + 3, uy - 11, 1, 1, d);
+                break;
+            }
+            case 6: // salakot: a domed, wide, woven hat; its brim shades the brow and a cord runs under the chin
+            {
+                string c = cap ?? "#d7b66a", d = Shade(c, 0.76f), lt = Lighten(c, 0.12f);
+                Tex(p, hx - 1, uy - 16, 2, 1, lt, 0.05f);
+                Tex(p, hx - 2, uy - 15, 4, 1, c, 0.06f); Tex(p, hx - 3, uy - 14, 6, 1, c, 0.06f, 0.08f);
+                Tex(p, hx - 5, uy - 13, 10, 1, lt, 0.07f); Tex(p, hx - 6, uy - 12, 12, 1, d, 0.06f);   // the wide, woven brim
+                for (int k = -5; k <= 4; k += 2) p.Rect(hx + k, uy - 13, 1, 1, d);
+                if (hf != "up") { p.Rect(hx - 3, uy - 11, 1, 3, Shade(c, 0.6f)); p.Rect(hx + 2, uy - 11, 1, 3, Shade(c, 0.6f)); }
+                break;
+            }
             case 3: // cap with a brim facing forward
                 Tex(p, hx - 3, uy - 13, 6, 2, cap ?? shirt, 0.06f, 0.1f);
                 if (hf == "right") Tex(p, hx + 2, uy - 11, 3, 1, Shade(cap ?? shirt, 0.7f), 0.05f);

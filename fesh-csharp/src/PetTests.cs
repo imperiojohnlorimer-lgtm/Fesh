@@ -19,6 +19,7 @@ partial class Game
         Settings.Data.pauseUnfocused = false; Settings.Data.zoom = 5; Inp.ScriptMouse = Offscreen;
         state.food = 100; state.hp = 100;
         yield return 3;
+        bugs.Clear(); state.loose.RemoveAll(l => l.kind == "worm");   // no worm mound from the start-up in front of the lagoon
         var dog = animals.First(a => a.Kind == "dog");
         IEnumerable<int> FaceDog()
         {
@@ -81,7 +82,19 @@ partial class Game
         player.X = 160; player.Y = 115; yield return 4;
         Give("boat"); state.aboard = true; float ax = dog.X, ay = dog.Y;
         player.X = SaltJettyX + 40; player.Y = SaltJettyY + 10; yield return 20;
-        Check("while you're aboard he waits", Dist(dog.X, dog.Y, ax, ay) < 1);
+        Check($"while you're aboard he rides in the bow ({Dist(dog.X, dog.Y, player.X, player.Y):0} px from you)", Dist(dog.X, dog.Y, player.X, player.Y) < 12 && Dist(dog.X, dog.Y, ax, ay) > 5);
+        pendingShot = "p04-aboard"; yield return 4;
+        state.aboard = false; player.X = 160; player.Y = 115; yield return 6;
+        Check($"ashore again he steps out beside you ({Dist(dog.X, dog.Y, player.X, player.Y):0} px)", Dist(dog.X, dog.Y, player.X, player.Y) < 40 && CanStand(dog.X, dog.Y));
+        // Told to stay, he stays ashore while you sail; the call key brings him from anywhere.
+        state.pet.follow = false; sx = dog.X; sy = dog.Y;
+        state.aboard = true; player.X = SaltJettyX + 40; player.Y = SaltJettyY + 10; yield return 20;
+        Check("told to stay, he waits ashore", Dist(dog.X, dog.Y, sx, sy) < 1);
+        state.aboard = false; player.X = 160; player.Y = 115; yield return 4;
+        Inp.Tap(KeyboardKey.H); yield return 4;
+        Check("the call key brings him back to following", state.pet.follow);
+        Inp.Tap(KeyboardKey.H); yield return 4;
+        Check("and again just gets a bark", state.pet.follow && floaters.Any(f => f.Text is "Woof!"));
         state.aboard = false; player.X = 160; player.Y = 115; yield return 6;
 
         /* ---------- finds, night, a catch ---------- */

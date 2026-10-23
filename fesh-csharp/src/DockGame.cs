@@ -84,6 +84,7 @@ partial class Game
     /* ---------- Every frame ---------- */
     void UpdateDockNet(float dt)
     {
+        UpdateDockProfile();   // your showroom card, once you're in (DockShowroom.cs)
         if (dockClient == null && dockBrowser == null && dockConnect == null && dockHost == null) return;
         dockBrowser?.Poll();
         if (dockView == "finding" && dockConnect == null && mode == "panel" && panel == "matches")
@@ -225,7 +226,7 @@ partial class Game
             list.Add((pl.Y, () =>
             {
                 int bob = time % 2.4f > 1.5f ? 1 : 0;
-                LookData.DrawPerson(pix, pl.ToLook(), (int)MathF.Round(pl.X), (int)MathF.Round(pl.Y), pl.FaceName, pl.Step, bob: pl.Step == 0 ? bob : 0, idle: false);
+                LookData.DrawPerson(pix, RemoteLook(pl), (int)MathF.Round(pl.X), (int)MathF.Round(pl.Y), pl.FaceName, pl.Step, bob: pl.Step == 0 ? bob : 0, idle: false);
             }));
         }
     }

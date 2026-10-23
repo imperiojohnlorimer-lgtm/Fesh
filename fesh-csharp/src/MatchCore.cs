@@ -79,6 +79,29 @@ static class MatchRules
     public static int DailySeed(DateTime d) => Mix(Version, d.Year, d.Month, d.Day, 7);
     public static string DailyLabel(DateTime d) => d.ToString("yyyy-MM-dd");
 
+    // The Daily Challenge streak (1.45.1): the days in a row, ending today or yesterday, that you finished a run with a catch.
+    // `days` are DailyLabel dates. Start is the first day of that run (a missed day starts a new one).
+    public static (int Streak, bool Today, DateTime Start) DailyStreak(IEnumerable<string> days, DateTime now)
+    {
+        var set = new HashSet<string>(days);
+        var d = now.Date;
+        bool today = set.Contains(DailyLabel(d));
+        if (!today) d = d.AddDays(-1);
+        int n = 0;
+        var start = d;
+        while (set.Contains(DailyLabel(d))) { n++; start = d; d = d.AddDays(-1); }
+        return (n, today, start);
+    }
+
+    // A small prize for each day you play, and more at 3, 7, 14 and 30 days in a row.
+    public const int DailyPlayCoins = 15;
+    public static (int coins, string item, int n) DailyMilestone(int streak) => streak switch
+    {
+        3 => (40, null, 0), 7 => (100, "glow_bait", 3), 14 => (200, null, 0), 30 => (300, "glow_bait", 5), _ => (0, null, 0)
+    };
+    public static int NextMilestone(int streak) => streak < 3 ? 3 : streak < 7 ? 7 : streak < 14 ? 14 : streak < 30 ? 30 : 0;
+    public static int DayNumber(DateTime d) => d.Year * 10000 + d.Month * 100 + d.Day;
+
     // The nth cast of a match: its fish, its size and its wait are drawn from a stream of their own, so they don't
     // depend on what happened in the casts before (a lost fish, a late hook) or on how fast the frames come.
     public static CastPlan Plan(int seed, int cast)

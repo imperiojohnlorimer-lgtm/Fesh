@@ -25,6 +25,7 @@ sealed class Look
 {
     public string name = "Fisher";
     public int skin = 1, hair, hairColor = 1, hat = 1, shirt, pants;
+    public string shirtId, pantsId, hairId, hatId;   // wardrobe cosmetics worn instead of the creator's colours (Wardrobe.cs); null: the creator's
 }
 
 // Everything that is saved between sessions. Field names match the web version's save format.
@@ -57,6 +58,7 @@ sealed class State
     public Dictionary<string, int> mined = new();   // unused since cave floors became random; kept so older saves load
     public Dictionary<string, int> picked = new();  // berry bush "x,y" -> day picked
     public Dictionary<string, int> gifts = new();   // animal -> day it last gave a gift
+    public List<string> dailyDays = new();         // the dates (yyyy-MM-dd) a Daily Challenge was finished with a catch: its streak (DailyStreak.cs)
     public Dictionary<string, List<Build>> rooms = new(); // "house:x,y" -> furniture inside that shack
     public string scene = "world";
     public float exitX = 160, exitY = 115;           // where to come back out into the world
@@ -129,9 +131,16 @@ sealed class State
     // The Angler's Ledger (1.44, Ledger.cs): achievements are in hinted ("ach:<id>"); these count what the save didn't before.
     public Dictionary<string, int> tally = new();    // "sold", "earned", "eaten", "cooked", "crafted", "felled", "mined", "monsters", "doubles"
     public double sailed;                            // how far you've steered the boat, in pixels
+    public string favFish;                           // the favourite fish shown to visitors on the Tournament Dock (DockShowroom.cs)
     public string title = "";                        // the title you chose to wear ("" none)
     // The harbour board (1.45, Bounties.cs): today's three bounties, and the run of days with at least one done.
     public BoardDay board;                           // null until first read (older saves too)
+    public List<string> cosmetics = new();          // wardrobe things bought at Pip's (Wardrobe.cs); earned ones are worked out, not stored
+    public string hullId, rodId;                    // the banca's trim and your rod, by cosmetic id
+    public int golds, masters;                      // gold and master trophies landed (Mastery.cs)
+    public Dictionary<string, int> recordDay = new(); public Dictionary<string, float> recordM = new();   // the day and size-against-usual of each fish's record, for the trophy wall
+    public WeekBounty week;                          // this week's big bounty (WeeklyBounty.cs); null in older saves
+    public int weeksDone;                            // weekly bounties finished
     public int boardStreak, boardBest, boardLastDay, boardDone, boardSeen;   // days in a row, the best run, the last day credited, bounties done, the day it was last read
     // The events deck (1.45, Events.cs): today's event, a bottle's X still to dig, and how many days had one.
     public DayEvent dayEvent;
@@ -274,12 +283,16 @@ static class SaveFile
             if (s == null) return null;
             s.caught ??= new(); s.commons ??= new(); s.odd ??= new(); s.flags ??= new(); s.pity ??= new(); s.hinted ??= new();
             s.mats ??= new(); s.loose ??= new(); s.look ??= new(); s.inv ??= new(); s.felled ??= new(); s.mined ??= new(); s.wear ??= new();
+            s.cosmetics = (s.cosmetics ?? new()).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList(); s.recordDay ??= new(); s.recordM ??= new();
+            s.dailyDays = (s.dailyDays ?? new()).Where(d => d != null && d.Length == 10).Distinct().OrderBy(d => d, StringComparer.Ordinal).TakeLast(400).ToList();
             s.picked ??= new(); s.gifts ??= new(); s.rooms ??= new(); s.scene ??= "world";
             s.tanks ??= new(); s.weather ??= "clear"; s.boatAt ??= "saltmere";
             s.tackle ??= new(); s.records ??= new(); s.trophies ??= new(); s.big ??= new(); s.pots ??= new();
             s.yards = (s.yards ?? new()).Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => new Yard { stage = Math.Clamp(kv.Value.stage, 0, 5), paid = kv.Value.paid && kv.Value.stage < 5, work = Math.Clamp(kv.Value.work, 0, 2.5f) });
             s.racks ??= new(); s.sightings ??= new(); s.gleanTide ??= "";
             // A damaged board is rolled again (Bounties.cs): only whole entries are kept, with their lists filled in.
+            if (s.week != null && (s.week.b?.kind == null || s.week.b.need <= 0)) s.week = null;
+            if (s.week?.b != null) s.week.b.ids ??= new();
             if (s.board != null)
             {
                 s.board.list = (s.board.list ?? new()).Where(b => b?.kind != null && b.need > 0).ToList();

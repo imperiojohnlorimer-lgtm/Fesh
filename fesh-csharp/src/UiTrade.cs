@@ -21,7 +21,7 @@ partial class Game
         shopTip = null;
         var (x, y, cw, ch) = PanelFrame("Pip's stall");
         float tx = x + pad + Gfx.Measure("Pip's stall", FontKind.Ui700, PanelTitleSize) + 28;
-        foreach (var (id, label) in new[] { ("sell", "Sell"), ("buy", "Buy"), ("derby", "Derby") })
+        foreach (var (id, label) in new[] { ("sell", "Sell"), ("buy", "Buy"), ("dress", "Dress"), ("derby", "Derby") })
         {
             float w = SmallW(label);
             if (Button(label, tx, y + PanelPad - 6, w, 44, FontKind.Ui700, 20, shopTab == id ? Pal.Lantern : Pal.Sand, Pal.Ink, 4)) { shopTab = id; shopPage = 0; }
@@ -32,6 +32,7 @@ partial class Game
         float ly = y + pad + 62;
         if (shopTab == "sell") DrawSellList(x + pad, ly, cw - pad * 2, y + ch - pad - ly);
         else if (shopTab == "buy") DrawBuyList(x + pad, ly, cw - pad * 2);
+        else if (shopTab == "dress") DrawDressTab(x + pad, ly, cw - pad * 2, y + ch - pad);
         else DrawDerbyTab(x + pad, ly, cw - pad * 2);
         if (shopTip != null) DrawItemTip(shopTip, Gfx.Mouse.X, Gfx.Mouse.Y);
         if (Gfx.PressedOutside(x, y, cw, ch)) ClosePanels();

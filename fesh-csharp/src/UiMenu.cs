@@ -435,10 +435,10 @@ partial class Game
     void DrawGameTab(float x, float y, float w, float bottom)
     {
         float bx = x, by = y + 4;
-        foreach (var label in new[] { "Resume", "Journal", "Matches", "Photo mode", "Save game", "Change your look", "Quit to title", "Quit game" })
+        foreach (var label in new[] { "Resume", "Journal", "Matches", "Photo mode", "Save game", "Change your look", "Wardrobe", "Quit to title", "Quit game" })
         {
             // Changing your look, or the journal, waits until you're not in the middle of fishing (the menu can open mid-cast).
-            bool live = label is not ("Change your look" or "Journal" or "Matches" or "Photo mode") || pausedFrom == "play" && !MatchActive;
+            bool live = label is not ("Change your look" or "Wardrobe" or "Journal" or "Matches" or "Photo mode") || pausedFrom == "play" && !MatchActive;
             if (Button(label, bx, by, 300, 52, FontKind.Ui700, 22, label == "Resume" ? Pal.Buoy : live ? Pal.Sand : Pal.C("#d8cbb0"), label == "Resume" ? White : live ? Pal.Ink : Muted, 4, 3, 6, live))
             {
                 switch (label)
@@ -453,6 +453,7 @@ partial class Game
                         Toast(Save() ? $"Saved to slot {SaveFile.Slot}." : "Couldn't save the game! Check there's space on the disk.");
                         break;
                     case "Change your look": OpenCreator("edit"); break;
+                    case "Wardrobe": ClosePause(); if (mode == "play") OpenWardrobe(); break;
                     case "Quit to title": Sfx.Play("ui"); QuitToTitle(); break;
                     default: Save(); quit = true; break;
                 }
@@ -539,9 +540,10 @@ partial class Game
         d.shake = Pair("Screen shake", d.shake, !Platform.Touch) == 0;
         if (!Platform.Touch) d.pauseUnfocused = Pair("Pause in the background", d.pauseUnfocused, false) == 0;
         d.guide = Pair("Goal and arrow", d.guide, true) == 0;
-        // Off: no food meter and no going hungry; food still heals (Survival.cs, HungerOn).
-        d.hunger = Pair("Hunger", d.hunger, false) == 0;
-        y += rowH;
+        // On: now and then bubbles stir the water and a gold mark on the power meter shows how hard to cast into them.
+        d.castSkill = Pair("Cast bubbles", d.castSkill, false) == 0;
+        // Off: no food meter and no going hungry; food still heals (Survival.cs, HungerOn). Drawn last in the row: the board test clicks its Off.
+        d.hunger = Pair("Hunger", d.hunger, true) == 0;
         var lengths = Settings.DayLengths;
         int li = Array.IndexOf(lengths, d.dayLength);
         d.dayLength = lengths[Pick("Length of a day", lengths.Select(m => m > 0 ? $"{m} min" : "Stopped").ToArray(), li < 0 ? 1 : li)];

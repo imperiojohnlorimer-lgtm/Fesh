@@ -60,7 +60,7 @@ partial class Game
         dockPending = 0; dockInvite = null; dockChallengeTarget = -1;
         if (!InDock || ev.Link == null) { dockClient?.Done(ev.Ch); return; }
         var peer = dockClient.Roster.FirstOrDefault(p => p.Id == ev.From);
-        regPeerName = peer?.Name ?? "Someone"; regPeerLook = peer?.ToLook() ?? new Look(); regRivalId = "net";
+        regPeerName = peer?.Name ?? "Someone"; regPeerLook = peer != null ? RemoteLook(peer) : new Look(); regRivalId = "net";
         regSession = new RegattaSession(LanName, ev.Link, host: ev.Role == 0);
         regCh = ev.Ch; regBot = null;
         var spec = new MatchSpec { Mode = "regatta", Seed = 0, Rival = "net", Label = $"Regatta · against {regPeerName}", Duration = 0 };

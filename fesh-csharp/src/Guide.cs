@@ -54,6 +54,7 @@ partial class Game
         SchoolGoals(list);
         ExploreGoals(list);
         BoardGoals(list);
+        HomeGoals(list);
         EventGoals(list);
         NoteSleepers(list);
         return list;
@@ -829,24 +830,33 @@ partial class Game
         const float pad = 24;
         var (x, y, cw, ch) = PanelFrame("Journal", "Where to go next. Follow a goal and the arrow points the way.");
         if (PanelClose()) { ClosePanels(); return; }
+        // The header (1.46, after the user found it crammed): the title and your fishing progress on the first line, then one
+        // row of shortcuts under the subtitle, all left to right, so nothing is stacked or runs into the title.
+        DrawFishingProgress(x + pad + 190, y + pad - 14, PanelCloseX - 16 - (x + pad + 190));
         string toggle = GuideOn ? "Hide the arrow" : "Show the arrow";
-        if (SmallButton(toggle, PanelCloseX - 12 - SmallW(toggle), y + pad - 6))
+        float sx = x + pad, sy = y + pad + 82;
+        bool Shortcut(string label)
+        {
+            float w = SmallW(label);
+            bool hit = SmallButton(label, sx, sy);
+            sx += w + 10;
+            return hit;
+        }
+        if (Shortcut("Angler's Ledger")) { OpenLedger(); return; }
+        // Today's harbour board (Bounties.cs), readable from anywhere once you've found one.
+        if (!BoardOff && Shortcut("Harbour board")) { OpenBoard(); return; }
+        if (!FriendsOff && Shortcut("Friends")) { OpenFriends(); return; }
+        if (Shortcut("Wardrobe")) { OpenWardrobe(); return; }
+        if (Shortcut("Moon")) { OpenMoon(); return; }
+        if (Shortcut(toggle))
         {
             Settings.Data.guide = !Settings.Data.guide;
             Settings.Save();
             Sfx.Play("ui");
         }
-        // The Angler's Ledger (Ledger.cs).
-        const string ledger = "Angler's Ledger";
-        if (SmallButton(ledger, PanelCloseX - 24 - SmallW(toggle) - SmallW(ledger), y + pad - 6)) { OpenLedger(); return; }
-        // Today's harbour board (Bounties.cs), readable from anywhere once you've found one.
-        const string board = "Harbour board";
-        if (!BoardOff && SmallButton(board, PanelCloseX - 36 - SmallW(toggle) - SmallW(ledger) - SmallW(board), y + pad - 6)) { OpenBoard(); return; }
-        const string friends = "Friends";
-        if (!FriendsOff && SmallButton(friends, PanelCloseX - 48 - SmallW(toggle) - SmallW(ledger) - SmallW(board) - SmallW(friends), y + pad - 6)) { OpenFriends(); return; }
 
         // Goals, a page at a time.
-        float lx = x + pad, ly = y + pad + 84, lw = 700;
+        float lx = x + pad, ly = y + pad + 142, lw = 700;
         int pages = Math.Max(1, (goals.Count + JournalRows - 1) / JournalRows);
         journalPage = Math.Clamp(journalPage, 0, pages - 1);
         bool auto = state.track is not { Length: > 0 };
@@ -867,7 +877,7 @@ partial class Game
         ly += 40;
         if (goals.Count == 0)
             Lines(Gfx.Wrap("Nothing waiting on you right now. Fish where you like, and talk to people: they'll have something for you.", FontKind.Note, 19, lw), lx, ly + 10, 26, FontKind.Note, 19, Muted);
-        const float rowH = 82;
+        const float rowH = 76;
         foreach (var (g, i) in goals.Skip(journalPage * JournalRows).Take(JournalRows).Select((g, i) => (g, i)))
         {
             float ry = ly + i * (rowH + 6);
@@ -901,7 +911,7 @@ partial class Game
         }
 
         // Getting started, or the Sea school (SeaSchool.cs).
-        float rx = lx + lw + 26, rw = x + cw - pad - rx, ry0 = y + pad + 84;
+        float rx = lx + lw + 26, rw = x + cw - pad - rx, ry0 = y + pad + 142;
         var basics = Basics();
         bool school = journalSide == "school";
         float tw = (rw - 8) / 2;
@@ -957,4 +967,48 @@ partial class Game
 #endif
         return live && Gfx.Click(x, y, w, h);
     }
+}
+
+partial class Game
+{
+    // Your fishing progress, in the journal's header: the level, a bar to the next one and what it gives; past level 10, the
+    // mastery level and its bar (Mastery.cs).
+    void DrawFishingProgress(float x, float y, float w)
+    {
+        if (w < 260) return;
+        const float h = 50;
+        Gfx.Box(x, y, w, h, CardBg, Pal.C("#c9b48f"), 2, 6);
+        int level = FishLevel;
+        string head, right;
+        float frac;
+        if (level < 10)
+        {
+            int cur = XpFor(level), next = XpFor(level + 1);
+            head = $"Fishing level {level}";
+            right = $"{state.xp - cur} / {next - cur} XP · next: {PerkText[level + 1]}";
+            frac = (state.xp - cur) / (float)(next - cur);
+        }
+        else
+        {
+            int m = MasteryLevel;
+            head = m == 0 ? "Fishing level 10" : $"Fishing level 10 · mastery {m}";
+            if (m >= MasteryMax) { right = "Mastery complete"; frac = 1; }
+            else
+            {
+                int have = MasteryXp - (m == 0 ? 0 : MasteryTotal(m)), need = MasteryNeed(m + 1);
+                right = $"{have} / {need} XP to mastery {m + 1}";
+                frac = have / (float)need;
+            }
+        }
+        Gfx.Text(head, x + 14, y + 5, FontKind.Ui700, 19, Pal.PaperInk);
+        float rw = w - 28 - Gfx.Measure(head, FontKind.Ui700, 19) - 14;
+        Gfx.Text(Gfx.Ellipsize(right, FontKind.Ui500, 15, rw), x + w - 14 - Math.Min(rw, Gfx.Measure(right, FontKind.Ui500, 15)), y + 8, FontKind.Ui500, 15, Muted);
+        Gfx.Rect(x + 14, y + 32, w - 28, 10, Pal.C("#e9e0cc"), 4);
+        if (frac > 0.01f) Gfx.Rect(x + 14, y + 32, MathF.Max(8, (w - 28) * Math.Clamp(frac, 0, 1)), 10, Pal.C("#3f8a4a"), 4);
+#if DEBUG
+        Gfx.Seen["journal:fishing"] = new Rectangle(x, y, w, h);
+#endif
+        lastFishingProgress = (head, right, frac);
+    }
+    internal (string head, string right, float frac) lastFishingProgress;
 }

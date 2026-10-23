@@ -71,9 +71,11 @@ partial class Game
         if (SpotBiome(spot) == "frost" && SetActive("frost")) l++;
         // The sanctuary's fish spilling over into the water just outside it, and Bakunawa's scale under the moon.
         if (fish?.Spill == true) l++;
+        if (fish?.Hot == true) l++;   // a cast into the bubbles (CastSkill.cs)
         if (Night && Wears("moon_charm")) l++;
         if (Wears("gold_star_pin")) l++;
         if (MeteorNow) l++;   // shooting stars (Events.cs)
+        if (WhaleBoost) l++;   // the morning of a whale song (EventsMore.cs)
         return l;
     }
 
@@ -213,8 +215,10 @@ partial class Game
     void GainXp(int n)
     {
         if (SetActive("mire")) n = (int)MathF.Round(n * 1.15f);
-        int before = FishLevel;
+        int before = FishLevel, masteryBefore = MasteryLevel;
         state.xp += n;
+        // Past level 10 the XP goes on counting: mastery (Mastery.cs). Its titles and cosmetics are the Ledger's to announce.
+        if (MasteryLevel > masteryBefore) Floater($"Mastery {MasteryLevel}!", player.X, player.Y - 26, "#ffd76a");
         if (FishLevel <= before) return;
         Floater($"Fishing level {FishLevel}!", player.X, player.Y - 26, "#f3c25b");
         int now = FishLevel;
@@ -340,10 +344,9 @@ partial class Game
         var s = Data.SpotById[spotId];
         var (spotX, spotY) = SpotPos(s);
         FaceToward(spotX, spotY);
-        var (lx, ly) = LandingPoint(s, power);
         // From just outside the sanctuary, a long cast toward it falls short of the buoys; if it can't, there's no cast.
-        for (int i = 0; i < 40 && scene == "world" && InSanctuary(lx, ly); i++) { lx += (player.X - lx) * 0.15f; ly += (player.Y + 3 - ly) * 0.15f; }
-        if (scene == "world" && InSanctuary(lx, ly))
+        var (lx, ly, landOk) = FinalLanding(s, power);
+        if (!landOk)
         {
             mode = "play";
             Sfx.Play("nope");
@@ -367,14 +370,17 @@ partial class Game
             if (ShadowPos(s, k, time) is (float hx, float hy, bool hb) && Dist(lx, ly, hx, hy) < 8) { onShadow = true; big |= hb; }
         if (s.Scene == "sea" && InSchool(lx, ly) && !MatchActive) onShadow = true;
         bool spill = scene == "world" && InSpillover(lx, ly);
+        bool onHot = HotHit(spotId, lx, ly);
+        if (onHot) HotUsed();
         float wait = (baitBox ? Rand(0.5f, 1.2f) : MatchActive ? MatchWait(matchN) : Rand(1.6f, 3.6f)) * Rod.Bite * WeatherBite * (bait != null ? Items.Baits[bait].Bite : 1)
             * (Perk(3) ? 0.9f : 1) * (Chummed(spotId) && !MatchActive ? 0.5f : 1) * (onShadow ? 0.55f : 1) * (spotId == "icehole" ? 1.6f : 1)
             * (s.Biome == "saltmere" && s.Scene != "sea" && SetActive("saltmere") ? 0.85f : 1) * (spill ? 0.8f : 1)
-            * (FishRunAt(spotId) && !MatchActive ? 0.5f : 1);   // a fish run (Events.cs)
+            * (FishRunAt(spotId) && !MatchActive ? 0.5f : 1)   // a fish run (Events.cs)
+            * (onHot ? HotBonus : 1);   // a cast into the bubbles (CastSkill.cs)
         fish = new FishCast
         {
             Spot = spotId, Sx = tip.X, Sy = tip.Y, Tx = lx, Ty = ly, Bx = tip.X, By = tip.Y, Bait = bait, Power = power,
-            Depth = CastDepth(power), BigShadow = big, Timer = wait, Spill = spill, MatchN = matchN
+            Depth = CastDepth(power), BigShadow = big, Timer = wait, Spill = spill, Hot = onHot, MatchN = matchN
         };
         if (spill && !state.Hinted("spillover"))
         {
@@ -567,7 +573,8 @@ partial class Game
                     charge += chargeDir * dt * 1.15f;
                     if (charge >= 1) { charge = 1; chargeDir = -1; }
                     if (charge <= 0) { charge = 0; chargeDir = 1; }
-                    SetPrompt($"Let go to cast into {DepthName(CastDepth(charge))}");
+                    SetPrompt(HotPowerRange() is (float hlo, float hhi) ? (charge >= hlo && charge <= hhi ? "Now! Let go to land in the bubbles" : "Let go on the gold mark to land in the bubbles")
+                        : $"Let go to cast into {DepthName(CastDepth(charge))}");
                 }
                 else if (chargeSpot == null) CastFree(charge);
                 else Cast(chargeSpot, charge);
@@ -592,6 +599,7 @@ partial class Game
                     mode = "waiting";
                     Sfx.Play("splash");
                     Burst(f.Bx, f.By, "#cfe8ee", 6);
+                    if (f.Hot) { Floater("On the bubbles!", f.Bx, f.By - 8, "#ffd76a"); Sfx.Play("blip"); }
                 }
                 return;
             }
@@ -907,11 +915,15 @@ partial class Game
         Give(f.Id);
         if (m >= 1.25f) state.big[f.Id] = state.big.GetValueOrDefault(f.Id) + 1;
         bool trophy = m >= 1.5f;
+        // Trophy tiers (Mastery.cs): the same size measure, three steps. A fish's record remembers the day and size it was set.
+        int tier = TrophyTier(m);
+        if (tier >= 2) state.golds++;
+        if (tier >= 3) state.masters++;
         bool firstTrophy = trophy && state.trophies.GetValueOrDefault(f.Id) == 0;
         if (trophy) state.trophies[f.Id] = state.trophies.GetValueOrDefault(f.Id) + 1;
         float recordWas = state.records.GetValueOrDefault(f.Id);
         bool record = kg > recordWas;
-        if (record) state.records[f.Id] = kg;
+        if (record) { state.records[f.Id] = kg; state.recordDay[f.Id] = state.day; state.recordM[f.Id] = m; }
         // What happened, for the landing's banner (Celebrate.cs). A double catch's second fish adds to the first's news.
         bool cotd = !f.Legend && NoteCatchOfDay(f.Id, m, kg);
         var news = catchNews ??= new CatchNews { RecordWas = recordWas };
@@ -919,7 +931,7 @@ partial class Game
         if (m >= news.M) { news.M = m; news.Kg = kg; }
         float fx = player.X, fy = player.Y - 26;
         Floater(Kg(kg), fx, fy, m >= 1.25f ? "#f3c25b" : "#ffffff");
-        if (trophy) Floater("Trophy!", fx, fy - 7, "#f3c25b");
+        if (trophy) Floater(tier >= 3 ? "Master trophy!" : tier == 2 ? "Gold trophy!" : "Trophy!", fx, fy - 7, tier >= 2 ? "#ffd76a" : "#f3c25b");
         else if (record && !first) Floater("New record!", fx, fy - 7, "#7fd36b");
         GainXp(4 + (int)MathF.Round(f.Difficulty * 4) + (f.Rare ? 8 : 0) + (f.Legend ? 60 : 0) + (perfect ? 3 : 0) + (trophy ? 5 : 0));
         DerbyCatch(f, kg);

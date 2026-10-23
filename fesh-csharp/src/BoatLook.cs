@@ -13,7 +13,7 @@ partial class Game
     // Draws one of BoatArt's grids with its anchor (ax, ay) at (x, y), mirrored about that column if asked.
     void BlitBoat(string[] grid, int ax, int ay, int x, int y, bool mirror = false, float alpha = 1f)
     {
-        boatPal ??= BoatArt.Palette.Select(Pal.C).ToArray();
+        var palette = BoatPaletteNow();
         int oy = y - ay;
         for (int j = 0; j < grid.Length; j++)
         {
@@ -23,7 +23,7 @@ partial class Game
                 char ch = row[i];
                 if (ch == '.') continue;
                 int k = ch >= 'a' ? ch - 'a' : 26 + (ch - 'A');
-                var c = boatPal[k];
+                var c = palette[k];
                 if (alpha < 1f) c.A = (byte)(c.A * alpha);
                 pix.Rect(mirror ? x - (i - ax) : x + (i - ax), oy + j, 1, 1, c);
             }
@@ -60,5 +60,26 @@ partial class Game
                 if (front) WaterlineFoam(BoatArt.RightFront, BoatArt.RightFrontX, BoatArt.RightFrontY, X, Y + BoatSideDy, dir < 0);
                 break;
         }
+    }
+}
+
+partial class Game
+{
+    // The hull's teal trim (palette entries 0, 1 and 9: shade, base, light) in the colour you've painted it (Wardrobe.cs): the
+    // chosen colour as the base, a darker and a lighter step either side, so the planks and the rim keep their shading.
+    static Color[] paintedPal;
+    static string paintedFor;
+    Color[] BoatPaletteNow()
+    {
+        boatPal ??= BoatArt.Palette.Select(Pal.C).ToArray();
+        string hex = HullHex;
+        if (hex == null) return boatPal;
+        if (paintedPal != null && paintedFor == hex) return paintedPal;
+        var pal = (Color[])boatPal.Clone();
+        var b = Pal.C(hex);
+        Color Step(float k) => new((byte)Math.Clamp(b.R * k, 0, 255), (byte)Math.Clamp(b.G * k, 0, 255), (byte)Math.Clamp(b.B * k, 0, 255), (byte)255);
+        pal[0] = Step(0.6f); pal[1] = Step(1f); pal[9] = new Color((byte)Math.Min(255, b.R + (255 - b.R) * 0.35f), (byte)Math.Min(255, b.G + (255 - b.G) * 0.35f), (byte)Math.Min(255, b.B + (255 - b.B) * 0.35f), (byte)255);
+        paintedFor = hex; paintedPal = pal;
+        return pal;
     }
 }

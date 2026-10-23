@@ -242,6 +242,7 @@ partial class Game
         var day = Board();
         CatchUpCounters(day);
         PayBounties(day);
+        var week = Weekly(); CatchUpOne(week); PayWeekly(week);
     }
 
     void CatchUpCounters(BoardDay day)
@@ -252,15 +253,16 @@ partial class Game
     }
 
     // AddCatch: one fish (each of a double catch counts). Where you stand is where it was caught: the rod, a pot, a
-    // spear or a bubo, it's all from beside you.
+    // spear or a bubo, it's all from beside you. The week's bounty counts the same catches.
     void BoardCatch(CommonFish f, float m)
     {
         if (BoardOff || MatchActive || f.Legend || state == null || !state.created) return;
         var day = Board();
+        var week = Weekly();
         string here = scene == "world" ? RegionOf(player.X, player.Y) : null;
-        foreach (var b in day.list)
+        void Count(Bounty b)
         {
-            if (b.paid) continue;
+            if (b.paid) return;
             switch (b.kind)
             {
                 case "fish": b.have++; break;
@@ -270,7 +272,10 @@ partial class Game
                 case "big": if (m >= 1.25f) b.have++; break;
             }
         }
+        foreach (var b in day.list) Count(b);
+        Count(week);
         PayBounties(day, later: true);
+        PayWeekly(week, later: true);
     }
 
     // Done is paid at once and saved before anything is shown, so a quit can't lose it and a reload can't pay it twice.

@@ -56,6 +56,7 @@ partial class Game
         Gfx.Rect(x, y, w * 0.35f, h, Pal.C("#9fd3e6"), 3);
         Gfx.Rect(x + w * 0.35f, y, w * 0.4f, h, Pal.C("#3a8db0"));
         Gfx.Rect(x + w * 0.75f, y, w * 0.25f, h, Pal.C("#1d4f78"), 3);
+        DrawHotBand(x, y, w, h);
         float mx = x + w * charge;
         Gfx.Rect(mx - 2, y - 5, 4, h + 10, Pal.C("#ffffff"));
         string label = CastDepth(charge) switch { 0 => "Shallow", 1 => "Middle", _ => "Deep" };

@@ -13,7 +13,7 @@ partial class Game
     {
         var copy = JsonSerializer.Deserialize<State>(JsonSerializer.Serialize(state, JsonAll), JsonAll);
         copy.playSecs = 0; copy.savedAt = null; copy.food = 0;   // hunger is meant to move on the island
-        copy.coins = 0; copy.inv.Remove("glow_bait"); foreach (var k in copy.gifts.Keys.Where(k => k.StartsWith("duel_")).ToList()) copy.gifts.Remove(k);   // and Pip pays for a Duel won
+        copy.coins = 0; copy.dailyDays = new(); copy.inv.Remove("glow_bait"); foreach (var k in copy.gifts.Keys.Where(k => k.StartsWith("duel_") || k.StartsWith("daily_")).ToList()) copy.gifts.Remove(k);   // and Pip pays for a Duel won
         return JsonSerializer.Serialize(copy, JsonAll);
     }
 
@@ -570,7 +570,7 @@ partial class Game
     {
         var copy = JsonSerializer.Deserialize<State>(JsonSerializer.Serialize(s, JsonAll), JsonAll);
         copy.playSecs = 0; copy.savedAt = null; copy.food = 0;   // hunger is meant to move on the island
-        copy.coins = 0; copy.inv.Remove("glow_bait"); foreach (var k in copy.gifts.Keys.Where(k => k.StartsWith("duel_")).ToList()) copy.gifts.Remove(k);   // and Pip pays for a Duel won
+        copy.coins = 0; copy.dailyDays = new(); copy.inv.Remove("glow_bait"); foreach (var k in copy.gifts.Keys.Where(k => k.StartsWith("duel_") || k.StartsWith("daily_")).ToList()) copy.gifts.Remove(k);   // and Pip pays for a Duel won
         return JsonSerializer.Serialize(copy, JsonAll);
     }
 }

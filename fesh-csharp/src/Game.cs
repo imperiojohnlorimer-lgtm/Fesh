@@ -9,7 +9,7 @@ sealed class Critter { public string Id; public float X, Y, Vx, Vy, T; }
 // One cast. Depth is 0 shallow, 1 middle, 2 deep. WaitT counts up while waiting (the ice hole's jig rhythm uses it).
 sealed class FishCast
 {
-    public string Spot, Bait; public float T, Sx, Sy, Tx, Ty, Bx, By, Timer, BiteT, WaitT, Power; public int Depth, Jigs, MatchN = -1; public bool BigShadow, Spill;   // MatchN: the cast's number in a match (Match.cs)
+    public string Spot, Bait; public float T, Sx, Sy, Tx, Ty, Bx, By, Timer, BiteT, WaitT, Power; public int Depth, Jigs, MatchN = -1; public bool BigShadow, Spill, Hot;   // MatchN: the cast's number in a match (Match.cs)
     // A cast you aimed yourself (Hotbar.cs): Spot is the named spot whose water it fell in, and only its everyday fish bite
     // (Wild); Dry, it fell on land; Empty, in water nothing lives in.
     public bool Wild, Dry, Empty;
@@ -73,6 +73,8 @@ partial class Game
     FishCast fish;
     ReelState reel;
     DialogueState dlg;
+    bool dlgArmed; float dlgHoldT, dlgPageT;   // holding to skip ahead (1.45.1)
+    internal const float DlgHoldNeed = 0.4f, DlgPageGap = 0.15f;
     double catchOpenedAt;
     string catchId, panel;
     bool pointerHold, hasSave, quit;
@@ -332,6 +334,7 @@ partial class Game
         else if (Bind.Pressed("journal")) TogglePanel("journal");
         else if (Bind.Pressed("mute")) ToggleSound();
         else if (Bind.Pressed("ride")) ToggleRide();
+        else if (Bind.Pressed("petcall")) CallPet();
         else if (BackPressed())
         {
             // A card open over the Fish log, the album or the island guide closes back to its page first.
@@ -480,6 +483,7 @@ partial class Game
     void Talk(List<Say> lines, Action onDone = null)
     {
         dlg = new DialogueState { Lines = lines, OnDone = onDone };
+        dlgArmed = false; dlgHoldT = dlgPageT = 0;
         NoteTalkLines(lines);   // a conversation with a villager (Friends.cs)
         mode = "dialogue";
         SetPrompt("");
@@ -826,6 +830,7 @@ partial class Game
                 if (d.Station != null && Dist(x, y, cx, cy) < 8 + d.W * 5)
                     return new Target { Type = "craft", Id = d.Station, Label = $"Use the {d.Name.ToLowerInvariant()}" };
                 if (b.id == "aquarium" && Dist(x, y, cx, cy) < 18) return new Target { Type = "tank", Ref = b, Label = "Look after the aquarium" };
+                if (b.id == "trophy" && Dist(x, y, cx, cy) < 18) return new Target { Type = "trophy", Ref = b, Label = "Read the trophy wall" };
             }
             return null;
         }
@@ -1032,6 +1037,7 @@ partial class Game
                     case "joy": TalkJoy(); break;
                     case "agong": BeatAgong(); break;
                     case "tank": OpenTank((Build)target.Ref); break;
+                    case "trophy": OpenTrophies(); break;
                     case "planter": PickPlanter((Build)target.Ref); break;
                     case "info": Sfx.Play("nope"); break;
                     case "dockplayer": FaceToward(dockClient.Roster.First(p => p.Id == int.Parse(target.Id)).X, player.Y); dockChallengeTarget = int.Parse(target.Id); Sfx.Play("ui"); break;
@@ -1127,7 +1133,7 @@ partial class Game
         UpdateFloaters(dt);
         UpdateTitleTour(dt);
         UpdateTitleIntro(dt);
-        if (!MatchActive) { UpdateGuide(dt); TellBadgeNews(); UpdateLedger(dt); UpdateBoard(dt); UpdateEvents(); UpdateCelebrations(dt); }
+        if (!MatchActive) { UpdateGuide(dt); TellBadgeNews(); UpdateLedger(dt); UpdateBoard(dt); UpdateCastSkill(); UpdateEvents(); UpdateCelebrations(dt); }
         HoldMount();
         if (mode is not ("pause" or "panel" or "title" or "create"))
         {
@@ -1195,12 +1201,24 @@ partial class Game
 
         if (mode == "dialogue" && dlg != null)
         {
+            // Holding the key (or the button, or a finger) speeds the typing and then turns the pages by itself, stopping on
+            // the last line so a conversation never ends or starts something unless you press (1.45.1). The press that began
+            // the conversation, and a press that was already down, don't count: the hold has to start inside it.
+            bool held = Bind.Down("act") || Inp.Down(KeyboardKey.Enter) || pointerHold;
+            if (!held) { dlgArmed = true; dlgHoldT = 0; dlgPageT = 0; }
+            else if (dlgArmed) dlgHoldT += dt;
+            bool fast = dlgHoldT >= DlgHoldNeed;
             if (dlg.Shown < dlg.Full.Length)
             {
                 int before = (int)dlg.Shown;
-                dlg.Shown = Math.Min(dlg.Full.Length, dlg.Shown + dt * 48);
+                dlg.Shown = Math.Min(dlg.Full.Length, dlg.Shown + dt * (fast ? 48 * 6 : 48));
                 int now = (int)dlg.Shown;
-                if (now != before && now % 3 == 0) Sfx.Play("blip");
+                if (now != before && now % 3 == 0 && !fast) Sfx.Play("blip");
+            }
+            else if (fast && dlg.I < dlg.Lines.Count - 1 && (dlgPageT += dt) >= DlgPageGap)
+            {
+                dlgPageT = 0;
+                AdvanceDialogue();
             }
             return;
         }
@@ -1347,6 +1365,7 @@ partial class Game
             if (look != null) { state.look = look; state.created = true; }
         }
         state.FixClock();
+        FixWardrobe();   // anything worn that isn't yours comes off (Wardrobe.cs)
         lastWearTile = (-1, -1); CatchUpWear();
         chartEast = false;
         if (state.aboard && (Has("boat") == 0 || state.scene != "world")) state.aboard = false;
@@ -1360,6 +1379,7 @@ partial class Game
         stampDock = false;
         tremor = null; evac = null; cocos.Clear(); trackBeforeSea = null;
         ResetMagayon();
+        hot = null; hotNext = 0; hotArmAt = -1;   // bubbles belong to the game they stirred in (CastSkill.cs)
         bolts.Clear(); chumUntil.Clear(); floaters.Clear(); leaves.Clear(); bugs.Clear(); animals.Clear(); schools.Clear(); seaLife.Clear(); glowTrail.Clear();
         habagatWalk.Clear();
         // Marilaya's story (1.23): its panels and the storytellers' gathering are never carried over.

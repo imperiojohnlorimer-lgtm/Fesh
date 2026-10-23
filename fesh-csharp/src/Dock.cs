@@ -289,6 +289,6 @@ partial class Game
         if (PanelClose()) { match.BoardOpen = false; return; }
         float top = py + 96, gap = 20;
         float ch = ph - (top - py) - PanelPad;
-        DrawBoardPages(px + PanelPad, top, pw - PanelPad * 2, ch);
+        DrawBoardPages(px + PanelPad, top, pw - PanelPad * 2, ch, dock: true);
     }
 }

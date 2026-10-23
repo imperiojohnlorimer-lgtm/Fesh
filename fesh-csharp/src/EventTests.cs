@@ -23,10 +23,11 @@ partial class Game
         /* ---------- the roll ---------- */
         Check($"the same day rolls the same event ({Sig(RollEvent(9))})", Sig(RollEvent(9)) == Sig(RollEvent(9)));
         state.eventsHad = 5;
+        state.clock = 7 * 60;   // the whale needs the morning (it only rolls while its window has an hour left)
         var rolls = Enumerable.Range(4, 80).Select(d => { state.day = d; return RollEvent(d); }).ToList();
         int some = rolls.Count(e => e.kind != "none");
         var kinds = rolls.Select(e => e.kind).Where(k => k != "none").Distinct().OrderBy(k => k).ToList();
-        Check($"most days have something ({some} of 80), every kind turns up ({string.Join(", ", kinds)})", some >= 35 && some <= 60 && kinds.Count == 5);
+        Check($"most days have something ({some} of 80), every kind turns up ({string.Join(", ", kinds)})", some >= 35 && some <= 60 && kinds.Count == 6);
         Check("a run only at a charted Saltmere spot, a bottle only on a charted beach, a turtle on Saltmere",
             rolls.All(e => e.kind != "run" || Charted(SpotRegion(Data.SpotById[e.arg])))
             && rolls.Where(e => e.kind is "bottle" or "turtle").All(e => Charted(RegionOf(e.x, e.y)) && TileAt((int)(e.x / T), (int)(e.y / T)) == 's')

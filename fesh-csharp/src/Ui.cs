@@ -66,6 +66,9 @@ partial class Game
         if (mode == "panel" && panel == "voyage") DrawVoyage();
         if (mode == "panel" && panel == "journal") DrawJournal();
         if (mode == "panel" && panel == "ledger") DrawLedger();
+        if (mode == "panel" && panel == "moon") DrawMoonCalendar();
+        if (mode == "panel" && panel == "wardrobe") DrawWardrobe();
+        if (mode == "panel" && panel == "trophies") DrawTrophies();
         if (mode == "panel" && panel == "board") DrawBoard();
         if (mode == "panel" && panel == "trader") DrawTrader();
         if (mode == "panel" && panel == "friends") DrawFriends();
@@ -225,6 +228,8 @@ partial class Game
         Gfx.Text(coins, x + w - 14 - coinTw, y + 18 - cfs / 2 - 1, FontKind.Ui600, cfs, Pal.Lantern);
         DrawIcon("coin", x + w - 14 - coinTw - 28, y + 6, 24);
         if (Gfx.Hover(x, y, w - 14 - coinTw - 34, 36)) clockTip = x;
+        // A click on the clock opens the moon calendar (MoonCalendar.cs), in plain play only.
+        if (mode == "play" && Gfx.Click(x, y, w - 14 - coinTw - 34, 36)) { TogglePanel("moon"); return; }
         // Where you are.
         Gfx.Rect(x + 12, y + 37, w - 24, 1, Pal.C("rgba(255,255,255,0.12)"));
         DrawPin(x + 21, y + 49);
@@ -296,7 +301,8 @@ partial class Game
             Night ? $"Night until {HourText(DawnMin)}" : $"Daylight until {HourText(DuskMin)}",
             SeasonLine(),
             FullMoon ? "The moon is full tonight" : toFull == 0 ? "Full moon tonight" : toFull == 1 ? "Full moon tomorrow night" : $"Full moon in {toFull} days",
-            Forecast() ?? "No change in the weather expected today."
+            Forecast() ?? "No change in the weather expected today.",
+            "Click the clock for the moon calendar"
         };
         if (KnowTomorrow) lines.Add($"Tomorrow: {DescribeDay(state.tomorrow)}");
         // On Habagat (or anywhere with the tide watch), the tide matters for gleaning (Tides.cs).
@@ -466,6 +472,7 @@ partial class Game
             var c = Pal.C("#7a6a55");
             float nx = x + w - 34, ny = y + h - 30;
             Gfx.Text("Next", nx - Gfx.Measure("Next", FontKind.Ui500, 19) - 4, ny, FontKind.Ui500, 19, c);
+            if (dlg.I < dlg.Lines.Count - 1) Gfx.Text(Bind.Fix("Hold <act> to skip ahead"), x + 34, ny + 3, FontKind.Note, 15, Pal.WithAlpha(c, 0.8f));
             DrawTriangle(Gfx.P(nx, ny + 7), Gfx.P(nx + 5, ny + 15), Gfx.P(nx + 10, ny + 7), c);
         }
     }

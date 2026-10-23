@@ -27,6 +27,10 @@ partial class Game
             Friends.All(f => f.Loves.All(Items.ById.ContainsKey) && Items.ById.ContainsKey(f.Present) && f.Loves.All(l => !Data.FishById.TryGetValue(l, out var fish) || !fish.Legend)));
         var villagerNames = Islanders.Select(n => n.name).Concat(HabagatFolk.Select(n => n.name)).Concat(MlFolk.Select(n => n.name)).Concat(new[] { "Tomas", "Pip", "Bantay Joy" }).ToHashSet();
         Check("their names are the villagers' own names (the ones they speak under)", Friends.All(f => villagerNames.Contains(f.Name)));
+        var badWords = new[] { "daughter", "Mara", "Starwell", "Tidemane", "guardian", "Platejaw", "Bakunawa", "Ironbill", "legend" };
+        Check("every friend has five heart lines: ASCII, short, and nothing about the stories", Friends.All(f => HeartLines.TryGetValue(f.Id, out var hl) && hl.Length == 5
+            && hl.All(s => s.Length is > 20 and <= 140 && s.All(ch => ch is >= ' ' and <= '~') && !badWords.Any(b => s.Contains(b, StringComparison.OrdinalIgnoreCase)))));
+        Check("and no two lines are the same", HeartLines.Values.SelectMany(v => v).Distinct().Count() == Friends.Length * 5);
         // Codex's review: Rosa takes so many of any of her kinds, so only the total is kept back.
         int dayKeep = state.day; state.day = 2; state.hinted["metRosa"] = true;
         var (kinds, need, _) = RosaOrder;
@@ -86,6 +90,7 @@ partial class Game
         var f = FriendData("lira");
         f.points = 23; int c0 = state.coins, gb = Has("glow_bait"); var earned0 = Achievements.Where(a => AchEarned(state, a)).Select(a => a.Id).ToHashSet();
         Inp.Tap(KeyboardKey.E); yield return 4;   // today's talk: 24
+        Check("the heart brings that friend's own line into the conversation", dlg != null && dlg.Lines.Any(l => l.T == HeartLine("lira", 3)) && HeartLine("lira", 3) != null);
         foreach (var s in EndTalk()) yield return s;
         Check($"three hearts: her present ({Has("glow_bait") - gb} glow bait) and a banner", Hearts("lira") == 3 && f.got3 && Has("glow_bait") - gb == 3 && celebQueue.Concat(banner == null ? Array.Empty<Celeb>() : new[] { banner }).Any(c => c.Kind == "friend"));
         state.day++; SetNight(false);

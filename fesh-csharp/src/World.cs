@@ -536,6 +536,7 @@ partial class Game
                 }
             }
         }
+        DrawHotSpot(t);
     }
 
     // A fish shadow drifting under the surface (seen through polarized sunglasses).
@@ -1134,6 +1135,7 @@ partial class Game
                 if (state.picked.GetValueOrDefault($"b:{b.x},{b.y}") != state.day)
                     foreach (var (bx, by) in new[] { (2, 5), (6, 3), (4, 7), (7, 6), (1, 7), (5, 4) }) pix.Rect(X + bx, Y + by, 1, 1, "#e04b3a");
                 break;
+            case "trophy": DrawTrophyWall(b, X, Y); break;
             case "aquarium":
                 pix.Rect(X + 1, Y + 9, 18, 1, "rgba(0,0,0,0.25)");
                 pix.Rect(X + 1, Y + 6, 18, 3, "#6b4a2b"); pix.Rect(X + 2, Y + 8, 2, 2, "#5b3a24"); pix.Rect(X + 16, Y + 8, 2, 2, "#5b3a24");
@@ -1238,14 +1240,30 @@ partial class Game
         else Outline(g.Tx * T, g.Ty * T, d.W * T, T, Pal.C("#7fd36b"));
     }
 
-    void DrawAnimal(Animal a)
+    // What an animal is doing with its body (1.45.1): standing still they get on with things (chickens peck, sheep and pigs graze,
+    // the dog wags, the cat flicks its tail), twitch an ear now and then, and lift their heads when you stop near them; patted,
+    // each reacts its own way. Pose 0 stands, 1 dips the head, 2 lifts the tail, 3 sleeps, 4 head up, 5 an ear twitches.
+    internal int AnimalPose(Animal a, bool moving, out int hop)
     {
-        bool moving = a.Vx != 0 || a.Vy != 0;
-        // Standing still, they get on with things: chickens peck, sheep and pigs graze, the dog wags, the cat flicks its tail.
+        hop = 0;
         int pose = 0;
         float ph = (time * 0.7f + a.HomeX * 0.13f) % 3f;
-        if (a.Hearts > 0 && a.Kind is "dog" or "cat") pose = (int)(time * 12) % 2 == 0 ? 2 : 0;
+        bool pat = a.Hearts > 0 && !(a.Asleep && a.Hearts <= 0);
+        if (pat && a.Kind is "dog" or "cat") pose = (int)(time * 12) % 2 == 0 ? 2 : 0;
+        else if (pat)
+        {
+            // Each its own way: the sheep hops, the goat nods, the pig snuffles, the chicken flutters up and down.
+            int beat = (int)(time * 8) % 2;
+            switch (a.Kind)
+            {
+                case "sheep": hop = beat; break;
+                case "goat": pose = beat == 0 ? 1 : 4; break;
+                case "pig": pose = beat == 0 ? 1 : 0; break;
+                case "chicken": pose = beat == 0 ? 1 : 2; hop = beat; break;
+            }
+        }
         else if (!moving)
+        {
             pose = a.Kind switch
             {
                 "chicken" => (time * 1.7f + a.HomeX) % 2.2f < 0.35f ? 1 : 0,
@@ -1254,11 +1272,24 @@ partial class Game
                 "cat" => ph < 0.35f ? 2 : 0,
                 _ => 0
             };
+            // Noticing you: stopped within a few steps of it, it looks up (not grazing, not asleep).
+            bool near = scene == "world" && Dist(a.X, a.Y, player.X, player.Y) < 34 && Dist(a.X, a.Y, player.X, player.Y) > 3;
+            if (pose is 0 or 1 && near && !player.Moving && a.Kind is "sheep" or "pig" or "goat" or "chicken" or "dog" && !Calm) pose = 4;
+            // An ear twitch every few seconds, each animal on its own beat.
+            else if (pose == 0 && !Calm && a.Kind is "sheep" or "goat" or "pig" or "dog" && (time * 0.8f + a.HomeX * 0.37f + a.HomeY * 0.11f) % 4.1f < 0.22f) pose = 5;
+        }
+        return pose;
+    }
+
+    void DrawAnimal(Animal a)
+    {
+        bool moving = a.Vx != 0 || a.Vy != 0;
+        int pose = AnimalPose(a, moving, out int hop);
         // Once it has bedded down for the night (UpdateAnimals) it lies curled up until morning, with the odd z drifting up.
         bool asleep = a.Asleep && a.Hearts <= 0;
         if (asleep) pose = 3;
         // Walking runs four frames (step, pass, step, pass); faster for the small quick ones.
-        AnimalArt.Draw(pix, a.Kind, a.X, a.Y, a.Flip, moving ? 1 + (int)(time * (a.Kind is "chicken" or "cat" or "dog" ? 12 : 8)) % 4 : 0, pose);
+        AnimalArt.Draw(pix, a.Kind, a.X, a.Y - (asleep ? 0 : hop), a.Flip, moving ? 1 + (int)(time * (a.Kind is "chicken" or "cat" or "dog" ? 12 : 8)) % 4 : 0, pose);
         if (asleep)
         {
             float zt = (time * 0.6f + a.HomeX * 0.07f) % 3f;
@@ -1429,6 +1460,7 @@ partial class Game
         AddArchipelagoObjects(list);
         AddBoardObjects(list);
         AddEventObjects(list);
+        AddStoryDetails(list);
         AddRestlessSeaObjects(list);
         AddMagayonObjects(list);
         if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
@@ -1678,11 +1710,13 @@ partial class Game
             LightRay();
             LightTarpon();
             LightWindows();
+            LightBoatLamp();
             KeepMoonPath();
             ApplyDark(new Color(8, 16, 40, 255));
         }
         // The lamps (windows, fires, lanterns) come on at dusk, before the dark does (LampK): they glow while the sky is orange.
         GlowWindows(t, lk);
+        GlowBoatLamp(t, lk);
         if (k > 0)
         {
             DrawMoonPath(k);

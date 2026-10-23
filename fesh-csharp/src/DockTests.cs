@@ -55,6 +55,22 @@ partial class Game
         Inp.Tap(KeyboardKey.E); yield return 3;
         Check("E opens the board", match.BoardOpen);
         pendingShot = "dock-board"; yield return 2;
+        // The showroom (1.46): the board's third page, with your own card and arrows for your favourite fish.
+        realState.records[ShowcaseFish[0]] = 1.2f; realState.records[ShowcaseFish[3]] = 1.5f; realState.favFish = null;
+        ClickButton("More boards"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 3;
+        Check("the dock's second board page has a Showroom button beside First boards", boardPage == 1 && Gfx.Seen.ContainsKey("Showroom") && Gfx.Seen.ContainsKey("First boards"));
+        ClickButton("Showroom"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 3;
+        Check("the showroom shows you, alone, and nobody else", boardPage == 2 && Gfx.Seen.ContainsKey("show:card:0") && !Gfx.Seen.ContainsKey("show:card:1") && ShowEntries().Count == 1 && ShowEntries()[0].Mine);
+        pendingShot = "dock-showroom"; yield return 3;
+        Check($"its card fits the board ({lastShowroomBottom:0} of {panelAt.y + panelAt.h - 12:0})", lastShowroomBottom > 0 && lastShowroomBottom <= panelAt.y + panelAt.h - 12);
+        ClickButton("show:next"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 3;
+        Check($"the arrow picks a favourite from the fish you hold a record for, in the real save ({realState.favFish})", realState.favFish == ShowcaseFish[0] && state.favFish == null);
+        ClickButton("show:next"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 3;
+        Check("and the next one", realState.favFish == ShowcaseFish[3]);
+        ClickButton("Back to boards"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 3;
+        ClickButton("First boards"); yield return 3; Inp.ScriptMouse = Offscreen; yield return 3;
+        Check("Back to boards and First boards return to the first page", boardPage == 0);
+        realState.records.Remove(ShowcaseFish[0]); realState.records.Remove(ShowcaseFish[3]); realState.favFish = null;
         Inp.Tap(KeyboardKey.W); yield return 3;
         Check("keys do nothing behind the board", match.BoardOpen && MathF.Abs(player.X - 326) < 0.5f);
         Inp.Tap(KeyboardKey.Escape); yield return 3;

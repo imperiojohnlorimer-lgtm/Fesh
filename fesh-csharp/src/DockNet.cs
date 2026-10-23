@@ -80,6 +80,7 @@ sealed class DockPeer
     public readonly DockPlayer P = new();
     public int Busy;                                   // the id of the challenge this player is part of (0: none)
     public bool Away;                                  // off at a match of their own against someone the dock can't see (an angler)
+    public int[] Profile;                              // what they told the showroom: title, favourite fish, mastery, kinds (DockShowroom.cs); only ever bounds-checked, never trusted
     public readonly Bucket Pose = new(12, 8), Emote = new(0.5, 1), Invite = new(0.34, 2), Route = new(80, 40), Misc = new(20, 20);
 }
 
@@ -139,6 +140,14 @@ sealed class DockHostCore
         if ((dirty && now - lastRoster >= 0.2) || now - lastRoster >= 1.5) { lastRoster = now; dirty = false; SendRoster(); }
     }
 
+    // Everyone's showroom numbers, id first: [id, title, favourite, mastery, kinds, shirt, trousers, hair, hat] for each who has sent them.
+    NetMsg ProfilesMsg()
+    {
+        var list = new List<int>();
+        foreach (var o in peers.Where(o => o.In && o.Profile != null)) { list.Add(o.Id); list.AddRange(o.Profile); }
+        return new NetMsg { t = "profiles", n = list.ToArray() };
+    }
+
     void SendRoster()
     {
         var list = new List<int>();
@@ -164,6 +173,7 @@ sealed class DockHostCore
             p.X = p.TX = DockRules.SpawnX + (peer.Id % 5 - 2) * 5; p.Y = p.TY = DockRules.SpawnY - peer.Id % 3 * 3;
             peer.In = true; peer.LastPose = peer.LastBudget = now;
             peer.Link.Send(new NetMsg { t = "dwelcome", from = peer.Id, v = DockRules.Protocol });
+            if (peers.Any(o => o.In && o.Profile != null)) peer.Link.Send(ProfilesMsg());
             dirty = true;
             return;
         }
@@ -189,6 +199,15 @@ sealed class DockHostCore
                 p.State = peer.Busy != 0 && challenges.TryGetValue(peer.Busy, out var bc) && bc.Active || peer.Away ? 1 : 0;
                 peer.LastPose = now;
                 dirty = true;
+                break;
+            }
+            case "dprofile":
+            {
+                // The showroom card (1.46): four small numbers, clamped. It is what they say about themselves, shown as such.
+                if (!peer.Misc.Take(now) || m.n == null || m.n.Length != 8) return;
+                peer.Profile = new[] { Math.Clamp(m.n[0], 0, 255), Math.Clamp(m.n[1], 0, 4095), Math.Clamp(m.n[2], 0, 10), Math.Clamp(m.n[3], 0, 999), Math.Clamp(m.n[4], 0, 255), Math.Clamp(m.n[5], 0, 255), Math.Clamp(m.n[6], 0, 255), Math.Clamp(m.n[7], 0, 255) };
+                var all = ProfilesMsg();
+                foreach (var o in peers.Where(o => o.In)) o.Link.Send(all);
                 break;
             }
             case "emote":
@@ -336,6 +355,7 @@ sealed class DockClientCore
     public string Why = "";
     public int MyId;
     public readonly List<DockPlayer> Roster = new();    // everyone, you included
+    public readonly Dictionary<int, int[]> Profiles = new();   // the showroom numbers people sent, by id (title, favourite fish, mastery, kinds)
     public readonly Queue<DockEvent> Events = new();
     readonly Dictionary<int, RoutedLink> routes = new();
     double lastPoseSent = -9, lastHb;
@@ -349,6 +369,9 @@ sealed class DockClientCore
         Now = () => clock.Elapsed.TotalSeconds;
         link.Send(new NetMsg { t = "dhello", v = DockRules.Protocol, n = new[] { adj, noun, look.skin, look.hair, look.hairColor, look.hat, look.shirt, look.pants } });
     }
+
+    // Tell the dock your showroom card (four small numbers).
+    public void SendProfile(int[] p) { if (State == "in" && p is { Length: 8 }) link.Send(new NetMsg { t = "dprofile", n = p }); }
 
     public DockPlayer Me => Roster.FirstOrDefault(p => p.Id == MyId);
     public IEnumerable<DockPlayer> Others => Roster.Where(p => p.Id != MyId);
@@ -436,6 +459,14 @@ sealed class DockClientCore
                     int k = 1;
                     foreach (var rp in grp.OrderBy(rp => rp.Id)) { rp.Name = k == 1 ? rp.BaseName : $"{rp.BaseName} {k}"; k++; }
                 }
+                break;
+            }
+            case "profiles" when State == "in":
+            {
+                if (m.n == null || m.n.Length % 9 != 0 || m.n.Length / 9 > DockRules.MaxPlayers) return;
+                Profiles.Clear();
+                for (int at = 0; at < m.n.Length; at += 9)
+                    Profiles[m.n[at]] = new[] { Math.Clamp(m.n[at + 1], 0, 255), Math.Clamp(m.n[at + 2], 0, 4095), Math.Clamp(m.n[at + 3], 0, 10), Math.Clamp(m.n[at + 4], 0, 999), Math.Clamp(m.n[at + 5], 0, 255), Math.Clamp(m.n[at + 6], 0, 255), Math.Clamp(m.n[at + 7], 0, 255), Math.Clamp(m.n[at + 8], 0, 255) };
                 break;
             }
             case "emote" when State == "in":

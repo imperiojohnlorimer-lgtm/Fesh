@@ -558,7 +558,9 @@ static class Data
         new("plant", "Potted plant", Cost(("stone", 1), ("berries", 1)), "A little green.", Box: new[] { 2, 5, 6, 4 }, Indoor: true),
         new("lamp", "Lamp", Cost(("wood", 1), ("copper_bar", 1)), "Warm light at night.", Box: new[] { 3, 6, 4, 3 }, Light: new[] { 5, -5, 44 }, Indoor: true),
         new("aquarium", "Aquarium", Cost(("wood", 4), ("stone", 6), ("copper_bar", 2)), "Show off up to four fish.", W: 2, Box: new[] { 1, 2, 18, 7 }, Indoor: true,
-            Tip: "Press <act> at the aquarium to put fish in it.")
+            Tip: "Press <act> at the aquarium to put fish in it."),
+        new("trophy", "Trophy wall", Cost(("wood", 6), ("stone", 2)), "Mount your record fish as plaques.", W: 2, Box: new[] { 1, 2, 18, 7 }, Indoor: true,
+            Tip: "Press <act> at the trophy wall to read your records.")
     };
     public static readonly Dictionary<string, BuildDef> BuildById = Builds.ToDictionary(b => b.Id);
     public static readonly string[] OutdoorTools = Builds.Where(b => !b.Indoor).Select(b => b.Id).Append("remove").ToArray();

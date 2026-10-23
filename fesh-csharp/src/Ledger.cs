@@ -11,7 +11,7 @@ sealed record Ach(string Id, string Group, string Name, string Desc, Func<Game, 
 
 partial class Game
 {
-    static readonly string[] LedgerGroups = { "Catching", "Collecting", "Exploring", "Sea school", "Legends & stories", "Home & boat" };
+    static readonly string[] LedgerGroups = { "Catching", "Collecting", "Exploring", "Sea school", "Legends & stories", "Home & boat", "Mastery" };
     const double MilePx = 926;   // a nautical mile, at a tile of ten pixels being about twenty metres
 
     int FishCaught => state.commons.Where(kv => Data.FishById.ContainsKey(kv.Key)).Sum(kv => kv.Value);
@@ -29,7 +29,8 @@ partial class Game
     static Ach[] achievements;
     static Ach[] Achievements => achievements ??= MakeAchievements();
 
-    static Ach[] MakeAchievements() => new Ach[]
+    static Ach[] MakeAchievements() => BaseAchievements().Concat(ExtraAchievements()).ToArray();
+    static Ach[] BaseAchievements() => new Ach[]
     {
         // Catching
         new("first", "Catching", "First bite", "Catch a fish.", g => g.FishCaught, 1, 10),
@@ -302,7 +303,8 @@ partial class Game
             ("Legends landed", LegendsCaught.ToString()),
             ("Sunken chests", state.chests.ToString()),
             ("Fish let go", state.releasedAll.ToString()),
-            ("Fishing level", $"{FishLevel} ({state.xp} XP)"),
+            ("Fishing level", FishLevel >= 10 ? $"10 · mastery {MasteryLevel} ({state.xp} XP)" : $"{FishLevel} ({state.xp} XP)"),
+            ("Gold and master trophies", $"{state.golds} gold, {state.masters} master"),
             ("Days on the islands", state.day.ToString()),
             ("Time played", PlayTime(state.playSecs)),
             ("Places charted", (state.charted?.Count ?? 0).ToString()),

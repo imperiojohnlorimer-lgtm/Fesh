@@ -22,7 +22,7 @@ partial class Game
         if (!InDock || ev.Link == null) { dockClient?.Done(ev.Ch); return; }
         var peer = dockClient.Roster.FirstOrDefault(p => p.Id == ev.From);
         netPeerName = peer?.Name ?? "Someone";
-        netRivalLook = peer?.ToLook() ?? new Look();
+        netRivalLook = peer != null ? RemoteLook(peer) : new Look();
         netDerby = new DerbySession(LanName, ev.Link, host: ev.Role == 0);
         netGameId = "";
         dockDerbyCh = ev.Ch;

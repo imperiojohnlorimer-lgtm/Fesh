@@ -280,6 +280,28 @@ partial class Game
                 if (len > 3) R(mx + 2, my - 6, 1, 2, "#a8844e");
                 if (len > 6) R(mx + 5, my - 6, 1, 2, "#a8844e");
             }
+            // Looks only (1.46): bunting from the masthead to the stern, and a lantern hung from the boom (it lights the water
+            // after dark: BoatLampOn).
+            if (Wears("boat_bunting") && !reflecting)
+            {
+                int ex = endOn ? 8 : -11, ey = my - 4;
+                for (int i = 0; i <= 8; i++)
+                {
+                    float u = i / 8f;
+                    int bx = mx + (int)MathF.Round((ex - mx) * u), by = my - mast + 2 + (int)MathF.Round((ey - (my - mast + 2)) * u) + (int)MathF.Round(MathF.Sin(u * MathF.PI) * 1.2f);
+                    R(bx, by, 1, 1, "#8a7a5a");
+                    if (i % 2 == 1) R(bx, by + 1, 2, 2, i % 4 == 1 ? "#e04b3a" : i % 4 == 3 ? "#f3c25b" : "#2f7fa3");
+                    if (endOn && i > 0 && i < 8 && i % 2 == 1) R(2 * mx - bx - 1, by + 1, 2, 2, i % 4 == 1 ? "#2f7fa3" : "#f3c25b");
+                }
+            }
+            if (Wears("boat_lantern") && !reflecting)
+            {
+                int lx = mx + 3, ly = my - 7;
+                R(lx, ly - 1, 1, 1, "#6c4c32");
+                R(lx - 1, ly, 3, 1, "#3b2a1d"); R(lx - 1, ly + 1, 3, 3, Night ? "#ffe28a" : "#e0b04a"); R(lx - 1, ly + 4, 3, 1, "#3b2a1d");
+                R(lx, ly + 2, 1, 1, Night ? "#ffffff" : "#fff0b8");
+                boatLampX = X + (endOn || dir > 0 ? lx : -lx); boatLampY = Y + ly + 2; boatLampT = time;
+            }
             // The pennant streams back off the masthead under way, and flutters loosely when stopped.
             for (int i = 0; i < 4; i++)
             {
@@ -437,5 +459,21 @@ partial class Game
         R(-3, 7, 7, 1, "#c48b51");
         R(-2, 8, 5, 1, "#916039");
         R(-1, 9, 3, 1, "#563e2d");
+    }
+}
+
+partial class Game
+{
+    float boatLampX, boatLampY, boatLampT = -9;
+    bool BoatLampOn => time - boatLampT < 0.2f && Wears("boat_lantern");
+
+    // After dark the lantern lights the water round the hull: a hole in the dark, then a warm glow (LampK brings it up at dusk).
+    void LightBoatLamp() { if (BoatLampOn) LightHole(boatLampX, boatLampY + 2, 34, 0.8f); }
+    void GlowBoatLamp(float t, float lk)
+    {
+        if (!BoatLampOn) return;
+        float flick = Calm ? 1 : 0.92f + 0.08f * MathF.Sin(t * 6);
+        LightGlow(boatLampX, boatLampY, 22, 255, 200, 110, 0.24f * lk, 0.6f * lk * flick);
+        if (LightMode > 0) pix.AddGlow(boatLampX, boatLampY, 6, new Color(255, 224, 150, 255), 0.5f * lk);
     }
 }

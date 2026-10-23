@@ -63,6 +63,7 @@ partial class Game
             }, OpenQuiz);
             return;
         }
+        if (IsayKite()) return;   // a lost kite brought back (EventsMore.cs)
         // The restless sea (RestlessSea.cs) comes before the day's lesson.
         if (IsaySeaTalk()) return;
         OpenQuiz();

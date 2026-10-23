@@ -64,17 +64,17 @@ partial class Game
     void NoteTalkLines(List<Say> lines)
     {
         if (FriendsOff || noTalkCredit || MatchActive || state?.created != true) return;
-        foreach (var name in lines.Select(l => l.S).Distinct())
-            if (FriendByName.TryGetValue(name, out var f) && f.Id == talkingTo) NoteTalk(f.Id);
+        foreach (var name in lines.Select(l => l.S).Distinct().ToList())   // a copy: a new heart adds its line to `lines`
+            if (FriendByName.TryGetValue(name, out var f) && f.Id == talkingTo) NoteTalk(f.Id, lines);
     }
 
-    void NoteTalk(string id)
+    void NoteTalk(string id, List<Say> lines = null)
     {
         if (FriendsOff || MatchActive || state?.created != true) return;
         var f = state.friends.TryGetValue(id, out var have) ? have : state.friends[id] = new Friendship();
         if (f.talkDay == state.day) return;
         f.talkDay = state.day;
-        AddFriendPoints(id, TalkPoints);
+        AddFriendPoints(id, TalkPoints, lines);
     }
 
     /* ---------- Gifts ---------- */
@@ -147,6 +147,8 @@ partial class Game
         int after = Hearts(id);
         if (after <= before) return;
         string got = "";
+        // What they say at this heart: after the conversation that earned it (the Friends panel keeps all of them).
+        if (HeartLine(id, after) is string said) lines?.Add(new Say(fr.Name, said));
         if (after >= 3 && !f.got3)
         {
             f.got3 = true;
@@ -172,6 +174,7 @@ partial class Game
 
     /* ---------- The panel ---------- */
     float lastFriendsBottom;
+    string friendTip;   // whose card the mouse is on: what they have said at each heart (1.45.1)
     int friendsPage;
 
     void OpenFriends() { Sfx.Play("ui"); panel = "friends"; mode = "panel"; SetPrompt(""); }
@@ -205,8 +208,10 @@ partial class Game
 #if DEBUG
             Gfx.Seen["friend:" + fr.Id] = new Rectangle(cx, cy, cw, ch);
 #endif
+            if (Gfx.Hover(cx, cy, cw, ch)) friendTip = fr.Id;
             lastFriendsBottom = MathF.Max(lastFriendsBottom, cy + ch);
         }
+        if (friendTip != null) { DrawFriendTip(friendTip, Gfx.Mouse.X, Gfx.Mouse.Y); friendTip = null; }
         if (pages > 1)
         {
             float by = ly + rows * (ch + gap) + 4;
@@ -215,5 +220,26 @@ partial class Game
             if (friendsPage < pages - 1 && SmallButton("More", x + w - PanelPad - SmallW("More"), by)) { friendsPage++; Sfx.Play("ui"); return; }
             lastFriendsBottom = MathF.Max(lastFriendsBottom, by + 44);
         }
+    }
+}
+
+partial class Game
+{
+    // Hovering a card: what they have said at each heart you've earned, so it can be read again.
+    void DrawFriendTip(string id, float mx, float my)
+    {
+        var fr = FriendById[id];
+        int hearts = Hearts(id);
+        const float w = 440, fs = 16, lh = 21;
+        var blocks = new List<List<string>>();
+        for (int k = 1; k <= hearts; k++) if (HeartLine(id, k) is string s) blocks.Add(Gfx.Wrap($"{k}. {s}", FontKind.Note, fs, w - 28));
+        if (blocks.Count == 0) blocks.Add(Gfx.Wrap($"{fr.Name} will say something once you're friends: talk each day and bring what they love.", FontKind.Note, fs, w - 28));
+        float h = 44 + blocks.Sum(b => b.Count * lh + 6) + 8;
+        float x = Math.Clamp(mx + 18, 8, Gfx.LW - w - 8), y = Math.Clamp(my + 18, 8, Gfx.LH - h - 8);
+        if (my + 18 + h > Gfx.LH - 8) y = Math.Max(8, my - h - 12);
+        Gfx.Box(x, y, w, h, NavyStrong, Pal.Ink, 2, 6);
+        Gfx.Text(fr.Name, x + 14, y + 10, FontKind.Ui700, 19, Pal.Lantern);
+        float ty = y + 40;
+        foreach (var b in blocks) { Lines(b, x + 14, ty, lh, FontKind.Note, fs, Pal.Paper); ty += b.Count * lh + 6; }
     }
 }

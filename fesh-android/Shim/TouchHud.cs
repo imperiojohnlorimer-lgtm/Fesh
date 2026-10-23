@@ -24,7 +24,7 @@ internal static class TouchHud
     public static volatile bool Editing;
     public static volatile bool WheelAllowed; // a menu or panel is up: a vertical drag scrolls it
     public static int W = 1280, H = 720;
-    public const string Build = "1.45.0";
+    public const string Build = "1.46.0";
 
     // "chest" is left out on purpose: the sunken chest's four arrow buttons are drawn by the game, and the stick's zone would
     // swallow the left ones before the game ever saw the tap.

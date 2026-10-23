@@ -199,7 +199,7 @@ partial class Game
         return new HandPose
         {
             Hand = hand, Hand2 = hand2, Tool = "rod", Dx = ux1, Dy = uy1, Length = len,
-            ArmsBehind = face == "up", ToolBehind = false, Tint = Items.ById.TryGetValue(BestRod(), out var r) ? r.Tint : null
+            ArmsBehind = face == "up", ToolBehind = false, Tint = RodHex ?? (Items.ById.TryGetValue(BestRod(), out var r) ? r.Tint : null)
         };
     }
 
