@@ -25,6 +25,7 @@ sealed class SettingsData
     public bool grain;                         // faint film grain
     public bool reduceMotion;                  // no screen shake, flashes, sway, bobbing or blinking (Access.cs)
     public bool highContrast;                  // solid cards, darker small text, no vignette, a lighter night, readings on the meters (Gfx.HighContrast)
+    public bool minimalHud;                    // only the hotbar, prompts and fight bars on screen: no status card, top buttons or goal card (Ui.cs)
     public bool autoQuality = true;            // switch the dearest effects off for a while when the game can't keep up (Quality.cs)
     public Dictionary<string, int[]> keys = new(); // action -> its two keys (KeyboardKey values, 0 = none); missing actions use the defaults
 }

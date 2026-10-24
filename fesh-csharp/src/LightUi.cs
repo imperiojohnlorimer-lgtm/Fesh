@@ -42,6 +42,8 @@ partial class Game
         // High contrast makes the cards solid, the small text darker, and the night and corners lighter.
         d.reduceMotion = Pick("Reduce motion", new[] { "Normal motion", "Reduced" }, d.reduceMotion ? 1 : 0) == 1;
         d.highContrast = Pick("High contrast", new[] { "Normal colours", "High contrast" }, d.highContrast ? 1 : 0) == 1;
+        // Minimal: just the hotbar, prompts and fight bars on screen; the panels are still on their keys and in the pause menu.
+        if (!Platform.Touch) d.minimalHud = Pick("HUD", new[] { "Full", "Minimal" }, d.minimalHud ? 1 : 0) == 1;
         if (changed) Settings.Save();
 
         y += 6;

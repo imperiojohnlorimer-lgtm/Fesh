@@ -62,7 +62,9 @@ partial class Game
         introDone = true;
         // People's own blinking would make pixel checks on faces depend on the moment (the scenery shots keep it).
         LookData.AutoBlink = Environment.GetEnvironmentVariable("FESH_SCENIC") == "1";
-        script = Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster2" ? Poster2Script().GetEnumerator()
+        script = Environment.GetEnvironmentVariable("FESH_TRAILER") is { Length: > 0 } ? TrailerScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_HUD_TEST") == "1" ? HudScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster2" ? Poster2Script().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster" ? PosterScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_SCENIC") == "1" ? ScenicScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_SCENIC") == "checks" ? GraphicsScript().GetEnumerator()
@@ -164,8 +166,11 @@ partial class Game
     Action screenDraw;
     Action<Image> screenProbe;
 
+    partial void TrailerAfterDraw();
+
     partial void AutoTestAfterDraw()
     {
+        TrailerAfterDraw();
         ExportPixShot();
         if (screenProbe != null)
         {

@@ -62,6 +62,7 @@ partial class Game
     static float Dist(float ax, float ay, float bx, float by) => MathF.Sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
 
     readonly Actor player = new() { X = 160, Y = 115 };
+    internal static float FixedDt;   // the trailer recorder steps the game by exactly one video frame (0: real time)
     float tomasX = TomasHomeX, tomasY = TomasHomeY;
 
     string mode = "title";
@@ -107,7 +108,11 @@ partial class Game
         SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint | (testRun ? ConfigFlags.AlwaysRunWindow : 0));
         SetTraceLogLevel(TraceLogLevel.Error);
         InitWindow(1280, 720, "Fesh");
-        FitWindowToMonitor();
+        // The trailer recorder (TrailerShots.cs) captures whole 1280x720 frames, so it keeps the full size.
+#if DEBUG
+        if (Environment.GetEnvironmentVariable("FESH_TRAILER") is not { Length: > 0 })
+#endif
+            FitWindowToMonitor();
         SetWindowMinSize(640, 360);
         if (Settings.Data.fullscreen) ToggleBorderlessWindowed();
         SetExitKey(KeyboardKey.Null);
@@ -127,7 +132,7 @@ partial class Game
         while (!quit && !WindowShouldClose())
         {
             Prof.FrameStart();
-            float dt = Math.Min(0.05f, GetFrameTime());
+            float dt = FixedDt > 0 ? FixedDt : Math.Min(0.05f, GetFrameTime());
             if (WantZoom != ViewK) ApplyZoom();
             // Menus, panels and the title take a gamepad pointer (see Inp).
             Inp.BeginFrame(dt, mode is "title" or "pause" or "panel" or "create" or "ending");
@@ -426,7 +431,9 @@ partial class Game
 
     /* ---------- UI state helpers ---------- */
     // Key tokens like <act> in toasts, prompts and dialogue become whatever that action is bound to (Bind.Fix).
-    void Toast(string msg, float secs = 2.6f) { toastMsg = Bind.Fix(msg); toastTimer = secs; }
+    internal static bool MuteToasts;   // the trailer recorder keeps the screen clear of hints
+    internal static string MutedToast;   // the last one kept off the screen (for the recorder's log)
+    void Toast(string msg, float secs = 2.6f) { if (MuteToasts) { MutedToast = msg; return; } toastMsg = Bind.Fix(msg); toastTimer = secs; }
     // Text in [brackets] is drawn as a key badge.
     void SetPrompt(string text, string key = null, bool urgent = false) => prompt = (Bind.Fix(key), Bind.Fix(text), urgent);
 

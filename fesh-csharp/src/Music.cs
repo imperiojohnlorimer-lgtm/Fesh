@@ -61,6 +61,15 @@ static class Music
     public static short[] Rebuild(string name) => Pack(Tracks[name].Calm ? ComposeCalm(Tracks[name]) : Compose(Tracks[name]));
     public static bool IsCalm(string name) => Tracks[name].Calm;
     public static int SampleRate => Rate;
+    // What is playing and how loud, for the trailer recorder: music, the rain loop, and birds or crickets.
+    public static (string mus, float mv, string amb, float av, string nat, float nv) Levels
+    {
+        get
+        {
+            float sound = Sfx.Muted || Hushed ? 0 : Sfx.Volume, music = Enabled && !Sfx.Muted && !Hushed ? Volume : 0;
+            return (current, Math.Max(0, vol) * music, amb, Math.Max(0, ambVol) * sound, nat, Math.Max(0, natVol) * sound);
+        }
+    }
 #endif
 
     public static void Init()

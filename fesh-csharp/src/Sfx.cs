@@ -26,7 +26,7 @@ static class Sfx
         Add("whale", 2.2f, b => { Tone(b, 78, 1.1f, "sine", 0.3f, 95); Tone(b, 156, 1.0f, "sine", 0.1f, 190, 0.05f); Tone(b, 150, 0.95f, "sine", 0.26f, -70, 1.15f); });
         Add("gulp", 0.6f, b => { Tone(b, 150, 0.32f, "sine", 0.32f, -85); Noise(b, 0.2f, 0.08f); Tone(b, 420, 0.08f, "sine", 0.12f, 260, 0.36f); });
         Add("bite", 0.25f, b => { Tone(b, 880, 0.08f, "square", 0.05f); Tone(b, 1175, 0.1f, "square", 0.05f, 0, 0.09f); });
-        for (int i = 0; i < 4; i++) { float f = 260 + i * 30; reels.Add(Make(0.05f, b => Tone(b, f, 0.03f, "square", 0.012f))); }
+        for (int i = 0; i < 4; i++) { float f = 260 + i * 30; reels.Add(Make(0.05f, b => Tone(b, f, 0.03f, "square", 0.012f), "reel" + i)); }
         Add("catch", 0.45f, b => { var fs = new[] { 523f, 659, 784, 1047 }; for (int i = 0; i < 4; i++) Tone(b, fs[i], 0.14f, "square", 0.04f, 0, i * 0.08f); });
         Add("rare", 0.75f, b => { var fs = new[] { 392f, 523, 659, 784, 1047, 1319 }; for (int i = 0; i < 6; i++) Tone(b, fs[i], 0.2f, "triangle", 0.06f, 0, i * 0.1f); });
         Add("fail", 0.35f, b => Tone(b, 320, 0.3f, "sawtooth", 0.035f, -200));
@@ -107,6 +107,9 @@ static class Sfx
     public static void Play(string name)
     {
         if (Muted || !sounds.TryGetValue(name, out var s)) return;
+#if DEBUG
+        Heard?.Invoke(name, Volume);
+#endif
         SetSoundVolume(s, Volume);
         PlaySound(s);
     }
@@ -114,10 +117,22 @@ static class Sfx
     public static void Reel()
     {
         if (Muted || reels.Count == 0) return;
-        var s = reels[rng.Next(reels.Count)];
+        int ri = rng.Next(reels.Count);
+        var s = reels[ri];
+#if DEBUG
+        Heard?.Invoke("reel" + ri, Volume);
+#endif
         SetSoundVolume(s, Volume);
         PlaySound(s);
     }
+
+#if DEBUG
+    // For the trailer recorder (TrailerShots.cs): every sound made, and each one as it plays (name, volume).
+    public static readonly Dictionary<string, float[]> Raw = new();
+    public static Action<string, float> Heard;
+    public static float MasterGain => Master;
+    public static int SampleRate => Rate;
+#endif
 
     public static void Shutdown()
     {
@@ -126,12 +141,15 @@ static class Sfx
         if (IsAudioDeviceReady()) CloseAudioDevice();
     }
 
-    static void Add(string name, float dur, Action<float[]> fill) => sounds[name] = Make(dur, fill);
+    static void Add(string name, float dur, Action<float[]> fill) => sounds[name] = Make(dur, fill, name);
 
-    static Sound Make(float dur, Action<float[]> fill)
+    static Sound Make(float dur, Action<float[]> fill, string key = null)
     {
         var buf = new float[(int)(Rate * dur) + 1];
         fill(buf);
+#if DEBUG
+        if (key != null) Raw[key] = buf;
+#endif
         var wave = LoadWaveFromMemory(".wav", Wav(buf));
         var sound = LoadSoundFromWave(wave);
         UnloadWave(wave);

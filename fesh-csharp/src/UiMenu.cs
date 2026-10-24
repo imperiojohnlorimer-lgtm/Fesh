@@ -432,14 +432,18 @@ partial class Game
         if (!Gfx.Down) EndSliderDrag();
     }
 
+    float lastPauseBottom;   // where the Game tab's last button ended (checked against the panel)
     void DrawGameTab(float x, float y, float w, float bottom)
     {
         float bx = x, by = y + 4;
-        foreach (var label in new[] { "Resume", "Journal", "Matches", "Photo mode", "Save game", "Change your look", "Wardrobe", "Quit to title", "Quit game" })
+        var labels = new[] { "Resume", "Journal", "Matches", "Photo mode", "Save game", "Change your look", "Wardrobe", "Quit to title", "Quit game" };
+        // As many buttons as fit above the panel's bottom: they share the height (52 tall at most).
+        float step = MathF.Min(60, (bottom - by) / labels.Length), bh = step - 8;
+        foreach (var label in labels)
         {
             // Changing your look, or the journal, waits until you're not in the middle of fishing (the menu can open mid-cast).
             bool live = label is not ("Change your look" or "Wardrobe" or "Journal" or "Matches" or "Photo mode") || pausedFrom == "play" && !MatchActive;
-            if (Button(label, bx, by, 300, 52, FontKind.Ui700, 22, label == "Resume" ? Pal.Buoy : live ? Pal.Sand : Pal.C("#d8cbb0"), label == "Resume" ? White : live ? Pal.Ink : Muted, 4, 3, 6, live))
+            if (Button(label, bx, by, 300, bh, FontKind.Ui700, 22, label == "Resume" ? Pal.Buoy : live ? Pal.Sand : Pal.C("#d8cbb0"), label == "Resume" ? White : live ? Pal.Ink : Muted, 4, 3, 6, live))
             {
                 switch (label)
                 {
@@ -459,7 +463,8 @@ partial class Game
                 }
                 return;
             }
-            by += 52 + 8;
+            by += step;
+            lastPauseBottom = by - 8;
         }
 
         // What's going on in this game: the slot, the time and weather, the moon.

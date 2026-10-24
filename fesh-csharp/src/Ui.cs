@@ -19,13 +19,16 @@ partial class Game
     float buildBarH;
     float? clockTip;   // where the clock chip is, while the mouse is over it (its tooltip is drawn last, over the meters)
 
+    internal static bool CleanHud;   // the trailer recorder leaves out the status card and the buttons along the top
+    // The Minimal HUD setting (Graphics tab): the same, but the menu button stays. First steps point at the HUD's buttons, so not then.
+    bool MinimalHud => Settings.Data.minimalHud && !TourActive && !Platform.Touch;   // (a phone has no keys for the panels: Codex)
     void DrawUi()
     {
         if (mode == "create") { DrawCreator(); return; }
         if (mode == "photo") { DrawPhotoUi(); if (shotReq == null) DrawToast(); return; }   // no HUD in a photo (Photo.cs)
         bool title = mode == "title";
         if (!title && !MatchActive) DrawTourSpotlight();
-        if (!title) { if (MatchActive) DrawMatchHud(); else DrawHud(); }
+        if (!title) { if (MatchActive) DrawMatchHud(); else if (CleanHud) DrawStoryDuty(); else if (MinimalHud) { DrawStoryDuty(); DrawMenuButton(); } else DrawHud(); }
         DrawDockTags();
         if (!title && !MatchActive) DrawGuideArrow();
         if (!title && !MatchActive) { DrawPinCompass(); DrawCacheCompass(); }
@@ -245,10 +248,7 @@ partial class Game
         meterTip = null;
 
         bool live = mode is not ("panel" or "catch" or "odd" or "pause" or "ending");
-        // The menu button (the same as Esc), far right.
-        float rx = Gfx.LW - m - h;
-        if (Button("", rx, m, h, h, FontKind.Ui600, fs, Pal.Sand, Pal.Ink, 2, 2, 5, live)) OpenPause();
-        for (int i = 0; i < 3; i++) Gfx.Rect(rx + 9, m + 10 + i * 7, h - 18, 3, Pal.Ink, 1);
+        float rx = DrawMenuButton();
         rx -= 6;
         var buttons = new (string label, Action act, bool on)[]
         {
@@ -272,6 +272,17 @@ partial class Game
         DrawTourButtonRing();
         if (clockTip is float tipX) DrawClockTip(tipX, HudY + HudH + 6);
         clockTip = null;
+    }
+
+    // The menu button (the same as Esc), far right along the top. Returns its left edge.
+    float DrawMenuButton()
+    {
+        const float m = 13, h = 36;
+        bool live = mode is not ("panel" or "catch" or "odd" or "pause" or "ending");
+        float rx = Gfx.LW - m - h;
+        if (Button("", rx, m, h, h, FontKind.Ui600, 20, Pal.Sand, Pal.Ink, 2, 2, 5, live)) OpenPause();
+        for (int i = 0; i < 3; i++) Gfx.Rect(rx + 9, m + 10 + i * 7, h - 18, 3, Pal.Ink, 1);
+        return rx;
     }
 
     // A little cloud with rain under it (or a bolt, in a storm), beside the time.
