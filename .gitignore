@@ -1,2 +1,8 @@
 CLAUDE.md
 AGENTS.md
+
+# Natural Earth source data for tools/phmap/rasterize.js (public domain, ~15 MB: download from naturalearthdata.com) and its preview
+tools/phmap/*.geojson
+tools/phmap/*.ppm
+fesh-csharp/publish-new/
+*.crdownload

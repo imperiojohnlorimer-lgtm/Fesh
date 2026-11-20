@@ -49,6 +49,25 @@ partial class Game
         // A breach mid-air.
         reel.Leap = reel.LeapLen * 0.5f; reel.LeapDone = true; yield return 1;
         pendingShot = "ib-03-breach-top"; yield return 1;
+        // 1.48: the line goes up to it in the air, not to the spot in the water it left.
+        {
+            // (reads the frame just drawn for the screenshot, with reel.Leap as it was drawn: no extra frames, the shore check below is timing-sensitive)
+            var end = IronbillLineEnd(time);
+            bool lineThere = false;
+            var tipNow = RodTip();
+            // A little way back along the line from its end (the marlin is drawn over the end itself).
+            if (end is (float ex0, float ey0) && Dist(ex0, ey0, tipNow.X, tipNow.Y) is float dl && dl > 10
+                && (ex0 + (tipNow.X - ex0) * 8 / dl, ey0 + (tipNow.Y - ey0) * 8 / dl) is (float ex, float ey))
+                for (int dy = -2; dy <= 2 && !lineThere; dy++)
+                    for (int dx = -2; dx <= 2; dx++)
+                    {
+                        int vx = (int)ex + dx - camX, vy = (int)ey + dy - camY;
+                        if (vx < 0 || vy < 0 || vx >= W || vy >= H) continue;
+                        var c = pix.Buf[vy * W + vx];
+                        if (c.R > 150 && c.G > 150 && c.B > 150) { lineThere = true; break; }   // the line is 75% white over the sea
+                    }
+            Check($"mid-leap the line runs up to it ({end?.x:0},{end?.y:0} vs the water at {fish.Bx:0},{fish.By:0})", end is (float _, float ly) && ly < fish.By - 15 && lineThere);
+        }
         reel.Leap = 0.01f; yield return 3;
 
         // Phase two: it charges. Holding on: rammed.

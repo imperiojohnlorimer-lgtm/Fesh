@@ -44,13 +44,14 @@ partial class Game
     bool Deco(int x, int y, char t, int px, int py, Color c)
     {
         if (px < 1 || px > 8 || py < 1 || py > 8) return false;
-        int wx = x * T + px, wy = y * T + py, i = wy * worldBase.W + wx;
-        if (shape[wy * PW + wx] != t) return false;
+        int wx = x * T + px, wy = y * T + py, i = BI(wx, wy);
+        if (ShapePx(wx, wy) != t) return false;
         var b = worldBase.Buf[i];
         if (!worldRich.Buf[i].Equals(b) || !b.Equals(GroundPixel(wx, wy, t))) return false;
         foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
         {
-            var n = worldBase.Buf[(wy + dy) * worldBase.W + wx + dx];
+            if (!InBuf(wx + dx, wy + dy)) continue;
+            var n = worldBase.Buf[BI(wx + dx, wy + dy)];
             if (Math.Abs(n.R - b.R) + Math.Abs(n.G - b.G) + Math.Abs(n.B - b.B) > 80) return false;
         }
         worldRich.Buf[i] = c;

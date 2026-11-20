@@ -926,6 +926,7 @@ partial class Game
             R(x - 1, y - 1, 1, kick ? 1 : 2, skin); R(x + 1, y - 1, 1, 2, skin);
             R(x - 1 + (kick ? -1 : 0), y + (kick ? 0 : 1), 1, 1, "#3a2a20"); R(x + 1, y + 1, 1, 1, "#3a2a20");
         }
+        if (!LookData.OldPeople) { LookData.DrawKidNew(R, x, y, k, pose, skin, shirt, hair); return; }
         // Body and arms.
         R(x - 1, y - 5, 3, 3, shirt);
         if (pose == 1) { R(x - 2, y - 8, 1, 3, skin); R(x + 2, y - 8, 1, 3, skin); }
@@ -944,16 +945,26 @@ partial class Game
         if (!OldArt && DrawFolkPortrait("Ma'am Isay", x, y)) return;
         if (isayTex.Id == 0)
         {
-            var p = new Pix(16, 18);
-            DrawIsayFigure(p, 8, 16, "down", 0, 0, false);
-            isayTex = Gfx.ToTexture(p.Buf, 16, 18, TextureFilter.Point);
+            var p = new Pix(20, 24);
+            DrawIsayFigure(p, 10, 22, "down", 0, 0, false);
+            isayTex = Gfx.ToTexture(p.Buf, 20, 24, TextureFilter.Point);
         }
-        DrawTexturePro(isayTex, new Rectangle(0, 0, 16, 18), Gfx.S(x, y, 16 * 6, 18 * 6), System.Numerics.Vector2.Zero, 0, Color.White);
+        DrawTexturePro(isayTex, new Rectangle(0, 0, 20, 24), Gfx.S(x - 12, y - 36, 20 * 6, 24 * 6), System.Numerics.Vector2.Zero, 0, Color.White);
     }
 
     static void DrawIsayFigure(Pix p, int x, int y, string face, int step, int bob, bool blink)
     {
         LookData.DrawFigure(p, "#b07a52", "#2b1d14", "#f2ecf8", "#3f4a7a", true, 0, "#e04b3a", x, y, face, step, bob: bob, blink: blink);
+        if (!LookData.OldPeople)
+        {
+            // Round glasses framing her eyes (rows uy - 11 and uy - 10), and a pencil tucked beside her head.
+            int uy = y - bob - LookData.Stature;
+            // A thin frame over the eyes and a shine on each lens (a full frame round them filled the face at this size).
+            if (face == "down") foreach (int ex in new[] { x - 2, x + 1 }) { p.Rect(ex - 1, uy - 11, 1, 2, "#cfdde8"); p.Rect(ex + 1, uy - 11, 1, 2, "#cfdde8"); }
+            else if (face is "left" or "right") { int ex = face == "right" ? x + 2 : x - 3; p.Rect(face == "right" ? ex - 1 : ex + 1, uy - 11, 1, 2, "#cfdde8"); }
+            p.Rect(face == "left" ? x + 5 : x - 6, uy - 14, 1, 3, "#f2c94a");
+            return;
+        }
         // Her glasses and a pencil behind her ear.
         if (face is "down") { p.Rect(x - 2, y - 10 - LookData.Stature - bob, 2, 1, "#10243a"); p.Rect(x + 1, y - 10 - LookData.Stature - bob, 2, 1, "#10243a"); }
         p.Rect(face == "left" ? x + 2 : x - 3, y - 12 - LookData.Stature - bob, 1, 2, "#f2c94a");

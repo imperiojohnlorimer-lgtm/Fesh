@@ -6,8 +6,8 @@ partial class Game
 {
     // Biomes: Saltmere, Frostfang, Sunscald, Mirewood, Starfall, Amihan. Matches Data.Biomes.
     // map is the current scene's tiles; it points at worldMap whenever the player is outdoors.
-    char[,] map = new char[ROWS, COLS];
-    readonly byte[,] biome = new byte[ROWS, COLS];
+    char[,] map = new char[OldRows, OldCols];
+    byte[,] biome = new byte[OldRows, OldCols];
     // Trees, cacti, palms, boulders ('R') and berry bushes ('y'), all solid tiles drawn as sprites.
     readonly List<(int x, int y, char kind)> trees = new();
     readonly Dictionary<(int, int), char> stumps = new();
@@ -112,6 +112,9 @@ partial class Game
     // Regenerates the outdoor world. It is deterministic, so only changes (tide, dock, chopped trees) come from the save.
     void BuildMap()
     {
+        // The Philippines map is its own world, a window onto the country (PhMap.cs).
+        if (PhWorld) { BuildPh(); return; }
+        ResizeWorld(OldCols, OldRows, OldCols * T, OldRows * T);
         var keepMap = map;
         var keepBase = basePix;
         map = worldMap;
@@ -400,6 +403,7 @@ partial class Game
 
     void PaintTile(int x, int y)
     {
+        if (!TileInBuf(x, y)) return;   // outside the baked window (Scenery.bufX0)
         var g = worldBase;
         char t = worldMap[y, x];
         int X = x * T, Y = y * T;
@@ -507,6 +511,7 @@ partial class Game
 
     void DrawSpots(float t)
     {
+        if (PhWorld) { DrawPhSpots(t); return; }   // the original world's spots; this map's own (PhFishing.cs)
         for (int i = 0; i < Data.Spots.Length; i++)
         {
             var s = Data.Spots[i];
@@ -596,6 +601,7 @@ partial class Game
     // The ice hole freezes over again by each morning. While you're drilling, cracks spread across the ice.
     void DrawIceCap()
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (scene != "world" || !IceFrozen) return;
         int X = 600, Y = 80;
         pix.Rect(X + 1, Y + 1, 8, 8, "#cfe6f0"); pix.Rect(X + 2, Y + 2, 6, 6, "#e6f3f8");
@@ -711,22 +717,31 @@ partial class Game
         string face = TomasAtCamp ? s.Face : "down";
         string head = !walking && face == "down" && Dist(player.X, player.Y, tomasX, tomasY) < 50
             ? (player.X < tomasX - 12 ? "left" : player.X > tomasX + 12 ? "right" : null) : null;
-        LookData.DrawFigure(pix, "#e0b07d", "#e8e8e8", "#2f5d8a", "#2b3a4a", false, 3, "#1d2f45", x, y, face, step,
-            bob: bob, blink: (time + 1.3f) % 3.9f < 0.13f, head: head);
+        // Standing about, now and then he strokes his beard (1.48).
+        bool stroke = !LookData.OldPeople && !walking && face != "up" && (time + 2.3f) % 9f < 1.6f;
+        LookData.TurnFrom = TomasAtCamp ? s.Turning : null;
+        LookData.TurnFrom = TomasAtCamp ? s.Turning : null;
+        (int x, int y)? chin = stroke ? (face == "left" ? x - 1 : x + 1, y - bob - LookData.Stature - 8 + (int)(time * 5) % 2) : null;
+        LookData.DrawFigure(pix, "#e0b07d", LookData.OldPeople ? "#e8e8e8" : "#d6d1c8", "#2f5d8a", "#2b3a4a", false, 3, LookData.OldPeople ? "#1d2f45" : "#34507a", x, y, face, step,
+            bob: bob, blink: (time + 1.3f) % 3.9f < 0.13f, head: stroke ? null : head, beard: LookData.OldPeople ? null : "#ebe7df",
+            arms: stroke ? 4 : 0, hand: chin);
         string hf = head ?? face;
-        if (hf != "up")
+        if (hf != "up" && LookData.OldPeople)
         {
             int up = bob + (step is 2 or 4 ? 1 : 0), fo = hf == "left" ? -1 : hf == "right" ? 1 : 0;
             pix.Rect(x - 2 + fo, y - up - 9 - LookData.Stature, 4, 2, "#e8e8e8");
         }
     }
 
+    string turnLast, turnFrom;   // the facing you were last drawn with, and the one you are turning from (until turnUntil)
+    float turnUntil;
+
     void DrawPlayer()
     {
         if (Aboard) { DrawHelmsman(); return; }
         int x = (int)Math.Floor(player.X + 0.5), y = (int)Math.Floor(player.Y + 0.5);
         bool moving = player.Moving && mode is "play" or "build";
-        int walk = moving ? 1 + (int)(player.WalkT * 9) % 4 : 0;   // your own four-frame walk
+        int walk = moving ? LookData.WalkStep(player.WalkT, 9) : 0;   // your own walk: eight frames (People.cs), the four key ones at the old pace
         // Stepping down off Tidemane: from the saddle to the ground in a little hop (Tidemane.cs).
         if (!Riding && hopDown && hopT > 0)
         {
@@ -745,6 +760,20 @@ partial class Game
         bool blink = time % 3.7f < 0.12f;
         bool rod = fish != null || mode == "charging";
         var (arms, pump, lean, glance) = PlayerPose(rod, holding);
+        bool fresh = !LookData.OldPeople && !Riding;
+        // 1.48: fishing poses. You crouch into a full power cast, jolt up as you strike a bite, and hop with joy holding up a catch.
+        int hop = 0;
+        if (fresh && mode == "charging" && charge > 0.5f) bob = -1;
+        if (fresh && mode == "reeling" && reel != null && reel.Age < 0.18f) { bob = 1; lean = -1; }
+        if (fresh && holding) { float since = heldPeak - heldT; if (since >= 0 && since < 0.5f) hop = (int)MathF.Round(MathF.Abs(MathF.Sin(since / 0.25f * MathF.PI)) * 2); }
+        // Idle (standing about in play): now and then a tap of the foot, and a scratch of the head.
+        bool scratch = false;
+        if (fresh && !holding && !rod && arms == 0 && mode == "play" && !moving && swingT <= 0 && HeldTool == null && HeldFood == null && idleT > 4)
+        {
+            float c = (idleT - 4) % 15;
+            if (c is >= 1.5f and < 2.5f && f is "down" or "up") walk = (int)(time * 8) % 2 == 0 ? 6 : 0;
+            else if (c is >= 7f and < 8.4f) { scratch = true; glance = null; }
+        }
         // Whistling for Tidemane, a hand goes up.
         if (whistleT > 0.2f && !Riding && arms == 0) { arms = 1; pump = (int)(time * 8) % 2; }
         int side = f == "left" ? -1 : 1;
@@ -755,6 +784,11 @@ partial class Game
         if (Riding) lean = !rod && !holding && swingT <= 0 && RidePose().Kind == "gallop" ? 1 : 0;
         int rise = Riding ? 0 : bob + (walk is 2 or 4 ? 1 : 0);
         var hands = holding ? null : HandsPose(f, bx + (f is "left" or "right" ? lean * side : 0), by - rise + (Riding ? LookData.Stature : 0), rod, pump);
+        if (scratch && hands == null)
+        {
+            int suy = by - rise - LookData.Stature, wig = (int)(time * 10) % 2;
+            hands = new HandPose { Hand = f is "left" or "right" ? (bx + side, suy - 16 + wig) : (bx + 4, suy - 14 + wig) };
+        }
         if (hands != null) arms = 4;
         if (hands?.ToolBehind == true) DrawToolPose(hands);
         if (Riding)
@@ -762,8 +796,22 @@ partial class Game
             DrawRider(x, y, arms, pump, hands, lean);
             (x, y) = (bx, by);
         }
-        else LookData.DrawPerson(pix, state.look, x, y, f, walk, idle: false, bob: bob, blink: blink, arms: arms, swing: pump, lean: lean, head: glance,
-            hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
+        else
+        {
+            // Turning: for a moment the head is already round and the body still on its way (a three-quarter look), turning through
+            // the front for an about-turn.
+            string body = f, look = glance;
+            if (f != turnLast) { turnFrom = turnLast; turnUntil = time + 0.08f; turnLast = f; }
+            if (fresh && turnFrom != null && time < turnUntil && arms == 0 && hands == null && !holding)
+            {
+                bool across = (turnFrom is "left" or "right") != (f is "left" or "right");
+                body = across ? turnFrom : f is "left" or "right" ? "down" : "right";
+                look = f;
+            }
+            if (hop > 0) { pix.Rect(x - 3, y, 6, 1, "rgba(16,40,44,0.3)"); pix.Rect(x - 2, y + 1, 4, 1, "rgba(16,40,44,0.14)"); }
+            LookData.DrawPerson(pix, state.look, x, y - hop, body, walk, shadow: hop == 0, idle: false, bob: bob, blink: blink, arms: arms, swing: pump, lean: lean, head: look,
+                hand: hands?.Hand, hand2: hands?.Hand2, armsBehind: hands?.ArmsBehind == true);
+        }
         if (InWater && !Riding && !reflecting)   // a reflection (Reflections.cs) is you alone, not the wading bowl
         {
             string water = TileAt((int)MathF.Floor(player.X / T), (int)MathF.Floor((player.Y - 1.5f) / T)) switch { 'l' => "#2a9d8f", 'o' => "#22a6a0", 'm' => "#4f6440", _ => "#2f7fa3" };
@@ -799,7 +847,7 @@ partial class Game
                 if (f == "down" && hands.Hand2 is { } h2) pix.Rect(h2.x, h2.y, 1, 1, skin);
             }
         }
-        if (holding) DrawHeld(x, y - 17);
+        if (holding) DrawHeld(x, y - 17 - LookData.HoldLift - hop);
     }
 
     // How you hold yourself: the rod out in front while fishing (pumping it as you reel, leaning back as you pull and
@@ -1455,16 +1503,22 @@ partial class Game
         foreach (var c in critters) list.Add((c.Y, () => AnimalArt.Draw(pix, c.Id, c.X, c.Y, c.Vx < 0, 1 + (int)(c.T * 10) % 4)));
         foreach (var a in animals)
             if (Visible(a.X, a.Y)) list.Add((a.Y, () => DrawAnimal(a)));
-        if (Visible(MouthX * T, MouthY * T)) list.Add(((MouthY + 2) * T, DrawCaveMouth));
-        if (Visible(PipX, PipY)) { if (PipOpen) list.Add((PipY, DrawPip)); list.Add((PipY + 9, () => DrawStall(t))); }
-        AddArchipelagoObjects(list);
-        AddBoardObjects(list);
-        AddEventObjects(list);
-        AddStoryDetails(list);
-        AddRestlessSeaObjects(list);
-        AddMagayonObjects(list);
-        if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
-        AddMarilayaObjects(list);
+        // The original world's places and people (none of them are on the Philippines map, PhMap.cs).
+        bool old = !PhWorld;
+        if (!old) AddPhTownObjects(list, Visible);
+        if (old && Visible(MouthX * T, MouthY * T)) list.Add(((MouthY + 2) * T, DrawCaveMouth));
+        if (old && Visible(PipX, PipY)) { if (PipOpen) list.Add((PipY, DrawPip)); list.Add((PipY + 9, () => DrawStall(t))); }
+        if (old)
+        {
+            AddArchipelagoObjects(list);
+            AddBoardObjects(list);
+            AddEventObjects(list);
+            AddStoryDetails(list);
+            AddRestlessSeaObjects(list);
+            AddMagayonObjects(list);
+            if (player.Y > (HabagatTop - 25) * T) AddHabagatObjects(list);
+            AddMarilayaObjects(list);
+        }
         AddMatchObjects(list);
         AddMireObjects(list);
         AddDockObjects(list);
@@ -1474,20 +1528,20 @@ partial class Game
             var (bx, by) = BoatPosition();
             if (Visible(bx, by)) list.Add((by - 6, () => DrawBoat(bx, by, t)));
         }
-        if (Visible(160, 60)) { list.Add((69, DrawHut)); list.Add((FireY + 2, () => DrawFire(t))); }
-        if (Visible(CarvingX, CarvingY)) list.Add((CarvingY, DrawCarving));
-        if (!OldArt && Visible(StarwellX, StarwellY))
+        if (old && Visible(160, 60)) { list.Add((69, DrawHut)); list.Add((FireY + 2, () => DrawFire(t))); }
+        if (old && Visible(CarvingX, CarvingY)) list.Add((CarvingY, DrawCarving));
+        if (old && !OldArt && Visible(StarwellX, StarwellY))
             foreach (var (sx, sy, k, m) in StarwellStones())
                 list.Add((sy, () => BlitArt(k == 0 ? LandmarkArt2.RimStone0 : k == 1 ? LandmarkArt2.RimStone1 : LandmarkArt2.RimStone2,
                     k == 0 ? LandmarkArt2.RimStone0Palette : k == 1 ? LandmarkArt2.RimStone1Palette : LandmarkArt2.RimStone2Palette,
                     LandmarkArt2.RimStone0AnchorX, LandmarkArt2.RimStone0AnchorY, (int)sx, (int)sy, mirror: m)));
         if (state.tamed && !state.riding && (call != null || Visible(state.mountX, state.mountY))) list.Add((call is { Phase: not "whistle" } ? call.Y : state.mountY, DrawMountIdle));
         if (boss != null) list.Add((boss.Y, () => DrawBoss(t)));
-        if (!TomasInBed) list.Add((tomasY, DrawTomas));
+        if (old && !TomasInBed) list.Add((tomasY, DrawTomas));
         // On the title the view tours the islands with nobody in it (UiMenu.cs), and behind the creator of a new fisher too.
         if (!(mode == "title" || mode == "create" && creatorFor == "new")) list.Add((player.Y, DrawPlayer));
-        if (Visible(26, 150)) list.Add((157, DrawWreck));
-        if (!RocksCleared && Visible(RockfallX, RockfallY)) list.Add((RockfallY + 3, DrawRockfall));
+        if (old && Visible(26, 150)) list.Add((157, DrawWreck));
+        if (old && !RocksCleared && Visible(RockfallX, RockfallY)) list.Add((RockfallY + 3, DrawRockfall));
         foreach (var o in list.OrderBy(o => o.y)) o.draw();
     }
 
@@ -1499,7 +1553,17 @@ partial class Game
         float bx = f.Bx, by = f.By;
         if (mode == "waiting") by += MathF.Round(MathF.Sin(t * 4) * 0.6f);
         bool taut = mode == "reeling";
-        int n = Math.Max(6, (int)MathF.Round(Dist(tip.X, tip.Y, bx, by)));
+        // The line follows a fish that's out of the water: Ironbill's leaps, charges and tail-walks, and an ordinary
+        // jumper's leap (1.48: it used to stay at the spot in the water while the fish flew).
+        float lx = bx, ly = by;
+        if (taut && reel?.Roll?.Id == TowFish && IronbillLineEnd(t) is (float ix, float iy)) (lx, ly) = (ix, iy);
+        else if (taut && reel?.Leap > 0 && reel.Roll?.Id is not (MireFish or LungfishFish or WhiskersFish or RayFish or TarponFish))
+        {
+            float k = 1 - reel.Leap / reel.LeapLen;
+            bool oldBill = OldArt && reel.Roll?.Id == TowFish;
+            (lx, ly) = (bx + (k - 0.5f) * (oldBill ? 30 : 8), by - MathF.Sin(k * MathF.PI) * (oldBill ? 22 : 10));
+        }
+        int n = Math.Max(6, (int)MathF.Round(Dist(tip.X, tip.Y, lx, ly)));
         float sag = taut ? 0 : mode == "casting" ? 1 : 4;
         // A tight line shivers while you fight the fish.
         float buzz = taut ? MathF.Sin(t * 60) * (reel?.Running > 0 ? 1.2f : 0.5f) : 0;
@@ -1507,7 +1571,7 @@ partial class Game
         for (int i = 0; i <= n; i++)
         {
             float k = (float)i / n;
-            pix.Rect(tip.X + (bx - tip.X) * k, tip.Y + (by - tip.Y) * k + MathF.Sin(MathF.PI * k) * (sag + buzz), 1, 1, line);
+            pix.Rect(tip.X + (lx - tip.X) * k, tip.Y + (ly - tip.Y) * k + MathF.Sin(MathF.PI * k) * (sag + buzz), 1, 1, line);
         }
         if (mode == "bite" || mode == "reeling" || mode == "chest")
         {
@@ -1603,13 +1667,15 @@ partial class Game
     // is painted at the zoom's own scale and ReelBarX tells the words where it is. The green zone, the fish, the
     // catch meter, and for runners a tension gauge that turns red as the line nears snapping.
     int ReelBarX() => (reel?.Style == "runner" ? 280 : 284) + (W - 320);
+    // The bar's top: 26 view pixels down, or 14 at the closest zoom (only 144 pixels tall), where the 130-pixel bar ran off the bottom.
+    int ReelBarY() => H >= 170 ? 26 : 14;
 
     void DrawReel()
     {
         if (reel == null) return;
         bool tension = reel.Style == "runner";
         int x0 = ReelBarX(), w = tension ? 37 : 33;
-        const int y0 = 26, bh = 120;
+        int y0 = ReelBarY(); const int bh = 120;
         pix.Rect(x0 - 3, y0 - 5, w, bh + 10, "#10243a");
         pix.Rect(x0 - 2, y0 - 4, w - 2, bh + 8, "#6b4a2b");
         pix.Rect(x0 - 2, y0 - 4, w - 2, 1, "#9a6a3a");
@@ -1806,7 +1872,8 @@ partial class Game
         UpdateCamera();
         pix.CamX = camX; pix.CamY = camY;
         Prof.Begin(Pass.Copy);
-        pix.CopyFrom(LiveBase(), camX, camY, scene == "world" ? Pal.Sea : scene == "cave" ? Pal.C("#0b0908") : Pal.C("#140f0c"));
+        var liveBase = LiveBase();   // its CamX/CamY is where its window starts (the Philippines map bakes only a window, PhMap.cs)
+        pix.CopyFrom(liveBase, camX - liveBase.CamX, camY - liveBase.CamY, scene == "world" ? Pal.Sea : scene == "cave" ? Pal.C("#0b0908") : Pal.C("#140f0c"));
         Prof.End(Pass.Copy);
         if (scene == "world")
         {

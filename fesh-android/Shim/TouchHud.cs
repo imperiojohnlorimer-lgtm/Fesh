@@ -28,7 +28,8 @@ internal static class TouchHud
 
     // "chest" is left out on purpose: the sunken chest's four arrow buttons are drawn by the game, and the stick's zone would
     // swallow the left ones before the game ever saw the tap.
-    static readonly string[] Live = { "play", "build", "charging", "casting", "waiting", "bite", "reeling", "spear", "drill" };
+    // "boatwork" and "boatanim" (building the banca on the slipway, BoatYard.cs) hold and press E, so the buttons stay.
+    static readonly string[] Live = { "play", "build", "charging", "casting", "waiting", "bite", "reeling", "spear", "drill", "boatwork", "boatanim" };
 
     // ---------- layout ----------
     // Each control: where it sits by default (layout units from its side edge and from the bottom), how big it is, and

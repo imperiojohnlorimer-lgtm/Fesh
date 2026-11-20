@@ -10,11 +10,18 @@ sealed class Leaf { public float X, Y, Vx, Vy, Life, Ground, Phase; public Color
 // Collisions and interactions stay on whole tiles; only the pictures change.
 partial class Game
 {
-    const int PW = COLS * T, PH = ROWS * T;
+    static int PW => COLS * T;
+    static int PH => ROWS * T;
+    // The baked layers (shape, the base and rich pixels, relief) cover a window of the world, bufW x bufH pixels from
+    // (bufX0, bufY0): the whole world on the original map, a part of the country round you on the Philippines map (PhMap.cs).
+    int bufX0, bufY0, bufW = OldCols * T, bufH = OldRows * T;
+    int BI(int wx, int wy) => (wy - bufY0) * bufW + (wx - bufX0);
+    bool InBuf(int wx, int wy) => wx >= bufX0 && wy >= bufY0 && wx < bufX0 + bufW && wy < bufY0 + bufH;
+    bool TileInBuf(int x, int y) => InBuf(x * T, y * T);
     // Every outdoor pixel's ground once the coast is rounded off (a ground or water tile letter), filled with the base layer.
-    readonly char[] shape = new char[PW * PH];
+    char[] shape = new char[OldCols * T * OldRows * T];
     // How deep the water is under each tile: 0 on land, 1 in the shallows and at a pond's edge, more further out.
-    readonly float[,] depth = new float[ROWS, COLS];
+    float[,] depth = new float[OldRows, OldCols];
     // Water pixels touching land, with the way out to sea, for the foam.
     readonly List<(short x, short y, sbyte nx, sbyte ny, char w)> shore = new();
     readonly List<Leaf> leaves = new();
@@ -63,7 +70,7 @@ partial class Game
     static int Prio(char g) => g switch { 'j' => 7, 'g' => 6, 'n' => 5, 'D' => 4, 'e' => 3, 's' => 2, 'p' => 1, _ => 0 };
 
     // Each tile's ground, worked out once per bake (RenderBase, and round a tile RenderTile repaints).
-    readonly char[,] groundCache = new char[ROWS, COLS];
+    char[,] groundCache = new char[OldRows, OldCols];
     char GroundAt(int tx, int ty) => tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS ? '~' : groundCache[ty, tx];
 
     // Smooth value noise in 0..1 with cells of the given size in pixels.
@@ -86,7 +93,7 @@ partial class Game
         if (s is 'w' or '~') return SeaShape(wx, wy, s);
         if (!Shore(s)) return s;
         char g = GroundShape(wx, wy, s);
-        return g == 'p' && wx >= MlStart * T ? MlFootpath(wx, wy) : g;
+        return g == 'p' && MlCol(wx / T) ? MlFootpath(wx, wy) : g;
     }
 
     // Marilaya's trail and lanes are whole tiles of path underfoot, but they're drawn as a footpath a few pixels wide
@@ -219,22 +226,23 @@ partial class Game
 
     void ShapeTile(int x, int y)
     {
+        if (!TileInBuf(x, y)) return;   // outside the baked window (Scenery.bufX0)
         // A tile among eight of the same can't take anything from its neighbours (every blend and wobble above reaches
         // less than a tile), so it's filled straight away; that's most of the map, and keeps the bake quick.
         char g = GroundAt(x, y);
-        bool same = !(g == 'p' && x >= MlStart);
+        bool same = !(g == 'p' && MlCol(x));
         for (int oy = -1; oy <= 1 && same; oy++)
             for (int ox = -1; ox <= 1 && same; ox++) same = GroundAt(x + ox, y + oy) == g;
         if (same)
         {
-            for (int py = 0; py < T; py++) Array.Fill(shape, g, (y * T + py) * PW + x * T, T);
+            for (int py = 0; py < T; py++) Array.Fill(shape, g, BI(x * T, y * T + py), T);
             return;
         }
         for (int py = 0; py < T; py++)
-            for (int px = 0; px < T; px++) shape[(y * T + py) * PW + x * T + px] = ShapeAt(x * T + px, y * T + py);
+            for (int px = 0; px < T; px++) shape[BI(x * T + px, y * T + py)] = ShapeAt(x * T + px, y * T + py);
     }
 
-    char ShapePx(int wx, int wy) => wx < 0 || wy < 0 || wx >= PW || wy >= PH ? '~' : shape[wy * PW + wx];
+    char ShapePx(int wx, int wy) => !InBuf(wx, wy) ? '~' : shape[BI(wx, wy)];
 
     // Depth per tile: shallows 1, open sea 2 and more the further it is from anything else (a chamfer distance, so the
     // deep shades off in rounded bands rather than diamonds); ponds 1 at the edge, 2 inside.
@@ -340,13 +348,15 @@ partial class Game
         float v = VNoise(wx, wy, 26, 170) * 0.65f + VNoise(wx, wy, 8, 171) * 0.35f + (BayerAt(wx, wy) - 0.5f) * 0.16f;
         // Marilaya's hills and Tindig are shaded by the light from the north-west (Marilaya.cs), through the same three
         // tones, and a fourth, darker one in the deepest shade.
-        if (tx >= MlStart)
+        if (MlCol(tx))
         {
             float shade = MlShade(wx, wy);
             v += shade * 0.6f;
             var c = tones[v < 0.38f ? 0 : v > 0.62f ? 2 : 1];
             return MlRelief(wx, wy, g, c, shade);
         }
+        // The Philippines map: its mountains and volcanoes (PhTerrain.cs).
+        if (PhWorld && phElev != null) return PhRelief(wx, wy, g, tones, v);
         // Every other island has its own terrain (Relief.cs): baked heights lit from the north-west, banks on its coast.
         if (TerrainAt(tx, wy / T) is { } terrain && relief != null)
         {
@@ -362,7 +372,7 @@ partial class Game
     }
 
     // How far each land tile is from water (tiles), for the islands' gentle rise (ComputeDepth fills it).
-    readonly float[,] landDist = new float[ROWS, COLS];
+    float[,] landDist = new float[OldRows, OldCols];
 
     // The height of the land at a pixel: rising from the shore and levelling off inland, with broad low swells.
     float IsleHeight(float wx, float wy)
@@ -435,7 +445,7 @@ partial class Game
             for (int px = 0; px < T; px++)
             {
                 int wx = x * T + px, wy = y * T + py;
-                g.Buf[wy * g.W + wx] = GroundPixel(wx, wy, shape[wy * PW + wx]);
+                g.Buf[BI(wx, wy)] = GroundPixel(wx, wy, shape[BI(wx, wy)]);
             }
     }
 
@@ -452,8 +462,8 @@ partial class Game
             for (int px = 0; px < T; px++)
             {
                 int wx = x * T + px, wy = y * T + py;
-                char s = shape[wy * PW + wx];
-                if (s != own) worldBase.Buf[wy * worldBase.W + wx] = GroundPixel(wx, wy, s);
+                char s = shape[BI(wx, wy)];
+                if (s != own) worldBase.Buf[BI(wx, wy)] = GroundPixel(wx, wy, s);
             }
     }
 
@@ -501,7 +511,7 @@ partial class Game
                 else if (h < 0.3) { g.Rect(X + 1, Y + ay, 5, 1, "#d3e0e8"); g.Rect(X + 2, Y + ay - 1, 3, 1, "#ffffff"); }
                 break;
             case 'e':
-                if (x >= MlStart)
+                if (MlCol(x))
                 {
                     // Scree on Marilaya's high rock: loose stones, each lit on top with a shadow under it, and cracks.
                     if (h < 0.45) { g.Rect(X + ax, Y + ay, 3, 2, "#9a958a"); g.Rect(X + ax, Y + ay, 2, 1, "#d9d4c7"); g.Rect(X + ax, Y + ay + 2, 3, 1, "#7a766c"); }
@@ -527,10 +537,10 @@ partial class Game
     void FindShore()
     {
         shore.Clear();
-        for (int wy = 0; wy < PH; wy++)
-            for (int wx = 0; wx < PW; wx++)
+        for (int wy = bufY0; wy < bufY0 + bufH; wy++)
+            for (int wx = bufX0; wx < bufX0 + bufW; wx++)
             {
-                char w = shape[wy * PW + wx];
+                char w = shape[BI(wx, wy)];
                 if (!Wet(w)) continue;
                 int nx = 0, ny = 0;
                 if (Shore(ShapePx(wx + 1, wy))) nx--;
@@ -774,7 +784,7 @@ partial class Game
         // Each one between 0.8 and 1.2 of the usual size, so a stand of them isn't a row of copies.
         float s = (0.8f + 0.4f * (float)Pix.Hash(tx, ty, 61)) * TreeScale(kind);
         // Higher up Marilaya's hills the trees grow smaller, so the slope shows between them.
-        if (tx >= MlStart) s *= 1 - 0.3f * Math.Clamp((MlHeight(MlLx(X + 5), MlLy(Y + 5)) - 0.28f) / 0.35f, 0, 1);
+        if (MlCol(tx)) s *= 1 - 0.3f * Math.Clamp((MlHeight(MlLx(X + 5), MlLy(Y + 5)) - 0.28f) / 0.35f, 0, 1);
         // Saltmere's trees round Pip's stall stay small enough not to hide its awning (the bigger trees of 1.31 covered it).
         if (Dist(X + 5, Y + 9, PipX, PipY) < 60) s = MathF.Min(s, 1.05f);
         int m = Pix.Hash(tx, ty, 62) < 0.5 ? 1 : -1;

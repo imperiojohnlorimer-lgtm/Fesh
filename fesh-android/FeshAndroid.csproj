@@ -12,7 +12,7 @@
     <AssemblyName>Fesh.Android</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
     <ApplicationId>com.fesh.game</ApplicationId>
-    <ApplicationVersion>31</ApplicationVersion>
+    <ApplicationVersion>43</ApplicationVersion>
     <Version>1.46.0</Version>
     <ApplicationDisplayVersion>1.47.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>

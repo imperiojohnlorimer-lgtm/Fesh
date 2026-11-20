@@ -52,7 +52,7 @@ partial class Game
                 }
         ray.X = ray.TargetX = ray.CX; ray.Y = ray.TargetY = ray.CY;
         reel.Progress = reel.Perfect ? 0.38f : 0.3f;
-        reel.Pull = 0.75f;
+        reel.Pull = 0.75f * BossPullScale;
         quake = 0.3f;
         Sfx.Play("splash");
     }
@@ -288,7 +288,7 @@ partial class Game
     static int RayLoopFrame(float loop)
     {
         loop = (loop % 360 + 360) % 360;
-        if (loop < 22.5f || loop >= 337.5f) return RayGlideFrame(MathF.PI / 2, 1);   // flat, facing you
+        if (loop < 7.5f || loop >= 352.5f) return RayGlideFrame(MathF.PI / 2, MantaArt.Flaps / 2);   // flat, facing you
         int best = 0;
         float bd = float.MaxValue;
         for (int i = 0; i < MantaArt.Loop.Length; i++)
@@ -343,7 +343,8 @@ partial class Game
 
     bool InSeaPx(float x, float y) => Swimmable(TileUnder(x, y + 1.5f));
 
-    int RayFlap(float t) => ((int)(t * 2.6f) % 4) switch { 0 => 0, 1 => 1, 2 => 2, _ => 1 };   // brackets: % binds looser than switch (Codex)
+    // The wings beat up and down through every position there is (MantaArt.Flaps), at the same pace whatever their number.
+    int RayFlap(float t) { int n = MantaArt.Flaps, cyc = 2 * (n - 1), s = (int)(t * 2.6f * (n - 1) / 2f) % cyc; return s < n ? s : cyc - s; }
 
     // Under the water: gliding (stars glinting through), the plankton gathering before a sweep, the loop's outline before
     // a somersault and the somersault itself, and the rising oval before a breach.

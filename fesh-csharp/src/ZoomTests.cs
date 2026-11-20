@@ -50,6 +50,8 @@ partial class Game
             TestBite("lagoon", rf.Id); StartReel(); mode = "reeling"; reel.Running = 1; reel.Tension = 0.5f; yield return 4;
             float barLeft = (ReelBarX() - 3) * ViewK, barRight = (ReelBarX() - 3 + 37) * ViewK;
             Check($"zoom {k}x: the reel bar is inside the screen ({barLeft:0}-{barRight:0}) and tucked into the right edge", barRight <= Gfx.LW + 1 && barRight > Gfx.LW - 40 * ViewK);
+            float barBottom = (ReelBarY() + 125) * ViewK;
+            Check($"zoom {k}x: and its bottom is on the screen too ({barBottom:0} of {Gfx.LH})", barBottom <= Gfx.LH);
             pendingShot = $"zoom-{k}x-reel"; yield return 2;
             reel = null; fish = null; mode = "play"; yield return 2;
         }

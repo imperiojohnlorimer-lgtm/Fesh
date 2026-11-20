@@ -89,7 +89,7 @@ partial class Game
     /* ---------- The flats ---------- */
     // Habagat's shallow tiles right beside a beach. They dry out at a spring low, and you can walk on them.
     HashSet<(int, int)> flatTiles;
-    const int FlatBoxX = 0, FlatBoxY = (HabagatTop - 4) * T, FlatBoxW = EastStart * T, FlatBoxH = ROWS * T - FlatBoxY;
+    const int FlatBoxX = 0, FlatBoxY = (HabagatTop - 4) * T, FlatBoxW = EastStart * T, FlatBoxH = OldRows * T - FlatBoxY;
     byte[] flatPx;          // per pixel in the box: how far a flat's water pixel is from the land (255: not a flat)
 
     HashSet<(int, int)> Flats()
@@ -172,6 +172,7 @@ partial class Game
     // Wet sand where the water has gone out, tide pools and weed on it, and a line of foam at the new edge.
     void DrawTideFlats(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (scene != "world" || player.Y < FlatBoxY - H) return;
         Flats();
         float dry = TideDryPx;

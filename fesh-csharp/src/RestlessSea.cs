@@ -444,7 +444,7 @@ partial class Game
             if (a < 0) a += 360;
             return a is > 150 and < 210;   // the west coast, from the landing's north to its south (not the north beach)
         }
-        char G(int x, int y) => shape[(SeaBoxY + y) * PW + SeaBoxX + x];
+        char G(int x, int y) => ShapePx(SeaBoxX + x, SeaBoxY + y);
         // Distances in tenths of a pixel, 10 straight and 14 diagonally, so they come out close to true distances (a plain
         // eight-way count makes diagonals short, and let the wave reach School Rise from the north-west).
         var dist = new int[SeaBoxW * SeaBoxH];
@@ -509,6 +509,7 @@ partial class Game
     // Ground level, after the water: the dry seabed with its stranded fish, the foam where the sea is, and the flood.
     void DrawRestlessSea(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         DrawPond(t);
         float w = SeaLine;
         if (w == 0) return;
@@ -604,7 +605,7 @@ partial class Game
                 for (int px = 0; px < T; px++)
                 {
                     int wx = tx * T + px, wy = ty * T + py;
-                    if (shape[wy * PW + wx] != 'l') continue;
+                    if (ShapePx(wx, wy) != 'l') continue;
                     float r = MathF.Sqrt(MathF.Pow((wx - 1645) / 30f, 2) + MathF.Pow((wy - 240) / 20f, 2));
                     if (r < 0.32f + fill) continue;   // still water in the middle
                     float v = VNoise(wx, wy, 5, 331);
@@ -699,18 +700,21 @@ partial class Game
     {
         int x = (int)MathF.Round(m.X), y = (int)MathF.Round(m.Y);
         bool duck = Shaking;
-        int step = (m.Going && !m.Safe) || m.Moving ? 1 + (int)(m.WalkT * 8) % 4 : 0;
+        int step = (m.Going && !m.Safe) || m.Moving ? LookData.WalkStep(m.WalkT, 8) : 0;
         if (m.Kid >= 0)
         {
             DrawKid((px, py, pw, ph, c) => pix.Rect(px, py, pw, ph, c), x, y, m.Kid, duck || !m.Going ? 2 : step % 2 == 0 ? 0 : 1, time, stand: !duck);
             return;
         }
-        var look = new Look { skin = 2, shirt = m.Id == "niko" ? 2 : 1, hat = 0, hair = 1 };
+        var look = new Look { skin = 2, shirt = m.Id == "niko" ? 2 : 1, hat = LookData.OldPeople ? 0 : 6, hair = 1 };
         if (duck) { DrawDucked(look, x, y, m.Face); return; }
         LookData.DrawPerson(pix, look, x, y, m.Face, step);
         int up = step is 2 or 4 ? 1 : 0;
-        pix.Rect(x - 5, y - 14 - LookData.Stature - up, 11, 2, "#ddbc78");
+        if (LookData.OldPeople)
+        {
+            pix.Rect(x - 5, y - 14 - LookData.Stature - up, 11, 2, "#ddbc78");
         pix.Rect(x - 3, y - 16 - LookData.Stature - up, 7, 2, "#f0d596");
+        }
     }
 
     // Ducked down low with your forearms up round your head and your hands clasped over it, while the ground shakes.
@@ -718,6 +722,14 @@ partial class Game
     {
         LookData.DrawPerson(pix, look, x, y, face, 0, bob: -3);
         string skin = LookData.Skins[look.skin % LookData.Skins.Length], shirt = LookData.Shirts[look.shirt % LookData.Shirts.Length];
+        if (!LookData.OldPeople)
+        {
+            // The new head is bigger: forearms up beside it and the hands clasped on its crown.
+            int ht = y + 3 - LookData.Stature - 17;   // the top of the crouched head (bob -3)
+            pix.Rect(x - 6, ht + 1, 1, 5, shirt); pix.Rect(x + 5, ht + 1, 1, 5, shirt);
+            pix.Rect(x - 5, ht, 4, 1, skin); pix.Rect(x + 1, ht, 4, 1, skin);
+            return;
+        }
         pix.Rect(x - 4, y - 9 - LookData.Stature, 1, 3, shirt); pix.Rect(x + 3, y - 9 - LookData.Stature, 1, 3, shirt);
         pix.Rect(x - 3, y - 11 - LookData.Stature, 3, 1, skin); pix.Rect(x + 1, y - 11 - LookData.Stature, 2, 1, skin);
     }
@@ -768,6 +780,7 @@ partial class Game
     // The rise itself: a slope of greener grass with stone steps where the route comes up (drawn on the ground).
     void DrawRiseGround()
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (Math.Abs(RiseX - player.X) > W || Math.Abs(RiseY - player.Y) > H) return;
         for (int i = 0; i < 3; i++)
         {
@@ -780,6 +793,7 @@ partial class Game
     // The old post, the crack in the pond's bank and the sign spots, when there's something to do or see there.
     Target RestlessSeaTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         if (!InAmihan || Aboard || evac != null || tremor != null) return null;
         if (Dist(player.X, player.Y, PostX, PostY + 6) < 13)
             return new Target { Type = "seapost", Label = state.Hinted("rs:markTold") && !state.Hinted("rs:mark") ? "Look at the mark on the old post" : "Look at the old post" };

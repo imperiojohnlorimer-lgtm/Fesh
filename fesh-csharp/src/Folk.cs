@@ -6,10 +6,14 @@ sealed class Stroller
 {
     public float X, Y, HomeX, HomeY, RangeX, RangeUp, RangeDown, Notice = 28, Wait = 2, WalkT;
     public float? ToX, ToY;
-    public string Face = "down";
+    // 1.48: a change of facing is remembered for a moment, so they turn through a three-quarter look like you do.
+    string face = "down";
+    public string Face { get => face; set { if (value != face) { TurnFrom = face; TurnAt = LookData.Now; face = value; } } }
+    public string TurnFrom; public float TurnAt;
+    public string Turning => TurnFrom != null && LookData.Now >= TurnAt && LookData.Now - TurnAt < 0.1f ? TurnFrom : null;
     public bool Moving;
     // The walk frame for LookData.DrawPerson: a slower, shorter stride than yours.
-    public int Step => Moving ? 1 + (int)(WalkT * 5) % 4 : 0;
+    public int Step => Moving ? LookData.WalkStep(WalkT, 5) : 0;
 }
 
 // Tomas pottering round his camp, Pip shuffling behind the counter, and the Amihan villagers strolling in front of

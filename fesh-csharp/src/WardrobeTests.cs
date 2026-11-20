@@ -78,7 +78,7 @@ partial class Game
         {
             var p = new Pix(40, 44);
             LookData.DrawPerson(p, l, 20, 38, "down", 0, shadow: false, idle: false);
-            int n = 0; foreach (var c in p.Buf) if (c.A > 0 && c.R < 70 && c.G < 60 && c.B < 60 && c.R > 20) n++;
+            var eye = Pal.C("#2a1c18"); int n = 0; foreach (var c in p.Buf) if (c.A > 0 && (LookData.OldPeople ? c.R < 70 && c.G < 60 && c.B < 60 && c.R > 20 : c.R == eye.R && c.G == eye.G && c.B == eye.B)) n++;
             return n;
         }
         Check("the hats leave the eyes showing", new[] { 4, 5, 6 }.All(s => Eyes(new Look { hat = s, hatId = null }) >= Eyes(new Look { hat = 0 }) - 0));

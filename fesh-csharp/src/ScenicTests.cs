@@ -464,10 +464,12 @@ partial class Game
             SetNight(true);
             int windowsBefore = litWindows.Count;
             DrawBahay(100, 60, "#d9734f");
-            var win = chartLike.Buf[(60 - 12 + 2) * 200 + 100 - 13 + 2];
+            // (1.48: the houses are drawn bigger, so look for the window colour anywhere on the house rather than at a fixed pixel.)
+            var dayWin = Pal.C("#485d56"); int dayPx = 0;
+            foreach (var c in chartLike.Buf) if (c.Equals(dayWin)) dayPx++;
             pix = keepPix;
             SetNight(false);
-            Check($"a house drawn onto the chart at night keeps its day windows ({win.R},{win.G},{win.B})", win.Equals(Pal.C("#485d56")) && litWindows.Count == windowsBefore);
+            Check($"a house drawn onto the chart at night keeps its day windows ({dayPx} window pixels in the day colour)", dayPx >= 4 && litWindows.Count == windowsBefore);
         }
         // The moon's path only lands on bare water: anything drawn over its strokes keeps them off (Codex's review).
         state.day = 1; SetNight(true);

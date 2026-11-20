@@ -97,7 +97,7 @@ partial class Game
             {
                 int wx = px + camX;
                 if (wx < 0 || wx >= PW) continue;
-                char s = shape[wy * PW + wx];
+                char s = ShapePx(wx, wy);
                 if (s is not ('w' or 'l' or 'o')) continue;
                 // Where two slow wavy fields cancel out, a thin bright thread: a net of light like the real thing.
                 float v = CausticSin(causticAx[px] + causticAy[py]) + CausticSin(causticBy[py] + causticBx[px]);
@@ -304,6 +304,7 @@ partial class Game
     // drawn earlier): the villagers' houses, Tomas's hut, and your shacks and kubo.
     void DrawBuildingShadows()
     {
+        if (PhWorld) { PhTownShadows(); return; }   // the Philippines map's towns (PhTowns.cs)
         bool Near(float x, float y) => x > camX - 60 && x < camX + W + 60 && y > camY - 40 && y < camY + H + 60;
         void Bahay(float x, float y) { if (Near(x, y)) BuildingShadow((int)(x - 17 * HouseS), (int)y + 3, (int)(34 * HouseS), (int)(18 * HouseS)); }
         foreach (var n in Islanders) if (n.id is not ("isay" or "ben")) Bahay(n.x, n.y - 5);

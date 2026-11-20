@@ -150,7 +150,7 @@ partial class Game
         }
         mire.TargetX = mire.X; mire.TargetY = mire.Y;
         reel.Progress = reel.Perfect ? 0.38f : 0.3f;
-        reel.Pull = 0.75f;
+        reel.Pull = 0.75f * BossPullScale;
         quake = 0.35f;
         Sfx.Play("splash");
     }
@@ -467,7 +467,7 @@ partial class Game
         if (!MireShown) return;
         var m = mire;
         if (m == null) return;
-        int dir = m.Vx < 0 ? -1 : 1, ph = (int)(t * (m.Ev is "roots" or "rub" ? 9 : 4));
+        int dir = m.Vx < 0 ? -1 : 1, ph = (int)(t * (m.Ev is "roots" or "rub" ? 9 : 4) * ArapaimaArt.Phases / 3f);   // the same beat at any number of tail steps
         // The mud it stirs up: soft brown puffs drifting behind.
         for (int i = 0; i < 7; i++)
         {
@@ -547,7 +547,7 @@ partial class Game
                     pix.Rect(ex + (i - 4) * 2.2f, m.Y - MathF.Abs(MathF.Sin(i * 1.7f)) * 8 * (1 - q) - q * 3, 1, 2, Pal.Rgba(225, 235, 215, 0.9f));
             }
             // Its middle is (m.Y - jy) above the water at m.Y: whatever is still under it near the ends isn't drawn.
-            DrawMireFish(jx, m.Y, (int)m.LeapDir, up, (int)(t * 10), false, jy - m.Y, dropUnder: true);
+            DrawMireFish(jx, m.Y, (int)m.LeapDir, up, (int)(t * 10 * ArapaimaArt.Phases / 3f), false, jy - m.Y, dropUnder: true);
         }
     }
 

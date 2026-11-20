@@ -115,7 +115,7 @@ partial class Game
         lung = new LungFight { X = sx, Y = sy, TargetX = sx, TargetY = sy };
         fish.Bx = fish.Tx = sx; fish.By = fish.Ty = sy;
         reel.Progress = reel.Perfect ? 0.38f : 0.3f;
-        reel.Pull = 0.75f;
+        reel.Pull = 0.75f * BossPullScale;
         quake = 0.3f;
         Sfx.Play("splash");
     }
@@ -467,7 +467,7 @@ partial class Game
         float pop = LungPop(m);
         if (pop > 0.02f) return;   // its head is out: DrawLungOver draws it
         float sink = m.Ev switch { "breathWarn" => 7 - 3 * (1 - m.EvT / LungBreathWarn), "breath" => 4, "cradleWarn" or "cradle" => 8, _ => 6 };
-        int ph = (int)(t * (m.Ev == "march" ? 5 : 3));
+        int ph = (int)(t * (m.Ev == "march" ? 5 : 3) * LungfishArt.Phases / 3f);
         DrawLungFish(m.X, m.Y, dir, 0, ph, false, sink);
         if (m.Ev == "breath")
         {
@@ -612,6 +612,7 @@ partial class Game
     float lungDry;   // 0 to 1: how far the mud apron has crept out
     void DrawOasisMud()
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         lungDry = Math.Clamp(lungDry + (LungfishShown ? 1 : -1) * Raylib.GetFrameTime() * 0.35f, 0, 1);
         if (lungDry <= 0 || scene != "world") return;
         var spot = Data.SpotById["oasis"];

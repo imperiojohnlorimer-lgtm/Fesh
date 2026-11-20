@@ -234,10 +234,14 @@ def finish_layer(r, b, name, grids, anchors):
 
 
 def render_boat(heading, layer):
-    r = new_renderer(46, 44)
+    # 1.48: two three-quarter views for turning between a side and an end-on view: "ru", the bow up and to the right (heading
+    # away at an angle), and "rd", down and to the right (coming toward you at an angle). Their near half is the side
+    # facing you, as in the side view.
+    diag = heading in ("ru", "rd")
+    r = new_renderer(58, 52) if diag else new_renderer(46, 44)
     r.water()
-    rot = {"right": 0.0, "up": math.pi / 2, "down": -math.pi / 2}[heading]
-    near = ("y", -1) if heading == "right" else ("x", -1 if heading == "up" else 1)
+    rot = {"right": 0.0, "up": math.pi / 2, "down": -math.pi / 2, "ru": math.pi / 4, "rd": -math.pi / 4}[heading]
+    near = ("y", -1) if heading in ("right", "ru", "rd") else ("x", -1 if heading == "up" else 1)
     b = Builder(r, rot, near, layer)
     b.hull()
     b.fittings()
@@ -318,7 +322,7 @@ sets = []
 if os.environ.get("FESH_QUICK"):
     jobs = [(h, l) for h in ("right", "up", "down") for l in ("back", "front")]
 else:
-    jobs = [(h, l) for h in ("right", "up", "down") for l in ("back", "front")]
+    jobs = [(h, l) for h in ("right", "up", "down", "ru", "rd") for l in ("back", "front")]
 results = []
 rr = None
 for heading, layer in jobs:

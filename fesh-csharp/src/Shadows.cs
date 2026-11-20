@@ -93,7 +93,7 @@ partial class Game
             int reach = (int)(MathF.Abs(ox) / T) + 3;
             if (tr.x < vx0 - reach - 2 || tr.x > vx1 + reach + 2 || tr.y < vy0 - 3 || tr.y > vy1 + reach + 3) continue;
             float s = 0.9f + 0.2f * (float)Pix.Hash(tr.x, tr.y, 61);
-            if (tr.x >= MlStart) s *= 1 - 0.3f * Math.Clamp((MlHeight(MlLx(tr.x * T + 5), MlLy(tr.y * T + 5)) - 0.28f) / 0.35f, 0, 1);
+            if (MlCol(tr.x)) s *= 1 - 0.3f * Math.Clamp((MlHeight(MlLx(tr.x * T + 5), MlLy(tr.y * T + 5)) - 0.28f) / 0.35f, 0, 1);
             float rx0 = (tr.kind == 't' ? 11 : tr.kind == 'f' ? 8 : 9) * s * scale, ry0 = (tr.kind == 'h' ? 3.6f : 4.8f) * s * scale;
             // Short shadows sit under the crown; long ones stretch out and thin.
             float rx = rx0 * (0.85f + 0.25f * far), ry = ry0 * (0.95f + 0.1f * far);

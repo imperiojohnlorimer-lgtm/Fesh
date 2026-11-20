@@ -63,6 +63,8 @@ partial class Game
         // People's own blinking would make pixel checks on faces depend on the moment (the scenery shots keep it).
         LookData.AutoBlink = Environment.GetEnvironmentVariable("FESH_SCENIC") == "1";
         script = Environment.GetEnvironmentVariable("FESH_TRAILER") is { Length: > 0 } ? TrailerScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_ANIM_TEST") == "1" ? AnimScript().GetEnumerator()
+            : Environment.GetEnvironmentVariable("FESH_PH_TEST") == "1" ? PhScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_HUD_TEST") == "1" ? HudScript().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster2" ? Poster2Script().GetEnumerator()
             : Environment.GetEnvironmentVariable("FESH_SCENIC") == "poster" ? PosterScript().GetEnumerator()
@@ -207,7 +209,7 @@ partial class Game
         ExportDirectionSprites(path);
         ExportLighthouseSprites(path);
         var keep = pix;
-        var sheet = new Pix(W, H);
+        var sheet = new Pix(330, 200);
         pix = sheet;
         Array.Fill(sheet.Buf, Pal.C("#86b86a"));
         var looks = new[]
@@ -219,13 +221,38 @@ partial class Game
         foreach (string face in new[] { "down", "up", "right", "left" })
             foreach (var look in looks)
             {
-                int y = 17 + row++ * 20, col = 0;
+                int y = 22 + row++ * 24, col = 0;
                 void At(int step, int arms = 0, int swing = 0, int lean = 0, string head = null, bool blink = false) =>
-                    LookData.DrawPerson(sheet, look, 9 + col++ * 13, y, face, step, arms: arms, swing: swing, lean: lean, head: head, blink: blink);
-                for (int s = 0; s <= 4; s++) At(s);
+                    LookData.DrawPerson(sheet, look, 10 + col++ * 15, y, face, step, arms: arms, swing: swing, lean: lean, head: head, blink: blink);
+                foreach (int s in new[] { 0, 1, 5, 2, 6, 3, 7, 4, 8 }) At(s);   // standing, then the eight-frame walk in order
                 At(0, arms: 3); At(0, arms: 3, swing: 1); At(0, arms: 2); At(0, arms: 1);
                 At(0, lean: -1); At(0, lean: 1); At(0, head: "left"); At(0, head: "right"); At(0, blink: true);
             }
+        // Every hat and both hair lengths in all four facings, Tomas with his beard, and the children (People.cs).
+        {
+            var hats = new Pix(300, 128);
+            Array.Fill(hats.Buf, Pal.C("#86b86a"));
+            string[] faces = { "down", "right", "up", "left" };
+            for (int h = 0; h < 7; h++)
+                for (int fi = 0; fi < 4; fi++)
+                {
+                    var lk = new Look { skin = h % 5, hair = h % 2, hairColor = h % 6, hat = h, shirt = h % 7, pants = h % 5 };
+                    LookData.DrawPerson(hats, lk, 12 + (h * 4 + fi) % 14 * 21, 26 + (h * 4 + fi) / 14 * 30, faces[fi], 0);
+                }
+            for (int fi = 0; fi < 4; fi++)
+                LookData.DrawFigure(hats, "#e0b07d", "#d6d1c8", "#2f5d8a", "#2b3a4a", false, 3, "#34507a", 12 + fi * 21, 86, faces[fi], 0, beard: "#ebe7df");
+            for (int k = 0; k < 4; k++)
+            {
+                DrawKid((px, py, pw, ph, c) => hats.Rect(px, py, pw, ph, c), 110 + k * 14, 86, k, k % 3, 0, stand: true);
+                DrawKid((px, py, pw, ph, c) => hats.Rect(px, py, pw, ph, c), 180 + k * 14, 86, k, 0, 0);
+            }
+            var img = GenImageColor(hats.W, hats.H, Color.Black);
+            for (int y = 0; y < hats.H; y++)
+                for (int x = 0; x < hats.W; x++) ImageDrawPixel(ref img, x, y, hats.Buf[y * hats.W + x]);
+            ImageResizeNN(ref img, hats.W * 4, hats.H * 4);
+            ExportImage(img, path.Replace(".png", "-hats.png"));
+            UnloadImage(img);
+        }
         // The boat, out at sea: rows facing right, facing left, then moored and in a storm. Columns step through time.
         var boats = new Pix(W, H) { CamX = 1150, CamY = 380 };
         pix = boats;
@@ -299,10 +326,10 @@ partial class Game
         // Two halves (front and back, then the sides), each small enough to judge pixel by pixel.
         for (int half = 0; half < 2; half++)
         {
-            int w = 184, h = 82, top = half * 80;
+            int w = 320, h = 98, top = half * 96;
             var img = GenImageColor(w, h, Color.Black);
             for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++) ImageDrawPixel(ref img, x, y, sheet.Buf[(top + y) * W + x]);
+                for (int x = 0; x < w; x++) ImageDrawPixel(ref img, x, y, sheet.Buf[(top + y) * sheet.W + x]);
             ImageResizeNN(ref img, w * 7, h * 7);
             ExportImage(img, path.Replace(".png", half == 0 ? "-a.png" : "-b.png"));
             UnloadImage(img);

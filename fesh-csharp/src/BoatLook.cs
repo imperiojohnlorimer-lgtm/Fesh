@@ -49,8 +49,19 @@ partial class Game
         }
     }
 
+    // While the helm turns between a side view and an end-on one (DrawHelmsman), the hull is drawn three-quarter on: "ru" the
+    // bow up and to the side, "rd" down and to the side (mirrored for the left, like the side view).
+    string boatDiag;
+
     void BlitBoatHull(string face, bool front, int X, int Y, int dir)
     {
+        if (boatDiag != null && face is "left" or "right")
+        {
+            var (g, gx, gy) = boatDiag == "ru" ? (front ? BoatArt.RuFront : BoatArt.RuBack, BoatArt.RuBackX, BoatArt.RuBackY) : (front ? BoatArt.RdFront : BoatArt.RdBack, BoatArt.RdBackX, BoatArt.RdBackY);
+            BlitBoat(g, gx, gy, X, Y + BoatSideDy, dir < 0);
+            if (front) WaterlineFoam(g, gx, gy, X, Y + BoatSideDy, dir < 0);
+            return;
+        }
         switch (face)
         {
             case "up": BlitBoat(front ? BoatArt.UpFront : BoatArt.UpBack, BoatArt.UpBackX, BoatArt.UpBackY, X, Y + BoatUpDy); if (front) WaterlineFoam(BoatArt.UpFront, BoatArt.UpFrontX, BoatArt.UpFrontY, X, Y + BoatUpDy, false); break;
@@ -78,7 +89,10 @@ partial class Game
         var pal = (Color[])boatPal.Clone();
         var b = Pal.C(hex);
         Color Step(float k) => new((byte)Math.Clamp(b.R * k, 0, 255), (byte)Math.Clamp(b.G * k, 0, 255), (byte)Math.Clamp(b.B * k, 0, 255), (byte)255);
-        pal[0] = Step(0.6f); pal[1] = Step(1f); pal[9] = new Color((byte)Math.Min(255, b.R + (255 - b.R) * 0.35f), (byte)Math.Min(255, b.G + (255 - b.G) * 0.35f), (byte)Math.Min(255, b.B + (255 - b.B) * 0.35f), (byte)255);
+        // The trim's three tones, found by colour (1.48: the palette is sorted by colour, so a new grid can move their indexes).
+        int i0 = Array.IndexOf(BoatArt.Palette, "#2f6c69"), i1 = Array.IndexOf(BoatArt.Palette, "#4e9691"), i9 = Array.IndexOf(BoatArt.Palette, "#7cc4b8");
+        if (i0 < 0 || i1 < 0 || i9 < 0) return boatPal;
+        pal[i0] = Step(0.6f); pal[i1] = Step(1f); pal[i9] = new Color((byte)Math.Min(255, b.R + (255 - b.R) * 0.35f), (byte)Math.Min(255, b.G + (255 - b.G) * 0.35f), (byte)Math.Min(255, b.B + (255 - b.B) * 0.35f), (byte)255);
         paintedFor = hex; paintedPal = pal;
         return pal;
     }

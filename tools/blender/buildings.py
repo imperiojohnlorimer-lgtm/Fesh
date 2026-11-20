@@ -20,7 +20,7 @@ os.makedirs(OUT, exist_ok=True)
 PITCH = 16
 # Drawn bigger than the old houses (which looked small beside the trees): the model is laid out on the old drawings and
 # shown ZOOM times the size, so the game scales its window and chimney positions by the same Scale.
-ZOOM = 1.3
+ZOOM = 1.55   # 1.48: 1.3 -> 1.55, so a house stands three and a half people tall beside the new people
 
 WOOD = {
     "post":   ("#4a3220", "#65452e", "#7d5a3c"),

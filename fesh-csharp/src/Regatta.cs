@@ -105,6 +105,7 @@ partial class Game
     // The buoys at each gate (always there; the next one flashes during a race).
     void DrawRaceBuoys(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (player.Y < (HabagatTop - 20) * T || player.X > 1100) return;
         for (int i = 0; i < RaceGates.Length; i++)
         {

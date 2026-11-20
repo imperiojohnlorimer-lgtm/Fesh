@@ -260,6 +260,21 @@ partial class Game
         for (int i = 0; i < 300 && call != null; i++) yield return 1;
         Check($"walking away while it comes, it still ends up beside you ({Dist(state.mountX, state.mountY, player.X, player.Y):0} px)", call == null && Dist(state.mountX, state.mountY, player.X, player.Y) < 21);
 
+        // 1.48: walking on for a good while as it comes, it runs after you and keeps at your side: no flash of rearing each
+        // time it catches up, and no giving up into sea foam; it rears and waits once you stop.
+        state.mountX = sx0 + 60; state.mountY = sy0; player.X = sx0 - 30; player.Y = sy0 + 70; yield return 2;
+        Inp.Tap(KeyboardKey.R); yield return 2;
+        var phases = new HashSet<string>();
+        Inp.Hold(KeyboardKey.Left, true);
+        float walkStart = time;
+        while (time - walkStart < 3.6f && call != null) { if (call.Phase != "whistle") phases.Add(call.Phase); yield return 1; }
+        Inp.Hold(KeyboardKey.Left, false);
+        bool stillComing = call != null;
+        float behind = call != null ? Dist(call.X, call.Y, player.X, player.Y) : 999;
+        Check($"walking on as it comes, it keeps up with you: no rearing or foam on the way ({string.Join(",", phases)}, {behind:0} px behind)", stillComing && !phases.Contains("foam") && !phases.Contains("arrive") && behind < 40);
+        for (int i = 0; i < 300 && call != null; i++) yield return 1;
+        Check($"and once you stop it pulls up beside you ({Dist(state.mountX, state.mountY, player.X, player.Y):0} px)", call == null && Dist(state.mountX, state.mountY, player.X, player.Y) < 21);
+
         // <ride> again while it's still coming: once it's close, you climb on there.
         state.mountX = sx0 + 60; state.mountY = sy0; player.X = sx0 - 50; player.Y = sy0 + 70; yield return 2;
         Inp.Tap(KeyboardKey.R); yield return 2;

@@ -10,6 +10,7 @@ partial class Game
     {
         Say P(string t) => new("Pip", t);
         if (TourBlocked(4, "Pip's stall opens once you've caught a fish and looked in your bag.")) return;
+        shopName = null;
         if (!PipOpen) { Sfx.Play("nope"); Toast("Pip's stall has just closed for the night."); return; }
         NoteTalk("pip");   // a chat over the counter (Friends.cs)
         if (!state.Hinted("metPip"))
@@ -83,6 +84,7 @@ partial class Game
     }
 
     string shopTab = "sell";
+    string shopName;   // the stall's name on the panel: null is Pip's; a town market on the Philippines map (PhTowns.cs)
 
     void OpenShop()
     {

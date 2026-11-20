@@ -40,7 +40,7 @@ partial class Game
 
     bool GuideOn => Settings.Data.guide;
     // The card and the arrow: in ordinary play only, never over a fight, the eclipse or a race (they have their own).
-    bool GuideShown => (GuideOn || TourActive) && mode is "play" or "build" && boss == null && guardian == null && tremor == null && evac?.Phase != "quake" && eclipse == null && race == null && !raceArmed;
+    bool GuideShown => !PhWorld && (GuideOn || TourActive) && mode is "play" or "build" && boss == null && guardian == null && tremor == null && evac?.Phase != "quake" && eclipse == null && race == null && !raceArmed;
 
     /* ---------- Working out the goals ---------- */
     List<Goal> Goals()
@@ -433,6 +433,7 @@ partial class Game
     void UpdateGuide(float dt)
     {
         if (mode is "title" or "create") return;
+        if (PhWorld) { goals.Clear(); return; }   // the Philippines map has no goals yet (PhMap.cs)
         if (mode == "play") goalDoneT = Math.Max(0, goalDoneT - dt);
         // First steps (Tutorial.cs): the card, the arrow and the journal show only the step you're on.
         if (state.tour < TourDone) UpdateTour();

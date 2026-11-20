@@ -121,6 +121,7 @@ partial class Game
     // On foot: after dark the trees offer watching; by day (or in the rain) a closer look says when to come back.
     Target FireflyTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         if (FirefliesOut && FireflyTreeNear(26) is int i and >= 0) return new Target { Type = "fireflies", Id = i.ToString(), Label = "Watch the alitaptap" };
         if (FireflyTreeNear(15) < 0) return null;
         return new Target { Type = "info", Label = Night ? "No alitaptap in the rain tonight" : "Pagatpat trees. Tala says the alitaptap gather here after dark" };
@@ -155,6 +156,7 @@ partial class Game
     // Each flash lights the crowns a little (before the dark is laid over the world).
     void LightFireflies(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (!FirefliesOut) return;
         float flash = FireflyFlash(t);
         if (flash <= 0) return;
@@ -165,6 +167,7 @@ partial class Game
     // The fireflies themselves, drawn over the dark: most flash in step, and a few stragglers blink on their own.
     void DrawFireflies(float t, float k)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (!FirefliesOut) return;
         float flash = FireflyFlash(t);
         for (int i = 0; i < FireflyTrees.Length; i++)

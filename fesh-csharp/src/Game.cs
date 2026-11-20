@@ -39,7 +39,10 @@ sealed class Actor { public float X, Y, WalkT; public string Face = "down"; publ
 partial class Game
 {
     // W x H is the view; the world is COLS x ROWS tiles of T pixels.
-    const int T = 10, COLS = 336, ROWS = 76;
+    // COLS x ROWS changes with the map being played (1.48): the original world (OldCols x OldRows), or a window onto the
+    // Philippines map (PhMap.cs). Anything about the original world itself uses OldCols / OldRows.
+    const int T = 10, OldCols = 336, OldRows = 76;
+    static int COLS = OldCols, ROWS = OldRows;
     // The view is the logical screen divided by a whole number of screen pixels per game pixel (ViewK, the zoom setting:
     // 5 closer, 4 normal, 3 wider, 2 widest), so every game pixel stays the same size on screen. ViewW/ViewH round up, so
     // the view always covers the whole 1280x720 screen. ApplyZoom rebuilds everything sized by it.
@@ -92,7 +95,7 @@ partial class Game
     Dictionary<(int, int), Build> buildIndex = new();
     Texture2D worldTex;
     Pix pix = new(ViewW, ViewH);
-    Pix basePix = new(COLS * T, ROWS * T);
+    Pix basePix = new(OldCols * T, OldRows * T);
     int camX, camY;
     readonly List<Critter> critters = new();
     string oddId, oddSpot, dexTab = "creatures";
@@ -234,6 +237,7 @@ partial class Game
         int k = Settings.Data.zoom is >= 2 and <= 5 ? Settings.Data.zoom : 4;
         Settings.Data.zoom = k;
         if (mode == "photo" && photoZoom is >= 2 and <= 5) k = photoZoom;   // photo mode's own zoom, never saved (Photo.cs)
+        if (Platform.Touch && k < 3) k = 3;   // as WantZoom: no Widest on a phone
         ViewK = k;
         ViewW = (int)Math.Ceiling(Gfx.LW / k);
         ViewH = (int)Math.Ceiling(Gfx.LH / k);
@@ -445,6 +449,7 @@ partial class Game
         if (InHouse) return "Your shack";
         if (scene == "cave") return caveFloor == AncientFloor ? "The Ancient Floor" : $"Caverns, floor {caveFloor}";
         float x = player.X, y = player.Y;
+        if (PhWorld) return (PhTownName() is string town ? town + ", " : !Aboard && PhPeakAt(x, y) is string peak ? peak + ", " : "") + PhPlaceName(x, y, !Aboard && !Swimming && !InWater) + (Aboard ? " · at the helm" : "");
         if (Dist(x, y, PipX, PipY + 12) < 22) return "Pip's stall";
         if (Dist(x, y, SaltJettyX - 10, SaltJettyY) < 22) return "Pip's jetty";
         if (Dist(x, y, AtollJettyX + 20, AtollJettyY) < 34) return "Atoll jetty";
@@ -719,7 +724,7 @@ partial class Game
         Sfx.Play("ui");
         panel = which;
         mode = "panel";
-        if (which == "map") ChooseChart();
+        if (which == "map") { ChooseChart(); if (PhWorld) OpenPhChart(); }
         if (which is "dex" or "map" or "bag" or "journal") Learned(which);
         if (which == "journal") basicsPage = -1;
         SetPrompt("");
@@ -874,28 +879,29 @@ partial class Game
         // Baga and the shelter (Magayon.cs): during the evacuation and the ash, only what to do next.
         if (MagayonTarget() is Target volcanoTarget) return volcanoTarget;
         if (Aboard) return HelmTarget();
+        if (PhTownTarget() is Target phTown) return phTown;   // the Philippines map's towns (PhTowns.cs)
         if (ArchipelagoTarget() is Target islandTarget) return islandTarget;
         if (HabagatTarget() is Target habagatTarget) return habagatTarget;
         // Marilaya (MarilayaStory.cs): Aling Sela and the places the story looks at.
         if (MarilayaTarget() is Target marilayaTarget) return marilayaTarget;
         if (SanctuaryTarget() is Target sanctuaryTarget) return sanctuaryTarget;
-        if (Dist(x, y, tomasX, tomasY) < 16)
+        if (!PhWorld && Dist(x, y, tomasX, tomasY) < 16)
             return TomasInBed ? new Target { Type = "info", Label = "Tomas has gone to bed in his hut" }
                 : new Target { Type = "npc", Label = CanHandIn ? $"Give Tomas the {Items.Amount(state.req.item, state.req.count)}" : "Talk to Tomas" };
         if (EventTarget() is Target eventTarget) return eventTarget;   // a day's event first: it's only there today
         if (BoardTarget() is Target boardTarget) return boardTarget;
-        if (Dist(x, y, PipX, PipY + 14) < 12)
+        if (!PhWorld && Dist(x, y, PipX, PipY + 14) < 12)
             return PipOpen ? new Target { Type = "pip", Label = "Trade with Pip" } : new Target { Type = "info", Label = $"Pip's stall is closed for the night. Pip opens at {HourText(7 * 60)}" };
-        if (Dist(x, y, SaltJettyX, SaltJettyY) < 10)
+        if (!PhWorld && Dist(x, y, SaltJettyX, SaltJettyY) < 10)
             return new Target { Type = "sail", Id = "atoll", Label = Has("boat") == 0 ? "Pip's jetty (you need a boat to sail)" : VoyageChoice ? "Sail somewhere" : "Sail to Starfall Atoll", AltType = "launch", AltLabel = "Take the helm / explore east" };
-        if (Dist(x, y, AtollJettyX, AtollJettyY) < 10)
+        if (!PhWorld && Dist(x, y, AtollJettyX, AtollJettyY) < 10)
             return new Target { Type = "sail", Id = "saltmere", Label = VoyageChoice ? "Sail somewhere" : "Sail back to Saltmere", AltType = "launch", AltLabel = "Take the helm / explore" };
-        if (Dist(x, y, AsinanJettyX, AsinanJettyY) < 10)
+        if (!PhWorld && Dist(x, y, AsinanJettyX, AsinanJettyY) < 10)
             return new Target { Type = "sail", Id = "saltmere", Label = Has("boat") > 0 ? "Sail somewhere" : "Asinan landing (you need a boat to sail)", AltType = "launch", AltLabel = "Take the helm" };
-        if (Dist(x, y, MlJettyX, MlJettyY) < 10)
+        if (!PhWorld && Dist(x, y, MlJettyX, MlJettyY) < 10)
             return new Target { Type = "sail", Id = "saltmere", Label = Has("boat") > 0 ? "Sail somewhere" : "Marilaya's harbour (you need a boat to sail)", AltType = "launch", AltLabel = "Take the helm" };
-        if (Dist(x, y, 160, 72) < 10) return new Target { Type = "door", Id = "house:tomas", Label = "Go inside Tomas's hut" };
-        if (Dist(x, y, MouthDoorX, MouthDoorY) < 14) return new Target { Type = "cave", Label = "Enter Frostfang Caverns" };
+        if (!PhWorld && Dist(x, y, 160, 72) < 10) return new Target { Type = "door", Id = "house:tomas", Label = "Go inside Tomas's hut" };
+        if (!PhWorld && Dist(x, y, MouthDoorX, MouthDoorY) < 14) return new Target { Type = "cave", Label = "Enter Frostfang Caverns" };
         // The fallen rocks and the wreck's hatch, while the story needs them (Chapters.cs).
         if (ChapterTarget() is Target chapter) return chapter;
         // Facing your own crab pot or bubo beats a campfire, a smoker or a rack close by, and a chicken wandering past.
@@ -905,7 +911,7 @@ partial class Game
             return PotReady(pot) ? new Target { Type = "pot", Ref = pot, Label = pot.id == "bubo" ? "Lift the bubo" : "Haul up the crab pot" }
                 : new Target { Type = "info", Label = $"The {trap} is soaking. {(pot.id == "bubo" ? "Lift" : "Haul")} it up tomorrow morning" };
         }
-        if (Dist(x, y, FireX, FireY) < 16) return new Target { Type = "rest", Label = restLabel, AltType = "cook", AltLabel = "Cook" };
+        if (!PhWorld && Dist(x, y, FireX, FireY) < 16) return new Target { Type = "rest", Label = restLabel, AltType = "cook", AltLabel = "Cook" };
         foreach (var b in state.builds)
         {
             var d = Data.BuildById[b.id];
@@ -921,7 +927,7 @@ partial class Game
         // Bakawan's firefly trees: after dark, watch the alitaptap (Bakawan.cs).
         if (FireflyTarget() is Target fireflies) return fireflies;
         if (MountNear()) return new Target { Type = "ride", Label = $"Ride {Data.MountName}" };
-        if (Dist(x, y, CarvingX, CarvingY + 4) < 13) return new Target { Type = "carving", Label = "Read the carving" };
+        if (!PhWorld && Dist(x, y, CarvingX, CarvingY + 4) < 13) return new Target { Type = "carving", Label = "Read the carving" };
         if (NearestAnimal() is Animal a) return new Target { Type = "animal", Ref = a, Label = AnimalLabel(a) };
         if (CricketNear() is Bug bug) return new Target { Type = "cricket", Ref = bug, Label = "Catch the cricket" };
         if (state.loose.FirstOrDefault(l => l.kind == "worm" && Dist(l.x, l.y, x, y - 2) < 10) is Loose mound)
@@ -933,7 +939,8 @@ partial class Game
             return new Target { Type = "tree", Tx = fx, Ty = fy, Label = k == 'R' ? "Break the boulder" : $"Chop the {TreeName(k)}" };
         if (BridgeClosed(fx, fy)) return new Target { Type = "info", Label = Stormy ? "The bridge is closed until the storm passes" : "The bridge is roped off until you have finished your first steps" };
         foreach (var s in Data.Spots)
-            if (s.Scene == "world" && SpotOpen(s.Id) && Dist(x, y, s.X, s.Y) < s.R) return SpotTarget(s);
+            if (!PhWorld && s.Scene == "world" && SpotOpen(s.Id) && Dist(x, y, s.X, s.Y) < s.R) return SpotTarget(s);
+        if (PhSpotTarget(false) is Target phSpot) return phSpot;   // the Philippines map's spots (PhFishing.cs)
         // Your pet, after everything else (Pet.cs).
         if (PetTarget() is Target petTarget) return petTarget;
         // A moored boat comes last: it mustn't hide anything else, and <ride> boards it from beside them anyway.
@@ -1047,6 +1054,9 @@ partial class Game
                     case "trophy": OpenTrophies(); break;
                     case "planter": PickPlanter((Build)target.Ref); break;
                     case "info": Sfx.Play("nope"); break;
+                    case "phfolk": TalkPhFolk(target.Id); break;
+                    case "phmarket": TradePhMarket(target.Id); break;
+                    case "phchurch": LookAtChurch(target.Id); break;
                     case "dockplayer": FaceToward(dockClient.Roster.First(p => p.Id == int.Parse(target.Id)).X, player.Y); dockChallengeTarget = int.Parse(target.Id); Sfx.Play("ui"); break;
                     case "dockboard": FaceToward(DockBoardX, DockBoardY); match.BoardOpen = true; Sfx.Play("ui"); break;
                     case "dockrival": { var an = DockAnglers.First(a => a.id == target.Id); FaceToward(an.x, an.y); dockAnglerMenu = an.id; Sfx.Play("ui"); break; }
@@ -1153,8 +1163,8 @@ partial class Game
             UpdateMount(dt);
             hotbarTipT = MathF.Max(0, hotbarTipT - dt);
             UpdateSchools(dt);
-            UpdateStrollers(dt);
-            UpdateSeaLife(dt);
+            if (!PhWorld) { UpdateStrollers(dt); UpdateSeaLife(dt); }
+            else { UpdatePhFolk(dt); UpdatePhAnimals(dt); NotePhTown(); }
             UpdateLeaves(dt);
             UpdateWeather(dt);
             UpdateOvercast(dt);
@@ -1183,9 +1193,7 @@ partial class Game
             UpdateMonsters(dt);
             UpdateBoss(dt);
             UpdateGuardian(dt);
-            UpdateRestlessSea(dt);
-            UpdateMagayon(dt);
-            UpdateEclipse(dt);
+            if (!PhWorld) { UpdateRestlessSea(dt); UpdateMagayon(dt); UpdateEclipse(dt); }
             if (!held) TickDerby(dt);
         }
         else { iframes = Math.Max(0, iframes - dt); hurtFlash = Math.Max(0, hurtFlash - dt); }
@@ -1279,21 +1287,32 @@ partial class Game
             }
             if (scene == "world")
             {
-                TickLoose(dt);
-                AnnounceBiome();
-                CheckStarwell();
                 if (Riding) { state.mountX = player.X; state.mountY = player.Y; }
                 if (Aboard) { state.boatX = player.X; state.boatY = player.Y; }
-                DiscoverArchipelago();
-                DiscoverHabagat();
-                DiscoverMarilaya();
-                ChartNearIslets();
-                ChartNearMlIslets();
-                AmboCalls();
-                UpdateSandbar(dt);
-                UpdateReefWalk();
-                WarnRisingTide();
-                if (mode == "play") { UpdateTroll(dt); UpdateRegatta(dt); CheckEclipse(); }
+                if (PhWorld)
+                {
+                    // The Philippines map (PhMap.cs): the window follows you, and the land or sea you're on is named.
+                    PhRecenter();
+                    PhBakeStep(350);
+                    PhAnnounce();
+                    if (mode == "play") UpdateTroll(dt);
+                }
+                else
+                {
+                    TickLoose(dt);
+                    AnnounceBiome();
+                    CheckStarwell();
+                    DiscoverArchipelago();
+                    DiscoverHabagat();
+                    DiscoverMarilaya();
+                    ChartNearIslets();
+                    ChartNearMlIslets();
+                    AmboCalls();
+                    UpdateSandbar(dt);
+                    UpdateReefWalk();
+                    WarnRisingTide();
+                    if (mode == "play") { UpdateTroll(dt); UpdateRegatta(dt); CheckEclipse(); }
+                }
                 CheckPin();
             }
             // Walking down onto a doorway steps back outside.
@@ -1370,6 +1389,7 @@ partial class Game
             SaveFile.Clear(newSlot);
             state = new State();
             if (look != null) { state.look = look; state.created = true; }
+            if (newWorld == "ph") StartPh();   // the Philippines map, chosen in the creator (PhMap.cs)
         }
         state.FixClock();
         FixWardrobe();   // anything worn that isn't yours comes off (Wardrobe.cs)
@@ -1405,6 +1425,7 @@ partial class Game
         NoteGuideVersion(fresh);
         NoteChapterVersion(fresh);
         StartTour(fresh);
+        if (PhWorld) state.tour = TourDone;   // First steps are about the original world's people and places: none of them are on the Philippines map
         rockHits = 0;
         // A story finished without ever meeting Tomas (the early-Glowgill bug): he's met, so he gives requests.
         if (state.flags.ended) state.flags.metTomas = true;
@@ -1426,10 +1447,11 @@ partial class Game
         // Where you'll be outdoors, so a tree that's due doesn't grow back on top of you (see RegrowBlocked).
         (player.X, player.Y) = state.scene == "world" ? (state.px, state.py) : state.scene == "cave" ? (MouthDoorX, MouthDoorY + 2) : (state.exitX, state.exitY);
         BuildMap();
+        if (fresh && PhWorld) PlacePhStart();
         state.charted ??= LegacyCharted();
         mapTexDirty = true;
         SpawnAnimals();
-        int sunk = RescueSunkBuilds();
+        int sunk = PhWorld ? 0 : RescueSunkBuilds();
         player.X = state.px; player.Y = state.py; player.Face = Aboard ? boatFace : "down";
         // Cave floors aren't saved, so a game saved underground carries on at the cave mouth.
         if (state.scene == "cave") { player.X = MouthDoorX; player.Y = MouthDoorY + 2; }
@@ -1437,7 +1459,7 @@ partial class Game
         // A room that isn't there any more (the school once it's no longer the shelter): outside its door.
         else if (state.scene != "world") { player.X = state.exitX; player.Y = state.exitY; }
         // Somewhere closed now (Baga while it's evacuated, or inside its danger zone in an old save) (Magayon.cs).
-        PlaceAfterLoad();
+        if (!PhWorld) PlaceAfterLoad();
         if (!(Aboard ? BoatCanStand(player.X, player.Y) : CanStand(player.X, player.Y, Wading, Riding, !Riding)))
         {
             // Somewhere that isn't there any more (the atoll used to be smaller): back to the boat, or to Saltmere.
@@ -1446,10 +1468,11 @@ partial class Game
             state.aboard = false;
             bool atoll = state.boatAt == "atoll" && Has("boat") > 0;
             player.X = atoll ? AtollJettyX + 4 : 160; player.Y = atoll ? AtollJettyY + 1 : 115;
+            if (PhWorld) (player.X, player.Y) = PhStandNear(player.X, player.Y);
         }
-        int rescued = RescueStranded();
+        int rescued = PhWorld ? 0 : RescueStranded();
         ReconcileAlbum();
-        ReconcileMarilaya();
+        if (!PhWorld) ReconcileMarilaya();
         if (state.tamed && !state.riding && state.mountX == 0 && state.mountY == 0) { state.mountX = player.X + 12; state.mountY = player.Y; }
         ReindexBuilds();
         if (scene == "world") FillLoose();
@@ -1457,7 +1480,13 @@ partial class Game
         lastBiome = scene == "world" ? PlayerBiome() : (byte)0;
         chart = ChartFor(player.X);
         mode = "play";
-        if (fresh || !state.flags.metTomas)
+        if (fresh && PhWorld)
+            Talk(new()
+            {
+                new("", "You wake on the beach at Boac, on Marinduque, in the middle of the Philippines, with a rod, a bucket and your banca drawn up on the sand."),
+                new("", "The whole country is out there, true to size: Luzon to the north, the Visayas to the south, Mindanao beyond them. Board your boat with <ride> and sail with <move>.")
+            });
+        else if (!PhWorld && (fresh || !state.flags.metTomas))
         {
             Talk(new()
             {
@@ -1469,7 +1498,7 @@ partial class Game
             Toast($"Starfall Atoll has grown since you were last there, and the sea took the old shoreline. The {sunk} thing{(sunk == 1 ? "" : "s")} you built there {(sunk == 1 ? "is" : "are")} back in your bag.", 7);
         else if (rescued > 0)
             Toast($"New islands have risen in the south since you were last out there. Your boat was found and tied up at {(state.boatAt == "atoll" ? "the atoll's jetty" : "Pip's jetty")}.", 7);
-        else Toast($"Welcome back to {(InMarilaya ? "Marilaya" : InAmihan ? "Amihan" : InHabagat ? "Habagat" : "Saltmere")}. Day {state.day}, {ClockText(state.clock, 10)}.");
+        else Toast($"Welcome back to {(PhWorld ? AreaName() : InMarilaya ? "Marilaya" : InAmihan ? "Amihan" : InHabagat ? "Habagat" : "Saltmere")}. Day {state.day}, {ClockText(state.clock, 10)}.");
         // The Angler's Ledger (Ledger.cs): a save from before it gets what it had already done now, in one card,
         // before any catch could count as new; a new game is stamped with nothing to give.
         state.tally ??= new(); state.title ??= "";

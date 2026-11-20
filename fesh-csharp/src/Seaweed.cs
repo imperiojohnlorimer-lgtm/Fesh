@@ -171,6 +171,7 @@ partial class Game
     // they've just gone on, fat green-gold bunches when they're ready. A storm-torn line has gaps.
     void DrawGusoFarm(float t, bool live = true)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (live && (MathF.Abs(player.X - GusoFarmX) > W || MathF.Abs(player.Y - GusoFarmY) > H)) return;
         for (int i = 0; i < GusoLines.Length; i++)
         {

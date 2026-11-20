@@ -114,7 +114,7 @@ partial class Game
         whisk = new WhiskFight { X = spot.Item1, Y = spot.Item2, TargetX = spot.Item1, TargetY = spot.Item2 };
         fish.Bx = fish.Tx = whisk.X; fish.By = fish.Ty = whisk.Y;
         reel.Progress = reel.Perfect ? 0.38f : 0.3f;
-        reel.Pull = 0.75f;
+        reel.Pull = 0.75f * BossPullScale;
         quake = 0.3f;
         Sfx.Play("splash");
     }
@@ -452,7 +452,7 @@ partial class Game
             }
         float sink = m.Ev switch { "quietWarn" or "quiet" => 8, "thief" => 5, _ => 6 };
         bool open = m.Ev == "thief" && WhiskBobber(m).under;
-        DrawWhiskFish(m.X, m.Y, dir, 0, (int)(t * (m.Ev is "quiet" ? 1 : 3)), open, sink);
+        DrawWhiskFish(m.X, m.Y, dir, 0, (int)(t * (m.Ev is "quiet" ? 1 : 3) * WhiskersArt.Phases / 3f), open, sink);
     }
 
     // Over everything (the oak beside the lagoon can hide the fish itself): the bobber, the whisker badges and the quiet ring.

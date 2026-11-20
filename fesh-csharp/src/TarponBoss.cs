@@ -54,7 +54,7 @@ partial class Game
                 }
         tarpon.X = tarpon.TargetX = tarpon.CX; tarpon.Y = tarpon.TargetY = tarpon.CY;
         reel.Progress = reel.Perfect ? 0.38f : 0.3f;
-        reel.Pull = 0.75f;
+        reel.Pull = 0.75f * BossPullScale;
         quake = 0.3f;
         Sfx.Play("splash");
     }
@@ -355,7 +355,7 @@ partial class Game
             }
     }
 
-    int TarponTail(float t, float speed = 6) => (int)(t * speed) % 3;
+    int TarponTail(float t, float speed = 6) => (int)(t * speed * TarponArt.Phases / 3f) % TarponArt.Phases;
 
     // Under the water: his shape gliding by the pier, the ripple as his nose rises, the turn for the pilings.
     void DrawTarponUnder(float t)

@@ -32,6 +32,7 @@ partial class Game
 
     bool InSanctuary(float x, float y)
     {
+        if (PhWorld) return false;
         float dx = (x / T - SanctCX) / SanctRX, dy = (y / T - SanctCY) / SanctRY;
         return dx * dx + dy * dy < 1;
     }
@@ -110,6 +111,7 @@ partial class Game
 
     Target SanctuaryTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         if (scene != "world") return null;
         if (SeaLifeInReach() is SeaCreature c) return new Target { Type = "watch", Ref = c, Label = SeaKinds[c.Kind].label };
         if (!Aboard && Dist(player.X, player.Y, JoyX, JoyY + 6) < 15) return new Target { Type = "joy", Label = "Talk to Bantay Joy" };
@@ -199,6 +201,7 @@ partial class Game
     // The yellow buoys that mark the sanctuary, bobbing on the swell, and the seagrass swaying in its shallows.
     void DrawBuoys(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (Dist(player.X, player.Y, SanctCX * T, SanctCY * T) > 420) return;
         var (vx0, vy0, vx1, vy1) = VisibleTiles();
         for (int y = Math.Max(vy0, 63); y <= vy1; y++)
@@ -280,6 +283,7 @@ partial class Game
     // Beneath the surface, a darker shape; now and then a head (or a fin) breaks it with a ring of ripples.
     void DrawSeaLife(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         foreach (var c in VisibleSeaLife())
         {
             if (c.X < camX - 40 || c.X > camX + W + 40 || c.Y < camY - 20 || c.Y > camY + H + 20) continue;

@@ -241,7 +241,7 @@ partial class Game
     Look editLook;
     string previewFace = "down";
     Texture2D previewTex;
-    readonly Pix previewPix = new(16, 20);
+    readonly Pix previewPix = new(20, 24);
 
     void OpenCreator(string kind)
     {
@@ -333,12 +333,23 @@ partial class Game
         DrawRectangleGradientV((int)sky.X, (int)sky.Y, (int)sky.Width, (int)sky.Height, Pal.C("#3a8db0"), Pal.C("#1d4f78"));
         Gfx.Rect(px, py + ph - 70, pw, 70, Pal.C("#e8cf96"));
         Array.Fill(previewPix.Buf, default);
-        LookData.DrawPerson(previewPix, editLook, 8, 18, previewFace, 1 + (int)(time * 8) % 4, shadow: false);
-        if (previewTex.Id == 0) previewTex = Gfx.ToTexture(previewPix.Buf, 16, 20, TextureFilter.Point);
+        LookData.DrawPerson(previewPix, editLook, 10, 22, previewFace, 1 + (int)(time * 8) % 4, shadow: false);
+        if (previewTex.Id == 0) previewTex = Gfx.ToTexture(previewPix.Buf, 20, 24, TextureFilter.Point);
         UpdateTexture(previewTex, previewPix.Buf);
-        DrawTexturePro(previewTex, new Rectangle(0, 0, 16, 20), Gfx.S(px + pw / 2 - 16 * 7, py + ph - 70 - 19 * 14 + 14, 16 * 14, 20 * 14), Vector2.Zero, 0, Color.White);
+        DrawTexturePro(previewTex, new Rectangle(0, 0, 20, 24), Gfx.S(px + pw / 2 - 20 * 6, py + ph - 70 - 22 * 12, 20 * 12, 24 * 12), Vector2.Zero, 0, Color.White);
         if (Button("Turn", px + pw / 2 - 50, py + ph + 14, 100, 40, FontKind.Ui700, 18, Pal.Sand, Pal.Ink, 3, 2, 5))
             previewFace = previewFace switch { "down" => "right", "right" => "up", "up" => "left", _ => "down" };
+
+        // A new game picks its map (1.48): the original islands, or the real Philippines (PhMap.cs).
+        if (creatorFor == "new")
+        {
+            string[] maps = { "Pulo ng Asin", "Philippines" };
+            float mw = maps.Sum(m => Gfx.Measure(m, FontKind.Ui700, 18) + 38);
+            float mx = x + cw - pad - mw;
+            Gfx.Text("Map", mx - 56, y + pad + 12, FontKind.Ui700, 20, Pal.PaperInk);
+            int mr = Choices(maps, newWorld == "ph" ? 1 : 0, mx, y + pad + 2);
+            if (mr >= 0) newWorld = mr == 1 ? "ph" : "";
+        }
 
         // Options
         float ox = x + pad + pw + 36, oy = y + pad + 66, lw = 140;

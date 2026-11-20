@@ -97,7 +97,7 @@ partial class Game
         bool Open(int wx, int wy)
         {
             if (wx < 0 || wy < 0 || wx >= PW || wy >= PH) return true;
-            if (!Wet(shape[wy * PW + wx])) return false;
+            if (!Wet(ShapePx(wx, wy))) return false;
             int tx = wx / T, ty = wy / T, cx = wx % T < T / 2 ? -1 : 1, cy = wy % T < T / 2 ? -1 : 1;
             return sea[ty, tx] || SeaTile(tx + cx, ty) || SeaTile(tx, ty + cy) || SeaTile(tx + cx, ty + cy);
         }
@@ -121,7 +121,7 @@ partial class Game
         var isOpen = new bool[W0 * H0];
         for (int y = 0; y < H0; y++) for (int x = 0; x < W0; x++) isOpen[y * W0 + x] = open(x, y);
         bool Open(int x, int y) => x < 0 || y < 0 || x >= W0 || y >= H0 || isOpen[y * W0 + x];
-        bool Land(int x, int y) => x >= 0 && y >= 0 && x < W0 && y < H0 && !Wet(shape[y * PW + x]);
+        bool Land(int x, int y) => x >= 0 && y >= 0 && x < W0 && y < H0 && !Wet(ShapePx(x, y));
         var inkC = Pal.C("#4d3d28");
         for (int y = 0; y < H0; y++)
             for (int x = 0; x < W0; x++)
@@ -201,6 +201,12 @@ partial class Game
     bool ChartShown(int c) => c != 2 || state.Hinted("amihan") || state.Hinted("marilaya");
 
     void DrawMap()
+    {
+        if (PhWorld) { DrawPhMap(); return; }   // the whole country (PhMap.cs)
+        DrawMapOld();
+    }
+
+    void DrawMapOld()
     {
         islandHover = null;
         RefreshMapTexture();

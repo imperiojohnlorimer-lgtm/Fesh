@@ -389,6 +389,7 @@ partial class Game
 
     Target ChapterTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         if (scene != "world") return null;
         if (!RocksCleared && FacingPoint(RockfallX, RockfallY, 16))
             return PickTier > 0 ? new Target { Type = "rockfall", Label = "Break up the fallen rocks" }

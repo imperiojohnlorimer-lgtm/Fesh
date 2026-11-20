@@ -34,8 +34,8 @@ W, H = 84, 84
 LIFT = 40
 SPAN = 23.0          # half the wingspan
 HEADINGS = [0, 45, 90, 135, 180, 225, 270, 315]   # degrees, 0 east, counter-clockwise seen from above
-FLAPS = 3
-LOOPS = [45, 90, 135, 180, 225, 270, 315]
+FLAPS = 5   # 1.48: five wing positions (was three), for a smoother beat
+LOOPS = list(range(15, 360, 15))   # 1.48: every 15 degrees (was 45)
 
 
 def outline_half_width(x):
@@ -155,7 +155,7 @@ def build(r, heading, flap, loop):
 
 
 # The loops face south, toward you, so a breach shows its white belly with the wings spread across the view.
-specs = [(h, f, 0) for h in HEADINGS for f in range(FLAPS)] + [(270, 1, lp) for lp in LOOPS]
+specs = [(h, f, 0) for h in HEADINGS for f in range(FLAPS)] + [(270, FLAPS // 2, lp) for lp in LOOPS]
 if os.environ.get("FESH_QUICK"):
     specs = [(0, 0, 0), (0, 2, 0), (90, 1, 0), (270, 1, 60) if False else (270, 1, 90), (270, 1, 180)]
 frames, meta_rows = [], []
@@ -163,7 +163,7 @@ anchor = None
 for n, (h, f, lp) in enumerate(specs):
     r = Renderer(W, H, pitch=55, tones=TONES, special=SPECIAL)
     r.keep_blend = n == 0
-    flap = [-0.55, 0.25, 0.85][f]
+    flap = -0.55 + 1.4 * f / (FLAPS - 1)
     build(r, h, flap, lp)
     r.aim((0, 0, LIFT))
     grid = r.render(OUT, heights=True)

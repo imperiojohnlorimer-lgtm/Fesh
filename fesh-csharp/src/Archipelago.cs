@@ -145,6 +145,7 @@ partial class Game
 
     Target ArchipelagoTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         if (!InAmihan || Aboard) return null;
         foreach (var n in Islanders)
         {
@@ -289,7 +290,7 @@ partial class Game
                 list.Add((n.y - 3, () => DrawSchool(n.x, n.y - 5)));
                 list.Add((SchoolY + 18, () => DrawSchoolBench(time)));
                 // While the ash falls she's inside the shelter with her class (Magayon.cs).
-                if (!AshFalling && !FolkAsleep) list.Add((s.Y, () => DrawIsayFigure(pix, (int)MathF.Round(s.X), (int)MathF.Round(s.Y), s.Face, s.Step, s.Moving ? 0 : (int)(time % 3 / 2), (time + 3) % 4.3f < 0.12f)));
+                if (!AshFalling && !FolkAsleep) list.Add((s.Y, () => { LookData.TurnFrom = s.Turning; DrawIsayFigure(pix, (int)MathF.Round(s.X), (int)MathF.Round(s.Y), s.Face, s.Step, s.Moving ? 0 : (int)(time % 3 / 2), (time + 3) % 4.3f < 0.12f); }));
                 continue;
             }
             // Baga's two (Magayon.cs): Ben's station and Manay Mila's house, and them unless they're at the shelter.
@@ -309,7 +310,7 @@ partial class Game
             if (SeaEmergency && n.id is "lira" or "niko" || FolkAsleep) continue;
             list.Add((s.Y, () =>
             {
-                var look = new Look { skin = 2, shirt = n.id == "niko" ? 2 : n.id == "tala" ? 3 : 1, hat = 0, hair = 1 };
+                var look = new Look { skin = 2, shirt = n.id == "niko" ? 2 : n.id == "tala" ? 3 : 1, hat = LookData.OldPeople ? 0 : 6, hair = 1 };
                 int x = (int)MathF.Round(s.X), y = (int)MathF.Round(s.Y), bob = s.Moving ? 0 : (int)(time % 3 / 2);
                 // Ducked, hands over their heads, while the ground shakes (RestlessSea.cs).
                 if (Shaking) { DrawDucked(look, x, y, s.Face); return; }
@@ -317,11 +318,14 @@ partial class Game
                 string chore = ChoreNow(n.id, x, y, s.Face, s.Moving);
                 var hands = chore != null ? ChoreHands(chore, x, y, s.Face) : default;
                 if (chore != null) LookData.DrawPerson(pix, look, x, y, s.Face, s.Step, bob: bob, arms: 4, hand: hands.hand, hand2: hands.hand2);
-                else LookData.DrawPerson(pix, look, x, y, s.Face, s.Step, bob: bob);
+                else { LookData.TurnFrom = s.Turning; LookData.DrawPerson(pix, look, x, y, s.Face, s.Step, bob: bob); }
                 // A woven salakot and a sash distinguish the village fishers; both ride the walk's bounce.
                 int up = bob + (s.Step is 2 or 4 ? 1 : 0);
-                pix.Rect(x - 5, y - 14 - LookData.Stature - up, 11, 2, "#ddbc78");
+                if (LookData.OldPeople)
+                {
+                    pix.Rect(x - 5, y - 14 - LookData.Stature - up, 11, 2, "#ddbc78");
                 pix.Rect(x - 3, y - 16 - LookData.Stature - up, 7, 2, "#f0d596");
+                }
                 pix.Rect(x - 2, y - 7 - LookData.Stature - up, 4, 2, n.shirt);
                 if (chore != null) DrawChoreProp(chore, x, y, s.Face);
             }));

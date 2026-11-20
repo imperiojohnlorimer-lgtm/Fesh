@@ -264,7 +264,7 @@ partial class Game
         {
             if (tr.x < vx0 - 1 || tr.x > vx1 + 1 || tr.y < vy0 || tr.y > vy1 + 3 || tr.kind is not ('t' or 'h' or 'f')) continue;
             float s = 0.9f + 0.2f * (float)Pix.Hash(tr.x, tr.y, 61);
-            if (tr.x >= MlStart) s *= 1 - 0.3f * Math.Clamp((MlHeight(MlLx(tr.x * T + 5), MlLy(tr.y * T + 5)) - 0.28f) / 0.35f, 0, 1);
+            if (MlCol(tr.x)) s *= 1 - 0.3f * Math.Clamp((MlHeight(MlLx(tr.x * T + 5), MlLy(tr.y * T + 5)) - 0.28f) / 0.35f, 0, 1);
             float rx = (tr.kind == 't' ? 11 : tr.kind == 'f' ? 8 : 9) * s * TreeScale(tr.kind), ry = (tr.kind == 'h' ? 3.6f : 4.8f) * s * TreeScale(tr.kind);
             float cx = tr.x * T + 5 + (tr.kind == 'h' ? 5 : 6) * lean * TreeScale(tr.kind), cy = tr.y * T + 9 + 1.5f * lean * TreeScale(tr.kind);
             for (int dy = (int)-ry; dy <= (int)ry; dy++)
@@ -303,7 +303,7 @@ partial class Game
 {
     // How much taller than the first drawings the trees stand (their collision tile is unchanged).
     // A fifth bigger again with the bigger houses (an oak is now about 55 px, four times you).
-    internal static float TreeScale(char kind) => kind switch { 't' => 1.8f, 'h' => 1.75f, 'f' => 1.7f, 'c' => 1.65f, _ => 1f };
+    internal static float TreeScale(char kind) => kind switch { 't' => 2.15f, 'h' => 2.1f, 'f' => 2.05f, 'c' => 1.95f, _ => 1f };   // 1.48: a fifth bigger, with the people's new heads
 }
 
 partial class Game
@@ -348,7 +348,7 @@ partial class Game
         float rise = (burst ? 44 : 38) * power * (1 - MathF.Exp(-age * (burst ? 0.9f : 0.3f)));
         float drift = -(rise * 0.25f + age * age * 0.05f * (0.6f + (float)h1)) - 0.8f * age;
         float turb = MathF.Sin(age * 1.6f + (float)h1 * 6.3f) * (1 + 3 * k) + MathF.Sin(age * 0.8f + (float)h2 * 6.3f) * 1.5f * k;
-        float x = ConeX + ((float)h2 - 0.5f) * 5 + drift + turb, y = top - 3 - rise;
+        float x = plumeX + ((float)h2 - 0.5f) * 5 + drift + turb, y = top - 3 - rise;   // (plumeX: Baga's cone, or a volcano on the Philippines map)
         float r = (3.4f + k * (burst ? 17 : 14) * (0.8f + 0.5f * (float)h3)) * (0.7f + 0.3f * power);
         float a = Math.Min(1, age / (life * 0.1f)) * MathF.Pow(1 - k, 0.8f) * (burst ? 0.98f : 0.9f);
         if (a < 0.03f) return;

@@ -113,9 +113,11 @@ partial class Game
         return r == "marilaya" ? "Marilaya" : char.ToUpper(MlRegionNames[r][0]) + MlRegionNames[r][1..];
     }
 
-    static bool InMarilayaBox(float wx, float wy) => wx >= MlStart * T;
+    // A column of Marilaya's band (only on the original map: the Philippines map's columns run on past it).
+    static bool MlCol(int tx) => tx >= MlStart && COLS == OldCols;
+    static bool InMarilayaBox(float wx, float wy) => COLS == OldCols && wx >= MlStart * T;   // (never on the Philippines map)
     // Marilaya's whole band, in tiles (the survey panel's chart is drawn from it).
-    const int MlBoxX0 = MlStart, MlBoxY0 = 0, MlBoxX1 = COLS, MlBoxY1 = ROWS;
+    const int MlBoxX0 = MlStart, MlBoxY0 = 0, MlBoxX1 = OldCols, MlBoxY1 = OldRows;
     bool InMarilaya => scene == "world" && InMarilayaBox(player.X, player.Y);
     // On Marilaya or in its shallows (within about a tile and a half of its coasts), not just in its sea.
     bool NearMarilaya(float wx, float wy)
@@ -127,13 +129,13 @@ partial class Game
     // Which part of the outdoors a point is in, for discovery, fishing the open sea, where you wake, and so on: Marilaya's
     // band at the far east first, then Amihan east of EastStart, Habagat along the bottom, and the west (Saltmere and its
     // neighbours, the atoll, the open sea between).
-    string ZoneAt(float wx, float wy) => InMarilayaBox(wx, wy) ? "marilaya" : wx >= EastStart * T ? "amihan" : wy >= HabagatTop * T ? "habagat" : "west";
+    string ZoneAt(float wx, float wy) => PhWorld ? "ph" : InMarilayaBox(wx, wy) ? "marilaya" : wx >= EastStart * T ? "amihan" : wy >= HabagatTop * T ? "habagat" : "west";
 
     /* ---------- Making it ---------- */
     // Each tile's region in the band (0 none, 1 the island, 2 north islets, 3 Salomague, 4 Tres Reyes), set by GenerateMarilaya.
-    readonly byte[,] mlRegion = new byte[ROWS, COLS];
+    readonly byte[,] mlRegion = new byte[OldRows, OldCols];
     // The ground under each of its trees, bushes and boulders (Ground).
-    readonly char[,] mlGround = new char[ROWS, COLS];
+    readonly char[,] mlGround = new char[OldRows, OldCols];
 
     static float SegDist(float px, float py, float ax, float ay, float bx, float by)
     {

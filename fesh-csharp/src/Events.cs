@@ -249,6 +249,7 @@ partial class Game
     /* ---------- Targets ---------- */
     Target EventTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         if (EventsOff || MatchActive || state?.created != true || Aboard) return null;
         float x = player.X, y = player.Y;
         var ev = TodayEvent();
@@ -462,6 +463,7 @@ partial class Game
     int runDrawn;   // splashes drawn last frame (the autotest)
     void DrawFishRun(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (!EventOn("run") || !Data.SpotById.TryGetValue(TodayEvent().arg, out var s)) return;
         if (s.X < camX - 30 || s.X > camX + W + 30 || s.Y < camY - 30 || s.Y > camY + H + 30) return;
         // Six fish at a time, each leaping in a little arc and leaving a ring, all over the spot.

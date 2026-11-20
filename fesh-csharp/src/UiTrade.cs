@@ -19,9 +19,11 @@ partial class Game
     {
         const float pad = 24;
         shopTip = null;
-        var (x, y, cw, ch) = PanelFrame("Pip's stall");
-        float tx = x + pad + Gfx.Measure("Pip's stall", FontKind.Ui700, PanelTitleSize) + 28;
-        foreach (var (id, label) in new[] { ("sell", "Sell"), ("buy", "Buy"), ("dress", "Dress"), ("derby", "Derby") })
+        string title = shopName ?? "Pip's stall";
+        if (shopName != null && shopTab == "derby") shopTab = "sell";
+        var (x, y, cw, ch) = PanelFrame(title);
+        float tx = x + pad + Gfx.Measure(title, FontKind.Ui700, PanelTitleSize) + 28;
+        foreach (var (id, label) in shopName != null ? new[] { ("sell", "Sell"), ("buy", "Buy"), ("dress", "Dress") } : new[] { ("sell", "Sell"), ("buy", "Buy"), ("dress", "Dress"), ("derby", "Derby") })
         {
             float w = SmallW(label);
             if (Button(label, tx, y + PanelPad - 6, w, 44, FontKind.Ui700, 20, shopTab == id ? Pal.Lantern : Pal.Sand, Pal.Ink, 4)) { shopTab = id; shopPage = 0; }

@@ -86,6 +86,7 @@ partial class Game
 
     Target BoardTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         for (int i = 0; i < HarbourBoards.Length; i++)
         {
             var (_, _, bx, by) = HarbourBoards[i];

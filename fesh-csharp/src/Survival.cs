@@ -295,6 +295,12 @@ partial class Game
     /* ---------- Animals ---------- */
     void SpawnAnimals()
     {
+        if (PhWorld) { animals.Clear(); phAnimalAt = (-999, -999); phAnimalT = 0; PlacePet(); return; }   // round you as you go (PhAnimals.cs)   // the original world's animals and places (PhMap.cs)
+        SpawnAnimalsOld();
+    }
+
+    void SpawnAnimalsOld()
+    {
         animals.Clear();
         for (int i = 0; i < Items.AnimalSpawns.Length; i++)
         {
@@ -386,9 +392,13 @@ partial class Game
         }).OrderBy(a => Dist(a.X, a.Y, player.X, player.Y)).FirstOrDefault();
     }
 
+    // Any dog but Biscuit (the Philippines map's town dogs) is just a dog.
+    static readonly AnimalKind TownDog = new("dog", "dog", 26, "The dog wags its whole body.", "wood", "The dog drops a stick at your feet. (+1 wood)");
+    static AnimalKind KindOf(Animal a) => a.Kind == "dog" && a.Key != "dog0" && a.Key.StartsWith("ph:") ? TownDog : Items.Animals[a.Kind];
+
     void Pet(Animal a)
     {
-        var k = Items.Animals[a.Kind];
+        var k = KindOf(a);
         FaceToward(a.X, a.Y);
         a.Pause = 2;
         a.Asleep = false;   // petting wakes it
@@ -409,5 +419,5 @@ partial class Game
         else Toast(k.Pet + (k.Gift != null ? " It has nothing more for you today." : ""), 3);
     }
 
-    static string AnimalLabel(Animal a) => a.Kind == "dog" ? "Pet Biscuit" : $"{(a.Kind is "tarsier" or "hornbill" or "parrot" ? "Observe" : "Pet")} the {Items.Animals[a.Kind].Name}";
+    static string AnimalLabel(Animal a) => a.Kind == "dog" && a.Key == "dog0" ? "Pet Biscuit" : $"{(a.Kind is "tarsier" or "hornbill" or "parrot" ? "Observe" : "Pet")} the {KindOf(a).Name}";
 }

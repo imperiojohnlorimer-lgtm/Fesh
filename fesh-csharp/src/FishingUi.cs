@@ -79,7 +79,7 @@ partial class Game
     {
         var r = reel;
         float zk = ViewK, rx = ReelBarX() * zk - 4 * zk;   // the bar's left edge on screen, and a unit of its height (the old layout's 4x pixels, scaled)
-        float Y(float old) => 26 * zk + (old - 104);   // from the bar's top, in screen pixels (the words keep their size)
+        float Y(float old) => ReelBarY() * zk + (old - 104);   // from the bar's top, in screen pixels (the words keep their size)
         string tag = r.Style switch { "runner" => "Runner", "jumper" => "Jumper", "bottom" => "Bottom-hugger", _ => "" };
         if (tag != "") Outlined(tag, rx - Gfx.Measure(tag, FontKind.Ui700, 18), Y(104), FontKind.Ui700, 18, Pal.C("#dfe9ee"));
         if (r.Running > 0)
@@ -89,7 +89,7 @@ partial class Game
             Outlined("Let go!", rx - Gfx.Measure("Let go!", FontKind.Ui700, 20), Y(170), FontKind.Ui700, 20, Pal.C("#ffffff"));
         }
         if (r.Style == "runner")
-            Outlined("Tension", (ReelBarX() + 27) * zk - Gfx.Measure("Tension", FontKind.Ui600, 14) / 2 + 2 * zk, (26 + 120) * zk + 6, FontKind.Ui600, 14, Pal.C("#dfe9ee"));
+            Outlined("Tension", (ReelBarX() + 27) * zk - Gfx.Measure("Tension", FontKind.Ui600, 14) / 2 + 2 * zk, (ReelBarY() + 120) * zk + 6, FontKind.Ui600, 14, Pal.C("#dfe9ee"));
         if (r.Roll?.Id == MireFish && mire is { Ev: not ("" or "leap" or "dive") } me) { DrawMireCue(me, rx, Y); return; }
         if (r.Roll?.Id == LungfishFish && lung is { Ev: not "" } le) { DrawLungfishCue(le, rx, Y); return; }
         if (r.Roll?.Id == WhiskersFish && whisk is { Ev: not "" } we) { DrawWhiskersCue(we, rx, Y); return; }

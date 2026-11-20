@@ -95,7 +95,31 @@ partial class Game
         Toast("Boat moored. Press <ride> beside it to board again.");
     }
 
-    void DrawHelmsman() => DrawBoat(player.X, player.Y, time, occupied: true);
+    // An about-turn at the helm (left to right, or up to down) swings through the view in between for a moment (1.48),
+    // instead of the hull flipping round in a single frame.
+    string boatLastFace = "right", boatTurnFrom;
+    float boatTurnUntil;
+    void DrawHelmsman()
+    {
+        if (boatFace != boatLastFace) { boatTurnFrom = boatLastFace; boatTurnUntil = time + 0.14f; boatLastFace = boatFace; }
+        string show = boatFace;
+        if (boatTurnFrom != null && time < boatTurnUntil && !reflecting)
+        {
+            bool sides = (boatTurnFrom is "left" or "right") && (boatFace is "left" or "right"), ends = (boatTurnFrom is "up" or "down") && (boatFace is "up" or "down");
+            if (sides) show = "down"; else if (ends) show = "right";
+            else
+            {
+                // A quarter turn: three-quarter on, between the two (BoatLook.cs, boatDiag).
+                string sideFace = boatFace is "left" or "right" ? boatFace : boatTurnFrom, endFace = boatFace is "up" or "down" ? boatFace : boatTurnFrom;
+                show = sideFace; boatDiag = endFace == "up" ? "ru" : "rd";
+            }
+        }
+        if (show == boatFace && boatDiag == null) { DrawBoat(player.X, player.Y, time, occupied: true); return; }
+        string keepBoat = boatFace, keepFace = player.Face;
+        boatFace = player.Face = show;
+        DrawBoat(player.X, player.Y, time, occupied: true);
+        boatFace = keepBoat; player.Face = keepFace; boatDiag = null;
+    }
     static readonly string[] PaintedPanel = { "#e04b3a", "#f3c25b", "#2f7fa3", "#3f9a5a" };
 
     /* ---------- How the banca moves ---------- */
@@ -339,7 +363,7 @@ partial class Game
                 var tip = RodTip();
                 pix.Line(hx, hy, tip.X, tip.Y, "#6b4a2b");
             }
-            if (holding) DrawHeld(sx, sy - 17);
+            if (holding) DrawHeld(sx, sy - 17 - LookData.HoldLift);
         }
 
         if (endOn)

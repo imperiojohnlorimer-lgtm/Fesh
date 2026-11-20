@@ -113,7 +113,7 @@ partial class Game
                     {
                         int wx = tx * T + px, sx = wx - camX;
                         if (sx < 0 || sx >= W || wx >= PW) continue;
-                        char g = shape[wy * PW + wx];
+                        char g = ShapePx(wx, wy);
                         float k = WetK(g);
                         if (k <= 0) continue;
                         // Wet in blotches of about three pixels: as it dries the blotches shrink and go.

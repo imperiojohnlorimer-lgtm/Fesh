@@ -37,6 +37,7 @@ partial class Game
     /* ---------- What's in front of you ---------- */
     Target MarilayaTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         float x = player.X, y = player.Y;
         if (Dist(x, y, NoticeX, NoticeY + 6) < 14 && !Aboard)
             return new Target { Type = "marilaya", Id = "notice", Label = "Read the notice" };
@@ -608,7 +609,7 @@ partial class Game
             string face = dx < 0 ? "right" : "left";
             list.Add((y, () =>
             {
-                if (name == "Tomas") LookData.DrawFigure(pix, "#d9a066", "#c9c4bc", "#5d6e7e", "#3f4a5a", false, 3, "#3f4a5a", x, y, face, 0);
+                if (name == "Tomas") LookData.DrawFigure(pix, "#d9a066", "#c9c4bc", "#5d6e7e", "#3f4a5a", false, 3, "#3f4a5a", x, y, face, 0, beard: LookData.OldPeople ? null : "#ebe7df");
                 else if (name == "Manay Mila") DrawMila(pix, x, y, face, 0);
                 else if (name == "Ben") DrawBen(pix, x, y, face, 0);
                 else LookData.DrawFigure(pix, "#c68a5a", name == "Lola Pacing" ? "#e8e8e8" : "#2b1d14", shirt, "#3f4a5a", name is "Lira" or "Lola Pacing" or "Ma'am Isay", 0, null, x, y, face, 0);

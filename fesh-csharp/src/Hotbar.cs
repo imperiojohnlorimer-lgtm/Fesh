@@ -215,6 +215,7 @@ partial class Game
     // nothing to catch here.
     string WildSpot(float x, float y)
     {
+        if (PhWorld && scene == "world") return PhWildSpot(x, y);   // the Philippines map (PhFishing.cs)
         int tx = (int)MathF.Floor(x / T), ty = (int)MathF.Floor(y / T);
         if (scene == "cave")
             return Data.Spots.Where(s => s.Scene == "cave" && SpotHere(s)).OrderBy(s => { var (sx, sy) = SpotPos(s); return Dist(sx, sy, x, y); }).Select(s => s.Id).FirstOrDefault();
@@ -260,7 +261,7 @@ partial class Game
     }
 
     // The open sea's fish by where the water is (SeaSpotHere goes by where you are).
-    string SeaSpotAt(float x, float y) => ZoneAt(x, y) switch { "marilaya" => "marilayasea", "amihan" => "amihansea", "habagat" => "habagatsea", _ => "opensea" };
+    string SeaSpotAt(float x, float y) => PhWorld ? "ph:sea" : ZoneAt(x, y) switch { "marilaya" => "marilayasea", "amihan" => "amihansea", "habagat" => "habagatsea", _ => "opensea" };
 
     void CastFree(float power)
     {

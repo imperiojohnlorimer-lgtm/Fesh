@@ -8,6 +8,9 @@ namespace Fesh;
 partial class Game
 {
     const float Bar = 120, JigBeat = 0.9f;
+    // 1.48: every boss on a line (Tidemane, Ironbill, the legends with fights of their own) takes 1.65 times as long to bring
+    // in: the user found the fights over too soon to feel big, before you had seen much of what the fish does.
+    const float BossPullScale = 0.6f;
     float charge, chargeDir = 1;
     string chargeSpot;
     bool reelTap;                                       // a fresh press this frame while reeling (leaps and pumps)
@@ -50,7 +53,7 @@ partial class Game
     // Fish that go for a bait are three times as likely to bite on it.
     static bool BaitLikes(string bait, CommonFish f, string spot) => bait switch
     {
-        "worm" => FreshSpots.Contains(spot) || f.Style == "bottom",
+        "worm" => FreshSpots.Contains(spot) || PhFresh(spot) || f.Style == "bottom",
         "cricket" => f.Style == "jumper" || f.Depth == "shallow",
         "cut_bait" => SeaSpots.Contains(spot) && f.Style is "runner" or "bottom",
         "glow_shrimp" => f.Depth == "deep",
@@ -88,7 +91,7 @@ partial class Game
         // Trolling fish (Ironbill) belong to every open sea, not only the one west of Amihan where the Fish log lists them.
         var pool = trolled && spot is "amihansea" or "habagatsea" or "marilayasea"
             ? Data.Common[spot].Concat(Data.Common["opensea"].Where(f => f.Troll))
-            : Data.Common[spot];
+            : spot.StartsWith("ph:") ? PhPool(spot) : Data.Common[spot];
         foreach (var f in pool)
         {
             if (!Bites(f, bait) || f.Troll && !trolled) continue;
@@ -485,7 +488,7 @@ partial class Game
         if (roll.Boss)
         {
             // It fights every way there is, switching every few seconds, and it takes a long time to bring in.
-            reel.Pull = 0.6f;
+            reel.Pull = 0.6f * BossPullScale;
             reel.StyleT = 4.5f;
             Sfx.Play("neigh");
             quake = 0.4f;
@@ -525,7 +528,7 @@ partial class Game
         if (roll.Id == TowFish)
         {
             // Ironbill: a long fight while it tows the boat (UpdateTow).
-            reel.Pull = 0.7f;
+            reel.Pull = 0.7f * BossPullScale;
             quake = 0.3f;
             Sfx.Play("splash");
             if (OldArt) Toast("Ironbill! The legend takes the lure and tows your boat away. Hang on!", 5);
@@ -628,7 +631,7 @@ partial class Game
                 if (fish.BiteT <= 0) GotAway("Too slow. It got away.");
                 return;
             case "reeling":
-                if (reel != null) { if (MatchActive) StepMatchReel(dt); else UpdateReel(dt); }
+                if (reel != null) { if (MatchActive) StepMatchReel(dt); else { float p0 = reel.Progress; UpdateReel(dt); if (reel != null) BossBeat(reel.Progress - p0); } }
                 return;
             case "chest": UpdateChest(dt); return;
             case "spear": UpdateSpear(dt); return;

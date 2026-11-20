@@ -136,7 +136,7 @@ static class AnimalArt
     public static (int w, int h) Size(string id) => (Sprites[id].Rows[0].Length, Sprites[id].Rows.Length);
 
     // Lying down, the carabao curls its legs under it (a dedicated drawing: tucking the standing one would leave its legs showing).
-    static readonly string[] CarabaoSleep =
+    static string[] CarabaoSleep =
     {
         "......." + "......." + "...H..." + ".....H.",
         "......." + "......." + "...HH.." + "....HH.",
@@ -201,6 +201,11 @@ static class AnimalArt
             ".BbB.",
             ".B.BB"
         }, new() { ['B'] = "#8a6749", ['b'] = "#bb9872", ['Y'] = "#e5c56b", ['e'] = "#201b1c" });
+        // 1.48: the people grew a big head, so the farm animals grew about an eighth to stand right beside them and the
+        // bigger trees and houses (the small ones are still just big enough to read).
+        foreach (var (id, dc, dr) in new[] { ("carabao", 4, 2), ("pig", 2, 1), ("sheep", 2, 1), ("goat", 2, 1), ("dog", 1, 1) })
+            Sprites[id] = Sprites[id] with { Rows = Stretch(Sprites[id].Rows, dc, dr) };
+        CarabaoSleep = Stretch(CarabaoSleep, 4, 1);
     }
 
     // Light on every animal from the upper left (1.31): a pixel with open air above it or to its left catches the light, one
@@ -229,6 +234,20 @@ static class AnimalArt
             for (int k = 0; k < rows.Count(x => x == r); k++) tall.Add(wide[r]);
         }
         Sprites[id] = s with { Rows = tall.ToArray() };
+    }
+
+    // Grows a drawing by dc columns and dr rows, copying columns spread through the body (between a fifth and three fifths of
+    // the width: the head is on the right and stays as drawn) and rows through the middle of the body (not the head's top
+    // rows, not the legs).
+    static string[] Stretch(string[] rows, int dc, int dr)
+    {
+        int w = rows[0].Length, h = rows.Length;
+        var cols = Enumerable.Range(0, dc).Select(i => (int)(w * (0.2f + 0.42f * (i + 0.5f) / dc))).ToHashSet();
+        var rws = Enumerable.Range(0, dr).Select(i => (int)(h * (0.35f + 0.3f * (i + 0.5f) / dr))).ToHashSet();
+        var wide = rows.Select(row => string.Concat(row.Select((ch, c) => cols.Contains(c) ? new string(ch, 2) : ch.ToString()))).ToList();
+        var tall = new List<string>();
+        for (int r = 0; r < wide.Count; r++) { tall.Add(wide[r]); if (rws.Contains(r)) tall.Add(wide[r]); }
+        return tall.ToArray();
     }
 
     static void Trim(string id, int[] cols, int[] rows)

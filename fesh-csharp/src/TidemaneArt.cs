@@ -9,6 +9,7 @@ sealed class MountPose
 {
     public string Kind = "stand";
     public int Frame;
+    public float Sub;       // 1.48: how far (0 or 0.5) it is on from Frame to the next, so every gait has twice the frames
     public float Time, Seed;
     public bool Saddle;     // tamed: a woven saddle cloth
     public bool Flash;      // just hurt: drawn all white
@@ -222,8 +223,8 @@ static class MountArt
         int f = p.Frame;
         return p.Kind switch
         {
-            "gallop" => (0, GallopBody[f % 8], GallopPitch[f % 8]),
-            "trot" => (0, TrotBody[f % 6], 0),
+            "gallop" => (0, Li(GallopBody, f, p.Sub, 8), Lp(GallopPitch, f, p.Sub, 8)),
+            "trot" => (0, Li(TrotBody, f, p.Sub, 6), 0),
             "rear" => (0, -1 - (f % 2), -0.5f),
             "lie" => (0, 5, 0.04f),
             "swim" => (0, 3, -0.06f),
@@ -244,13 +245,13 @@ static class MountArt
         float nA, nB, fA, fB;
         switch (p.Kind)
         {
-            case "gallop": nA = GallopNearA[f % 8]; nB = GallopNearB[f % 8]; fA = GallopFarA[f % 8]; fB = GallopFarB[f % 8]; break;
-            case "trot": nA = TrotNearA[f % 6]; nB = TrotNearB[f % 6]; fA = TrotNearA[(f + 3) % 6]; fB = TrotNearB[(f + 3) % 6]; break;
+            case "gallop": nA = Lp(GallopNearA, f, p.Sub, 8); nB = Lp(GallopNearB, f, p.Sub, 8); fA = Lp(GallopFarA, f, p.Sub, 8); fB = Lp(GallopFarB, f, p.Sub, 8); break;
+            case "trot": nA = Lp(TrotNearA, f, p.Sub, 6); nB = Lp(TrotNearB, f, p.Sub, 6); fA = Lp(TrotNearA, f + 3, p.Sub, 6); fB = Lp(TrotNearB, f + 3, p.Sub, 6); break;
             // Rearing, it paws the air, one leg and then the other.
             case "rear": nA = f % 2 == 0 ? 1.3f : 0.8f; nB = f % 2 == 0 ? 2.2f : 1.5f; fA = f % 2 == 0 ? 0.7f : 1.3f; fB = f % 2 == 0 ? 1.4f : 2.2f; break;
             case "leap": nA = 1.2f; nB = 2.4f; fA = 1.0f; fB = 2.2f; break;
             // Swimming, they paddle under the surface.
-            case "swim": nA = Paddle(f); nB = 0.9f; fA = Paddle(f + 3); fB = 0.9f; break;
+            case "swim": nA = Paddle(f) + (Paddle(f + 1) - Paddle(f)) * p.Sub; nB = 0.9f; fA = Paddle(f + 3) + (Paddle(f + 4) - Paddle(f + 3)) * p.Sub; fB = 0.9f; break;
             default: nA = 0.04f; nB = 0; fA = -0.1f; fB = 0; break;
         }
         if (lie) { c.Thick(4, -3, 9, -2, 2, 'd'); c.Thick(9, -2, 6, -1, 2, 'd'); }
@@ -305,6 +306,9 @@ static class MountArt
         Light(c);
     }
 
+    // A gait table at Frame f, Sub of the way on to the next frame (n frames round).
+    static float Lp(float[] t, int f, float sub, int n) => t[f % n] + (t[(f + 1) % n] - t[f % n]) * sub;
+    static int Li(int[] t, int f, float sub, int n) => (int)MathF.Round(t[f % n] + (t[(f + 1) % n] - t[f % n]) * sub);
     static float Paddle(int f) => (f % 6) switch { 0 => 0.9f, 1 => 0.4f, 2 => -0.1f, 3 => -0.3f, 4 => 0.1f, _ => 0.6f };
 
     // A foreleg from the shoulder: forearm a radians from straight down, the cannon folded b further back.
@@ -363,7 +367,7 @@ static class MountArt
         float lift = 0;
         switch (p.Kind)
         {
-            case "gallop": lift = GallopTail[f % 8]; P1 = (-15, -9); P2 = (-15, -1 - lift); P3 = (-21, -5 - lift * 1.6f); break;
+            case "gallop": lift = Lp(GallopTail, f, p.Sub, 8); P1 = (-15, -9); P2 = (-15, -1 - lift); P3 = (-21, -5 - lift * 1.6f); break;
             case "trot": lift = f % 3 == 1 ? -1 : 0; P1 = (-15, -10); P2 = (-15, -1 + lift); P3 = (-21, -4 + lift); break;
             case "rear": P0 = (-9, -9); P1 = (-12, -1); P2 = (-17, 1); P3 = (-22, -3 + sway); break;
             case "lie": P0 = (-9, -6); P1 = (-14, -3); P2 = (-15, 1); P3 = (-21, -1 + sway * 0.5f); break;
@@ -371,7 +375,7 @@ static class MountArt
             case "swim":
             {
                 // Along the surface, rolling in a wave, the fan flicking up out of the water.
-                float w = MathF.Sin(f / 6f * MathF.Tau) * 2;
+                float w = MathF.Sin((f + p.Sub) / 6f * MathF.Tau) * 2;
                 P0 = (-9, -11); P1 = (-14, -7 + w * 0.5f); P2 = (-19, -6 - w); P3 = (-24, -8 + w * 0.5f); break;
             }
             default: P1 = (-15, -10); P2 = (-15, -1); P3 = (-21, -4 + sway); break;
@@ -540,7 +544,7 @@ static class MountArt
         int f = p.Frame;
         float t = p.Time + p.Seed * 7;
         bool swim = p.Kind == "swim", moving = p.Kind is "gallop" or "trot";
-        int bob = p.Kind == "gallop" ? GallopBody[f % 8] : p.Kind == "trot" ? TrotBody[f % 6] : 0;
+        int bob = p.Kind == "gallop" ? Li(GallopBody, f, p.Sub, 8) : p.Kind == "trot" ? Li(TrotBody, f, p.Sub, 6) : 0;
         int sink = swim ? 3 : 0;
         int sway = (int)MathF.Round(MathF.Sin(t * (moving ? 9 : 3)) * (moving ? 1.5f : 0.8f));
         int Lift(int side) => p.Kind == "gallop" ? Math.Max(0, (int)MathF.Round(MathF.Sin((f + (side > 0 ? 2 : 0)) / 8f * MathF.Tau) * 2.5f))
@@ -552,7 +556,7 @@ static class MountArt
         if (!away && !near)
         {
             // Behind it: the fan of its tail, raised over its back.
-            int lift = p.Kind == "gallop" ? (int)MathF.Round(GallopTail[f % 8]) : swim ? (int)MathF.Round(MathF.Sin(f / 6f * MathF.Tau) * 1.5f) : 0;
+            int lift = p.Kind == "gallop" ? (int)MathF.Round(Lp(GallopTail, f, p.Sub, 8)) : swim ? (int)MathF.Round(MathF.Sin((f + p.Sub) / 6f * MathF.Tau) * 1.5f) : 0;
             int fy = -17 + lift, fx = sway;
             if (!low)
             {
@@ -602,7 +606,7 @@ static class MountArt
         else
         {
             // The tail lies along the ground toward you, swinging, and spreads into the fan.
-            int lift = p.Kind == "gallop" ? -(int)MathF.Round(GallopTail[f % 8]) : swim ? (int)MathF.Round(MathF.Sin(f / 6f * MathF.Tau) * 1.5f) : 0;
+            int lift = p.Kind == "gallop" ? -(int)MathF.Round(Lp(GallopTail, f, p.Sub, 8)) : swim ? (int)MathF.Round(MathF.Sin((f + p.Sub) / 6f * MathF.Tau) * 1.5f) : 0;
             float mx = sway * 0.6f;
             for (int i = 0; i <= 24; i++)
             {
@@ -626,7 +630,7 @@ static class MountArt
     public static (int x, int y) SeatEnd(MountPose p, bool away)
     {
         int f = p.Frame;
-        int bob = p.Kind == "gallop" ? GallopBody[f % 8] : p.Kind == "trot" ? TrotBody[f % 6] : 0;
+        int bob = p.Kind == "gallop" ? Li(GallopBody, f, p.Sub, 8) : p.Kind == "trot" ? Li(TrotBody, f, p.Sub, 6) : 0;
         int sink = p.Kind == "swim" ? 3 : 0;
         return away ? (0, -8 + bob + sink) : (0, -11 + bob + sink);
     }

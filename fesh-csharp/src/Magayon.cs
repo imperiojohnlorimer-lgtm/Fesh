@@ -291,6 +291,7 @@ partial class Game
     // Outdoors on Baga and at the school (before the islanders' usual lines, after the story-3 events).
     Target MagayonTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         if (scene != "world" || Aboard) return null;
         float x = player.X, y = player.Y;
         if (VolcanoControlled) return MagayonEventTarget();
@@ -899,6 +900,7 @@ partial class Game
     // At ground level: the lahar channel (dry, flowing in the rain, or with fresh mud in it) and the zone's marker stones.
     void DrawBagaGround(float t, bool force = false, bool? mudNow = null)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (!force && (Math.Abs(ConeX - player.X) > W + 80 || Math.Abs(PdzY - player.Y) > H + 120)) return;
         bool flowing = MgOrder && state.weather != "clear" && rainAmt > 0.3f;
         bool mud = mudNow ?? (MgOrder && (state.Hinted("mg:rained") || flowing));
@@ -959,7 +961,7 @@ partial class Game
         if (mgMilaWalk != null)
         {
             var m = mgMilaWalk;
-            list.Add((m.Y, () => DrawMila(pix, (int)MathF.Round(m.X), (int)MathF.Round(m.Y), m.Face, m.Safe ? 0 : 1 + (int)(m.WalkT * 8) % 4)));
+            list.Add((m.Y, () => DrawMila(pix, (int)MathF.Round(m.X), (int)MathF.Round(m.Y), m.Face, m.Safe ? 0 : LookData.WalkStep(m.WalkT, 8))));
         }
     }
 
@@ -1053,14 +1055,15 @@ partial class Game
         pix.Rect(x - 10, y, 21, 1, "#c58b4a");
         pix.Rect(x - 13, y + 5, 27, 1, "#d8c49a"); pix.Rect(x - 13, y - 3, 27, 1, "#d8c49a");
         pix.Rect(x - 6, y - 3, 1, 8, "#7a5a3e"); pix.Rect(x + 6, y - 3, 1, 8, "#7a5a3e");
-        var look = new Look { skin = 2, shirt = 2, hat = 0, hair = 1 };
+        var look = new Look { skin = 2, shirt = 2, hat = LookData.OldPeople ? 0 : 6, hair = 1 };
         LookData.DrawPerson(pix, look, (int)x + 4, (int)(y + 1), "left", 0, shadow: false);
-        pix.Rect(x - 1, y - 13, 11, 2, "#ddbc78"); pix.Rect(x + 1, y - 15, 7, 2, "#f0d596");
+        if (LookData.OldPeople) { pix.Rect(x - 1, y - 13, 11, 2, "#ddbc78"); pix.Rect(x + 1, y - 15, 7, 2, "#f0d596"); }
     }
 
     // Manay Mila: a striped scarf over her hair and an abaca-coloured blouse.
     static void DrawMila(Pix p, int x, int y, string face, int step, int bob = 0)
     {
+        if (!LookData.OldPeople) { LookData.DrawFigure(p, "#a9714b", "#3a2a20", "#d9a86a", "#5a4a7a", true, 4, "#c0392b", x, y, face, step, bob: bob); return; }
         LookData.DrawFigure(p, "#a9714b", "#3a2a20", "#d9a86a", "#5a4a7a", true, 0, null, x, y, face, step, bob: bob);
         p.Rect(x - 3, y - 13 - LookData.Stature - bob, 7, 2, "#c0392b"); p.Rect(x - 3, y - 12 - LookData.Stature - bob, 7, 1, "#f2c94a");
     }

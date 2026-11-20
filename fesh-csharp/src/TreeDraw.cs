@@ -189,7 +189,7 @@ partial class Game
         // disc over a darker one set down and right of it (so dark gaps show between leaves and the lower-right rim goes
         // deep), lit by where it sits on its clump's ball (upper left bright yellow-green, lower right deep green), with a
         // fleck of light on its own upper left. Leaves at the rim stick out past the ball, so the outline is bumpy, not drawn.
-        float s = 1.2f + 0.2f * (float)Pix.Hash(tx, ty, 63);
+        float s = 1.35f + 0.2f * (float)Pix.Hash(tx, ty, 63);   // 1.48: an eighth bigger, beside the new people
         int shape = (int)(Pix.Hash(tx, ty, 64) * 4) % 4, m = Pix.Hash(tx, ty, 65) < 0.5 ? 1 : -1;
         (float ox, float oy, float r)[] lobes = shape switch
         {

@@ -29,22 +29,23 @@ partial class Game
 
     void BakeRich()
     {
-        worldRich = new Pix(worldBase.W, worldBase.H);
+        worldRich = new Pix(worldBase.W, worldBase.H) { CamX = worldBase.CamX, CamY = worldBase.CamY };
         Array.Copy(worldBase.Buf, worldRich.Buf, worldBase.Buf.Length);
-        for (int y = 0; y < ROWS; y++)
-            for (int x = 0; x < COLS; x++) RichTile(x, y);
+        for (int y = Math.Max(0, bufY0 / T); y < Math.Min(ROWS, (bufY0 + bufH) / T); y++)
+            for (int x = Math.Max(0, bufX0 / T); x < Math.Min(COLS, (bufX0 + bufW) / T); x++) RichTile(x, y);
     }
 
     // One tile of the rich layer: the ordinary bake's pixel, or for plain open sea its richer colour.
     void RichTile(int x, int y)
     {
+        if (!TileInBuf(x, y)) return;   // outside the baked window (Scenery.bufX0)
         if (worldRich == null) return;
         for (int py = 0; py < T; py++)
             for (int px = 0; px < T; px++)
             {
-                int wx = x * T + px, wy = y * T + py, i = wy * worldBase.W + wx;
+                int wx = x * T + px, wy = y * T + py, i = BI(wx, wy);
                 var baked = worldBase.Buf[i];
-                char s = shape[wy * PW + wx];
+                char s = ShapePx(wx, wy);
                 if (s is 'w' or '~' && baked.Equals(GroundPixel(wx, wy, s))) worldRich.Buf[i] = RichSeaPixel(wx, wy, s, baked);
                 else worldRich.Buf[i] = baked;
             }

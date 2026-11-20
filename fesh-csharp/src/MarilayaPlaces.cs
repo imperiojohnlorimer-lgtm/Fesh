@@ -137,7 +137,7 @@ partial class Game
             {
                 if (!MlFolkHere(f.id)) continue;
                 var s = MlWalk(f.id);
-                list.Add((s.Y, () => DrawMlPerson(f.id, (int)MathF.Round(s.X), (int)MathF.Round(s.Y), s.Face, s.Step, s.Moving ? 0 : (int)(time % 3 / 2))));
+                list.Add((s.Y, () => { LookData.TurnFrom = s.Turning; DrawMlPerson(f.id, (int)MathF.Round(s.X), (int)MathF.Round(s.Y), s.Face, s.Step, s.Moving ? 0 : (int)(time % 3 / 2)); }));
             }
         else AddGathering(list);
         AddKalutangKids(list);

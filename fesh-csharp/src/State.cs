@@ -43,6 +43,11 @@ sealed class State
     public Dictionary<string, bool> hinted = new();
     public int tour = 99;                            // First steps (Tutorial.cs): the step a new fisher is on; 99 is done (every older save)
     public float px = 160, py = 115;
+    // 1.48: which map this game is on: "" the original world, "ph" the Philippines (PhMap.cs). On the Philippines map px/py are
+    // inside a window of the country whose top-left tile is (phX0, phY0); the window moves with you.
+    public string world = "";
+    public int phX0, phY0;
+    public List<string> phVisited = new();            // the Philippines map's towns you've been to (PhTowns.cs), for the chart
     public Mats mats = new(); // only read when loading saves from before the bag existed
     public List<Build> builds = new();
     public List<Loose> loose = new();

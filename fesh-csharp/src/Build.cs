@@ -11,7 +11,7 @@ partial class Game
 {
     /* ---------- Collision ---------- */
     // Tomas's hut, his campfire, the wreck, Tomas himself, Pip's stall, the carving at the Starwell and the fallen rocks. Only outdoors.
-    List<Box> StaticSolids() => scene != "world" ? new() : new()
+    List<Box> StaticSolids() => scene != "world" || PhWorld ? new() : new()
     {
         new(160 - 10 * HouseS, 56, 20 * HouseS, 13),
         new(FireX - 4, FireY - 3, 9, 5),
@@ -29,7 +29,8 @@ partial class Game
     List<Box> Solids()
     {
         var list = StaticSolids();
-        if (scene == "world") { list.AddRange(IslandSolids()); list.AddRange(HabagatSolids()); list.AddRange(MlSolids()); list.AddRange(BoardSolids()); }
+        if (scene == "world" && !PhWorld) { list.AddRange(IslandSolids()); list.AddRange(HabagatSolids()); list.AddRange(MlSolids()); list.AddRange(BoardSolids()); }
+        if (scene == "world" && PhWorld) list.AddRange(PhTownSolids());
         foreach (var b in SceneBuilds()) if (BuildBox(b) is Box r) list.Add(r);
         list.AddRange(SchoolRoomSolids());
         list.AddRange(MlCaveSolids());
@@ -67,6 +68,7 @@ partial class Game
             if (flats && OnSandbarTile(tx, ty)) { if (!SandbarOk(tx, ty)) return false; continue; }
             if (!(Walkable(t) || wade && Wadeable(t) && !OnSandbarTile(tx, ty) || swim && SwimOk(tx, ty, t) || flats && FlatOk(tx, ty)) || BridgeClosed(tx, ty)) return false;
         }
+        if (PhWorld && scene == "world" && PhMountainBlocks(x, y)) return false;   // the Philippines map's mountains are solid (PhTerrain.cs)
         foreach (var r in Solids())
             if (x + 3 > r.X && x - 3 < r.X + r.W && y > r.Y && y - 3 < r.Y + r.H) return false;
         return true;

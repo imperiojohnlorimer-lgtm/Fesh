@@ -297,6 +297,38 @@ partial class Game
     }
 
     // Above the water: the breach, the charge across to the boat, and the tail-walk. Drawn over everything else.
+    // Where the line meets Ironbill when it's out of the water (its mouth, 11 px along its heading from its middle, as DrawMarlin
+    // draws it), so the line follows the leap, the charge and the tail-walk instead of staying in the water (1.48). Null while
+    // it's under, when the line ends at fish.Bx/By as before.
+    (float x, float y)? IronbillLineEnd(float t)
+    {
+        var b = ironbill;
+        if (b == null || !IronbillOnLine || OldArt || reel == null) return null;
+        float dirX = MathF.Cos(IronbillHeading()) >= 0 ? 1 : -1;
+        float x = fish.Bx, y = fish.By, cx, cy, a;
+        if (reel.Leap > 0)
+        {
+            float k = 1 - reel.Leap / reel.LeapLen;
+            cx = x + (k - 0.5f) * 56 * dirX; cy = y - MathF.Sin(k * MathF.PI) * 34;
+            float pitch = 1.05f * (1 - 2 * k);
+            a = dirX > 0 ? -pitch : MathF.PI + pitch;
+        }
+        else if (b.ChargeT > 0)
+        {
+            float k = 1 - b.ChargeT / ChargeLen;
+            a = MathF.Atan2(b.Cy1 - b.Cy0, b.Cx1 - b.Cx0);
+            cx = x; cy = y - MathF.Sin(k * MathF.PI) * 8;
+        }
+        else if (b.Walk > 0)
+        {
+            float shake = MathF.Sin(t * 26) * 0.16f, bob = MathF.Abs(MathF.Sin(t * 13)) * 2;
+            a = dirX > 0 ? -1.32f + shake : MathF.PI + 1.32f - shake;
+            cx = x; cy = y - 18 - bob;
+        }
+        else return null;
+        return (cx + MathF.Cos(a) * 11, cy + MathF.Sin(a) * 11);
+    }
+
     void DrawIronbillOver(float t)
     {
         var b = ironbill;

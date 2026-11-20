@@ -71,7 +71,7 @@ partial class Game
     {
         slotInfo = new State[SaveFile.Slots + 1];
         slotBad = new bool[SaveFile.Slots + 1];
-        var face = new Pix(16, 20);
+        var face = new Pix(20, 24);
         for (int n = 1; n <= SaveFile.Slots; n++)
         {
             slotInfo[n] = SaveFile.Read(n);
@@ -79,8 +79,8 @@ partial class Game
             if (slotTex[n].Id != 0) { UnloadTexture(slotTex[n]); slotTex[n] = default; }
             if (slotInfo[n] == null) continue;
             Array.Fill(face.Buf, Color.Blank);
-            LookData.DrawPerson(face, slotInfo[n].look, 8, 18, "down", 0, shadow: false);
-            slotTex[n] = Gfx.ToTexture(face.Buf, 16, 20, TextureFilter.Point);
+            LookData.DrawPerson(face, slotInfo[n].look, 10, 22, "down", 0, shadow: false);
+            slotTex[n] = Gfx.ToTexture(face.Buf, 20, 24, TextureFilter.Point);
         }
         hasSave = SaveFile.Any();
         newestSlot = SaveFile.Newest();
@@ -253,7 +253,7 @@ partial class Game
         Gfx.Rect(px, py, pw, ph, Pal.C("#9fd0e0"), 4);
         Gfx.Rect(px, py + ph - 24, pw, 24, Pal.Sand, 0);
         if (s != null && slotTex[n].Id != 0)
-            DrawTexturePro(slotTex[n], new Rectangle(0, 0, 16, 20), Gfx.S(px + pw / 2 - 40, py + ph - 99, 80, 100), Vector2.Zero, 0, Color.White);
+            DrawTexturePro(slotTex[n], new Rectangle(0, 0, 20, 24), Gfx.S(px + pw / 2 - 40, py + ph - 99, 80, 96), Vector2.Zero, 0, Color.White);
         else Gfx.TextCenter(slotBad[n] ? "!" : "?", px + pw / 2, py + ph / 2 - 24, FontKind.Ui700, 40, Pal.C("rgba(16,36,58,0.35)"));
         float tx = px + pw + 18, ty = y + 14;
         Gfx.Text(s != null && s.slotName is { Length: > 0 } ? $"Slot {n}  ·  {s.look.name}" : $"Slot {n}", tx, ty + 4, FontKind.Ui600, 17, Muted);
@@ -553,8 +553,8 @@ partial class Game
         int li = Array.IndexOf(lengths, d.dayLength);
         d.dayLength = lengths[Pick("Length of a day", lengths.Select(m => m > 0 ? $"{m} min" : "Stopped").ToArray(), li < 0 ? 1 : li)];
         // How much of the world you see: the same pixels, drawn bigger or smaller (Game.ApplyZoom).
-        int zi = Array.IndexOf(ZoomLevels, d.zoom);
-        d.zoom = ZoomLevels[Pick("Zoom", new[] { "Closer", "Normal", "Wider", "Widest" }, zi < 0 ? 1 : zi)];
+        int zi = Array.IndexOf(ZoomLevels, Platform.Touch && d.zoom < 3 ? 3 : d.zoom);   // no Widest on a phone (Photo.cs, WantZoom)
+        d.zoom = ZoomLevels[Pick("Zoom", Platform.Touch ? new[] { "Closer", "Normal", "Wider" } : new[] { "Closer", "Normal", "Wider", "Widest" }, zi < 0 ? 1 : zi)];
         d.clock24 = Pick("Clock", new[] { "12-hour", "24-hour" }, d.clock24 ? 1 : 0) == 1;
         // Clear is Atkinson Hyperlegible, for anyone who finds the pixel and typewriter letters hard to read (Gfx.Clear).
         d.clearFont = Pick("Font", new[] { "Pixel", "Clear (easier to read)" }, d.clearFont ? 1 : 0) == 1;

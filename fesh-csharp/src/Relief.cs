@@ -42,7 +42,7 @@ partial class Game
 
     Terrain TerrainOfTile(int tx, int ty)
     {
-        if (OldGround || tx >= MlStart) return null;
+        if (OldGround || tx >= MlStart || PhWorld) return null;
         switch (biome[ty, tx])
         {
             case 5:
@@ -89,7 +89,7 @@ partial class Game
     // Bakes the height for every tile on or beside land (RenderBase, after ComputeDepth).
     void BakeRelief()
     {
-        relief ??= new float[PW * PH];
+        relief ??= new float[bufW * bufH];
         Array.Clear(relief);
         terrainAt ??= new Terrain[ROWS, COLS];
         for (int ty = 0; ty < ROWS; ty++)
@@ -105,11 +105,11 @@ partial class Game
                         if (landDist[j, i] > 0) { near = true; break; }
                 if (!near) continue;
                 for (int py = 0; py < T; py++)
-                    for (int px = 0; px < T; px++) relief[(ty * T + py) * PW + tx * T + px] = GenHeight(tx * T + px, ty * T + py, p);
+                    for (int px = 0; px < T; px++) if (InBuf(tx * T + px, ty * T + py)) relief[BI(tx * T + px, ty * T + py)] = GenHeight(tx * T + px, ty * T + py, p);
             }
     }
 
-    float Rel(int wx, int wy) => relief == null || wx < 0 || wy < 0 || wx >= PW || wy >= PH ? 0 : relief[wy * PW + wx];
+    float Rel(int wx, int wy) => relief == null || !InBuf(wx, wy) ? 0 : relief[BI(wx, wy)];
 
     // Light from the north-west on that height, in -0.45..0.45.
     float ReliefShadeAt(int wx, int wy, Terrain p)

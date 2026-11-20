@@ -290,6 +290,7 @@ partial class Game
 
     Target HabagatTarget()
     {
+        if (PhWorld) return null;   // the original world's (PhMap.cs)
         if (scene != "world" || Aboard || player.Y < (HabagatTop - 1) * T || player.X >= EastStart * T) return null;
         foreach (var n in HabagatFolk)
         {
@@ -454,12 +455,14 @@ partial class Game
     {
         int x = (int)MathF.Round(s.X), y = (int)MathF.Round(s.Y), bob = s.Moving ? 0 : (int)(time % 3 / 2);
         var (skin, hair, shirt, pants, longHair, hat) = FolkLook(id);
+        if (id == "rosa" && !LookData.OldPeople) hat = 6;   // her wide salakot, as a real hat on the new figure
         string chore = ChoreNow(id, x, y, s.Face, s.Moving);
         var hands = chore != null ? ChoreHands(chore, x, y, s.Face) : default;
-        LookData.DrawFigure(pix, skin, hair, shirt, pants, longHair, hat, "#e04b3a", x, y, s.Face, s.Step, bob: bob,
+        LookData.TurnFrom = chore == null ? s.Turning : null;
+        LookData.DrawFigure(pix, skin, hair, shirt, pants, longHair, hat, hat == 6 ? null : "#e04b3a", x, y, s.Face, s.Step, bob: bob,
             blink: (time + x * 0.01f) % 4.1f < 0.12f, arms: chore != null ? 4 : 0, hand: chore != null ? hands.hand : null, hand2: chore != null ? hands.hand2 : null);
         if (chore != null) DrawChoreProp(chore, x, y, s.Face);
-        if (id == "rosa")
+        if (id == "rosa" && LookData.OldPeople)
         {
             // A wide salakot against the sun.
             int up = bob + (s.Step is 2 or 4 ? 1 : 0);
@@ -574,6 +577,7 @@ partial class Game
     // wet; in the rain they're flooded.
     void DrawSaltBeds(bool live = true)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (live && (Math.Abs(SaltBedX - player.X) > W + 80 || Math.Abs(SaltBedY - player.Y) > H + 60)) return;
         int X = (int)SaltBedX, Y = (int)SaltBedY;
         bool wet = state.weather != "clear" || RainedToday, raked = RakedToday;

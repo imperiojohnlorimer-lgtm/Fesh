@@ -38,6 +38,8 @@ partial class Game
         bool near = Dist(player.X, player.Y, PipX, PipY + 12) < 42;
         var s = pipWalk;
         int x = (int)MathF.Round(s.X == 0 ? PipX : s.X);
+        LookData.TurnFrom = near ? null : s.Turning;
+        LookData.TurnFrom = near ? null : s.Turning;
         LookData.DrawPerson(pix, PipLook, x, (int)PipY, near ? "down" : s.Face, s.Step,
             bob: !s.Moving && (time + 0.4f) % 2.6f > 1.6f ? 1 : 0, blink: (time + 2.1f) % 4.3f < 0.13f, arms: near ? 1 : 0, swing: near ? (int)(time * 4) % 2 : 0);
     }

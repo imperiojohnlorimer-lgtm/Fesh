@@ -32,8 +32,8 @@ TONES = {
 W, H = 80, 80
 LIFT = 42              # the model's centre sits LIFT rows up, so every stored height is positive
 HX, L = 24.0, 46.0     # snout at x = HX, the tail's tip L px behind it
-UPS = [60, 40, 20, 0, -20, -40, -60]      # nose up (degrees) to nose down
-PHASES = 3
+UPS = list(range(60, -61, -10))   # 1.48: every 10 degrees (was 20), for smoother turns
+PHASES = 6   # 1.48: six steps of the tail (was three)
 OPEN_UPS = [40, 20, 0]
 
 

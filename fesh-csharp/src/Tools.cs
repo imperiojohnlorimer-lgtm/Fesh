@@ -43,9 +43,10 @@ partial class Game
         switch (tool)
         {
             case "sword":
-                // A quick slash from over the shoulder.
-                if (p < 0.12f) return (115, 3, -5, false);
-                if (p < 0.28f) return (Lerp(115, -35, (p - 0.12f) / 0.16f), 4, -5, false);
+                // A quick slash from over the shoulder (1.48: raised higher, so the blade shows above the new, bigger head).
+                if (p < 0.05f) return (50, 3, -5, false);
+                if (p < 0.12f) return (105, 4, -5, false);
+                if (p < 0.28f) return (Lerp(105, -35, (p - 0.12f) / 0.16f), 4, -5, false);
                 if (p < 0.5f) return (-35, 4, -5, false);
                 return (Lerp(-35, -75, (p - 0.5f) / 0.5f), Lerp(4, 3, (p - 0.5f) / 0.5f), -5, false);
             case "fist":
@@ -80,9 +81,12 @@ partial class Game
             default:
                 // An axe, a pickaxe or the agong's mallet: up and back, then down onto the tile in front. The axe
                 // bites and follows through; a pickaxe bounces back off the rock; the mallet springs off the gong.
+                // 1.48: a beat of anticipation, then a wind-up raised high enough that the tool stands up above the new,
+                // bigger head (from 130 degrees and three pixels, where it hid behind the hair and hat).
                 bool two = tool != "mallet";
-                if (p < 0.15f) return (130, 3, -15, two);
-                if (p < 0.3f) return (Lerp(130, -25, (p - 0.15f) / 0.15f), 4, -15, two);
+                if (p < 0.05f) return (60, 3, -15, two);
+                if (p < 0.15f) return (105, 4, -15, two);
+                if (p < 0.3f) return (Lerp(105, -25, (p - 0.15f) / 0.15f), 4, -15, two);
                 if (tool == "pick" && p < 0.55f) return (p < 0.4f ? -25 : 5, 4, -15, two);
                 if (tool == "pick") return (Lerp(5, -70, (p - 0.55f) / 0.45f), Lerp(4, 3, (p - 0.55f) / 0.45f), -15, two);
                 if (tool == "mallet") return (p < 0.4f ? -25 : Lerp(-25, 40, (p - 0.4f) / 0.6f), 4, -15, false);

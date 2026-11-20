@@ -16,6 +16,14 @@ OUT = a[0] if a else "."
 CS = a[1] if len(a) > 1 else None
 os.makedirs(OUT, exist_ok=True)
 PITCH = 16
+# 1.48: trees grew a fifth to stand properly over the new, bigger-headed people (the smallest band, used beside Pip's stall
+# and on high ground, only a little). TREE_GROW=1 renders the 1.47 sizes.
+GROW = float(os.environ.get("TREE_GROW", "1.22"))
+def grown(size, g=None):
+    g = GROW if g is None else g
+    return size * (g if size >= 0.85 else 1 + (g - 1) * 0.35)
+# Palms stand in thick groves on the beaches, and their fronds already spread wide: they grow less, or a grove is a wall.
+PALM_GROW = 1 + (GROW - 1) * 0.4
 
 LEAF = ("#14382a", "#1d5a38", "#2b7a40", "#4a9a42", "#8fcf58")       # outline-dark to sunlit, like the 1.25 oaks
 LEAF2 = ("#123226", "#1a5034", "#266e3b", "#408c3e", "#7cbf50")
@@ -208,11 +216,11 @@ def bush(name, seed, size, shape):
 
 
 for i, (seed, size) in enumerate(((3, 1.0), (7, 1.12), (11, 0.9), (15, 0.7))):
-    oak(f"Oak{i}", seed, size)
+    oak(f"Oak{i}", seed, grown(size))
 for i, (seed, size) in enumerate(((4, 1.0), (8, 1.1), (12, 0.92), (16, 0.72))):
-    palm(f"Palm{i}", seed, size)
+    palm(f"Palm{i}", seed, grown(size, PALM_GROW))
 for i, (seed, size) in enumerate(((5, 1.0), (9, 1.1), (13, 0.9), (17, 0.7))):
-    fir(f"Fir{i}", seed, size)
+    fir(f"Fir{i}", seed, grown(size))
 for i in range(4):
     bush(f"Bush{i}", 20 + i, 1.0 + 0.06 * (i % 2), i)
 

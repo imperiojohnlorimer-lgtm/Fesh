@@ -34,8 +34,8 @@ SPECIAL = "glint"
 W, H = 72, 72
 LIFT = 40
 HX, L = 21.0, 38.0
-UPS = [60, 40, 20, 0, -20, -40, -60]
-PHASES = 3
+UPS = list(range(60, -61, -10))   # 1.48: every 10 degrees (was 20), for smoother turns
+PHASES = 6   # 1.48: six steps of the tail (was three)
 OPEN_UPS = [30, 15]
 ROLLS = [(40, 40), (40, -40), (0, 50)]     # (nose up, roll): shaking its head in a leap, and rolled at the surface
 

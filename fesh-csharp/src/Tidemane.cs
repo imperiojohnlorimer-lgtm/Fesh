@@ -637,6 +637,9 @@ partial class Game
     }
 
     // What the mount under you is doing, for the sprite and the saddle.
+    // How far a gait is between two of its frames, in halves (1.48: twice the frames for every gait).
+    static float GaitSub(float x) => (int)((x - MathF.Floor(x)) * 2) / 2f;
+
     MountPose RidePose()
     {
         var p = new MountPose { Saddle = true, Time = time, Seed = 0.37f, Ridden = true };
@@ -646,9 +649,10 @@ partial class Game
             p.Kind = "swim";
             p.Speed = mountSpeed / 74;
             p.Frame = mountSpeed > 4 ? (int)(mountPhase * 6) % 6 : (int)(time * 2.5f) % 6;
+            p.Sub = GaitSub(mountSpeed > 4 ? mountPhase * 6 : time * 2.5f);
         }
-        else if (mountSpeed > 50) { p.Kind = "gallop"; p.Frame = (int)(mountPhase * 8) % 8; }
-        else if (mountSpeed > 4) { p.Kind = "trot"; p.Frame = (int)(mountPhase * 6) % 6; }
+        else if (mountSpeed > 50) { p.Kind = "gallop"; p.Frame = (int)(mountPhase * 8) % 8; p.Sub = GaitSub(mountPhase * 8); }
+        else if (mountSpeed > 4) { p.Kind = "trot"; p.Frame = (int)(mountPhase * 6) % 6; p.Sub = GaitSub(mountPhase * 6); }
         else p.Toss = IdleToss(time, 0.37f);
         return p;
     }
@@ -906,12 +910,13 @@ partial class Game
             }
             case "run":
             {
-                if (c.Total > CallLimit) { c.Phase = "foam"; c.T = 0; break; }
+                // Too slow: foam. Not while you walk on with it close behind (it was giving up and popping out of foam beside you).
+                if (c.Total > CallLimit && !(player.Moving && Dist(c.X, c.Y, player.X, player.Y) < 160) || c.Total > CallLimit * 4) { c.Phase = "foam"; c.T = 0; break; }
                 // You've moved off, or a storm has come on (or blown over) since it set out: another way.
                 if ((c.Replan -= dt) <= 0 && Dist(player.X, player.Y, c.ToX, c.ToY) > 16 || Stormy != c.Storm) { PlanCall(false); if (call == null || c.Phase != "run") break; }
                 bool swim = Swimmable(TileUnder(c.X, c.Y));
                 float left = Dist(c.X, c.Y, c.ToX, c.ToY);
-                float sp = (swim ? CallSwim : CallRun) * Math.Clamp(left / 18, 0.4f, 1) * dt;
+                float sp = (swim ? CallSwim : CallRun) * Math.Clamp(left / 18, player.Moving ? 1f : 0.4f, 1) * dt;   // no easing in while you walk on
                 float sx = c.X, sy = c.Y;
                 while (sp > 0 && c.Path.Count > 0)
                 {
@@ -925,6 +930,13 @@ partial class Game
                 c.Stride += moved / (swim ? 36 : 46);
                 if (moved > 0.01f) CallFace(mdx, mdy);
                 if (c.Path.Count > 0) break;
+                // Still walking: it keeps at your side instead of pulling up to rear (it used to flash a rear every time it caught up).
+                if (player.Moving)
+                {
+                    c.Speed = 0;
+                    if (Dist(player.X, player.Y, c.ToX, c.ToY) > 10) { PlanCall(false); }
+                    break;
+                }
                 // There: it pulls up beside you, rears and calls.
                 c.Phase = "arrive"; c.T = 0; c.Speed = 0;
                 CallFaceTo(player.X, player.Y);
@@ -1191,12 +1203,12 @@ partial class Game
             face = c.Face; dir = c.Dir;
             if (c.Phase == "breach") { p.Kind = "leap"; p.Leap = MathF.Min(1, c.T / 0.6f); }
             else if (c.Phase == "arrive") { if (swim) p.Kind = "swim"; else { p.Kind = "rear"; p.Frame = (int)(c.T * 6) % 2; } }
-            else if (swim) { p.Kind = "swim"; p.Speed = 1; p.Frame = (int)(c.Stride * 6) % 6; }
-            else { p.Kind = c.Speed > 50 ? "gallop" : "trot"; p.Frame = (int)(c.Stride * (p.Kind == "gallop" ? 8 : 6)) % (p.Kind == "gallop" ? 8 : 6); }
+            else if (swim) { p.Kind = "swim"; p.Speed = 1; p.Frame = (int)(c.Stride * 6) % 6; p.Sub = GaitSub(c.Stride * 6); }
+            else { p.Kind = c.Speed > 50 ? "gallop" : "trot"; p.Frame = (int)(c.Stride * (p.Kind == "gallop" ? 8 : 6)) % (p.Kind == "gallop" ? 8 : 6); p.Sub = GaitSub(c.Stride * (p.Kind == "gallop" ? 8 : 6)); }
         }
         else
         {
-            if (swim) { p.Kind = "swim"; p.Frame = (int)(time * 2.5f) % 6; }
+            if (swim) { p.Kind = "swim"; p.Frame = (int)(time * 2.5f) % 6; p.Sub = GaitSub(time * 2.5f); }
             else p.Toss = IdleToss(time, 0.37f) + (c != null ? 0.5f : 0);
             bool vertical = Math.Abs(player.Y - my) > Math.Abs(player.X - mx);
             dir = player.X < mx ? -1 : 1;
@@ -1239,8 +1251,8 @@ partial class Game
             case "emerge" or "surface": p.Kind = "leap"; p.Leap = MathF.Min(1, b.T / 0.6f); break;
             case "dive": p.Kind = "leap"; p.Leap = MathF.Min(1, b.T / 0.5f); break;
             case "rear" or "stompRear": p.Kind = "rear"; p.Frame = (int)(t * 7) % 2; break;
-            case "charge": p.Kind = "gallop"; p.Frame = (int)(t * 18) % 8; break;
-            case "stalk": p.Kind = "trot"; p.Frame = (int)(t * 10) % 6; break;
+            case "charge": p.Kind = "gallop"; p.Frame = (int)(t * 18) % 8; p.Sub = GaitSub(t * 18); break;
+            case "stalk": p.Kind = "trot"; p.Frame = (int)(t * 10) % 6; p.Sub = GaitSub(t * 10); break;
             case "calm": p.Kind = "lie"; break;
             default: p.Kind = "stand"; p.Toss = b.Phase == "winded" ? 0 : IdleToss(t, 0.11f); break;
         }
@@ -1392,6 +1404,7 @@ partial class Game
     // The Starwell's surface: stars reflected in it, and a soft glow at night.
     void DrawStarwell(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         for (int i = 0; i < 7; i++)
         {
             float a = (float)Pix.Hash(i, 3, 41) * MathF.Tau, r = (float)Pix.Hash(i, 4, 41) * (WellDeep * T - 2);

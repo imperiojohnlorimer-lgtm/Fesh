@@ -98,9 +98,9 @@ def palm_lean(name, seed, size):
 
 # three sizes each, matching the ordinary bands (sizes of the oak and palm sets without the small one)
 for i, (seed, size) in enumerate(((31, 0.9), (35, 1.0), (39, 1.12))):
-    oak_twin(f"OakTwin{i}", seed, size)
+    oak_twin(f"OakTwin{i}", seed, grown(size))
 for i, (seed, size) in enumerate(((32, 0.92), (36, 1.0), (40, 1.1))):
-    palm_lean(f"PalmLean{i}", seed, size)
+    palm_lean(f"PalmLean{i}", seed, grown(size, PALM_GROW))
 
 if CS:
     lines = [

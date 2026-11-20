@@ -265,7 +265,7 @@ partial class Game
             }
         Check($"at impact the axe and pickaxe land on the tile in front ({string.Join("; ", landed)})", landed.Count == 0);
         // Seen from behind, a tool raised overhead shows above you; the blow itself is hidden in front of you.
-        Swing("axe", 0.25f); swingT = 0.25f;
+        Swing("axe", 0.25f); swingT = 0.25f * 0.9f;   // the wind-up (1.48: the first twentieth is a beat of anticipation)
         var up0 = HandsPose("up", 160, 108, false, 0);
         swingT = 0.25f * 0.65f;
         var up1 = HandsPose("up", 160, 108, false, 0);

@@ -28,9 +28,9 @@ partial class Game
         void P(int u, int v, Color c)
         {
             int wx = horiz ? X + u : X + v, wy = horiz ? Y + v : Y + u;
-            if (wx < 0 || wy < 0 || wx >= PW || wy >= PH) return;
+            if (!InBuf(wx, wy)) return;
             if (bridgeClip is var (cx0, cy0, cx1, cy1) && (wx < cx0 || wy < cy0 || wx >= cx1 || wy >= cy1)) return;
-            g.Buf[wy * PW + wx] = c.A == 255 ? c : Pix.Mix(g.Buf[wy * PW + wx], c, c.A / 255f);
+            g.Buf[BI(wx, wy)] = c.A == 255 ? c : Pix.Mix(g.Buf[BI(wx, wy)], c, c.A / 255f);
         }
         int crossIdx = horiz ? ty : tx;
         for (int u = 0; u < T; u++)
@@ -100,9 +100,9 @@ partial class Game
         if (landAfter) Landing(T, 1);
         void P2(int wx, int wy, Color c)
         {
-            if (wx < 0 || wy < 0 || wx >= PW || wy >= PH) return;
+            if (!InBuf(wx, wy)) return;
             if (bridgeClip is var (cx0, cy0, cx1, cy1) && (wx < cx0 || wy < cy0 || wx >= cx1 || wy >= cy1)) return;
-            g.Buf[wy * PW + wx] = c.A == 255 ? c : Pix.Mix(g.Buf[wy * PW + wx], c, c.A / 255f);
+            g.Buf[BI(wx, wy)] = c.A == 255 ? c : Pix.Mix(g.Buf[BI(wx, wy)], c, c.A / 255f);
         }
     }
 }

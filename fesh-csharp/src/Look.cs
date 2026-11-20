@@ -2,7 +2,7 @@ using Raylib_cs;
 
 namespace Fesh;
 
-static class LookData
+static partial class LookData
 {
     public static readonly string[] Skins = { "#f6d3b3", "#f1c27d", "#d9a066", "#a9714b", "#6b4428" };
     public static readonly string[] HairColors = { "#2b1d14", "#6b4a2b", "#c98b3a", "#e8d27a", "#b5523b", "#e8e8e8" };
@@ -54,7 +54,7 @@ static class LookData
     // one from the front or back. Arms hang from here, so a hand placed relative to them stays on the arm.
     // How much taller than the first drawing a person stands (the legs are longer; the head, body and arms are as they were), so
     // they stand properly beside the trees. The shoulders sit this much higher than uy - 7.
-    public const int Stature = 2;
+    public static int Stature => OldPeople ? 2 : 1;   // 1.48: the new figure's big head adds height, so its legs gave one back
     public static (int x, int y) NearShoulder(int ux, int uy, string face) => face switch
     {
         "right" => (ux - 1, uy - 7 - Stature), "left" => (ux, uy - 7 - Stature), _ => (ux + 3, uy - 7 - Stature)
@@ -83,6 +83,9 @@ static class LookData
 
     // The creator's colours are clean and bright (that is what made people look like painted plastic): worn cloth is a little
     // duller and warmer than its dye, so every cloth colour is pulled gently towards an earthy grey-brown.
+    // The new figure (People.cs) is drawn in flat cel-shaded colours, not the old hashed texture.
+    [ThreadStatic] static bool flat;
+
     static string Natural(string hex) => Blend(hex, "#8a7a66", 0.17f);
 
     // Skin in shadow goes warm and a little red, not grey or blue.
@@ -93,6 +96,7 @@ static class LookData
     static void Tex(Pix p, int x, int y, int w, int h, string hex, float amp = 0.06f, float grad = 0f)
     {
         var c = Pal.C(hex);
+        if (flat) { p.Rect(x, y, w, h, c); return; }
         for (int yy = 0; yy < h; yy++)
             for (int xx = 0; xx < w; xx++)
             {
@@ -109,8 +113,23 @@ static class LookData
     // the shoulders.
     public static void DrawFigure(Pix p, string skin, string hair, string shirt, string pants, bool longHair, int hat, string cap,
         int x, int y, string face, int step, bool shadow = true, int bob = 0, bool blink = false, int arms = 0, int swing = 0,
-        int lean = 0, string head = null, (int x, int y)? hand = null, (int x, int y)? hand2 = null, bool armsBehind = false, bool idle = true, bool seated = false)
+        int lean = 0, string head = null, (int x, int y)? hand = null, (int x, int y)? hand2 = null, bool armsBehind = false, bool idle = true, bool seated = false,
+        string beard = null)
     {
+        flat = !OldPeople;
+        if ((OldPeople || seated) && step > 4) step -= 4;   // the old figure has only the four key frames
+        Pix dst = p;
+        if (!OldPeople) p = BeginBody(x, y);
+        // Turning (1.48): a caller that remembers a change of facing (Stroller.Turning) sets TurnFrom just before drawing; for a
+        // moment the head is already round and the body still on its way, through the front for an about-turn.
+        string turned = TurnFrom; TurnFrom = null;
+        if (!OldPeople && !seated && turned != null && turned != face && arms == 0 && head == null)
+        {
+            bool across = (turned is "left" or "right") != (face is "left" or "right");
+            head = face;
+            face = across ? turned : face is "left" or "right" ? "down" : "right";
+        }
+        bool idleScratch = false;
         // Standing about, everyone blinks and now and then glances aside, each on their own beat (they already breathe
         // through the bob their callers pass; you do all this yourself: Game.DrawPlayer passes idle false).
         if (idle && step == 0 && Now > 0 && AutoBlink)
@@ -120,6 +139,13 @@ static class LookData
             if (!blink) blink = (Now + beat * 1.7f) % beat < 0.12f;
             float look = (Now * 0.5f + seed * 0.37f) % 7.5f;
             if (head == null && arms == 0 && face == "down" && look < 0.7f) head = seed % 2 == 0 ? "left" : "right";
+            // 1.48: and every so often taps a foot (facing you or away) or scratches their head, each on their own beat.
+            if (!OldPeople && !seated && arms == 0)
+            {
+                float c = (Now + seed * 0.53f) % 13f;
+                if (c < 1f && face is "down" or "up") step = (int)(Now * 8) % 2 == 0 ? 6 : 0;
+                else if (c is >= 6f and < 7.2f && head == null) idleScratch = true;
+            }
         }
         shirt = Natural(shirt); pants = Natural(pants); if (cap != null) cap = Natural(cap);
         string farPants = Shade(pants, 0.74f), shirtShade = Shade(shirt, 0.84f), hem = Shade(shirt, 0.92f);
@@ -137,14 +163,40 @@ static class LookData
         int ux = side ? x + lean2 * dir : x, uy0 = y - up, uy = uy0 - st;
         // Front and back, walking: the shoulders and head swing a pixel over the foot that carries the weight (the hips don't),
         // and the hair follows a beat behind.
-        int hs = !side && arms == 0 ? (step == 1 ? -1 : step == 3 ? 1 : 0) : 0;
+        int hs = !side && arms == 0 ? (step is 1 or 5 ? -1 : step is 3 or 7 ? 1 : 0) : 0;
         int hx = ux + hs, sh = -hs;
+        if (idleScratch)
+        {
+            int wig = (int)(Now * 10) % 2;
+            arms = 4; hand2 = null;
+            hand = side ? (ux + dir, uy - 16 + wig) : (hx + 4, uy - 14 + wig);
+        }
         // Side views mirror about x - 0.5, the middle of the body. S draws the legs, U the upper body (bob and lean).
         void S(int dx, int dy, int w, int h, string c) => Tex(p, dir > 0 ? x + dx : x - dx - w, y + dy, w, h, c, 0.05f);
         void U(int dx, int dy, int w, int h, string c) => Tex(p, dir > 0 ? ux + dx : ux - dx - w, uy + dy, w, h, c, 0.05f);
 
-        if (shadow) { p.Rect(x - 3, y, 6, 1, "rgba(16,40,44,0.3)"); p.Rect(x - 2, y + 1, 4, 1, "rgba(16,40,44,0.14)"); }
+        if (shadow) { dst.Rect(x - 3, y, 6, 1, "rgba(16,40,44,0.3)"); dst.Rect(x - 2, y + 1, 4, 1, "rgba(16,40,44,0.14)"); }
 
+        if (!OldPeople && !seated)
+        {
+            // The new body (People.cs): hand-pixelled walk frames, with posed arms drawn here over it.
+            var nearS = NearShoulder(ux, uy0 + Stature - st, face); var farS = FarShoulder(ux, uy0 + Stature - st, face);
+            if (arms == 4 && side && hand2 is { } fh) ArmTo(p, farS, fh, Shade(shirt, 0.66f), farSkin);
+            if (arms == 4 && !side && armsBehind) { if (hand is { } bh) ArmTo(p, nearS, bh, shirtShade, skin); if (hand2 is { } bh2) ArmTo(p, farS, bh2, shirtShade, skin); }
+            DrawBodyNew(p, x, y, ux, uy, face, step, arms, hand2 == null, shirt, pants, skin);
+            if (arms == 3)
+            {
+                if (side) { U(0, -7, 1, 1, shirtShade); U(1, -6 + swing, 1, 1, shirtShade); U(2, -6 + swing, 1, 1, skin); }
+                else { p.Rect(ux + 3, uy - 7, 1, 1, shirtShade); p.Rect(ux + 2, uy - 6 + swing, 1, 1, skin); }
+            }
+            else if (arms == 4 && !armsBehind)
+            {
+                if (hand is { } nh) ArmTo(p, nearS, nh, shirtShade, skin);
+                if (!side && hand2 is { } nh2) ArmTo(p, farS, nh2, shirtShade, skin);
+            }
+        }
+        else
+        {
         // Legs, with a darker leather shoe on each foot so the steps read.
         if (side)
         {
@@ -181,7 +233,7 @@ static class LookData
 
         // Arms swing against the legs: a stride on the near leg puts the near arm back.
         int armSwing = arms == 0 ? (step == 1 ? -1 : step == 3 ? 1 : swing) : 0;
-        if (longHair && hf == "up") Tex(p, hx - 3, uy - 11, 6, 6, hair, 0.12f);
+        if (OldPeople && longHair && hf == "up") Tex(p, hx - 3, uy - 11, 6, 6, hair, 0.12f);
         if (side)
         {
             // Profile: the back curves in at the waist, the far arm behind the body and the near arm over it.
@@ -196,6 +248,7 @@ static class LookData
             U(-3, -5 + tl, 5, 1, hem);
             if (arms == 4) { if (hand is { } h) ArmTo(p, NearShoulder(ux, uy0 + Stature - st, face), h, shirtShade, skin); }
             else SideArm(U, arms, armSwing, swing, shirtShade, skin, tl);
+            if (!OldPeople) { U(1, -4 + tl, 1, 1, "#d8b04a"); U(-2, -7, 1, 2, Lighten(shirt, 0.1f)); }
         }
         else
         {
@@ -209,6 +262,12 @@ static class LookData
             Tex(p, ux - 2 + sx, uy - 8, 4, 1, shirt, 0.055f, 0.12f);
             if (face == "down") Tex(p, ux - 1 + sx, uy - 8, 2, 1, skinShade, 0.03f);
             else Tex(p, ux - 1 + sx, uy - 8, 2, 1, shirtShade, 0.05f);
+            if (!OldPeople)
+            {
+                // A collar either side of the neck, a lit left side and a belt buckle (the new figure is cel-shaded).
+                if (face == "down") { p.Rect(ux - 2 + sx, uy - 8, 1, 1, Lighten(shirt, 0.22f)); p.Rect(ux + 1 + sx, uy - 8, 1, 1, Lighten(shirt, 0.12f)); p.Rect(ux - 1 + sx, uy - 7, 1, 1, Lighten(shirt, 0.15f)); p.Rect(ux - 1, uy - 4 + tl, 1, 1, "#d8b04a"); }
+                p.Rect(ux - 2 + sx, uy - 7, 1, 2, Lighten(shirt, 0.1f));
+            }
             if (arms != 4) FrontArms(p, ux + sx, uy, arms, armSwing, swing, shirtShade, skin, tl);
             else if (!armsBehind) ReachArms();
         }
@@ -218,6 +277,16 @@ static class LookData
             if (hand is { } h) ArmTo(p, NearShoulder(ux, uy0 + Stature - st, face), h, shirtShade, skin);
             if (hand2 is { } h2) ArmTo(p, FarShoulder(ux, uy0 + Stature - st, face), h2, shirtShade, skin);
             else { p.Rect(ux - 4, uy - 7, 1, 4 + tl, shirtShade); p.Rect(ux - 4, uy - 3 + tl, 1, 1, skin); }
+        }
+        }
+        if (!OldPeople)
+        {
+            EndBody(dst);
+            DrawHead(dst, hx, uy, hf, skin, hair, longHair, hat, cap, shirt, blink, step, beard);
+            if (arms is 1 or 2) RaisedArms(dst, ux, uy, face, arms, swing, shirtShade, skin);
+            // Hands gripping a tool stay on top: a wind-up lifts them to the height of the bigger head.
+            if (arms == 4 && !armsBehind) { if (hand is { } gh) dst.Rect(gh.x, gh.y, 1, 1, skin); if (hand2 is { } gh2) dst.Rect(gh2.x, gh2.y, 1, 1, skin); }
+            return;
         }
         if (longHair && hf != "up")
         {
@@ -313,6 +382,7 @@ static class LookData
     // holding a rod out in front, or the two-arm and waving poses.
     static void SideArm(Action<int, int, int, int, string> U, int arms, int armSwing, int pump, string sleeve, string skin, int tl = 0)
     {
+        if (!OldPeople && arms is 1 or 2) return;   // drawn over the new, bigger head (RaisedArms)
         if (arms == 2) { U(-1, -11, 1, 4, sleeve); U(-1, -12, 1, 1, skin); return; }
         if (arms == 3) { U(0, -7, 1, 1, sleeve); U(1, -6 + pump, 1, 1, sleeve); U(2, -6 + pump, 1, 1, skin); return; }
         if (arms == 1) { U(0, -9, 1, 2, sleeve); U(pump & 1, -10, 1, 1, skin); return; }
@@ -324,6 +394,8 @@ static class LookData
     // Front and back views: an arm each side. A swing lifts one hand and lowers the other.
     static void FrontArms(Pix p, int x, int u, int arms, int armSwing, int pump, string sleeve, string skin, int tl = 0)
     {
+        if (!OldPeople && arms == 2) return;
+        if (!OldPeople && arms == 1) { p.Rect(x - 4, u - 7, 1, 4 + tl, sleeve); p.Rect(x - 4, u - 3 + tl, 1, 1, skin); return; }
         if (arms == 2)
         {
             foreach (int ax in new[] { x - 4, x + 3 }) { p.Rect(ax, u - 11, 1, 4, sleeve); p.Rect(ax, u - 12, 1, 1, skin); }

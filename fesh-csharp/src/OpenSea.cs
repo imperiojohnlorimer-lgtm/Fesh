@@ -37,7 +37,7 @@ partial class Game
     }
 
     // Which sea you're on: Amihan's to the east, Habagat's along the bottom of the map, the open sea between.
-    string SeaSpotHere => SeaSpotAt(player.X, player.Y);
+    string SeaSpotHere => PhWorld ? "ph:sea" : SeaSpotAt(player.X, player.Y);
 
     // The open-sea target: whichever sea you're in, aimed at the fish. Nothing is fished inside the sanctuary.
     Target SeaTarget()
@@ -74,6 +74,7 @@ partial class Game
                 fishing.Alt2Type = fishing.Alt2Label = null;   // no spearfishing from a boat
                 break;
             }
+        if (fishing == null && PhSpotTarget(true) is Target phSpot) fishing = phSpot;
         if (fishing == null && SeaTarget() is Target sea)
         {
             fishing = sea;

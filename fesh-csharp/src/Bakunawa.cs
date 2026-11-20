@@ -370,6 +370,7 @@ partial class Game
 
     void DrawEclipse(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         var e = eclipse;
         if (e == null) return;
         float k = e.Rise;
@@ -461,6 +462,7 @@ partial class Game
     // The agong over your head, and the beat ring closing on it: strike as they meet.
     void DrawEclipseRing()
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (eclipse?.Phase != "bang") return;
         var e = eclipse;
         float ph = e.Beat / BeatLen;
@@ -479,6 +481,7 @@ partial class Game
     // During the eclipse the moonlight goes out: a deep red tint over everything, lifting as the moon comes back.
     void DrawEclipseSky()
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (eclipse == null) return;
         float k = eclipse.Phase == "spit" ? Math.Max(0, 1 - eclipse.T / 2) : eclipse.Phase == "rise" ? eclipse.Rise : 1;
         if (k > 0) pix.Fill(0, 0, W, H, Pal.Rgba(110, 14, 26, 0.36f * k));
@@ -499,7 +502,7 @@ partial class Game
         bool up = eclipse.Phase == "bang" && (eclipse.Beat / BeatLen + id.Length * 0.13f) % 1 < 0.4f;
         LookData.DrawFigure(pix, skin, hair, shirt, pants, longHair, hat, "#e04b3a", x, y, "up", 0, arms: up ? 2 : 0);
         // A pot (or a pan) held up in both hands.
-        int py = up ? y - 15 - LookData.Stature : y - 7 - LookData.Stature;
+        int py = up ? y - 15 - LookData.Stature - (LookData.OldPeople ? 0 : 4) : y - 7 - LookData.Stature;
         pix.Rect(x - 2, py, 5, 2, id == "pacing" ? "#b5764a" : "#8a8f93");
         pix.Rect(x - 1, py - 1, 3, 1, "#b4b9bc");
         if (up && eclipse.Beat < 0.12f) { pix.Rect(x - 4, py - 2, 1, 1, "#ffe8a0"); pix.Rect(x + 4, py - 3, 1, 1, "#ffe8a0"); }
@@ -525,6 +528,7 @@ partial class Game
     // The lighthouse beam sweeping round after dark.
     void LightParola(float t)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (state.parola < 3 || Math.Abs(LighthouseX - player.X) > 420 || Math.Abs(LighthouseY - player.Y) > 300) return;
         float lx = LighthouseX, ly = LighthouseY - LampRise, a = t * 0.7f;
         LightHole(lx, ly, 18, 0.95f);
@@ -535,6 +539,7 @@ partial class Game
     // The lamp, and the beam itself: a pale shaft sweeping out over the water.
     void GlowParola(float t, float k)
     {
+        if (PhWorld) return;   // the original world's (PhMap.cs)
         if (state.parola < 3 || Math.Abs(LighthouseX - player.X) > 420 || Math.Abs(LighthouseY - player.Y) > 300) return;
         float lx = LighthouseX, ly = LighthouseY - LampRise, a = t * 0.7f;
         LightGlow(lx, ly, 14, 255, 226, 138, 0.45f * k, 0.8f * k);

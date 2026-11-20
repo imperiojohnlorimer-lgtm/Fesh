@@ -44,7 +44,7 @@ partial class Game
     {
         var keep = pix;
         bool keepOld = OldArt;
-        var sheet = new Pix(W, H);
+        var sheet = new Pix(180, 160);   // not the view size, which follows the zoom setting
         pix = sheet;
         Array.Fill(sheet.Buf, Pal.C("#86b86a"));
         foreach (bool old in new[] { true, false })
@@ -64,7 +64,7 @@ partial class Game
         int w = 180, h = 160;
         var img = Raylib.GenImageColor(w, h, Color.Black);
         for (int yy = 0; yy < h; yy++)
-            for (int xx = 0; xx < w; xx++) Raylib.ImageDrawPixel(ref img, xx, yy, sheet.Buf[yy * W + xx]);
+            for (int xx = 0; xx < w; xx++) Raylib.ImageDrawPixel(ref img, xx, yy, sheet.Buf[yy * sheet.W + xx]);
         Raylib.ImageResizeNN(ref img, w * 6, h * 6);
         Raylib.ExportImage(img, path.Replace(".png", "-buildings.png"));
         Raylib.UnloadImage(img);

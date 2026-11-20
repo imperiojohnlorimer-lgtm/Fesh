@@ -30,7 +30,8 @@ partial class Game
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "Fesh"));
 
     // The zoom the view should have: photo mode's own, else the setting.
-    int WantZoom => mode == "photo" && photoZoom is >= 2 and <= 5 ? photoZoom : Settings.Data.zoom;
+    // On a phone the widest zoom (640x360 pixels drawn in software, four times the normal view) is too slow, so it stops at Wider.
+    int WantZoom => Math.Max(Platform.Touch ? 3 : 2, mode == "photo" && photoZoom is >= 2 and <= 5 ? photoZoom : Settings.Data.zoom);
 
     void OpenPhoto()
     {
@@ -61,7 +62,7 @@ partial class Game
     {
         // ZoomLevels runs closest first (5, 4, 3, 2): +1 is closer.
         int i = Array.IndexOf(ZoomLevels, photoZoom is >= 2 and <= 5 ? photoZoom : ViewK);
-        i = Math.Clamp(i - d, 0, ZoomLevels.Length - 1);
+        i = Math.Clamp(i - d, 0, ZoomLevels.Length - (Platform.Touch ? 2 : 1));
         if (ZoomLevels[i] != photoZoom) { photoZoom = ZoomLevels[i]; Sfx.Play("ui"); }
     }
 

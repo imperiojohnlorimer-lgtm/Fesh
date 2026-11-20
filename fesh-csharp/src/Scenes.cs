@@ -6,8 +6,8 @@ namespace Fesh;
 partial class Game
 {
     string scene = "world";
-    readonly char[,] worldMap;
-    readonly Pix worldBase;
+    char[,] worldMap;
+    Pix worldBase;
 
     // Tomas's hut comes furnished, and you can use his workbench, stove and bed.
     static readonly List<Build> TomasRoom = new()
